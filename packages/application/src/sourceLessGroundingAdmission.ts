@@ -1,0 +1,433 @@
+import type { GeneratedGroundingBundle, GroundingAdmissionContext } from "@lrnki/domain-core";
+import { STAGE_TAGS } from "@lrnki/domain-core";
+import type {
+  ClaimFactualityJudgmentPort,
+  ClaimVerificationAnsweringPort,
+  ClaimVerificationQuestionPlanningPort,
+  GroundingGenerationPort,
+  KnowledgeBoundaryProbePort,
+  NodeEmbeddingPort
+} from "@lrnki/ports";
+import {
+  createClaimAdmission,
+  type ClaimJudgment,
+  type PositiveClaimTarget
+} from "./claimAdmission";
+import {
+  DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG,
+  probeKnowledgeBoundary,
+  validateKnowledgeBoundaryProbeConfig,
+  type KnowledgeBoundaryProbeConfig,
+  type KnowledgeBoundaryVerdict
+} from "./knowledgeBoundaryProbe";
+import { mapWithConcurrency } from "./mapWithConcurrency";
+import type { StageBracket } from "./runProgressReporter";
+
+export type GroundingAdmissionCandidate = Readonly<{
+  candidateKey: string;
+  canonicalLabel: string;
+  declaredDomain: string;
+  context: GroundingAdmissionContext;
+}>;
+
+export type CoreProbeSummary = Readonly<{
+  disposition: "core_knowledge";
+  agreementScore: number;
+  rationale: string;
+}>;
+
+export type BoundaryProbeSummary = Readonly<{
+  disposition: "boundary";
+  agreementScore: number;
+  rationale: string;
+}>;
+
+export type GroundingAdmissionOutcome =
+  | Readonly<{
+      candidateKey: string;
+      disposition: "admitted";
+      probe: CoreProbeSummary;
+      bundle: GeneratedGroundingBundle;
+    }>
+  | Readonly<{
+      candidateKey: string;
+      disposition: "held_out";
+      reason: "knowledge_boundary";
+      probe: BoundaryProbeSummary;
+    }>
+  | Readonly<{
+      candidateKey: string;
+      disposition: "rejected";
+      reason: "grounding_verification_exhausted";
+      probe: CoreProbeSummary;
+      rationale: string;
+    }>;
+
+export interface SourceLessGroundingAdmission {
+  forOperation(stage: StageBracket): {
+    admitBatch(candidates: readonly GroundingAdmissionCandidate[]): Promise<readonly GroundingAdmissionOutcome[]>;
+  };
+}
+
+export type SourceLessGroundingAdmissionPolicy = Readonly<{
+  probe: KnowledgeBoundaryProbeConfig;
+  groundingDraftAttempts: number;
+  verificationSampleCount: number;
+  verificationDecision: "same_model_replicated_rejection";
+  verificationRejectionSampleQuorum: number;
+  groundingClaimProjection: "sentence_and_semicolon";
+  judgmentTargetBatchSize: 1;
+  candidateConcurrency: number;
+  verificationConcurrency: number;
+}>;
+
+export const DEFAULT_SOURCE_LESS_GROUNDING_ADMISSION_POLICY: SourceLessGroundingAdmissionPolicy = {
+  probe: DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG,
+  groundingDraftAttempts: 2,
+  verificationSampleCount: 3,
+  verificationDecision: "same_model_replicated_rejection",
+  verificationRejectionSampleQuorum: 2,
+  groundingClaimProjection: "sentence_and_semicolon",
+  judgmentTargetBatchSize: 1,
+  candidateConcurrency: 8,
+  verificationConcurrency: 4
+};
+
+export function createSourceLessGroundingAdmission(construction: {
+  knowledgeBoundaryProbe: KnowledgeBoundaryProbePort;
+  embedding: NodeEmbeddingPort;
+  groundingGeneration: GroundingGenerationPort;
+  claimVerificationQuestionPlanning: ClaimVerificationQuestionPlanningPort;
+  claimVerificationAnswering: ClaimVerificationAnsweringPort;
+  claimFactualityJudgments: readonly [ClaimFactualityJudgmentPort, ClaimFactualityJudgmentPort];
+  policy?: SourceLessGroundingAdmissionPolicy;
+}): SourceLessGroundingAdmission {
+  const policy = construction.policy ?? DEFAULT_SOURCE_LESS_GROUNDING_ADMISSION_POLICY;
+  validatePolicy(policy);
+  const claimAdmission = createClaimAdmission({
+    questionPlanning: construction.claimVerificationQuestionPlanning,
+    answering: construction.claimVerificationAnswering,
+    factualityJudgments: construction.claimFactualityJudgments,
+    verificationSampleCount: policy.verificationSampleCount,
+    verificationDecision: policy.verificationDecision,
+    verificationRejectionSampleQuorum: policy.verificationRejectionSampleQuorum,
+    judgmentTargetBatchSize: policy.judgmentTargetBatchSize,
+    verificationConcurrency: policy.verificationConcurrency
+  });
+
+  return {
+    forOperation(stage) {
+      const operationClaims = claimAdmission.forOperation(stage);
+      return {
+        async admitBatch(candidates) {
+          if (candidates.length === 0) return [];
+          validateCandidates(candidates);
+
+          const probed = await stage(STAGE_TAGS.knowledgeBoundaryProbe, () =>
+            mapWithConcurrency(candidates, policy.candidateConcurrency, async (candidate) => ({
+              candidate,
+              verdict: await probeKnowledgeBoundary({
+                conceptLabel: candidate.canonicalLabel,
+                declaredDomain: candidate.declaredDomain,
+                probe: construction.knowledgeBoundaryProbe,
+                embedding: construction.embedding,
+                config: policy.probe
+              })
+            })), candidates.length
+          );
+
+          const outcomeByKey = new Map<string, GroundingAdmissionOutcome>();
+          const core = probed.filter(isCoreProbe);
+          for (const { candidate, verdict } of probed) {
+            if (verdict.disposition === "boundary") {
+              outcomeByKey.set(candidate.candidateKey, {
+                candidateKey: candidate.candidateKey,
+                disposition: "held_out",
+                reason: "knowledge_boundary",
+                probe: probeSummary(verdict)
+              });
+            }
+          }
+
+          const rejectionByKey = new Map<string, string>();
+          let pending = core;
+          for (let attempt = 0; attempt < policy.groundingDraftAttempts && pending.length > 0; attempt += 1) {
+            const drafts = await stage(STAGE_TAGS.groundingGeneration, () =>
+              mapWithConcurrency(pending, policy.candidateConcurrency, async ({ candidate, verdict }) => {
+                const bundle = await construction.groundingGeneration.generate({
+                  declaredDomain: candidate.declaredDomain,
+                  canonicalLabel: candidate.canonicalLabel,
+                  context: candidate.context,
+                  rejectionFeedback: rejectionByKey.get(candidate.candidateKey)
+                });
+                validateGeneratedBundle(candidate, bundle);
+                return { candidate, verdict, bundle };
+              }), pending.length
+            );
+
+            const claimResults = await operationClaims.admitBatch(drafts.map(({ candidate, bundle }) => ({
+              candidateKey: candidate.candidateKey,
+              canonicalLabel: candidate.canonicalLabel,
+              declaredDomain: candidate.declaredDomain,
+              context: candidate.context,
+              targets: groundingTargets(bundle, policy.groundingClaimProjection)
+            })));
+            const judgmentsByKey = new Map(claimResults.map((result) => [result.candidateKey, result.judgments] as const));
+
+            const rejected: typeof pending = [];
+            for (const draft of drafts) {
+              const judgments = judgmentsByKey.get(draft.candidate.candidateKey);
+              if (!judgments) {
+                throw new Error(`Claim admission omitted candidateKey ${JSON.stringify(draft.candidate.candidateKey)}.`);
+              }
+              const settled = settleGroundingBundle(draft.bundle, judgments);
+              if (settled.disposition === "rejected") {
+                rejectionByKey.set(draft.candidate.candidateKey, settled.rationale);
+                rejected.push({ candidate: draft.candidate, verdict: draft.verdict });
+                continue;
+              }
+              outcomeByKey.set(draft.candidate.candidateKey, {
+                candidateKey: draft.candidate.candidateKey,
+                disposition: "admitted",
+                probe: probeSummary(draft.verdict),
+                bundle: settled.bundle
+              });
+            }
+            pending = rejected;
+          }
+
+          for (const { candidate, verdict } of pending) {
+            outcomeByKey.set(candidate.candidateKey, {
+              candidateKey: candidate.candidateKey,
+              disposition: "rejected",
+              reason: "grounding_verification_exhausted",
+              probe: probeSummary(verdict),
+              rationale: rejectionByKey.get(candidate.candidateKey) ?? "Every generated Definition Passage was rejected."
+            });
+          }
+
+          return candidates.map((candidate) => {
+            const outcome = outcomeByKey.get(candidate.candidateKey);
+            if (!outcome) {
+              throw new Error(`Source-less Grounding Admission produced no outcome for ${JSON.stringify(candidate.candidateKey)}.`);
+            }
+            return outcome;
+          });
+        }
+      };
+    }
+  };
+}
+
+function isCoreProbe(entry: {
+  candidate: GroundingAdmissionCandidate;
+  verdict: KnowledgeBoundaryVerdict;
+}): entry is { candidate: GroundingAdmissionCandidate; verdict: KnowledgeBoundaryVerdict & { disposition: "core_knowledge" } } {
+  return entry.verdict.disposition === "core_knowledge";
+}
+
+function probeSummary(verdict: KnowledgeBoundaryVerdict & { disposition: "core_knowledge" }): CoreProbeSummary;
+function probeSummary(verdict: KnowledgeBoundaryVerdict & { disposition: "boundary" }): BoundaryProbeSummary;
+function probeSummary(verdict: KnowledgeBoundaryVerdict): CoreProbeSummary | BoundaryProbeSummary {
+  return {
+    disposition: verdict.disposition,
+    agreementScore: verdict.agreementScore,
+    rationale: verdict.rationale
+  } as CoreProbeSummary | BoundaryProbeSummary;
+}
+
+function groundingTargets(
+  bundle: GeneratedGroundingBundle,
+  projection: SourceLessGroundingAdmissionPolicy["groundingClaimProjection"]
+): readonly PositiveClaimTarget[] {
+  if (projection !== "sentence_and_semicolon") {
+    throw new Error("Source-less Grounding Admission received an unknown groundingClaimProjection.");
+  }
+  return [
+    ...bundle.definitions.flatMap((passage, passageIndex) =>
+      splitGroundingClaims(passage.text).map((text, claimIndex) => ({
+        targetKey: `definition:${passageIndex}:claim:${claimIndex}`,
+        // Grounding Generation is contracted to put the defining condition first. Requiring every
+        // later sentence or semicolon clause to define the candidate would incorrectly reject true
+        // consequences and examples that follow an already complete definition.
+        targetPurpose: claimIndex === 0 ? "definition" as const : "support" as const,
+        text
+      }))
+    ),
+    ...bundle.mentions.flatMap((passage, passageIndex) =>
+      splitGroundingClaims(passage.text).map((text, claimIndex) => ({
+        targetKey: `mention:${passageIndex}:claim:${claimIndex}`,
+        targetPurpose: "support" as const,
+        text
+      }))
+    )
+  ];
+}
+
+const sentenceSegmenter = new Intl.Segmenter("en", { granularity: "sentence" });
+
+// Punctuation is projection structure, never a factuality gate. Sentence boundaries and explicit
+// semicolons produce smaller claim targets so a true neighboring clause cannot mask a false one;
+// the original passage remains the only learner text and is settled atomically below.
+function splitGroundingClaims(text: string): string[] {
+  const claims = [...sentenceSegmenter.segment(text)]
+    .flatMap(({ segment }) => segment.split(";"))
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+  if (claims.length === 0) {
+    throw new Error("Source-less Grounding Admission could not project a generated passage into claims.");
+  }
+  return claims;
+}
+
+function settleGroundingBundle(
+  draft: GeneratedGroundingBundle,
+  judgments: readonly ClaimJudgment[]
+): { disposition: "admitted"; bundle: GeneratedGroundingBundle } | { disposition: "rejected"; rationale: string } {
+  const rejected = new Map(
+    judgments
+      .filter((judgment) => judgment.disposition === "rejected")
+      .map((judgment) => [judgment.targetKey, judgment.rationale] as const)
+  );
+  const definitions = draft.definitions.filter((_, index) =>
+    ![...rejected.keys()].some((targetKey) => targetKey.startsWith(`definition:${index}:claim:`))
+  );
+  if (definitions.length === 0) {
+    return {
+      disposition: "rejected",
+      rationale: boundedRejectionFeedback(judgments)
+    };
+  }
+  const mentions = draft.mentions.filter((_, index) =>
+    ![...rejected.keys()].some((targetKey) => targetKey.startsWith(`mention:${index}:claim:`))
+  );
+  return {
+    disposition: "admitted",
+    // Settlement is monotonic: retain original passage objects in original order and change no
+    // model/provenance/rationale metadata. The judgment port never receives authority to rewrite.
+    bundle: { ...draft, definitions, mentions }
+  };
+}
+
+function boundedRejectionFeedback(judgments: readonly ClaimJudgment[]): string {
+  const reasons = judgments
+    .filter((judgment) => judgment.disposition === "rejected")
+    .map((judgment) => `${judgment.targetKey}: ${judgment.rationale}`)
+    .join(" ");
+  const guidance = "Panel rationales may conflict and are not correction authority. Re-derive one internally consistent account; omit optional disputed detail rather than copying a proposed replacement. ";
+  return `${guidance}${reasons || "Every generated Definition Passage was rejected."}`.slice(0, 2_000);
+}
+
+function validatePolicy(policy: SourceLessGroundingAdmissionPolicy): void {
+  requireExactKeys(policy, ["probe", "groundingDraftAttempts", "verificationSampleCount", "verificationDecision", "verificationRejectionSampleQuorum", "groundingClaimProjection", "judgmentTargetBatchSize", "candidateConcurrency", "verificationConcurrency"], "policy");
+  validateKnowledgeBoundaryProbeConfig(policy.probe);
+  for (const [name, value] of [
+    ["groundingDraftAttempts", policy.groundingDraftAttempts],
+    ["verificationSampleCount", policy.verificationSampleCount],
+    ["verificationRejectionSampleQuorum", policy.verificationRejectionSampleQuorum],
+    ["candidateConcurrency", policy.candidateConcurrency],
+    ["verificationConcurrency", policy.verificationConcurrency]
+  ] as const) {
+    if (!Number.isInteger(value) || value < 1) {
+      throw new Error(`Source-less Grounding Admission ${name} must be a positive integer.`);
+    }
+  }
+  if (policy.verificationSampleCount < 2) {
+    throw new Error("Source-less Grounding Admission verificationSampleCount must be an integer of at least 2.");
+  }
+  if (policy.verificationDecision !== "same_model_replicated_rejection") {
+    throw new Error("Source-less Grounding Admission received an unknown verificationDecision.");
+  }
+  if (policy.verificationRejectionSampleQuorum < 2
+    || policy.verificationRejectionSampleQuorum > policy.verificationSampleCount) {
+    throw new Error(`Source-less Grounding Admission verificationRejectionSampleQuorum must be an integer from 2 through ${policy.verificationSampleCount}.`);
+  }
+  if (policy.judgmentTargetBatchSize !== 1) {
+    throw new Error("Source-less Grounding Admission judgmentTargetBatchSize must be exactly 1.");
+  }
+  if (policy.groundingClaimProjection !== "sentence_and_semicolon") {
+    throw new Error("Source-less Grounding Admission groundingClaimProjection must be sentence_and_semicolon.");
+  }
+}
+
+function validateCandidates(candidates: readonly GroundingAdmissionCandidate[]): void {
+  const keys = new Set<string>();
+  for (const candidate of candidates) {
+    requireExactKeys(candidate, ["candidateKey", "canonicalLabel", "declaredDomain", "context"], "candidate");
+    requireNonEmptyString(candidate.candidateKey, "candidateKey");
+    requireNonEmptyString(candidate.canonicalLabel, `canonicalLabel for ${candidate.candidateKey}`);
+    requireNonEmptyString(candidate.declaredDomain, `declaredDomain for ${candidate.candidateKey}`);
+    if (keys.has(candidate.candidateKey)) {
+      throw new Error(`Source-less Grounding Admission received duplicate candidateKey ${JSON.stringify(candidate.candidateKey)}.`);
+    }
+    keys.add(candidate.candidateKey);
+    validateContext(candidate.candidateKey, candidate.context);
+  }
+}
+
+function validateContext(candidateKey: string, context: GroundingAdmissionContext): void {
+  if (typeof context !== "object" || context === null || Array.isArray(context)) {
+    throw new Error(`Source-less Grounding Admission received malformed context for ${candidateKey}.`);
+  }
+  if (context.kind === "originating_topic") {
+    requireExactKeys(context, ["kind", "topic"], `originating-topic context for ${candidateKey}`);
+    requireNonEmptyString(context.topic, `originating topic for ${candidateKey}`);
+    return;
+  }
+  if (context.kind === "scaffolded_anchor") {
+    requireExactKeys(context, ["kind", "anchor"], `scaffolded-anchor context for ${candidateKey}`);
+    requireExactKeys(context.anchor, ["reference", "canonicalLabel", "definitionPassages"], `anchor for ${candidateKey}`);
+    requireNonEmptyString(context.anchor.reference, `anchor reference for ${candidateKey}`);
+    requireNonEmptyString(context.anchor.canonicalLabel, `anchor canonicalLabel for ${candidateKey}`);
+    if (!Array.isArray(context.anchor.definitionPassages) || context.anchor.definitionPassages.length === 0) {
+      throw new Error(`Source-less Grounding Admission requires an anchor Definition Passage for ${candidateKey}.`);
+    }
+    for (const passage of context.anchor.definitionPassages) {
+      requireNonEmptyString(passage, `anchor Definition Passage for ${candidateKey}`);
+    }
+    return;
+  }
+  throw new Error(`Source-less Grounding Admission received unknown context kind for ${candidateKey}.`);
+}
+
+function validateGeneratedBundle(candidate: GroundingAdmissionCandidate, bundle: GeneratedGroundingBundle): void {
+  requireExactKeys(bundle, [
+    "groundingOrigin",
+    "definitions",
+    "mentions",
+    "groundingAnchorReferences",
+    "generatingModel",
+    "rationale"
+  ], `Generated Grounding Bundle for ${candidate.candidateKey}`);
+  if (bundle.groundingOrigin !== "llm_grounded") {
+    throw new Error(`Grounding Generation returned a non-generated origin for ${candidate.candidateKey}.`);
+  }
+  if (!Array.isArray(bundle.definitions) || bundle.definitions.length === 0 || !Array.isArray(bundle.mentions)) {
+    throw new Error(`Grounding Generation returned no Definition Passage for ${candidate.candidateKey}.`);
+  }
+  requireNonEmptyString(bundle.generatingModel, `generatingModel for ${candidate.candidateKey}`);
+  requireNonEmptyString(bundle.rationale, `Grounding Bundle rationale for ${candidate.candidateKey}`);
+  const expectedReferences = candidate.context.kind === "scaffolded_anchor" ? [candidate.context.anchor.reference] : [];
+  if (!Array.isArray(bundle.groundingAnchorReferences)
+    || bundle.groundingAnchorReferences.length !== expectedReferences.length
+    || bundle.groundingAnchorReferences.some((reference, index) => reference !== expectedReferences[index])) {
+    throw new Error(`Grounding Generation returned mismatched anchor references for ${candidate.candidateKey}.`);
+  }
+}
+
+function requireExactKeys(value: unknown, expected: readonly string[], label: string): void {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error(`Source-less Grounding Admission received malformed ${label}.`);
+  }
+  const actual = Object.keys(value).sort();
+  const required = [...expected].sort();
+  if (actual.length !== required.length || actual.some((key, index) => key !== required[index])) {
+    throw new Error(`Source-less Grounding Admission received malformed ${label}; expected fields ${required.join(", ")}.`);
+  }
+}
+
+function requireNonEmptyString(value: unknown, label: string): asserts value is string {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`Source-less Grounding Admission requires a non-empty ${label}.`);
+  }
+}

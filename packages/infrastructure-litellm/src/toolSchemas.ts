@@ -226,91 +226,98 @@ const generatedGroundingPassage = z.object({
 }).strict();
 
 export const generatedGroundingBundleValidator = z.object({
-  definitions: z.array(generatedGroundingPassage).min(1).max(4).describe("Generated meaning-bearing definition passages for the concept. A minted prerequisite stays tight (1-2); a first-class topic concept may warrant more, up to the cap."),
-  mentions: z.array(generatedGroundingPassage).max(4).describe("Generated mention-like passages that connect the prerequisite concept to the scaffolded anchors."),
+  definitions: z.array(generatedGroundingPassage).min(1).max(3).describe("Generated meaning-bearing definition passages for the concept. Every passage stands alone, identifies the candidate, and states its defining condition or mechanism before secondary consequences or costs. Prefer 1-2 precise passages; use a third only for a distinct necessary fact."),
+  mentions: z.array(generatedGroundingPassage).max(2).describe("Optional generated mention-like passages that add a necessary context relation. Prefer none or one; never add broad curriculum analogies to fill the cap."),
   rationale: z.string().min(1).describe("One terse sentence explaining why this prerequisite scaffolds the provided anchors.")
 }).strict();
 
 export const generatedGroundingBundleSchema: JsonSchema = toForcedToolSchema(generatedGroundingBundleValidator);
 
-// --- Synthetic grounding verification questions: submit_grounding_verification_questions ---
-// The planner sees the draft and turns every passage into one or more self-contained,
-// non-leading questions. Runtime refinement proves complete passage coverage; the answer
-// stage receives only the resulting question strings.
-export function buildGroundingVerificationQuestionPlanningValidator(passageCount: number) {
+// --- Positive-claim verification questions: submit_claim_verification_questions ---
+// The planner sees code-owned positive claim targets and turns each into one or more
+// self-contained, non-leading questions. Runtime refinement proves exact known-target coverage;
+// the answer stage later receives only opaque question keys and question text.
+export function buildClaimVerificationQuestionPlanningValidator(targetKeys: readonly string[]) {
+  const known = new Set(targetKeys);
   return z.object({
     questions: z.array(z.object({
-      passageIndex: z.number().int().min(0).max(Math.max(0, passageCount - 1)).describe("The zero-based passage index whose atomic factual claim this question verifies."),
+      targetKey: z.string().min(1).describe("The exact code-owned targetKey of the positive claim this question verifies."),
       question: z.string().min(1).describe("One self-contained, non-leading factual question that can be answered without seeing the generated draft.")
-    }).strict()).min(passageCount).describe("Claim-targeted verification questions covering every listed passage at least once and every independently verifiable atomic claim within it.")
+    }).strict()).min(targetKeys.length).describe("Claim-targeted verification questions covering every listed target at least once and every independently verifiable atomic claim within it.")
   }).strict().superRefine((value, ctx) => {
-    const covered = new Set(value.questions.map((question) => question.passageIndex));
-    for (let passageIndex = 0; passageIndex < passageCount; passageIndex++) {
-      if (!covered.has(passageIndex)) {
-        ctx.addIssue({ code: "custom", message: `missing verification question for passage index ${passageIndex}` });
+    const covered = new Set<string>();
+    for (const question of value.questions) {
+      if (!known.has(question.targetKey)) {
+        ctx.addIssue({ code: "custom", message: `unknown targetKey ${question.targetKey}` });
       }
+      covered.add(question.targetKey);
+    }
+    for (const targetKey of targetKeys) {
+      if (!covered.has(targetKey)) ctx.addIssue({ code: "custom", message: `missing verification question for targetKey ${targetKey}` });
     }
   });
 }
 
-export const groundingVerificationQuestionPlanningValidator = buildGroundingVerificationQuestionPlanningValidator(1);
-export function buildGroundingVerificationQuestionPlanningSchema(passageCount: number): JsonSchema {
-  return toForcedToolSchema(buildGroundingVerificationQuestionPlanningValidator(passageCount));
+export const claimVerificationQuestionPlanningValidator = buildClaimVerificationQuestionPlanningValidator(["sentinel:target"]);
+export function buildClaimVerificationQuestionPlanningSchema(targetKeys: readonly string[]): JsonSchema {
+  return toForcedToolSchema(buildClaimVerificationQuestionPlanningValidator(targetKeys));
 }
 
-// --- Synthetic grounding verification answers: submit_grounding_verification_answers ---
-// One answer per planned question. The answerer sees no draft or passage index and returns
-// only independently generated parametric answers keyed to the displayed question number.
-export function buildGroundingVerificationAnsweringValidator(questionCount: number) {
+// --- Positive-claim verification answers: submit_claim_verification_answers ---
+// One answer per planned question. The answerer sees no draft, target text, or target key and
+// returns only independently generated parametric answers keyed to opaque displayed question keys.
+export function buildClaimVerificationAnsweringValidator(questionKeys: readonly string[]) {
+  const known = new Set(questionKeys);
   return z.object({
     answers: z.array(z.object({
-      questionIndex: z.number().int().min(0).max(Math.max(0, questionCount - 1)).describe("The zero-based verification-question index exactly as listed."),
+      questionKey: z.string().min(1).describe("The exact opaque verification-question key as listed."),
       answer: z.string().min(1).describe("A direct, self-contained factual answer from established domain knowledge; state that the answer is uncertain when it cannot be established reliably.")
-    }).strict()).length(questionCount).describe("Exactly one independent answer for every listed verification-question index.")
+    }).strict()).length(questionKeys.length).describe("Exactly one independent answer for every listed verification-question key.")
   }).strict().superRefine((value, ctx) => {
-    const seen = new Set<number>();
+    const seen = new Set<string>();
     for (const answer of value.answers) {
-      if (seen.has(answer.questionIndex)) ctx.addIssue({ code: "custom", message: `duplicate question index ${answer.questionIndex}` });
-      seen.add(answer.questionIndex);
+      if (!known.has(answer.questionKey)) ctx.addIssue({ code: "custom", message: `unknown questionKey ${answer.questionKey}` });
+      if (seen.has(answer.questionKey)) ctx.addIssue({ code: "custom", message: `duplicate questionKey ${answer.questionKey}` });
+      seen.add(answer.questionKey);
+    }
+    for (const questionKey of questionKeys) {
+      if (!seen.has(questionKey)) ctx.addIssue({ code: "custom", message: `missing questionKey ${questionKey}` });
     }
   });
 }
 
-export const groundingVerificationAnsweringValidator = buildGroundingVerificationAnsweringValidator(1);
-export function buildGroundingVerificationAnsweringSchema(questionCount: number): JsonSchema {
-  return toForcedToolSchema(buildGroundingVerificationAnsweringValidator(questionCount));
+export const claimVerificationAnsweringValidator = buildClaimVerificationAnsweringValidator(["sentinel:q:0"]);
+export function buildClaimVerificationAnsweringSchema(questionKeys: readonly string[]): JsonSchema {
+  return toForcedToolSchema(buildClaimVerificationAnsweringValidator(questionKeys));
 }
 
-// --- Synthetic grounding factuality revision: submit_grounding_factuality_judgments ---
-// One verdict per listed passage. The judge may identify a false atomic claim only by
-// copying its exact span; the adapter grounds that veto and can only DROP the whole
-// passage. It can never rewrite correct text into a new unsupported claim.
-export function buildGroundingFactualityRevisionValidator(passageCount: number) {
+// --- Positive-claim factuality judgment: submit_claim_factuality_judgments ---
+// One owner-neutral verdict per code-owned target. The result contains no text field and can only
+// accept or reject an original target; application code owns artifact-specific settlement.
+export function buildClaimFactualityJudgmentValidator(targetKeys: readonly string[]) {
+  const known = new Set(targetKeys);
   return z.object({
     judgments: z.array(z.object({
-      index: z.number().int().min(0).max(Math.max(0, passageCount - 1)).describe("The zero-based passage index exactly as listed."),
-      factual: z.boolean().describe("True only when every atomic factual claim in the passage is accurate within the stated concept and Declared Domain."),
-      problematicSpan: z.string().describe("When factual is false, copy the minimal exact false or conflating substring from the passage; otherwise return the empty string."),
+      targetKey: z.string().min(1).describe("The exact code-owned targetKey of the positive claim being judged."),
+      disposition: z.enum(["accepted", "rejected"]).describe("Accept only when every atomic factual claim in the target is accurate within the stated concept and Declared Domain."),
       rationale: z.string().min(1).describe("One terse sentence explaining the factual judgment, including any scope distinction or conflict with the independent checks.")
-    }).strict()).length(passageCount).describe("Exactly one factuality judgment for every listed passage index.")
+    }).strict()).length(targetKeys.length).describe("Exactly one factuality judgment for every listed positive-claim target.")
   }).strict().superRefine((value, ctx) => {
-    const seen = new Set<number>();
+    const seen = new Set<string>();
     for (const judgment of value.judgments) {
-      if (seen.has(judgment.index)) ctx.addIssue({ code: "custom", message: `duplicate passage index ${judgment.index}` });
-      seen.add(judgment.index);
-      if (judgment.factual && judgment.problematicSpan.length > 0) {
-        ctx.addIssue({ code: "custom", message: `factual passage ${judgment.index} must carry an empty problematicSpan` });
-      }
-      if (!judgment.factual && judgment.problematicSpan.length === 0) {
-        ctx.addIssue({ code: "custom", message: `non-factual passage ${judgment.index} requires a problematicSpan` });
-      }
+      if (!known.has(judgment.targetKey)) ctx.addIssue({ code: "custom", message: `unknown targetKey ${judgment.targetKey}` });
+      if (seen.has(judgment.targetKey)) ctx.addIssue({ code: "custom", message: `duplicate targetKey ${judgment.targetKey}` });
+      seen.add(judgment.targetKey);
+    }
+    for (const targetKey of targetKeys) {
+      if (!seen.has(targetKey)) ctx.addIssue({ code: "custom", message: `missing targetKey ${targetKey}` });
     }
   });
 }
 
-export const groundingFactualityRevisionValidator = buildGroundingFactualityRevisionValidator(1);
-export function buildGroundingFactualityRevisionSchema(passageCount: number): JsonSchema {
-  return toForcedToolSchema(buildGroundingFactualityRevisionValidator(passageCount));
+export const claimFactualityJudgmentValidator = buildClaimFactualityJudgmentValidator(["sentinel:target"]);
+export function buildClaimFactualityJudgmentSchema(targetKeys: readonly string[]): JsonSchema {
+  return toForcedToolSchema(buildClaimFactualityJudgmentValidator(targetKeys));
 }
 
 // --- Missing-prerequisite proposal: submit_missing_prerequisites ----------
@@ -702,7 +709,7 @@ export const layerPurposeSchema: JsonSchema = toForcedToolSchema(layerPurposeVal
 // Measurement stage (plan 2026-07-10-004 U1): the cross-family judge reports the
 // standalone learning objectives an extraction run's admitted set fails to preserve.
 // An empty `misses` list is the well-formed "coverage is sufficient" answer. Runs on
-// gpt-oss-120b, not MiMo, so a trailing nullable would be harmless — but every field
+// kg-independent-judge, not the extractor alias, so a trailing nullable would be harmless — but every field
 // is required prose anyway.
 
 export const discoveryCoverageAuditValidator = z.object({
@@ -718,7 +725,7 @@ export const discoveryCoverageAuditSchema: JsonSchema = toForcedToolSchema(disco
 // --- Scaffold-content congruence audit: submit_scaffold_content_congruence (plan 2026-07-16-001) ---
 // ONE sample of the cross-family judge over ONE generated Support Step (KTD3): does the content
 // teach its named step label, and is it a genuinely simpler prerequisite of the term? Runs on
-// gpt-oss-120b (kg-independent-judge), not the generator, so the generator never grades itself.
+// kg-independent-judge, not the generator, so the generator never grades itself.
 // Every field is required prose/boolean so the object closes without a trailing nullable.
 export const scaffoldContentCongruenceValidator = z.object({
   teachesStepLabel: z.boolean().describe("True if the micro-lesson, question, and options actually teach the named step label; false if the content is about something else (a label↔content mismatch)."),
@@ -774,9 +781,9 @@ export const toolValidators = [
   conceptSetSynthesisValidator,
   knowledgeBoundaryProbeValidator,
   generatedGroundingBundleValidator,
-  groundingVerificationQuestionPlanningValidator,
-  groundingVerificationAnsweringValidator,
-  groundingFactualityRevisionValidator,
+  claimVerificationQuestionPlanningValidator,
+  claimVerificationAnsweringValidator,
+  claimFactualityJudgmentValidator,
   missingPrerequisiteProposalValidator,
   buildDifficultyBandsValidator(3),
   difficultyComparisonValidator,

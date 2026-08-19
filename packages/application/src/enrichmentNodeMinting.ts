@@ -261,12 +261,22 @@ export async function assembleEnrichmentNodes(input: {
     let mintedForAnchor = 0;
     for (const proposal of keptProposals.keptProposals) {
       if (runBudget <= 0 || mintedForAnchor >= bounds.maxMintedPerAnchor) break;
+      const [firstDefinition, ...remainingDefinitions] = anchor.definitionQuotes;
+      if (!firstDefinition) {
+        throw new Error(`Cannot ground ${proposal.proposedLabel} on anchor ${anchor.conceptId} without a Definition Passage.`);
+      }
       const groundingBundle = await stage(STAGE_TAGS.groundingGeneration, () =>
         input.groundingPort.generate({
-          derivedNodeId: proposal.derivedNodeId,
           declaredDomain: anchor.declaredDomain,
-          nodeLabel: proposal.proposedLabel,
-          scaffoldedAnchors: [{ conceptId: anchor.conceptId, canonicalLabel: anchor.canonicalLabel, definitionQuotes: anchor.definitionQuotes }]
+          canonicalLabel: proposal.proposedLabel,
+          context: {
+            kind: "scaffolded_anchor",
+            anchor: {
+              reference: anchor.conceptId,
+              canonicalLabel: anchor.canonicalLabel,
+              definitionPassages: [firstDefinition, ...remainingDefinitions]
+            }
+          }
         })
       );
       mintedNodes.push({

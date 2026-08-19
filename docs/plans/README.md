@@ -11,7 +11,9 @@ lifecycle, retention, and validation rules live in
 
 ## Active implementation plans (execution order)
 
-None.
+1. [2026-08-19-001 — Deepen Source-less Grounding Admission](./2026-08-19-001-deepen-source-less-grounding-admission.md)
+   — **In progress.** U1 is closed `PASS`; U2 is next and cuts model-grounded prerequisite minting
+   over to the same admission module before its Rust-fixture real-use gate.
 
 Shaping, not yet a plan:
 [2026-08-08-002 — Generation model evaluation](../brainstorms/2026-08-08-002-generation-model-evaluation.md)

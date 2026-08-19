@@ -341,10 +341,11 @@ function buildNodePorts(options: {
   const groundingPort: GroundingGenerationPort = {
     model: "mock-gen",
     async generate(input): Promise<GeneratedGroundingBundle> {
+      const anchor = input.context.kind === "scaffolded_anchor" ? input.context.anchor : undefined;
       return {
-        derivedNodeId: input.derivedNodeId, groundingOrigin: "llm_grounded",
-        definitions: [{ passageType: "definition", text: `${input.nodeLabel} explained.`, groundingOrigin: "llm_grounded", headingPath: [], locator: {}, verbatimCheck: { disposition: "not_applicable_by_grounding", rationale: "generated" } }],
-        mentions: [], scaffoldedAnchorConceptIds: input.scaffoldedAnchors.map((a) => a.conceptId), generatingModel: "mock-gen", rationale: "r"
+        groundingOrigin: "llm_grounded",
+        definitions: [{ passageType: "definition", text: `${input.canonicalLabel} explained.`, groundingOrigin: "llm_grounded", headingPath: [], locator: {}, verbatimCheck: { disposition: "not_applicable_by_grounding", rationale: "generated" } }],
+        mentions: [], groundingAnchorReferences: anchor ? [anchor.reference] : [], generatingModel: "mock-gen", rationale: "r"
       };
     }
   };

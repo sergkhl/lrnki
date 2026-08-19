@@ -1,12 +1,10 @@
-import type { GeneratedGroundingBundle } from "@lrnki/domain-core";
-import { STAGE_TAGS } from "@lrnki/domain-core";
+import { STAGE_TAGS, type GeneratedGroundingBundle, type GroundingAdmissionContext } from "@lrnki/domain-core";
 import type {
-  GroundingFactualityRevisionPort,
-  GroundingFactualityRevisionResult,
-  GroundingGenerationPort,
-  GroundingVerificationAnsweringPort,
-  GroundingVerificationQuestion,
-  GroundingVerificationQuestionPlanningPort
+  ClaimFactualityJudgmentPort,
+  ClaimVerificationAnsweringPort,
+  ClaimVerificationQuestion,
+  ClaimVerificationQuestionPlanningPort,
+  GroundingGenerationPort
 } from "@lrnki/ports";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import { executeForcedToolStage, type NeuralStageDescriptor } from "./forcedToolStage";
@@ -14,47 +12,31 @@ import { readPromptFile } from "./promptFile";
 import {
   generatedGroundingBundleSchema,
   generatedGroundingBundleValidator,
-  buildGroundingFactualityRevisionSchema,
-  buildGroundingFactualityRevisionValidator,
-  buildGroundingVerificationAnsweringSchema,
-  buildGroundingVerificationAnsweringValidator,
-  buildGroundingVerificationQuestionPlanningSchema,
-  buildGroundingVerificationQuestionPlanningValidator
+  buildClaimFactualityJudgmentSchema,
+  buildClaimFactualityJudgmentValidator,
+  buildClaimVerificationAnsweringSchema,
+  buildClaimVerificationAnsweringValidator,
+  buildClaimVerificationQuestionPlanningSchema,
+  buildClaimVerificationQuestionPlanningValidator
 } from "./toolSchemas";
 
-type GroundingGenerationInput = {
-  derivedNodeId: string;
-  declaredDomain: string;
-  nodeLabel: string;
-  scaffoldedAnchors: { conceptId: string; canonicalLabel: string; definitionQuotes: string[] }[];
-  topic?: string;
-  rejectionFeedback?: string;
+type GroundingGenerationInput = Parameters<GroundingGenerationPort["generate"]>[0];
+type GroundingGenerationArgs = {
+  definitions: { text: string }[];
+  mentions: { text: string }[];
+  rationale: string;
 };
-
-type GroundingGenerationArgs = { definitions: { text: string }[]; mentions: { text: string }[]; rationale: string };
-type GroundingVerificationQuestionPlanningInput = {
-  declaredDomain: string;
-  topic: string;
-  nodeLabel: string;
-  draft: GeneratedGroundingBundle;
-};
-type GroundingVerificationQuestionPlanningArgs = { questions: GroundingVerificationQuestion[] };
-type GroundingVerificationAnsweringInput = {
-  declaredDomain: string;
-  topic: string;
-  nodeLabel: string;
-  questions: string[];
-};
-type GroundingVerificationAnsweringArgs = { answers: Array<{ questionIndex: number; answer: string }> };
-type GroundingFactualityRevisionInput = {
-  declaredDomain: string;
-  topic: string;
-  nodeLabel: string;
-  draft: GeneratedGroundingBundle;
-  verificationAnswers: Array<{ passageIndex: number; question: string; answer: string }>;
-};
-type GroundingFactualityRevisionArgs = {
-  judgments: Array<{ index: number; factual: boolean; problematicSpan: string; rationale: string }>;
+type ClaimQuestionPlanningInput = Parameters<ClaimVerificationQuestionPlanningPort["plan"]>[0];
+type ClaimQuestionPlanningArgs = { questions: ClaimVerificationQuestion[] };
+type ClaimAnsweringInput = Parameters<ClaimVerificationAnsweringPort["answer"]>[0];
+type ClaimAnsweringArgs = { answers: Array<{ questionKey: string; answer: string }> };
+type ClaimJudgmentInput = Parameters<ClaimFactualityJudgmentPort["judge"]>[0];
+type ClaimJudgmentArgs = {
+  judgments: Array<{
+    targetKey: string;
+    disposition: "accepted" | "rejected";
+    rationale: string;
+  }>;
 };
 
 export const groundingGenerationDescriptor: NeuralStageDescriptor<
@@ -67,38 +49,30 @@ export const groundingGenerationDescriptor: NeuralStageDescriptor<
   schema: generatedGroundingBundleSchema,
   validator: generatedGroundingBundleValidator,
   sentinelInput: {
-    derivedNodeId: "sentinel_node",
     declaredDomain: "sentinel domain",
-    nodeLabel: "Sentinel node",
-    scaffoldedAnchors: [{ conceptId: "sentinel_anchor", canonicalLabel: "Sentinel anchor", definitionQuotes: ["Sentinel definition."] }]
+    canonicalLabel: "Sentinel concept",
+    context: {
+      kind: "scaffolded_anchor",
+      anchor: {
+        reference: "sentinel_anchor",
+        canonicalLabel: "Sentinel anchor",
+        definitionPassages: ["Sentinel definition."]
+      }
+    }
   },
-  templateData: (input) => {
-    const anchorLess = input.scaffoldedAnchors.length === 0;
-    const anchorText = input.scaffoldedAnchors
-      .map((anchor) => [
-        `- ${anchor.canonicalLabel} (${anchor.conceptId})`,
-        ...anchor.definitionQuotes.map((quote) => `  definition quote: "${quote}"`)
-      ].join("\n"))
-      .join("\n");
-    return {
-      declaredDomain: input.declaredDomain,
-      contextLines: anchorLess
-        ? `${input.topic ? `Originating topic: "${input.topic}".\n` : ""}`
-        : `Generated prerequisite node: "${input.nodeLabel}".\nScaffolded anchors:\n${anchorText || "(none)"}`,
-      nodeLine: anchorLess ? `Concept node: "${input.nodeLabel}".` : "",
-      rejectionContext: input.rejectionFeedback
-        ? `A previous draft was rejected after independent factual verification. Generate a fresh bundle that resolves this feedback, then rely on the later verifier for admission:\n${input.rejectionFeedback}`
-        : ""
-    };
-  },
-  mapResult: (result, input) => {
-    return generatedBundleFromResult(
-      result,
-      input.derivedNodeId,
-      input.scaffoldedAnchors.map((anchor) => anchor.conceptId),
-      readPromptFile(groundingGenerationDescriptor.promptPath).model
-    );
-  }
+  templateData: (input) => ({
+    declaredDomain: input.declaredDomain,
+    canonicalLabel: input.canonicalLabel,
+    contextLines: formatContext(input.context),
+    rejectionContext: input.rejectionFeedback
+      ? `A previous draft was rejected after independent factual verification. Generate a fresh bundle that resolves this bounded feedback, then rely on the later verifier for admission:\n${input.rejectionFeedback}`
+      : ""
+  }),
+  mapResult: (result, input) => generatedBundleFromResult(
+    result,
+    input.context,
+    readPromptFile(groundingGenerationDescriptor.promptPath).model
+  )
 };
 
 export function createGroundingGenerationPort(client: LiteLlmForcedToolClient): GroundingGenerationPort {
@@ -108,200 +82,186 @@ export function createGroundingGenerationPort(client: LiteLlmForcedToolClient): 
   };
 }
 
-export const groundingVerificationQuestionPlanningDescriptor: NeuralStageDescriptor<
-  GroundingVerificationQuestionPlanningInput,
-  GroundingVerificationQuestionPlanningArgs,
-  GroundingVerificationQuestion[]
+export const claimVerificationQuestionPlanningDescriptor: NeuralStageDescriptor<
+  ClaimQuestionPlanningInput,
+  ClaimQuestionPlanningArgs,
+  ClaimVerificationQuestion[]
 > = {
-  promptPath: "grounding-verification-question-planning.prompt",
+  promptPath: "claim-verification-question-planning.prompt",
   stageTag: STAGE_TAGS.groundingVerificationQuestionPlanning,
-  schema: (input) => buildGroundingVerificationQuestionPlanningSchema(passageTexts(input.draft).length),
-  validator: (input) => buildGroundingVerificationQuestionPlanningValidator(passageTexts(input.draft).length),
+  schema: (input) => buildClaimVerificationQuestionPlanningSchema(input.targets.map((target) => target.targetKey)),
+  validator: (input) => buildClaimVerificationQuestionPlanningValidator(input.targets.map((target) => target.targetKey)),
   sentinelInput: {
     declaredDomain: "sentinel domain",
-    topic: "Sentinel topic",
-    nodeLabel: "Sentinel node",
-    draft: sentinelDraft()
+    canonicalLabel: "Sentinel concept",
+    context: { kind: "originating_topic", topic: "Sentinel topic" },
+    targets: [{ targetKey: "sentinel:definition", targetPurpose: "definition", text: "A sentinel concept is a validation placeholder." }]
   },
   templateData: (input) => ({
     declaredDomain: input.declaredDomain,
-    topic: input.topic,
-    nodeLabel: input.nodeLabel,
-    draftPassages: formattedPassages(input.draft)
+    canonicalLabel: input.canonicalLabel,
+    contextLines: formatContext(input.context),
+    claimTargets: formatTargets(input.targets)
   }),
   mapResult: (result, input) => {
-    const required = conceptIdentityQuestion(input.nodeLabel, input.declaredDomain);
+    const firstTarget = input.targets[0];
+    if (!firstTarget) return result.questions;
+    const identityQuestion = conceptIdentityQuestion(input.canonicalLabel, input.declaredDomain);
+    const applicationQuestion = contextApplicationQuestion(
+      input.canonicalLabel,
+      input.declaredDomain,
+      input.context
+    );
+    const required = [
+      { targetKey: firstTarget.targetKey, question: identityQuestion },
+      ...input.targets.map((target) => ({ targetKey: target.targetKey, question: applicationQuestion }))
+    ];
     return [
-      { passageIndex: 0, question: required },
-      ...result.questions.filter((question) => question.question !== required)
+      ...required,
+      ...result.questions.filter((question) => !required.some(
+        (codeOwned) => codeOwned.targetKey === question.targetKey && codeOwned.question === question.question
+      ))
     ];
   }
 };
 
-export function createGroundingVerificationQuestionPlanningPort(
+export function createClaimVerificationQuestionPlanningPort(
   client: LiteLlmForcedToolClient
-): GroundingVerificationQuestionPlanningPort {
+): ClaimVerificationQuestionPlanningPort {
   return {
-    model: readPromptFile(groundingVerificationQuestionPlanningDescriptor.promptPath).model,
-    plan: (input) => executeForcedToolStage(client, groundingVerificationQuestionPlanningDescriptor, input)
+    model: readPromptFile(claimVerificationQuestionPlanningDescriptor.promptPath).model,
+    plan: (input) => executeForcedToolStage(client, claimVerificationQuestionPlanningDescriptor, input)
   };
 }
 
-export const groundingVerificationAnsweringDescriptor: NeuralStageDescriptor<
-  GroundingVerificationAnsweringInput,
-  GroundingVerificationAnsweringArgs,
-  string[]
+export const claimVerificationAnsweringDescriptor: NeuralStageDescriptor<
+  ClaimAnsweringInput,
+  ClaimAnsweringArgs,
+  ClaimAnsweringArgs["answers"]
 > = {
-  promptPath: "grounding-verification-answering.prompt",
+  promptPath: "claim-verification-answering.prompt",
   stageTag: STAGE_TAGS.groundingVerificationAnswering,
-  schema: (input) => buildGroundingVerificationAnsweringSchema(input.questions.length),
-  validator: (input) => buildGroundingVerificationAnsweringValidator(input.questions.length),
+  schema: (input) => buildClaimVerificationAnsweringSchema(input.questions.map((question) => question.questionKey)),
+  validator: (input) => buildClaimVerificationAnsweringValidator(input.questions.map((question) => question.questionKey)),
   sentinelInput: {
     declaredDomain: "sentinel domain",
-    topic: "Sentinel topic",
-    nodeLabel: "Sentinel node",
-    questions: ["What is the established meaning of the sentinel node?"]
+    canonicalLabel: "Sentinel concept",
+    context: { kind: "originating_topic", topic: "Sentinel topic" },
+    questions: [{ questionKey: "sentinel:q:0", question: "What is the established meaning of a sentinel concept?" }]
   },
   templateData: (input) => ({
     declaredDomain: input.declaredDomain,
-    topic: input.topic,
-    nodeLabel: input.nodeLabel,
-    questions: input.questions.map((question, index) => `[${index}] ${question}`).join("\n")
+    canonicalLabel: input.canonicalLabel,
+    contextLines: formatContext(input.context),
+    questions: input.questions.map((question) => `[${question.questionKey}] ${question.question}`).join("\n")
   }),
-  mapResult: (result, input) => {
-    const byIndex = new Map(result.answers.map((answer) => [answer.questionIndex, answer.answer] as const));
-    return input.questions.map((_, index) => byIndex.get(index)!);
-  }
+  mapResult: (result) => result.answers
 };
 
-export function createGroundingVerificationAnsweringPort(
+export function createClaimVerificationAnsweringPort(
   client: LiteLlmForcedToolClient
-): GroundingVerificationAnsweringPort {
+): ClaimVerificationAnsweringPort {
   return {
-    model: readPromptFile(groundingVerificationAnsweringDescriptor.promptPath).model,
-    answer: (input) => executeForcedToolStage(client, groundingVerificationAnsweringDescriptor, input)
+    model: readPromptFile(claimVerificationAnsweringDescriptor.promptPath).model,
+    answer: (input) => executeForcedToolStage(client, claimVerificationAnsweringDescriptor, input)
   };
 }
 
-export const groundingFactualityRevisionDescriptor: NeuralStageDescriptor<
-  GroundingFactualityRevisionInput,
-  GroundingFactualityRevisionArgs,
-  GroundingFactualityRevisionResult
+export const claimFactualityJudgmentDescriptor: NeuralStageDescriptor<
+  ClaimJudgmentInput,
+  ClaimJudgmentArgs,
+  ClaimJudgmentArgs["judgments"]
 > = {
-  promptPath: "grounding-factuality-revision.prompt",
+  promptPath: "claim-factuality-judgment.prompt",
   stageTag: STAGE_TAGS.groundingFactualityRevision,
-  schema: (input) => buildGroundingFactualityRevisionSchema(passageTexts(input.draft).length),
-  validator: (input) => buildGroundingFactualityRevisionValidator(passageTexts(input.draft).length),
+  schema: (input) => buildClaimFactualityJudgmentSchema(input.targets.map((target) => target.targetKey)),
+  validator: (input) => buildClaimFactualityJudgmentValidator(input.targets.map((target) => target.targetKey)),
   sentinelInput: {
     declaredDomain: "sentinel domain",
-    topic: "Sentinel topic",
-    nodeLabel: "Sentinel node",
-    draft: sentinelDraft(),
+    canonicalLabel: "Sentinel concept",
+    context: { kind: "originating_topic", topic: "Sentinel topic" },
+    targets: [{ targetKey: "sentinel:definition", targetPurpose: "definition", text: "A sentinel concept is a validation placeholder." }],
     verificationAnswers: [{
-      passageIndex: 0,
-      question: "What is the established meaning of the sentinel node?",
-      answer: "A sentinel node is a placeholder used for validation."
+      targetKey: "sentinel:definition",
+      questionKey: "sentinel:q:0",
+      question: "What is the established meaning of a sentinel concept?",
+      answer: "A sentinel is a known placeholder used to exercise validation."
     }]
   },
   templateData: (input) => ({
     declaredDomain: input.declaredDomain,
-    topic: input.topic,
-    nodeLabel: input.nodeLabel,
+    canonicalLabel: input.canonicalLabel,
+    contextLines: formatContext(input.context),
+    claimTargets: formatTargets(input.targets),
     verificationChecks: input.verificationAnswers
-      .map((check, index) => `[passage ${check.passageIndex}; check ${index}] ${check.question}\nAnswer: ${check.answer}`)
-      .join("\n"),
-    draftPassages: formattedPassages(input.draft)
+      .map((check) => `[target ${check.targetKey}; question ${check.questionKey}] ${check.question}\nAnswer: ${check.answer}`)
+      .join("\n")
   }),
-  mapResult: (result, input) => applyGroundedFactualityVetoes(input.draft, result)
+  mapResult: (result) => result.judgments
 };
 
-export function createGroundingFactualityRevisionPort(
+// A second model family evaluates the same evidence packet through the same forced-tool contract.
+// Keeping one prompt and schema prevents policy drift while modelOverride makes both deployment
+// identities explicit in the operation config hash and the LiteLLM request record.
+export const claimFactualityChallengeDescriptor: NeuralStageDescriptor<
+  ClaimJudgmentInput,
+  ClaimJudgmentArgs,
+  ClaimJudgmentArgs["judgments"]
+> = {
+  ...claimFactualityJudgmentDescriptor,
+  modelOverride: "kg-claim-factuality-challenger"
+};
+
+export function createClaimFactualityJudgmentPort(
   client: LiteLlmForcedToolClient
-): GroundingFactualityRevisionPort {
+): ClaimFactualityJudgmentPort {
   return {
-    model: readPromptFile(groundingFactualityRevisionDescriptor.promptPath).model,
-    revise: (input) => executeForcedToolStage(client, groundingFactualityRevisionDescriptor, input)
+    model: readPromptFile(claimFactualityJudgmentDescriptor.promptPath).model,
+    judge: (input) => executeForcedToolStage(client, claimFactualityJudgmentDescriptor, input)
   };
 }
 
-function passageTexts(bundle: GeneratedGroundingBundle) {
-  return [...bundle.definitions, ...bundle.mentions];
-}
-
-function formattedPassages(bundle: GeneratedGroundingBundle): string {
-  return passageTexts(bundle)
-    .map((passage, index) => `[${index}] ${passage.passageType}: ${passage.text}`)
-    .join("\n");
-}
-
-function conceptIdentityQuestion(nodeLabel: string, declaredDomain: string): string {
-  return `What are the necessary defining features of "${nodeLabel}" in ${declaredDomain}, and how does it differ from the closest commonly confused concepts? State each concept separately rather than using a shared summary.`;
-}
-
-function sentinelDraft(): GeneratedGroundingBundle {
+export function createClaimFactualityChallengePort(
+  client: LiteLlmForcedToolClient
+): ClaimFactualityJudgmentPort {
   return {
-    derivedNodeId: "sentinel_node",
-    groundingOrigin: "llm_grounded",
-    definitions: [{
-      passageType: "definition",
-      text: "A sentinel node is a placeholder.",
-      groundingOrigin: "llm_grounded",
-      headingPath: [],
-      locator: {},
-      verbatimCheck: { disposition: "not_applicable_by_grounding", rationale: "generated" }
-    }],
-    mentions: [],
-    scaffoldedAnchorConceptIds: [],
-    generatingModel: "sentinel-generator",
-    rationale: "sentinel draft"
+    model: claimFactualityChallengeDescriptor.modelOverride!,
+    judge: (input) => executeForcedToolStage(client, claimFactualityChallengeDescriptor, input)
   };
 }
 
-// Monotonic correction boundary: the independent judge can remove a complete passage
-// only when its false verdict copies an exact span from that passage. It cannot rewrite
-// or add learner-facing facts. An ungrounded/missing veto keeps the original passage.
-function applyGroundedFactualityVetoes(
-  draft: GeneratedGroundingBundle,
-  result: GroundingFactualityRevisionArgs
-): GroundingFactualityRevisionResult {
-  const passages = passageTexts(draft);
-  const judgments = new Map(result.judgments.map((judgment) => [judgment.index, judgment] as const));
-  const dropped = new Set<number>();
-  const reasons: string[] = [];
-  passages.forEach((passage, index) => {
-    const judgment = judgments.get(index);
-    if (!judgment || judgment.factual) return;
-    const span = judgment.problematicSpan.trim();
-    if (!span || !passage.text.includes(span)) return;
-    dropped.add(index);
-    reasons.push(`[${index}] ${judgment.rationale}`);
-  });
-  const definitions = draft.definitions.filter((_, index) => !dropped.has(index));
-  if (definitions.length === 0) {
-    return {
-      disposition: "rejected",
-      rationale: `Grounding factuality revision rejected every definition for ${draft.derivedNodeId}: ${reasons.join(" ")}`
-    };
+function formatContext(context: GroundingAdmissionContext): string {
+  if (context.kind === "originating_topic") {
+    return `Originating topic: "${context.topic}".`;
   }
-  const mentionOffset = draft.definitions.length;
-  const mentions = draft.mentions.filter((_, index) => !dropped.has(mentionOffset + index));
-  return {
-    disposition: "accepted",
-    bundle: {
-      ...draft,
-      definitions,
-      mentions,
-      rationale: dropped.size === 0
-        ? `${draft.rationale} [independent factuality review preserved every passage]`
-        : `${draft.rationale} [independent factuality review dropped ${dropped.size} passage(s): ${reasons.join(" ")}]`
-    }
-  };
+  return [
+    `Scaffolded anchor: "${context.anchor.canonicalLabel}" (${context.anchor.reference}).`,
+    ...context.anchor.definitionPassages.map((passage) => `Anchor Definition Passage: "${passage}"`)
+  ].join("\n");
+}
+
+function formatTargets(targets: readonly { targetKey: string; targetPurpose: "definition" | "support"; text: string }[]): string {
+  return targets.map((target) => JSON.stringify(target)).join("\n");
+}
+
+function conceptIdentityQuestion(canonicalLabel: string, declaredDomain: string): string {
+  return `What are the necessary defining features of "${canonicalLabel}" in ${declaredDomain}, and how does it differ from the closest commonly confused concepts? State each concept separately rather than using a shared summary.`;
+}
+
+function contextApplicationQuestion(
+  canonicalLabel: string,
+  declaredDomain: string,
+  context: GroundingAdmissionContext
+): string {
+  const owningContext = context.kind === "originating_topic"
+    ? `the originating topic "${context.topic}"`
+    : `the scaffolded anchor "${context.anchor.canonicalLabel}"`;
+  return `Within ${owningContext}, how does "${canonicalLabel}" in ${declaredDomain} apply? State its mechanism or behavior, required conditions, material outputs or effects, and limits. Identify commonly attributed consequences that do not actually follow in this context, and separate any named senses, entities, or implementations that behave differently.`;
 }
 
 function generatedBundleFromResult(
   result: GroundingGenerationArgs,
-  derivedNodeId: string,
-  scaffoldedAnchorConceptIds: string[],
+  context: GroundingAdmissionContext,
   generatingModel: string
 ): GeneratedGroundingBundle {
   const notApplicable = {
@@ -309,7 +269,6 @@ function generatedBundleFromResult(
     rationale: "llm_grounded generated passage has no cited source block"
   };
   return {
-    derivedNodeId,
     groundingOrigin: "llm_grounded",
     definitions: result.definitions.map((passage) => ({
       passageType: "definition",
@@ -327,7 +286,7 @@ function generatedBundleFromResult(
       locator: {},
       verbatimCheck: notApplicable
     })),
-    scaffoldedAnchorConceptIds,
+    groundingAnchorReferences: context.kind === "scaffolded_anchor" ? [context.anchor.reference] : [],
     generatingModel,
     rationale: result.rationale
   };

@@ -89,7 +89,7 @@ type Harness = {
   sessionReads: number;
   outlineInputs: { retryFeedback?: string }[];
   probeLabels: string[];
-  groundingInputs: { nodeLabel: string; scaffoldedAnchors: { conceptId: string; definitionQuotes: string[] }[]; topic?: string }[];
+  groundingInputs: Array<Parameters<ScaffoldGenerationConstruction["groundingGeneration"]["generate"]>[0]>;
   contentCalls: number;
   judgeCalls: number;
   reporterEvents: { kind: string; detail: string }[];
@@ -178,16 +178,17 @@ function makeHarness(input: {
     groundingGeneration: {
       model: "g",
       generate: async (generateInput) => {
-        groundingInputs.push({ nodeLabel: generateInput.nodeLabel, scaffoldedAnchors: generateInput.scaffoldedAnchors, topic: generateInput.topic });
-        const definitions = emptyGrounding.has(generateInput.nodeLabel)
+        groundingInputs.push(generateInput);
+        const definitions = emptyGrounding.has(generateInput.canonicalLabel)
           ? []
-          : [{ text: `Generated definition of ${generateInput.nodeLabel}.` }];
+          : [{ text: `Generated definition of ${generateInput.canonicalLabel}.` }];
         return {
-          derivedNodeId: generateInput.derivedNodeId,
           groundingOrigin: "llm_grounded",
           definitions,
           mentions: [],
-          scaffoldedAnchorConceptIds: [],
+          groundingAnchorReferences: generateInput.context.kind === "scaffolded_anchor"
+            ? [generateInput.context.anchor.reference]
+            : [],
           generatingModel: "g",
           rationale: "r"
         } as unknown as GeneratedGroundingBundle;
@@ -430,7 +431,14 @@ test("every generated label runs probe then child grounding; parent definitions 
   // K=2 probe draws for the one generated label.
   assert.deepEqual(h.probeLabels, ["Affine types", "Affine types"]);
   assert.equal(h.groundingInputs.length, 1);
-  assert.deepEqual(h.groundingInputs[0].scaffoldedAnchors.map((anchor) => anchor.definitionQuotes), [["Parent definition text."]]);
+  assert.deepEqual(h.groundingInputs[0].context, {
+    kind: "scaffolded_anchor",
+    anchor: {
+      reference: "parent",
+      canonicalLabel: "Ownership",
+      definitionPassages: ["Parent definition text."]
+    }
+  });
   const step = h.published[0][0];
   assert.ok(step.kind === "generated");
   // The published lesson text is the CHILD's generated definition-derived content, never the
@@ -464,8 +472,8 @@ test("a boundary label drops; a mixed reference/generated outline survives in or
   // The boundary label was probed but never grounded or drafted; the empty-grounding label was
   // grounded but produced no publishable content.
   assert.ok(h.probeLabels.includes("Esoteric frontier idea"));
-  assert.ok(!h.groundingInputs.some((g) => g.nodeLabel === "Esoteric frontier idea"));
-  assert.ok(h.groundingInputs.some((g) => g.nodeLabel === "Empty grounding idea"));
+  assert.ok(!h.groundingInputs.some((g) => g.canonicalLabel === "Esoteric frontier idea"));
+  assert.ok(h.groundingInputs.some((g) => g.canonicalLabel === "Empty grounding idea"));
   assert.equal(h.contentCalls, 1, "content only for the surviving generated label");
 });
 

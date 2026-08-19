@@ -131,11 +131,10 @@ function llmGroundedNode(opts: { id?: string; label?: string } = {}) {
     declaredDomain: "software engineering",
     aliases: [],
     groundingBundle: {
-      derivedNodeId: id,
       groundingOrigin: "llm_grounded" as const,
       definitions: [{ passageType: "definition" as const, text: "Pointer arithmetic computes addresses.", groundingOrigin: "llm_grounded" as const, headingPath: [], locator: {}, verbatimCheck: { disposition: "not_applicable_by_grounding" as const, rationale: "generated" } }],
       mentions: [],
-      scaffoldedAnchorConceptIds: [],
+      groundingAnchorReferences: [],
       generatingModel: "mock",
       rationale: "r"
     }
@@ -1339,11 +1338,10 @@ function syntheticNode(opts: { id?: string; label?: string; def: string }) {
     declaredDomain: "biology",
     aliases: [],
     groundingBundle: {
-      derivedNodeId: id,
       groundingOrigin: "llm_grounded" as const,
       definitions: [{ passageType: "definition" as const, text: opts.def, groundingOrigin: "llm_grounded" as const, headingPath: [], locator: {}, verbatimCheck: { disposition: "not_applicable_by_grounding" as const, rationale: "generated" } }],
       mentions: [],
-      scaffoldedAnchorConceptIds: [],
+      groundingAnchorReferences: [],
       generatingModel: "mock",
       rationale: "topic concept"
     }

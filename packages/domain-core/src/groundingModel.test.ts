@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { Concept, EnrichmentNode } from "./index";
+import type { Concept, EnrichmentNode, LlmGroundedEnrichmentNode } from "./index";
 import { groundingForConcept, layerOf } from "./index";
 
 test("layerOf derives the graph layer from grounding origin", () => {
@@ -32,7 +32,7 @@ test("published concepts are document-anchored asserted anchors", () => {
 });
 
 test("llm-grounded enrichment nodes are derived prerequisites without ordering attributes", () => {
-  const node: EnrichmentNode = {
+  const node: LlmGroundedEnrichmentNode = {
     nodeKind: "enrichment",
     derivedNodeId: "dn1",
     groundingOrigin: "llm_grounded",
@@ -44,7 +44,6 @@ test("llm-grounded enrichment nodes are derived prerequisites without ordering a
     declaredDomain: "Rust",
     aliases: [],
     groundingBundle: {
-      derivedNodeId: "dn1",
       groundingOrigin: "llm_grounded",
       definitions: [
         {
@@ -57,7 +56,7 @@ test("llm-grounded enrichment nodes are derived prerequisites without ordering a
         }
       ],
       mentions: [],
-      scaffoldedAnchorConceptIds: ["c1"],
+      groundingAnchorReferences: ["c1"],
       generatingModel: "mock-generator",
       rationale: "Needed to scaffold Move semantics."
     }
@@ -71,7 +70,7 @@ test("llm-grounded enrichment nodes are derived prerequisites without ordering a
 });
 
 test("synthetic-primary nodes are llm-grounded derived concepts without a minting reason", () => {
-  const node: EnrichmentNode = {
+  const node: LlmGroundedEnrichmentNode = {
     nodeKind: "enrichment",
     derivedNodeId: "dn3",
     groundingOrigin: "llm_grounded",
@@ -82,7 +81,6 @@ test("synthetic-primary nodes are llm-grounded derived concepts without a mintin
     declaredDomain: "Biology",
     aliases: [],
     groundingBundle: {
-      derivedNodeId: "dn3",
       groundingOrigin: "llm_grounded",
       definitions: [
         {
@@ -96,7 +94,7 @@ test("synthetic-primary nodes are llm-grounded derived concepts without a mintin
       ],
       mentions: [],
       // Anchor-less: a synthetic primary concept scaffolds against no published anchor.
-      scaffoldedAnchorConceptIds: [],
+      groundingAnchorReferences: [],
       generatingModel: "mock-generator",
       rationale: "Primary concept synthesized for the topic."
     }

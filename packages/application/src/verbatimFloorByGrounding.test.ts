@@ -68,11 +68,10 @@ function llmGrounded(id: string): EnrichmentNode {
     declaredDomain: "software engineering",
     aliases: [],
     groundingBundle: {
-      derivedNodeId: id,
       groundingOrigin: "llm_grounded",
       definitions: [{ passageType: "definition", text: "generated", groundingOrigin: "llm_grounded", headingPath: [], locator: {}, verbatimCheck: { disposition: "not_applicable_by_grounding", rationale: "generated" } }],
       mentions: [],
-      scaffoldedAnchorConceptIds: [],
+      groundingAnchorReferences: [],
       generatingModel: "mock",
       rationale: "r"
     }

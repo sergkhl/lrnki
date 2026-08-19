@@ -38,6 +38,7 @@ import type {
   ExtractionQualityIssue,
   ExtractionRunResult,
   GeneratedGroundingBundle,
+  GroundingAdmissionContext,
   SynthesizedConcept,
   KnowledgeBoundaryProbeAnswer,
   WholeSetOrdering,
@@ -163,7 +164,7 @@ export interface AssertionEntailmentJudgmentPort {
 // judgment that re-reads a core Concept's already-verbatim-verified Definition
 // Passages and decides, per passage, whether it ESTABLISHES the Concept's meaning or
 // is a hollow passage (bare name repetition, heading/title, citation/bibliographic).
-// Run on the independent cross-family alias (`kg-independent-judge`) so the DeepSeek
+// Run on the independent cross-family alias (`kg-independent-judge`) so the
 // extractor never grades its own definitions. BATCHED per Concept (KTD4): one call
 // judges all of a Concept's definition passages, returning one judgment per passage,
 // index-aligned to the input order. Drop-only: a veto removes the hollow passage; it
@@ -204,7 +205,7 @@ export interface AdmissionLabelJudgmentPort {
 
 // Rescue durability judge (U3, ADR-0019 refinement). A bounded, forced-tool LLM
 // judgment over ONE aggregated `source_mentioned` rescue candidate, run on the
-// independent cross-family alias (`kg-independent-judge`) so the DeepSeek generator
+// independent cross-family alias (`kg-independent-judge`) so the generator
 // never grades rescue durability. It answers: against the same-domain anchors this
 // node would scaffold, is the candidate a durable prerequisite or an incidental
 // artifact? Used only to DROP a non-durable rescue candidate; it never creates a
@@ -221,7 +222,7 @@ export interface RescueDurabilityJudgmentPort {
 }
 
 // Dedicated measured Rescued-Node Canonical Labeling step (TODO #1), run on the independent
-// cross-family alias (`kg-independent-judge`) so the DeepSeek generator never names rescue
+// cross-family alias (`kg-independent-judge`) so the generator never names rescue
 // nodes. It replaces the rescue durability judge's under-attended optional `canonicalLabelProposal`
 // field: a rescued node's label is the source sentence it was mentioned in and reads as a
 // proposition, so this step re-names it to a concept-shaped noun phrase. ONE whole-set call per
@@ -320,7 +321,7 @@ export interface ConceptLessonRedundancyJudgmentPort {
 
 // Minting durability judge. A bounded, forced-tool LLM judgment over ONE proposed
 // assumed-prerequisite label before any generated grounding is created. Cross-family
-// from the DeepSeek proposer/generator; used only to DROP a clearly non-durable
+// from the proposer/generator; used only to DROP a clearly non-durable
 // proposal, never to create or reshape one. The application stage owns fail-open
 // behavior on transport or schema failure because generated proposals have no
 // candidate-owned verbatim source span to ground a veto against.
@@ -454,73 +455,70 @@ export interface PrerequisiteOrderingPort {
 export interface GroundingGenerationPort {
   readonly model: string;
   generate(input: {
-    derivedNodeId: string;
     declaredDomain: string;
-    nodeLabel: string;
-    scaffoldedAnchors: { conceptId: string; canonicalLabel: string; definitionQuotes: string[] }[];
-    // Topic context for the anchor-less synthetic case (KTD3, R3). When
-    // `scaffoldedAnchors` is empty (synthetic generation), the bundle is grounded on
-    // the originating topic instead of scaffolded anchors; absent/empty for the
-    // enrichment-minting path, which keeps scaffolding on its anchors unchanged.
-    topic?: string;
-    // Present only for a bounded replacement attempt after an exact-span-grounded
-    // factuality rejection. The generator may produce a fresh draft in response;
-    // it never edits or admits the rejected text, and the replacement is re-verified.
+    canonicalLabel: string;
+    context: GroundingAdmissionContext;
+    // Present only for a bounded replacement attempt after independent claim judgments reject
+    // every Definition Passage. The generator produces a fresh draft; it never edits or admits
+    // the rejected text, and the replacement is independently checked again.
     rejectionFeedback?: string;
   }): Promise<GeneratedGroundingBundle>;
 }
 
-export type GroundingVerificationQuestion = {
-  passageIndex: number;
+export type ClaimVerificationQuestion = {
+  targetKey: string;
   question: string;
 };
 
-export type GroundingVerificationAnswer = GroundingVerificationQuestion & {
+export type ClaimVerificationAnswer = {
+  questionKey: string;
   answer: string;
 };
 
-export type GroundingFactualityRevisionResult =
-  | { disposition: "accepted"; bundle: GeneratedGroundingBundle }
-  | { disposition: "rejected"; rationale: string };
-
-// Claim-targeted verification for a synthetic Generated Grounding Bundle. Planning sees
-// the draft so it can atomize every passage into self-contained factual questions. The
-// answering port deliberately cannot receive the draft; the application joins its answers
-// back to the plan only after that isolated call completes.
-export interface GroundingVerificationQuestionPlanningPort {
+// Owner-neutral claim-targeted verification. Planning sees code-owned positive targets so it can
+// atomize their factual content. Answering receives only independently answerable questions and
+// opaque correlation keys: no target text or generated artifact can cross that port. Each final
+// judgment port returns judgments over the original target keys and cannot author replacement
+// learner text. Cross-family panel membership, coverage, exact correlation, settlement, and retry
+// policy stay in application.
+export interface ClaimVerificationQuestionPlanningPort {
   readonly model: string;
   plan(input: {
     declaredDomain: string;
-    topic: string;
-    nodeLabel: string;
-    draft: GeneratedGroundingBundle;
-  }): Promise<GroundingVerificationQuestion[]>;
+    canonicalLabel: string;
+    context: GroundingAdmissionContext;
+    targets: readonly { targetKey: string; targetPurpose: "definition" | "support"; text: string }[];
+  }): Promise<ClaimVerificationQuestion[]>;
 }
 
-export interface GroundingVerificationAnsweringPort {
+export interface ClaimVerificationAnsweringPort {
   readonly model: string;
   answer(input: {
     declaredDomain: string;
-    topic: string;
-    nodeLabel: string;
-    questions: string[];
-  }): Promise<string[]>;
+    canonicalLabel: string;
+    context: GroundingAdmissionContext;
+    questions: readonly { questionKey: string; question: string }[];
+  }): Promise<ClaimVerificationAnswer[]>;
 }
 
-// The final cross-family comparison can revise the complete bundle only by removing an
-// original passage whose false verdict contains an exact span. It cannot mint source
-// provenance or author replacement learner-facing facts. A draft with no surviving
-// definition is rejected as a whole so the application can perform bounded rejection
-// sampling without admitting an undefined concept.
-export interface GroundingFactualityRevisionPort {
+export interface ClaimFactualityJudgmentPort {
   readonly model: string;
-  revise(input: {
+  judge(input: {
     declaredDomain: string;
-    topic: string;
-    nodeLabel: string;
-    draft: GeneratedGroundingBundle;
-    verificationAnswers: GroundingVerificationAnswer[];
-  }): Promise<GroundingFactualityRevisionResult>;
+    canonicalLabel: string;
+    context: GroundingAdmissionContext;
+    targets: readonly { targetKey: string; targetPurpose: "definition" | "support"; text: string }[];
+    verificationAnswers: readonly {
+      targetKey: string;
+      questionKey: string;
+      question: string;
+      answer: string;
+    }[];
+  }): Promise<readonly {
+    targetKey: string;
+    disposition: "accepted" | "rejected";
+    rationale: string;
+  }[]>;
 }
 
 // ---------------------------------------------------------------------------
@@ -533,7 +531,7 @@ export interface GroundingFactualityRevisionPort {
 
 // Concept-set synthesis (R1, R2, KTD7). ONE forced-tool call generates a bounded
 // concept set from `topic + declaredDomain` alone — no source, no coverage/grain gate
-// in this build. The generator stays DeepSeek-family (AGENTS rule 5); the probe below
+// in this build. The generator stays on the production extractor family (AGENTS rule 5); the probe below
 // is a cross-family second opinion.
 export interface ConceptSetSynthesisPort {
   readonly model: string;
@@ -557,7 +555,7 @@ export interface KnowledgeBoundaryProbePort {
 // unbounded graph-wide gap-filling); the application dedupes proposals against the
 // labels already present in the run (anchors + rescued + already-minted) within the
 // Declared Domain. Forced named tool schema; arguments validated and failed closed.
-// The generator stays DeepSeek-family (AGENTS rule 5), which is exactly why the
+// The generator stays on its production alias (AGENTS rule 5), which is exactly why the
 // generated-node ordering judge must be cross-family (KTD7).
 export interface MissingPrerequisiteProposalPort {
   readonly model: string;
@@ -857,7 +855,7 @@ export interface LessonReadStorePort {
 }
 
 // Study Item generation (R9, R10). Forced named tool schemas routed through LiteLLM; the
-// generator stays DeepSeek-family (AGENTS rule 5). `generateOptionSelect` returns a
+// generator stays on its production alias (AGENTS rule 5). `generateOptionSelect` returns a
 // pre-verification OptionSelectItemDraft (a grounded correct answer + three
 // sibling-conditioned distractors). The deterministic guard accepts or rejects —
 // semantic acceptance is NOT done here.
@@ -951,7 +949,7 @@ export interface StudyItemBlueprintPort {
 }
 
 // Concept Lesson generation (ADR-0031, R2/R4/R6/R7/R11/R14). Forced named tool schema
-// routed through LiteLLM; the generator stays DeepSeek-family (AGENTS rule 5). `generate`
+// routed through LiteLLM; the generator stays on its production alias (AGENTS rule 5). `generate`
 // returns a pre-verification ConceptLessonDraft — an ordered set of sections each citing a
 // grounding passage by id when source-supported. Provenance honesty is re-derived
 // authoritatively by the pure assembler (U6); this port never decides what is source-cited.

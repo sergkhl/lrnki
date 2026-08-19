@@ -17,6 +17,8 @@ import {
   scaffoldGenerationConfigHash,
   syntheticGenerationConfigHash
 } from "./configHashes";
+import { claimVerificationAnsweringDescriptor } from "./groundingGenerationAdapters";
+import type { LitellmProxyConfig } from "./litellmProxyConfig";
 import { operationConfigHash } from "./operationConfigHash";
 
 // KTD7 (plan 2026-07-16-004 U3): the registry is CLOSED against the Operation Timeline catalog.
@@ -130,6 +132,21 @@ test("the all-descriptor inventory deduplicates shared descriptors", () => {
     (descriptor) => descriptor.stageTag === STAGE_TAGS.knowledgeBoundaryProbe
   ).length;
   assert.equal(probeCount, 1);
+  const claimJudges = neuralOperationRegistry.syntheticTopicGeneration.descriptors.filter(
+    (descriptor) => descriptor.stageTag === STAGE_TAGS.groundingFactualityRevision
+  );
+  assert.equal(claimJudges.length, 2, "the factuality panel keeps both model identities");
+  assert.deepEqual(
+    claimJudges.map((descriptor) => descriptor.modelOverride),
+    [undefined, "kg-claim-factuality-challenger"]
+  );
+  assert.equal(
+    allNeuralOperationDescriptors.filter(
+      (descriptor) => descriptor.stageTag === STAGE_TAGS.groundingFactualityRevision
+    ).length,
+    2,
+    "deduplication does not collapse distinct judge deployments"
+  );
   // Both parameterizations of the definition-quality factory are distinct identities and kept.
   const qualityTags = allNeuralOperationDescriptors
     .filter((descriptor) => descriptor.promptPath.includes("definition-passage-quality"))
@@ -138,30 +155,122 @@ test("the all-descriptor inventory deduplicates shared descriptors", () => {
   assert.deepEqual(qualityTags, [STAGE_TAGS.definitionPassageQuality, STAGE_TAGS.rescueDefinitionQuality].sort());
 });
 
-// Exact identity regression (plan 2026-07-11-001 AE6): the registry derivation must not perturb
-// either default operation identity for unchanged inputs. A legitimate behavior change may update
-// these values deliberately — never as a side effect of a type refactor.
+// Model reassignment invalidates evidence even when the prompt alias stays stable. The routing
+// module keeps the YAML mechanics behind one interface; the operation hash consumes only its
+// behavior identity. Accounting-only price edits and unrelated aliases remain non-behavioral.
+test("operation identity follows effective model, provider, fallback, and router behavior", () => {
+  const fixture = (input: {
+    target?: "model-a" | "model-b";
+    provider?: string;
+    fallback?: boolean;
+    routingStrategy?: string;
+  } = {}): LitellmProxyConfig => ({
+    deployments: [
+      {
+        modelName: "model-a",
+        model: "openrouter/family/model-a",
+        inputCostPerToken: 0.1,
+        behavior: {
+          litellmParams: {
+            model: "openrouter/family/model-a",
+            extra_body: { provider: { only: [input.provider ?? "provider-a"], allow_fallbacks: false } }
+          },
+          modelInfo: { mode: "chat" }
+        }
+      },
+      {
+        modelName: "model-b",
+        model: "openrouter/family/model-b",
+        behavior: {
+          litellmParams: {
+            model: "openrouter/family/model-b",
+            extra_body: { provider: { only: ["provider-b"], allow_fallbacks: false } }
+          },
+          modelInfo: { mode: "chat" }
+        }
+      },
+      {
+        modelName: "backup",
+        model: "openrouter/family/backup",
+        behavior: { litellmParams: { model: "openrouter/family/backup" }, modelInfo: { mode: "chat" } }
+      }
+    ],
+    modelGroupAlias: {
+      "kg-claim-verification-answerer": input.target ?? "model-a"
+    },
+    fallbacks: input.fallback ? { "kg-claim-verification-answerer": ["backup"] } : {},
+    routerBehavior: { routing_strategy: input.routingStrategy ?? "usage-based-routing-v2" }
+  });
+  const hash = (config: LitellmProxyConfig): string => operationConfigHash(
+    "routing-probe",
+    [claimVerificationAnsweringDescriptor],
+    {},
+    { litellmConfig: config }
+  );
+
+  const baseConfig = fixture();
+  const base = hash(baseConfig);
+  assert.equal(base, hash(fixture()), "routing identity is deterministic");
+  assert.notEqual(hash(fixture({ target: "model-b" })), base, "alias reassignment");
+  assert.notEqual(hash(fixture({ provider: "provider-c" })), base, "provider pin");
+  assert.notEqual(hash(fixture({ fallback: true })), base, "fallback chain");
+  assert.notEqual(hash(fixture({ routingStrategy: "latency-based-routing" })), base, "router behavior");
+
+  const priceOnly = fixture();
+  priceOnly.deployments[0] = { ...priceOnly.deployments[0]!, inputCostPerToken: 99 };
+  assert.equal(hash(priceOnly), base, "accounting-only prices do not invalidate quality evidence");
+  const unrelatedAlias = fixture();
+  unrelatedAlias.modelGroupAlias["unrelated-role"] = "model-b";
+  assert.equal(hash(unrelatedAlias), base, "unrelated aliases do not perturb this operation");
+  const missingDeployment = fixture();
+  missingDeployment.modelGroupAlias["kg-claim-verification-answerer"] = "missing-model";
+  assert.throws(() => hash(missingDeployment), /has no declared deployment/);
+});
+
+// Exact identity regression (plan 2026-07-11-001 AE6): U1 deliberately re-baselined both hashes
+// because Grounding Generation now consumes the closed owner-neutral context, Synthetic Topic
+// Generation binds the complete Source-less Grounding Admission policy, and v2 binds every stage's
+// effective LiteLLM model/provider/fallback behavior. Future non-behavioral refactors must not
+// perturb these identities.
 test("default operation config hashes are stable across the registry derivation", () => {
-  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-913d1ab4584f");
-  assert.equal(syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG), "synthetic-topic-generation-28288308e450");
+  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-6fe9557d11f3");
+  assert.equal(syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG), "synthetic-topic-generation-2c7d199e35c5");
 });
 
 test("synthetic execution widths do not change identity while probe behavior still does", () => {
   const base = syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG);
   assert.equal(
-    syntheticGenerationConfigHash({ ...DEFAULT_SYNTHETIC_GENERATION_CONFIG, conceptConcurrency: 1 }),
+    syntheticGenerationConfigHash({
+      ...DEFAULT_SYNTHETIC_GENERATION_CONFIG,
+      sourceLessGroundingAdmission: {
+        ...DEFAULT_SYNTHETIC_GENERATION_CONFIG.sourceLessGroundingAdmission,
+        candidateConcurrency: 1
+      }
+    }),
     base,
     "concept fan-out is execution policy"
   );
   assert.equal(
-    syntheticGenerationConfigHash({ ...DEFAULT_SYNTHETIC_GENERATION_CONFIG, verificationConcurrency: 1 }),
+    syntheticGenerationConfigHash({
+      ...DEFAULT_SYNTHETIC_GENERATION_CONFIG,
+      sourceLessGroundingAdmission: {
+        ...DEFAULT_SYNTHETIC_GENERATION_CONFIG.sourceLessGroundingAdmission,
+        verificationConcurrency: 1
+      }
+    }),
     base,
     "verification fan-out is execution policy"
   );
   assert.equal(
     syntheticGenerationConfigHash({
       ...DEFAULT_SYNTHETIC_GENERATION_CONFIG,
-      probe: { ...DEFAULT_SYNTHETIC_GENERATION_CONFIG.probe, probeConcurrency: 1 }
+      sourceLessGroundingAdmission: {
+        ...DEFAULT_SYNTHETIC_GENERATION_CONFIG.sourceLessGroundingAdmission,
+        probe: {
+          ...DEFAULT_SYNTHETIC_GENERATION_CONFIG.sourceLessGroundingAdmission.probe,
+          probeConcurrency: 1
+        }
+      }
     }),
     base,
     "within-concept probe fan-out is execution policy"
@@ -169,7 +278,13 @@ test("synthetic execution widths do not change identity while probe behavior sti
   assert.notEqual(
     syntheticGenerationConfigHash({
       ...DEFAULT_SYNTHETIC_GENERATION_CONFIG,
-      probe: { ...DEFAULT_SYNTHETIC_GENERATION_CONFIG.probe, sampleCount: DEFAULT_SYNTHETIC_GENERATION_CONFIG.probe.sampleCount + 1 }
+      sourceLessGroundingAdmission: {
+        ...DEFAULT_SYNTHETIC_GENERATION_CONFIG.sourceLessGroundingAdmission,
+        probe: {
+          ...DEFAULT_SYNTHETIC_GENERATION_CONFIG.sourceLessGroundingAdmission.probe,
+          sampleCount: DEFAULT_SYNTHETIC_GENERATION_CONFIG.sourceLessGroundingAdmission.probe.sampleCount + 1
+        }
+      }
     }),
     base,
     "probe K remains behavioral identity"
@@ -177,7 +292,13 @@ test("synthetic execution widths do not change identity while probe behavior sti
   assert.notEqual(
     syntheticGenerationConfigHash({
       ...DEFAULT_SYNTHETIC_GENERATION_CONFIG,
-      probe: { ...DEFAULT_SYNTHETIC_GENERATION_CONFIG.probe, agreementThreshold: DEFAULT_SYNTHETIC_GENERATION_CONFIG.probe.agreementThreshold + 0.01 }
+      sourceLessGroundingAdmission: {
+        ...DEFAULT_SYNTHETIC_GENERATION_CONFIG.sourceLessGroundingAdmission,
+        probe: {
+          ...DEFAULT_SYNTHETIC_GENERATION_CONFIG.sourceLessGroundingAdmission.probe,
+          agreementThreshold: DEFAULT_SYNTHETIC_GENERATION_CONFIG.sourceLessGroundingAdmission.probe.agreementThreshold + 0.01
+        }
+      }
     }),
     base,
     "probe admission threshold remains behavioral identity"
@@ -185,9 +306,68 @@ test("synthetic execution widths do not change identity while probe behavior sti
   assert.notEqual(
     syntheticGenerationConfigHash({
       ...DEFAULT_SYNTHETIC_GENERATION_CONFIG,
-      groundingDraftAttempts: DEFAULT_SYNTHETIC_GENERATION_CONFIG.groundingDraftAttempts + 1
+      sourceLessGroundingAdmission: {
+        ...DEFAULT_SYNTHETIC_GENERATION_CONFIG.sourceLessGroundingAdmission,
+        groundingDraftAttempts: DEFAULT_SYNTHETIC_GENERATION_CONFIG.sourceLessGroundingAdmission.groundingDraftAttempts + 1
+      }
     }),
     base,
     "bounded grounding rejection sampling remains behavioral identity"
+  );
+  assert.notEqual(
+    syntheticGenerationConfigHash({
+      ...DEFAULT_SYNTHETIC_GENERATION_CONFIG,
+      sourceLessGroundingAdmission: {
+        ...DEFAULT_SYNTHETIC_GENERATION_CONFIG.sourceLessGroundingAdmission,
+        verificationSampleCount: DEFAULT_SYNTHETIC_GENERATION_CONFIG.sourceLessGroundingAdmission.verificationSampleCount + 1
+      }
+    }),
+    base,
+    "independent verification evidence sample count remains behavioral identity"
+  );
+  assert.notEqual(
+    syntheticGenerationConfigHash({
+      ...DEFAULT_SYNTHETIC_GENERATION_CONFIG,
+      sourceLessGroundingAdmission: {
+        ...DEFAULT_SYNTHETIC_GENERATION_CONFIG.sourceLessGroundingAdmission,
+        verificationDecision: "unanimous" as typeof DEFAULT_SYNTHETIC_GENERATION_CONFIG.sourceLessGroundingAdmission.verificationDecision
+      }
+    }),
+    base,
+    "same-model replicated rejection remains behavioral identity"
+  );
+  assert.notEqual(
+    syntheticGenerationConfigHash({
+      ...DEFAULT_SYNTHETIC_GENERATION_CONFIG,
+      sourceLessGroundingAdmission: {
+        ...DEFAULT_SYNTHETIC_GENERATION_CONFIG.sourceLessGroundingAdmission,
+        verificationSampleCount: 3,
+        verificationRejectionSampleQuorum: 3
+      }
+    }),
+    base,
+    "replicated rejection sample quorum remains behavioral identity"
+  );
+  assert.notEqual(
+    syntheticGenerationConfigHash({
+      ...DEFAULT_SYNTHETIC_GENERATION_CONFIG,
+      sourceLessGroundingAdmission: {
+        ...DEFAULT_SYNTHETIC_GENERATION_CONFIG.sourceLessGroundingAdmission,
+        groundingClaimProjection: "whole_passage" as "sentence_and_semicolon"
+      }
+    }),
+    base,
+    "grounding claim projection granularity remains behavioral identity"
+  );
+  assert.notEqual(
+    syntheticGenerationConfigHash({
+      ...DEFAULT_SYNTHETIC_GENERATION_CONFIG,
+      sourceLessGroundingAdmission: {
+        ...DEFAULT_SYNTHETIC_GENERATION_CONFIG.sourceLessGroundingAdmission,
+        judgmentTargetBatchSize: 2 as 1
+      }
+    }),
+    base,
+    "singleton terminal judgment context remains behavioral identity"
   );
 });

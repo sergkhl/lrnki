@@ -822,12 +822,33 @@ export type SourceMentionGroundingPassage = {
   verbatimCheck: Extract<GroundingPassageVerbatimCheck, { disposition: "verified" | "failed" }>;
 };
 
+// The complete context on which one source-less candidate may be grounded. A candidate is
+// either a first-class concept generated from an originating topic or a prerequisite generated
+// to scaffold exactly one already-grounded anchor. This closed union is shared by the admission
+// module and its Grounding Generation port so callers cannot construct ambiguous topic+anchor
+// combinations or silently omit the one real anchor they own.
+export type GroundingAdmissionContext =
+  | {
+      kind: "originating_topic";
+      topic: string;
+    }
+  | {
+      kind: "scaffolded_anchor";
+      anchor: {
+        reference: string;
+        canonicalLabel: string;
+        definitionPassages: readonly [string, ...string[]];
+      };
+    };
+
 export type GeneratedGroundingBundle = {
-  derivedNodeId: string;
   groundingOrigin: "llm_grounded";
   definitions: GeneratedGroundingPassage[];
   mentions: GeneratedGroundingPassage[];
-  scaffoldedAnchorConceptIds: string[];
+  // Owner-neutral references to the admitted anchors that conditioned generation. Empty for an
+  // originating-topic candidate. The enclosing Enrichment Node or generated Support Step owns
+  // durable identity; a Grounding Bundle never repeats it.
+  groundingAnchorReferences: string[];
   generatingModel: string;
   rationale: string;
 };
@@ -911,9 +932,9 @@ export type DerivedGraphNode = AnchorProjectionNode | EnrichmentNode;
 // One explicit, inspectable proposal that a prerequisite concept the source
 // ASSUMES but never teaches should be minted as an `llm_grounded` node (R7, KTD6).
 // This is the node-identity decision the minting pass makes BEFORE any grounding is
-// generated: `GroundingGenerationPort` fills a chosen label, it never decides which
-// labels exist. Proposals are anchor-driven (each names the anchor it scaffolds) and
-// bounded; the application dedupes them against existing node labels within domain.
+// generated: Source-less Grounding Admission fills a chosen label, it never decides which labels
+// exist. Proposals are anchor-driven (each names the anchor it scaffolds) and bounded; the
+// application dedupes them against existing node labels within domain.
 export type MissingPrerequisiteProposal = {
   proposedLabel: string;
   rationale: string;
@@ -1263,7 +1284,7 @@ export type PairDirectionVote = {
 // rule 18), so `reprompted`/`assertedEdges` are gone.
 export type PrerequisiteOrderingTrace = {
   declaredDomain: string;
-  // The single non-DeepSeek ordering alias that ordered this domain (R5).
+  // The single whole-set ordering alias that ordered this domain (R5).
   judgeModel: string;
   nodeCount: number;
   // The number of ordering draws taken for this domain (D1/D8). 0 for a singleton domain.
@@ -1307,9 +1328,10 @@ export type SyntheticProbeDisposition = {
   canonicalLabel: string;
   declaredDomain: string;
   disposition: "core_knowledge" | "boundary";
-  // Mean pairwise cosine over the K probe answers; null when agreement was unmeasurable
-  // (fewer than two draws) or the embedding port was unavailable (fail-safe to boundary).
-  agreementScore: number | null;
+  // Mean pairwise cosine over the K probe answers. Admission policy requires at least two draws,
+  // and an unavailable or malformed embedding result aborts the operation rather than fabricating
+  // a measured boundary disposition.
+  agreementScore: number;
   rationale: string;
   // The trusted derived node this concept became; null for a boundary concept (no node).
   derivedNodeId: string | null;

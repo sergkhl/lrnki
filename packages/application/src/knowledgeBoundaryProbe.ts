@@ -18,15 +18,20 @@ import { mapWithConcurrency } from "./mapWithConcurrency";
 
 export type KnowledgeBoundaryDisposition = "core_knowledge" | "boundary";
 
-export type KnowledgeBoundaryVerdict = {
-  disposition: KnowledgeBoundaryDisposition;
-  // Mean pairwise cosine over the K answer embeddings; null when agreement could not be
-  // measured (fewer than two answers, or the embedding port was unavailable).
-  agreementScore: number | null;
+type KnowledgeBoundaryVerdictCommon = {
+  // Mean pairwise cosine over the K answer embeddings. A valid admission policy always samples
+  // at least two answers, and an unavailable or malformed embedding result propagates instead of
+  // being misreported as a measured boundary outcome.
+  agreementScore: number;
   // The K raw probe answers, retained for the operation's inspectable trace.
   answers: string[];
   rationale: string;
 };
+
+export type KnowledgeBoundaryVerdict = KnowledgeBoundaryVerdictCommon & (
+  | { disposition: "core_knowledge" }
+  | { disposition: "boundary" }
+);
 
 export type KnowledgeBoundaryProbeConfig = {
   // K: how many independent probe draws to sample per concept.
@@ -58,8 +63,9 @@ export async function probeKnowledgeBoundary(input: {
   embedding: NodeEmbeddingPort;
   config: KnowledgeBoundaryProbeConfig;
 }): Promise<KnowledgeBoundaryVerdict> {
-  const k = Math.max(1, Math.trunc(input.config.sampleCount));
-  const concurrency = Math.max(1, Math.trunc(input.config.probeConcurrency));
+  validateKnowledgeBoundaryProbeConfig(input.config);
+  const k = input.config.sampleCount;
+  const concurrency = input.config.probeConcurrency;
 
   // K independent draws over the SAME concept. A probe transport/schema failure
   // propagates (the operation fails the stage) — only the embedding half fails safe.
@@ -69,39 +75,13 @@ export async function probeKnowledgeBoundary(input: {
     () => input.probe.probe({ conceptLabel: input.conceptLabel, declaredDomain: input.declaredDomain }).then((draw) => draw.answer)
   );
 
-  // A single draw carries no dispersion signal, so agreement is unmeasurable → fail safe
-  // to `boundary` rather than silently trusting one answer (never core on no signal).
-  if (answers.length < 2) {
-    return {
-      disposition: "boundary",
-      agreementScore: null,
-      answers,
-      rationale: `only ${answers.length} probe draw(s); agreement unmeasurable, routed to boundary fail-safe`
-    };
+  const vectors = await input.embedding.embed(answers);
+  if (vectors.length !== answers.length) {
+    throw new Error(`Knowledge-Boundary Probe embedding returned ${vectors.length} vectors for ${answers.length} answers.`);
   }
-
-  // Fail safe (R8): the embedding port throws on any shape mismatch or transport failure.
-  // Treat an unavailable similarity signal as `boundary` — never let a blip silently pass
-  // a concept as `core_knowledge`.
-  let agreementScore: number;
-  try {
-    const vectors = await input.embedding.embed(answers);
-    if (vectors.length !== answers.length) {
-      return {
-        disposition: "boundary",
-        agreementScore: null,
-        answers,
-        rationale: `embedding returned ${vectors.length} vectors for ${answers.length} answers; routed to boundary fail-safe`
-      };
-    }
-    agreementScore = meanPairwiseCosine(vectors);
-  } catch (error) {
-    return {
-      disposition: "boundary",
-      agreementScore: null,
-      answers,
-      rationale: `embedding port unavailable (${error instanceof Error ? error.message : String(error)}); routed to boundary fail-safe`
-    };
+  const agreementScore = meanPairwiseCosine(vectors);
+  if (!Number.isFinite(agreementScore)) {
+    throw new Error("Knowledge-Boundary Probe embedding produced a non-finite agreement score.");
   }
 
   const disposition: KnowledgeBoundaryDisposition =
@@ -112,6 +92,18 @@ export async function probeKnowledgeBoundary(input: {
     answers,
     rationale: `mean pairwise cosine ${agreementScore.toFixed(4)} over ${answers.length} draws ${disposition === "core_knowledge" ? ">=" : "<"} threshold ${input.config.agreementThreshold}`
   };
+}
+
+export function validateKnowledgeBoundaryProbeConfig(config: KnowledgeBoundaryProbeConfig): void {
+  if (!Number.isInteger(config.sampleCount) || config.sampleCount < 2) {
+    throw new Error("Knowledge-Boundary Probe sampleCount must be an integer of at least 2.");
+  }
+  if (!Number.isInteger(config.probeConcurrency) || config.probeConcurrency < 1) {
+    throw new Error("Knowledge-Boundary Probe probeConcurrency must be a positive integer.");
+  }
+  if (!Number.isFinite(config.agreementThreshold) || config.agreementThreshold < -1 || config.agreementThreshold > 1) {
+    throw new Error("Knowledge-Boundary Probe agreementThreshold must be between -1 and 1.");
+  }
 }
 
 // Mean cosine over every unordered pair of the K answer vectors. With near-identical

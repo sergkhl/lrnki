@@ -6,10 +6,11 @@ import { mintingDurabilityDescriptor, prerequisiteOrderingDescriptor, rescuedNod
 import { nodeMergeAdjudicationDescriptor, NODE_EMBEDDING_MODEL } from "./dedupAdapters";
 import { missingPrerequisiteProposalDescriptor } from "./missingPrerequisiteProposalAdapters";
 import {
-  groundingFactualityRevisionDescriptor,
+  claimFactualityChallengeDescriptor,
+  claimFactualityJudgmentDescriptor,
+  claimVerificationAnsweringDescriptor,
+  claimVerificationQuestionPlanningDescriptor,
   groundingGenerationDescriptor,
-  groundingVerificationAnsweringDescriptor,
-  groundingVerificationQuestionPlanningDescriptor
 } from "./groundingGenerationAdapters";
 import { intrinsicDifficultyBandingDescriptor, intrinsicDifficultyComparisonDescriptor } from "./intrinsicDifficultyAdapters";
 import { conceptSetSynthesisDescriptor, knowledgeBoundaryProbeDescriptor } from "./syntheticGenerationAdapters";
@@ -84,9 +85,10 @@ export const neuralOperationRegistry = {
       conceptSetSynthesisDescriptor,
       knowledgeBoundaryProbeDescriptor,
       groundingGenerationDescriptor,
-      groundingVerificationQuestionPlanningDescriptor,
-      groundingVerificationAnsweringDescriptor,
-      groundingFactualityRevisionDescriptor,
+      claimVerificationQuestionPlanningDescriptor,
+      claimVerificationAnsweringDescriptor,
+      claimFactualityJudgmentDescriptor,
+      claimFactualityChallengeDescriptor,
       prerequisiteOrderingDescriptor,
       intrinsicDifficultyBandingDescriptor,
       intrinsicDifficultyComparisonDescriptor
@@ -157,6 +159,8 @@ export function graphEnrichmentConfigHash(config: GraphEnrichmentConfig): string
   return operationConfigHash(entry.configSeed, entry.descriptors, {
     ...withoutEnrichmentConfigHash(config),
     nodeEmbeddingModel: NODE_EMBEDDING_MODEL
+  }, {
+    additionalModels: [NODE_EMBEDDING_MODEL]
   });
 }
 
@@ -165,6 +169,8 @@ export function syntheticGenerationConfigHash(config: SyntheticGenerationConfig)
   return operationConfigHash(entry.configSeed, entry.descriptors, {
     ...syntheticBehaviorConfig(config),
     nodeEmbeddingModel: NODE_EMBEDDING_MODEL
+  }, {
+    additionalModels: [NODE_EMBEDDING_MODEL]
   });
 }
 
@@ -182,6 +188,8 @@ export function scaffoldGenerationConfigHash(config: ScaffoldGenerationConfig): 
   return operationConfigHash(entry.configSeed, entry.descriptors, {
     ...config,
     nodeEmbeddingModel: NODE_EMBEDDING_MODEL
+  }, {
+    additionalModels: [NODE_EMBEDDING_MODEL]
   });
 }
 
@@ -205,16 +213,26 @@ function withoutEnrichmentConfigHash<T extends { enrichmentConfigHash: string }>
 // behavioral identity while every neural-policy knob remains hashed (ADR-0019).
 function syntheticBehaviorConfig(config: SyntheticGenerationConfig) {
   const {
-    conceptConcurrency: _conceptConcurrency,
-    verificationConcurrency: _verificationConcurrency,
-    probe,
+    sourceLessGroundingAdmission,
     ...behavior
   } = withoutEnrichmentConfigHash(config);
+  const {
+    candidateConcurrency: _candidateConcurrency,
+    verificationConcurrency: _verificationConcurrency,
+    probe,
+    ...admissionBehavior
+  } = sourceLessGroundingAdmission;
   const { probeConcurrency: _probeConcurrency, ...probeBehavior } = probe;
-  void _conceptConcurrency;
+  void _candidateConcurrency;
   void _verificationConcurrency;
   void _probeConcurrency;
-  return { ...behavior, probe: probeBehavior };
+  return {
+    ...behavior,
+    sourceLessGroundingAdmission: {
+      ...admissionBehavior,
+      probe: probeBehavior
+    }
+  };
 }
 
 // Two registry entries may hold the same descriptor value (probe/grounding are SHARED_STAGES) or

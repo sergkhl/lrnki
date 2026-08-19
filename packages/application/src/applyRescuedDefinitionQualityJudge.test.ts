@@ -125,11 +125,10 @@ test("llm_grounded nodes pass through untouched (only source_mentioned rescue de
     declaredDomain: "systems programming",
     aliases: [],
     groundingBundle: {
-      derivedNodeId: "gen-1",
       groundingOrigin: "llm_grounded",
       definitions: [{ passageType: "definition", text: "A stack frame is...", groundingOrigin: "llm_grounded", headingPath: [], locator: {}, verbatimCheck: { disposition: "not_applicable_by_grounding", rationale: "generated" } }],
       mentions: [],
-      scaffoldedAnchorConceptIds: [],
+      groundingAnchorReferences: [],
       generatingModel: "deepseek",
       rationale: "assumed"
     }

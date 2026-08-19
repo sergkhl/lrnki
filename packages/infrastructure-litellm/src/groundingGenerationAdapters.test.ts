@@ -1,14 +1,21 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  createGroundingFactualityRevisionPort,
-  createGroundingGenerationPort,
-  createGroundingVerificationAnsweringPort,
-  createGroundingVerificationQuestionPlanningPort
+  claimFactualityChallengeDescriptor,
+  claimFactualityJudgmentDescriptor,
+  createClaimFactualityChallengePort,
+  createClaimFactualityJudgmentPort,
+  createClaimVerificationAnsweringPort,
+  createClaimVerificationQuestionPlanningPort,
+  createGroundingGenerationPort
 } from "./groundingGenerationAdapters";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 
-function adapterReturning(canned: { definitions: { text: string }[]; mentions: { text: string }[]; rationale: string }) {
+function groundingAdapterReturning(canned: {
+  definitions: { text: string }[];
+  mentions: { text: string }[];
+  rationale: string;
+}) {
   const calls: unknown[] = [];
   const client = {
     async call(input: unknown) {
@@ -19,251 +26,226 @@ function adapterReturning(canned: { definitions: { text: string }[]; mentions: {
   return { adapter: createGroundingGenerationPort(client), calls };
 }
 
-test("generates an llm-grounded bundle conditioned on scaffolded anchors", async () => {
-  const { adapter, calls } = adapterReturning({
+test("generates an owner-neutral bundle conditioned on one closed scaffolded anchor", async () => {
+  const { adapter, calls } = groundingAdapterReturning({
     definitions: [{ text: "Stack allocation places short-lived values in stack memory." }],
-    mentions: [{ text: "Understanding stack allocation helps explain why Copy values can be duplicated cheaply." }],
-    rationale: "Stack allocation scaffolds Copy trait behavior."
+    mentions: [{ text: "Understanding stack allocation helps explain inexpensive value copying." }],
+    rationale: "Stack allocation scaffolds the anchor behavior."
   });
 
   const bundle = await adapter.generate({
-    derivedNodeId: "dn-stack-allocation",
     declaredDomain: "software engineering",
-    nodeLabel: "Stack allocation",
-    scaffoldedAnchors: [{ conceptId: "copy", canonicalLabel: "Copy Trait", definitionQuotes: ["Types such as integers that have a known size at compile time implement Copy."] }],
+    canonicalLabel: "Stack allocation",
+    context: {
+      kind: "scaffolded_anchor",
+      anchor: {
+        reference: "copy",
+        canonicalLabel: "Copy Trait",
+        definitionPassages: ["Types with a known size can implement Copy."]
+      }
+    },
     rejectionFeedback: "A prior definition contained a scope conflation."
   });
 
-  assert.equal(bundle.derivedNodeId, "dn-stack-allocation");
+  assert.equal("derivedNodeId" in bundle, false);
   assert.equal(bundle.groundingOrigin, "llm_grounded");
   assert.equal(bundle.generatingModel, "kg-claim-extraction");
-  assert.deepEqual(bundle.scaffoldedAnchorConceptIds, ["copy"]);
-  assert.equal(bundle.definitions[0].groundingOrigin, "llm_grounded");
+  assert.deepEqual(bundle.groundingAnchorReferences, ["copy"]);
   assert.equal(bundle.definitions[0].verbatimCheck.disposition, "not_applicable_by_grounding");
   assert.equal(bundle.mentions[0].passageType, "mention");
 
   const call = calls[0] as { model: string; toolName: string; messages: { content: string }[] };
   assert.equal(call.model, "kg-claim-extraction");
   assert.equal(call.toolName, "submit_generated_grounding_bundle");
+  assert.ok(call.messages.some((message) => message.content.includes("Candidate concept: \"Stack allocation\"")));
   assert.ok(call.messages.some((message) => message.content.includes("Copy Trait")));
-  assert.ok(call.messages.some((message) => message.content.includes("Types such as integers")));
+  assert.ok(call.messages.some((message) => message.content.includes("Types with a known size")));
   assert.ok(call.messages.some((message) => message.content.includes("prior definition contained a scope conflation")));
+  assert.ok(call.messages.some((message) => message.content.includes("Make every sentence independently checkable")));
+  assert.ok(call.messages.some((message) => message.content.includes("one factual proposition per sentence")));
+  assert.ok(call.messages.some((message) => message.content.includes("Definition Passage must stand alone")));
+  assert.ok(call.messages.some((message) => message.content.includes("first sentence, including the text before any semicolon")));
+  assert.ok(call.messages.some((message) => message.content.includes("criterion that makes something a member of that category")));
+  assert.ok(call.messages.some((message) => message.content.includes("including 0, 1, 2, and 3 when meaningful")));
+  assert.ok(call.messages.some((message) => message.content.includes("necessary, sufficient, typical")));
+  assert.ok(call.messages.some((message) => message.content.includes("component operation from a total outcome")));
+  assert.ok(call.messages.some((message) => message.content.includes("absolute or exact language")));
+  assert.ok(call.messages.some((message) => message.content.includes("observations, not correction authority")));
+  const modelFacing = call.messages.map((message) => message.content).join("\n").toLowerCase();
+  for (const fixtureTerm of ["binary search", "pivot", "linked list", "logarithmic", "half-open interval"]) {
+    assert.equal(modelFacing.includes(fixtureTerm), false, `fixture-derived term leaked: ${fixtureTerm}`);
+  }
 });
 
-test("malformed tool arguments fail closed through the forced-tool validator", async () => {
+test("originating-topic grounding produces no anchor references", async () => {
+  const { adapter, calls } = groundingAdapterReturning({
+    definitions: [{ text: "A feedback loop routes an output signal back into a system input." }],
+    mentions: [],
+    rationale: "First-class topic concept."
+  });
+  const bundle = await adapter.generate({
+    declaredDomain: "systems science",
+    canonicalLabel: "Feedback loop",
+    context: { kind: "originating_topic", topic: "Feedback systems" }
+  });
+  assert.deepEqual(bundle.groundingAnchorReferences, []);
+  const call = calls[0] as { messages: { content: string }[] };
+  assert.ok(call.messages.some((message) => message.content.includes("Originating topic: \"Feedback systems\"")));
+});
+
+test("malformed Grounding Generation arguments fail closed through the forced-tool client", async () => {
   const client = {
-    async call() {
-      throw new Error("Expected at least one definition");
-    }
+    async call() { throw new Error("Expected at least one definition"); }
   } as unknown as LiteLlmForcedToolClient;
-  const adapter = createGroundingGenerationPort(client);
-
-  await assert.rejects(
-    () => adapter.generate({
-      derivedNodeId: "dn",
-      declaredDomain: "software engineering",
-      nodeLabel: "Stack allocation",
-      scaffoldedAnchors: []
-    }),
-    /definition/
-  );
+  await assert.rejects(() => createGroundingGenerationPort(client).generate({
+    declaredDomain: "software engineering",
+    canonicalLabel: "Stack allocation",
+    context: { kind: "originating_topic", topic: "Memory management" }
+  }), /definition/);
 });
 
-test("plans claim-targeted questions from the draft, then answers them without draft context", async () => {
-  const calls: Array<{ toolName: string; messages: { content: string }[] }> = [];
+test("planning sees owner-neutral targets while the external answer model receives no target or draft text", async () => {
+  const calls: Array<{ model: string; toolName: string; messages: { content: string }[] }> = [];
   const client = {
-    async call(input: { toolName: string; messages: { content: string }[] }) {
+    async call(input: { model: string; toolName: string; messages: { content: string }[] }) {
       calls.push(input);
-      if (input.toolName === "submit_grounding_verification_questions") {
+      if (input.toolName === "submit_claim_verification_questions") {
         return {
           questions: [
-            { passageIndex: 0, question: "What distinguishes the two mechanisms?" },
-            { passageIndex: 1, question: "What role does the mechanism have in the topic?" }
+            { targetKey: "definition:0", question: "What distinguishes the two mechanisms?" },
+            { targetKey: "mention:0", question: "What role does the mechanism have in the topic?" }
           ]
         };
       }
       return {
         answers: [
-          { questionIndex: 2, answer: "It has a specific established role." },
-          { questionIndex: 0, answer: "The named concept has distinct necessary features." },
-          { questionIndex: 1, answer: "The mechanisms differ in their defining process." }
+          { questionKey: "q:2", answer: "It has a specific established role." },
+          { questionKey: "q:0", answer: "The named concept has distinct necessary features." },
+          { questionKey: "q:1", answer: "The mechanisms differ in their defining process." }
         ]
       };
     }
   } as unknown as LiteLlmForcedToolClient;
-  const draft = await adapterReturning({
-    definitions: [{ text: "Draft-only marker defines the mechanism." }],
-    mentions: [{ text: "The mechanism contributes to the topic." }],
-    rationale: "draft"
-  }).adapter.generate({
-    derivedNodeId: "dn-context-isolation",
+  const context = { kind: "originating_topic" as const, topic: "A broad topic" };
+  const targets = [
+    { targetKey: "definition:0", targetPurpose: "definition" as const, text: "Draft-only marker defines the mechanism." },
+    { targetKey: "mention:0", targetPurpose: "support" as const, text: "The mechanism contributes to the topic." }
+  ] as const;
+
+  const questions = await createClaimVerificationQuestionPlanningPort(client).plan({
     declaredDomain: "general",
-    nodeLabel: "Mechanism contrast",
-    scaffoldedAnchors: [],
-    topic: "A broad topic"
+    canonicalLabel: "Mechanism contrast",
+    context,
+    targets
+  });
+  const answers = await createClaimVerificationAnsweringPort(client).answer({
+    declaredDomain: "general",
+    canonicalLabel: "Mechanism contrast",
+    context,
+    questions: questions.map((question, index) => ({ questionKey: `q:${index}`, question: question.question }))
   });
 
-  const questions = await createGroundingVerificationQuestionPlanningPort(client).plan({
-    declaredDomain: "general",
-    topic: "A broad topic",
-    nodeLabel: "Mechanism contrast",
-    draft
-  });
-  const answers = await createGroundingVerificationAnsweringPort(client).answer({
-    declaredDomain: "general",
-    topic: "A broad topic",
-    nodeLabel: "Mechanism contrast",
-    questions: questions.map((question) => question.question)
-  });
-
-  assert.equal(calls[0].toolName, "submit_grounding_verification_questions");
+  assert.equal(calls[0].toolName, "submit_claim_verification_questions");
+  assert.equal(calls[0].model, "kg-claim-verification-planner");
   assert.ok(calls[0].messages.some((message) => message.content.includes("Draft-only marker")));
-  assert.ok(calls[0].messages.some((message) => message.content.includes("nearest-alternative check")));
+  assert.ok(calls[0].messages.some((message) => message.content.includes('{"targetKey":"definition:0","targetPurpose":"definition","text":"Draft-only marker defines the mechanism."}')));
+  assert.ok(calls[0].messages.some((message) => message.content.includes("code-owned positive claim targets")));
+  assert.ok(calls[0].messages.some((message) => message.content.includes("Mask every proposed value, count, outcome, consequence")));
+  assert.ok(calls[0].messages.some((message) => message.content.includes("Split coordinated entities")));
+  assert.ok(calls[0].messages.some((message) => message.content.includes("type, representation, value, unit, scope")));
+  assert.ok(calls[0].messages.some((message) => message.content.includes("boundary cases and counterexamples")));
+  assert.ok(calls[0].messages.some((message) => message.content.includes("candidate's established defining conditions or mechanism")));
   assert.match(questions[0].question, /necessary defining features/);
-  assert.ok(calls[0].messages.some((message) => message.content.includes("accounting convention")));
-  assert.ok(calls[0].messages.some((message) => message.content.includes("coordinated subjects")));
-  assert.equal(calls[1].toolName, "submit_grounding_verification_answers");
+  assert.match(questions[1].question, /originating topic "A broad topic"/);
+  assert.match(questions[1].question, /commonly attributed consequences that do not actually follow/);
+  assert.match(questions[1].question, /mechanism or behavior, required conditions/);
+  assert.deepEqual(questions.map((question) => question.targetKey), [
+    "definition:0",
+    "definition:0",
+    "mention:0",
+    "definition:0",
+    "mention:0"
+  ]);
+  assert.equal(calls[1].toolName, "submit_claim_verification_answers");
+  assert.equal(calls[1].model, "kg-claim-verification-answerer");
   assert.ok(calls[1].messages.some((message) => message.content.includes("closest commonly confused concepts")));
   assert.ok(calls[1].messages.some((message) => message.content.includes("What distinguishes the two mechanisms?")));
-  assert.ok(calls[1].messages.some((message) => message.content.includes("historical bookkeeping")));
-  assert.ok(calls[1].messages.some((message) => message.content.includes("each member individually")));
+  assert.ok(calls[1].messages.some((message) => message.content.includes("Correct a false premise")));
+  assert.ok(calls[1].messages.some((message) => message.content.includes("State what an operation literally returns or stores")));
+  assert.ok(calls[1].messages.some((message) => message.content.includes("object, category, enum, wrapper, or tagged result")));
+  assert.ok(calls[1].messages.some((message) => message.content.includes("component operation from the overall outcome")));
+  assert.ok(calls[1].messages.some((message) => message.content.includes("boundary and counterexample cases")));
+  assert.ok(calls[1].messages.some((message) => message.content.includes("state the named concept's defining condition or mechanism")));
+  assert.ok(calls[1].messages.some((message) => message.content.includes("multiple established senses")));
+  assert.ok(calls[1].messages.some((message) => message.content.includes("mutually exclusive branches")));
   assert.equal(calls[1].messages.some((message) => message.content.includes("Draft-only marker")), false);
-  assert.deepEqual(answers, [
-    "The named concept has distinct necessary features.",
-    "The mechanisms differ in their defining process.",
-    "It has a specific established role."
-  ], "answers are restored to question order before the application joins them");
+  assert.equal(calls[1].messages.some((message) => message.content.includes("definition:0")), false);
+  for (const fixtureTerm of ["binary search", "pivot", "linked list", "logarithmic", "half-open interval"]) {
+    assert.equal(calls[0].messages.some((message) => message.content.toLowerCase().includes(fixtureTerm)), false, `planner fixture-derived term leaked: ${fixtureTerm}`);
+    assert.equal(calls[1].messages.some((message) => message.content.toLowerCase().includes(fixtureTerm)), false, `answerer fixture-derived term leaked: ${fixtureTerm}`);
+  }
+  assert.deepEqual(answers.map((answer) => answer.questionKey), ["q:2", "q:0", "q:1"], "the adapter preserves opaque model correlation for application validation");
 });
 
-test("drops an exact-span-grounded false passage and keeps generated provenance", async () => {
+test("the factuality adapter returns judgments only and cannot settle or rewrite an artifact", async () => {
   const calls: unknown[] = [];
   const client = {
     async call(input: unknown) {
       calls.push(input);
       return {
         judgments: [
-          {
-            index: 0,
-            factual: false,
-            problematicSpan: "Draft definition.",
-            rationale: "The passage contains a scope conflation."
-          },
-          { index: 1, factual: true, problematicSpan: "", rationale: "The passage is accurate." }
+          { targetKey: "definition:0", disposition: "rejected", rationale: "The definition conflates two mechanisms." },
+          { targetKey: "definition:1", disposition: "accepted", rationale: "The definition is established." }
         ]
       };
     }
   } as unknown as LiteLlmForcedToolClient;
-  const draft = await adapterReturning({
-    definitions: [{ text: "Draft definition." }, { text: "Accurate definition." }],
-    mentions: [],
-    rationale: "draft"
-  }).adapter.generate({
-    derivedNodeId: "dn-respiration",
-    declaredDomain: "biology",
-    nodeLabel: "Respiration contrast",
-    scaffoldedAnchors: [],
-    topic: "Energy pathways"
-  });
 
-  const revised = await createGroundingFactualityRevisionPort(client).revise({
+  const input = {
     declaredDomain: "biology",
-    topic: "Energy pathways",
-    nodeLabel: "Respiration contrast",
-    draft,
-    verificationAnswers: [{
-      passageIndex: 0,
-      question: "What distinguishes the relevant processes?",
-      answer: "Independent characterization of the distinction."
-    }, {
-      passageIndex: 1,
-      question: "What is the accurate definition?",
-      answer: "Independent characterization of the accurate definition."
-    }]
-  });
+    canonicalLabel: "Respiration contrast",
+    context: { kind: "originating_topic", topic: "Energy pathways" },
+    targets: [
+      { targetKey: "definition:0", targetPurpose: "definition", text: "Draft definition." },
+      { targetKey: "definition:1", targetPurpose: "definition", text: "Accurate definition." }
+    ],
+    verificationAnswers: [
+      { targetKey: "definition:0", questionKey: "q:0", question: "What distinguishes the relevant processes?", answer: "Independent characterization of the distinction." },
+      { targetKey: "definition:1", questionKey: "q:1", question: "What is the accurate definition?", answer: "Independent characterization of the accurate definition." }
+    ]
+  } as const;
+  const judgments = await createClaimFactualityJudgmentPort(client).judge(input);
+  const challengerJudgments = await createClaimFactualityChallengePort(client).judge(input);
 
-  assert.equal(revised.disposition, "accepted");
-  assert.equal(revised.disposition === "accepted" && revised.bundle.derivedNodeId, draft.derivedNodeId);
-  assert.equal(revised.disposition === "accepted" && revised.bundle.generatingModel, "kg-claim-extraction");
-  assert.equal(revised.disposition === "accepted" && revised.bundle.groundingOrigin, "llm_grounded");
-  assert.deepEqual(revised.disposition === "accepted" ? revised.bundle.definitions.map((passage) => passage.text) : [], ["Accurate definition."]);
+  assert.deepEqual(judgments, [
+    { targetKey: "definition:0", disposition: "rejected", rationale: "The definition conflates two mechanisms." },
+    { targetKey: "definition:1", disposition: "accepted", rationale: "The definition is established." }
+  ]);
+  assert.equal(judgments.some((judgment) => "text" in judgment), false);
+  assert.deepEqual(challengerJudgments, judgments);
   const call = calls[0] as { model: string; toolName: string; tags: string[]; messages: { content: string }[] };
-  assert.equal(call.model, "kg-independent-judge");
-  assert.equal(call.toolName, "submit_grounding_factuality_judgments");
+  const challengeCall = calls[1] as { model: string; toolName: string; tags: string[] };
+  assert.equal(call.model, "kg-claim-factuality-judge");
+  assert.equal(challengeCall.model, "kg-claim-factuality-challenger");
+  assert.equal(call.toolName, "submit_claim_factuality_judgments");
+  assert.equal(challengeCall.toolName, call.toolName);
   assert.deepEqual(call.tags, ["grounding-factuality-revision"]);
-  assert.ok(call.messages.some((message) => message.content.includes("What distinguishes the relevant processes?")));
-  assert.ok(call.messages.some((message) => message.content.includes("Independent characterization of the distinction.")));
+  assert.deepEqual(challengeCall.tags, call.tags);
+  assert.equal(claimFactualityChallengeDescriptor.promptPath, claimFactualityJudgmentDescriptor.promptPath);
+  assert.equal(claimFactualityChallengeDescriptor.modelOverride, "kg-claim-factuality-challenger");
   assert.ok(call.messages.some((message) => message.content.includes("Draft definition.")));
-  assert.ok(call.messages.some((message) => message.content.includes("different-scope or historical value")));
-  assert.ok(call.messages.some((message) => message.content.includes("collective versus distributive scope")));
-});
-
-test("preserves a passage when a false verdict does not quote an exact span", async () => {
-  const client = {
-    async call() {
-      return {
-        judgments: [{
-          index: 0,
-          factual: false,
-          problematicSpan: "A paraphrase absent from the draft.",
-          rationale: "The verdict is not grounded to the passage text."
-        }]
-      };
-    }
-  } as unknown as LiteLlmForcedToolClient;
-  const draft = await adapterReturning({
-    definitions: [{ text: "The original definition remains intact." }],
-    mentions: [],
-    rationale: "draft"
-  }).adapter.generate({
-    derivedNodeId: "dn-monotonic",
-    declaredDomain: "general",
-    nodeLabel: "Monotonic review",
-    scaffoldedAnchors: []
-  });
-
-  const reviewed = await createGroundingFactualityRevisionPort(client).revise({
-    declaredDomain: "general",
-    topic: "Review behavior",
-    nodeLabel: "Monotonic review",
-    draft,
-    verificationAnswers: [{ passageIndex: 0, question: "What is the original definition?", answer: "An independent check." }]
-  });
-
-  assert.deepEqual(reviewed.disposition === "accepted" ? reviewed.bundle.definitions.map((passage) => passage.text) : [], ["The original definition remains intact."]);
-});
-
-test("rejects a whole draft when exact-span verdicts remove every definition", async () => {
-  const client = {
-    async call() {
-      return {
-        judgments: [{
-          index: 0,
-          factual: false,
-          problematicSpan: "Unsupported definition.",
-          rationale: "The only definition is false."
-        }]
-      };
-    }
-  } as unknown as LiteLlmForcedToolClient;
-  const draft = await adapterReturning({
-    definitions: [{ text: "Unsupported definition." }],
-    mentions: [],
-    rationale: "draft"
-  }).adapter.generate({
-    derivedNodeId: "dn-rejected",
-    declaredDomain: "general",
-    nodeLabel: "Rejected concept",
-    scaffoldedAnchors: []
-  });
-
-  const reviewed = await createGroundingFactualityRevisionPort(client).revise({
-    declaredDomain: "general",
-    topic: "Review behavior",
-    nodeLabel: "Rejected concept",
-    draft,
-    verificationAnswers: [{ passageIndex: 0, question: "Is the definition established?", answer: "An independent check." }]
-  });
-
-  assert.equal(reviewed.disposition, "rejected");
-  assert.match(reviewed.disposition === "rejected" ? reviewed.rationale : "", /rejected every definition/);
+  assert.ok(call.messages.some((message) => message.content.includes('{"targetKey":"definition:0","targetPurpose":"definition","text":"Draft definition."}')));
+  assert.ok(call.messages.some((message) => message.content.includes("Independent characterization of the distinction.")));
+  assert.ok(call.messages.some((message) => message.content.includes("verification question as contaminated")));
+  assert.ok(call.messages.some((message) => message.content.includes("material omission of a necessary qualifier")));
+  assert.ok(call.messages.some((message) => message.content.includes("different subject, sense, implementation, version")));
+  assert.ok(call.messages.some((message) => message.content.includes("Resolve coordinated subjects and predicates distributively")));
+  assert.ok(call.messages.some((message) => message.content.includes("component behavior from total outcome")));
+  assert.ok(call.messages.some((message) => message.content.includes("boundary and counterexample cases")));
+  assert.ok(call.messages.some((message) => message.content.includes("targetPurpose `definition` target must itself state the candidate concept's defining condition or mechanism")));
+  assert.ok(call.messages.some((message) => message.content.includes("application code owns settlement")));
+  const judgmentFacing = call.messages.map((message) => message.content).join("\n").toLowerCase();
+  for (const fixtureTerm of ["binary search", "pivot", "linked list", "logarithmic", "half-open interval"]) {
+    assert.equal(judgmentFacing.includes(fixtureTerm), false, `fixture-derived term leaked: ${fixtureTerm}`);
+  }
 });

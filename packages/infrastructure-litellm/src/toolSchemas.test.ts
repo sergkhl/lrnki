@@ -5,8 +5,9 @@ import { toForcedToolSchema } from "./forcedToolSchema";
 import {
   buildPrerequisiteOrderingSchema,
   buildPrerequisiteOrderingValidator,
-  buildGroundingVerificationAnsweringValidator,
-  buildGroundingVerificationQuestionPlanningValidator,
+  buildClaimFactualityJudgmentValidator,
+  buildClaimVerificationAnsweringValidator,
+  buildClaimVerificationQuestionPlanningValidator,
   conceptAdmissionSchemaForCandidateKeys,
   conceptAdmissionValidatorForCandidateKeys,
   conceptCoreSelectionSchemaForCandidateKeys,
@@ -105,30 +106,40 @@ test("prerequisite ordering schema keeps numeric bounds while refine remains val
   }));
 });
 
-test("grounding verification schemas require complete question and answer coverage", () => {
-  const plan = buildGroundingVerificationQuestionPlanningValidator(2);
+test("claim verification schemas require exact known-target, question, and judgment coverage", () => {
+  const plan = buildClaimVerificationQuestionPlanningValidator(["definition:0", "mention:0"]);
   assert.doesNotThrow(() => plan.parse({
     questions: [
-      { passageIndex: 0, question: "What establishes the first atomic claim?" },
-      { passageIndex: 1, question: "What establishes the second atomic claim?" }
+      { targetKey: "definition:0", question: "What establishes the first atomic claim?" },
+      { targetKey: "mention:0", question: "What establishes the second atomic claim?" }
     ]
   }));
   assert.throws(() => plan.parse({
     questions: [
-      { passageIndex: 0, question: "What establishes one claim?" },
-      { passageIndex: 0, question: "What establishes another claim in the same passage?" }
+      { targetKey: "definition:0", question: "What establishes one claim?" },
+      { targetKey: "definition:0", question: "What establishes another claim in the same target?" }
     ]
   }), /missing verification question/);
 
-  const answers = buildGroundingVerificationAnsweringValidator(2);
+  const answers = buildClaimVerificationAnsweringValidator(["q:0", "q:1"]);
   assert.doesNotThrow(() => answers.parse({ answers: [
-    { questionIndex: 1, answer: "The second answer." },
-    { questionIndex: 0, answer: "The first answer." }
+    { questionKey: "q:1", answer: "The second answer." },
+    { questionKey: "q:0", answer: "The first answer." }
   ] }));
   assert.throws(() => answers.parse({ answers: [
-    { questionIndex: 0, answer: "The first answer." },
-    { questionIndex: 0, answer: "A duplicate answer." }
-  ] }), /duplicate question index/);
+    { questionKey: "q:0", answer: "The first answer." },
+    { questionKey: "q:0", answer: "A duplicate answer." }
+  ] }), /duplicate questionKey/);
+
+  const judgments = buildClaimFactualityJudgmentValidator(["definition:0", "mention:0"]);
+  assert.doesNotThrow(() => judgments.parse({ judgments: [
+    { targetKey: "mention:0", disposition: "accepted", rationale: "established" },
+    { targetKey: "definition:0", disposition: "rejected", rationale: "not established" }
+  ] }));
+  assert.throws(() => judgments.parse({ judgments: [
+    { targetKey: "definition:0", disposition: "accepted", rationale: "established", text: "rewrite" },
+    { targetKey: "mention:0", disposition: "accepted", rationale: "established" }
+  ] }));
 });
 
 test("concept evidence profile emits nullable literalValue in forced-tool dialect", () => {

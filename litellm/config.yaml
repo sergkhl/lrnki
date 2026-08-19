@@ -129,15 +129,16 @@ model_list:
       input_cost_per_token: 0.0000003
       output_cost_per_token: 0.0000012
 
-  # Independent production judge (kg-independent-judge, ADR-0007/0005). gpt-oss-120b
-  # is cross-family independent of the MiMo extractor and forced tool_choice works.
-  # Provider lock measured 2026-07-18 against the real 15-node Biology ordering draw
-  # (tmp/2026-07-18-gptoss-provider-lock): Groq returned the forced named tool in
-  # 6.944s for $0.0026412 (5,420 input / 3,047 output tokens). Baseten was cheaper in
-  # endpoint metadata but failed the live forced-tool probe with OpenRouter 404 despite
-  # advertising tool_choice support, so ADR-0006 disqualifies it. Groq is deliberately
-  # single-host/no-fallback: an outage must surface, never silently reach an unverified
-  # slow or forced-tool-incompatible host. Replaces Mistral Small (free-tier rate-limited).
+  # Independent reasoning deployment used by prerequisite ordering and claim admission.
+  # gpt-oss-120b is cross-family independent of the MiMo extractor. Exact forced named-tool
+  # probes on 2026-08-19 qualified DigitalOcean for both the planner's object-array contract
+  # and the challenger's nested judgment contract even though OpenRouter's endpoint registry
+  # does not advertise tools/tool_choice for that endpoint. `require_parameters` is therefore
+  # intentionally omitted: it would incorrectly filter out the qualified primary. A combined
+  # DigitalOcean/Groq OpenRouter order still selected Groq because account routing can override
+  # provider order, so the primary and backup are separate LiteLLM model groups. This deployment
+  # is DigitalOcean-only; router_settings.fallbacks reaches the Groq-only group below on an actual
+  # provider error. Replaces Mistral Small (free-tier rate-limited).
   - model_name: "openrouter/openai/gpt-oss-120b"
     litellm_params:
       model: "openrouter/openai/gpt-oss-120b"
@@ -145,15 +146,32 @@ model_list:
       input_cost_per_token: 0.00000015
       output_cost_per_token: 0.0000006
       cache_read_input_token_cost: 0.000000075
-      # Forced-tool alias backing model: OpenRouter must only route to providers that
-      # honor every request parameter (tool_choice). Without this, provider failover
-      # (e.g. Groq 429 → Google Vertex) lands on a provider that rejects forced
-      # function calling with a 400 (real failure: expedition bd89e63a, 2026-07-06).
-      # Google deny-listed too: require_parameters did not exclude Vertex in the
-      # observed llama-4-scout fallback, so trust the deny-list, not the metadata.
+      # Forced-tool primary: DigitalOcean only. The explicit deny-list is defensive
+      # documentation of the historical Google forced-function failure (expedition
+      # bd89e63a, 2026-07-06); `only` is the operative boundary.
       extra_body:
         provider:
-          require_parameters: true
+          only:
+            - "digitalocean"
+          order:
+            - "digitalocean"
+          allow_fallbacks: false
+          ignore:
+            - "google-vertex"
+            - "google-ai-studio"
+
+  # Same GPT-OSS-120B model and forced-tool contract, pinned to Groq only. This is never
+  # selected by OpenRouter provider ordering; LiteLLM reaches it only through the explicit
+  # model-group fallbacks below, so provider identity remains visible in SpendLogs.
+  - model_name: "openrouter/openai/gpt-oss-120b-groq-backup"
+    litellm_params:
+      model: "openrouter/openai/gpt-oss-120b"
+      api_key: os.environ/OPENROUTER_API_KEY
+      input_cost_per_token: 0.00000015
+      output_cost_per_token: 0.0000006
+      cache_read_input_token_cost: 0.000000075
+      extra_body:
+        provider:
           only:
             - "groq"
           order:
@@ -162,10 +180,6 @@ model_list:
           ignore:
             - "google-vertex"
             - "google-ai-studio"
-          # NOTE: `allow_fallbacks` here is OpenRouter's PROVIDER fallback, which stays off so a
-          # non-compliant provider can never answer a forced-tool call. It is a different mechanism
-          # from LiteLLM's DEPLOYMENT fallback in router_settings.fallbacks, which does now cover
-          # kg-independent-judge — see the deepseek-v4-flash deployment directly below.
 
   # THE production independent judge (kg-independent-judge, ADR-0007/0005). Replaced gpt-oss-120b on
   # 2026-08-07: that deployment is Groq-pinned for forced tool_choice, and Groq's shared-account
@@ -192,10 +206,71 @@ model_list:
         reasoning:
           enabled: false
         provider:
+          # OpenRouter removed the previously qualified `deepseek/fp8` endpoint tag. On
+          # 2026-08-19 that stale lock failed every request with 404, after which LiteLLM's
+          # deployment cooldown surfaced retries as 429. Exact forced-named-tool probes over
+          # the nested verdict shape qualified BaseTen and Parasail at 200; Novita advertised
+          # tool_choice but returned 404 and remains excluded. `only` keeps fallback inside the
+          # same model and FP8 quantization, so model identity and verdict attribution do not drift.
+          require_parameters: true
           only:
-            - "deepseek/fp8"
+            - "baseten/fp8"
+            - "parasail/fp8"
           order:
-            - "deepseek/fp8"
+            - "baseten/fp8"
+            - "parasail/fp8"
+          allow_fallbacks: true
+    model_info:
+      mode: "chat"
+      max_input_tokens: 1048576
+
+  # Claim-admission answerer and primary factuality judge, deliberately separate from
+  # kg-independent-judge so this reassignment does not alter unrelated consumers. The pinned
+  # 0731 revision passed both exact forced-tool schemas and a 22-target, two-sample panel gate:
+  # all 12 unsafe claims were rejected and all 10 safe controls were accepted. Parasail FP8
+  # supplied all 58 answer/judge calls in the complete gate; reasoning stays disabled for the
+  # nested object-array contracts.
+  - model_name: "openrouter/deepseek/deepseek-v4-flash-0731-claim"
+    litellm_params:
+      model: "openrouter/deepseek/deepseek-v4-flash-0731"
+      api_key: os.environ/OPENROUTER_API_KEY
+      input_cost_per_token: 0.00000014
+      output_cost_per_token: 0.00000028
+      cache_read_input_token_cost: 0.00000007
+      extra_body:
+        reasoning:
+          enabled: false
+        provider:
+          require_parameters: true
+          only:
+            - "parasail/fp8"
+          order:
+            - "parasail/fp8"
+          allow_fallbacks: false
+    model_info:
+      mode: "chat"
+      max_input_tokens: 1048576
+
+  # Same pinned claim model and forced-tool contract, isolated on DeepInfra FP8. The
+  # Parasail route returned one repeated 429 after 27 successful calls in an earlier matrix;
+  # this group is reached only through the two explicit claim-role fallbacks below. Direct
+  # production-schema probes rejected both known unsafe claims and accepted the control.
+  - model_name: "openrouter/deepseek/deepseek-v4-flash-0731-claim-deepinfra-backup"
+    litellm_params:
+      model: "openrouter/deepseek/deepseek-v4-flash-0731"
+      api_key: os.environ/OPENROUTER_API_KEY
+      input_cost_per_token: 0.00000008
+      output_cost_per_token: 0.00000018
+      cache_read_input_token_cost: 0.000000016
+      extra_body:
+        reasoning:
+          enabled: false
+        provider:
+          require_parameters: true
+          only:
+            - "deepinfra/fp8"
+          order:
+            - "deepinfra/fp8"
           allow_fallbacks: false
     model_info:
       mode: "chat"
@@ -297,24 +372,6 @@ model_list:
   #     model: "openrouter/mistralai/mistral-small-2603"
   #     api_key: os.environ/OPENROUTER_API_KEY
 
-  # Candidate prerequisite judge / independent eval model.
-  # Qwen3-235B-A22B-Instruct-2507 is a multilingual MoE model with 22B active
-  # parameters, 262K context, strong instruction following / logical reasoning /
-  # tool-use positioning, and no thinking-mode blocks. Measured 2026-07-07 as a
-  # kg-prerequisite-ordering candidate: forced-tool OK and faster, but failed
-  # quality parity on two layers (kept-edge recovery 33% and 0%), so it remains
-  # registered for experiments only.
-  # OpenRouter list price: $0.09 input / $0.10 output per 1M tokens.
-  - model_name: "openrouter/qwen/qwen3-235b-a22b-2507"
-    litellm_params:
-      model: "openrouter/qwen/qwen3-235b-a22b-2507"
-      api_key: os.environ/OPENROUTER_API_KEY
-      input_cost_per_token: 0.00000009
-      output_cost_per_token: 0.00000010
-    model_info:
-      mode: "chat"
-      max_input_tokens: 262144
-
   # Candidate prerequisite judge / schema-reliability eval model.
   # Llama 4 Scout is a Meta MoE model activating 17B parameters out of 109B,
   # with native multimodal support and very large 10M context. Consider as a
@@ -343,7 +400,13 @@ model_list:
       mode: "chat"
       max_input_tokens: 10000000
 
-  # Fallback deployment for kg-knowledge-boundary-probe (see router_settings.fallbacks).
+  # Fallback deployment for kg-knowledge-boundary-probe (see router_settings.fallbacks) and the
+  # claim-verification planner/answerer. Planning may see targets, but answering remains structurally
+  # draft-blind. Both roles are distinct from the Qwen3-235B final factuality judge: U1 real-use
+  # inspection caught correlated single-model confirmation and a DeepSeek provider ceiling, while
+  # this deployment supplied the exact C++/Ruby distinction through the forced answer schema and
+  # sustained ordinary fan-out on 2026-08-19. It supplies questions/evidence only; the larger,
+  # separately qualified judge settles targets through repeated samples.
   # llama-4-scout honors forced tool_choice ONLY via Groq on OpenRouter, and a sustained
   # Groq 429 stalls K=5 generation (real outage 2026-07-06). Qwen3-30B-A3B is a small MoE
   # (~3B active — preserves the "small model K-dispersion reveals the boundary" design),
@@ -407,12 +470,17 @@ router_settings:
   # allowed_fails: 1
   enable_pre_call_checks: false
   cooldown_time: 15
-  # Ordered fallback for the knowledge-boundary probe: when the primary deployment
-  # (llama-4-scout, Groq-only for forced tool_choice) fails — e.g. a sustained Groq 429
-  # that would otherwise stall K=5 source-less generation — LiteLLM retries the request
-  # against the small cross-family Qwen3-30B-A3B deployment. Keyed on the request's alias.
+  # Explicit cross-deployment fallbacks, keyed on the request aliases. The knowledge-boundary
+  # probe retains its small cross-family Qwen backup. GPT-OSS roles move from DigitalOcean to
+  # same-model Groq only after an error; the two DeepSeek claim roles move from Parasail to
+  # same-model DeepInfra. Separate groups keep every provider route attributable.
   fallbacks:
     - kg-knowledge-boundary-probe: ["openrouter/qwen/qwen3-30b-a3b-instruct-2507"]
+    - kg-claim-verification-planner: ["openrouter/openai/gpt-oss-120b-groq-backup"]
+    - kg-claim-verification-answerer: ["openrouter/deepseek/deepseek-v4-flash-0731-claim-deepinfra-backup"]
+    - kg-claim-factuality-judge: ["openrouter/deepseek/deepseek-v4-flash-0731-claim-deepinfra-backup"]
+    - kg-claim-factuality-challenger: ["openrouter/openai/gpt-oss-120b-groq-backup"]
+    - kg-prerequisite-ordering: ["openrouter/openai/gpt-oss-120b-groq-backup"]
   # NOTE: kg-independent-judge has NO fallback on purpose — it is a single model now, so its verdicts
   # stay attributable from the alias alone. See its model_group_alias comment below.
   # disable_cooldowns: true
@@ -446,6 +514,22 @@ router_settings:
     # when a sustained Groq 429 would otherwise stall generation.
     kg-concept-synthesis: openrouter/xiaomi/mimo-v2.5
     kg-knowledge-boundary-probe: openrouter/meta-llama/llama-4-scout
+    # Target-aware verification planning and draft-blind answering use reasoning-grade deployments
+    # under separately attributable aliases. U1's literal-strength discrimination matrix found that
+    # the former small shared deployment could turn a proposed assertion into a leading question and
+    # then repeat it as an answer. GPT-OSS-120B plans; pinned DeepSeek V4 Flash 0731 answers without
+    # target text. Neither settles learner text. Two independently sampled evidence packets reach
+    # the panel below, with a third complete packet only for an unreplicated objection.
+    kg-claim-verification-planner: openrouter/openai/gpt-oss-120b
+    kg-claim-verification-answerer: openrouter/deepseek/deepseek-v4-flash-0731-claim
+    # Final Grounding Admission factuality panel. Separate aliases make both model assignments part
+    # of the operation config identity without changing any other kg-independent-judge consumer.
+    # DeepSeek 0731 and its Parasail→DeepInfra provider qualification are owned above; the
+    # challenger is provider-pinned GPT-OSS-120B. The families showed complementary blind spots,
+    # so neither settles alone: a model vetoes only after independently repeating the same rejection
+    # across separately planned and answered packets.
+    kg-claim-factuality-judge: openrouter/deepseek/deepseek-v4-flash-0731-claim
+    kg-claim-factuality-challenger: openrouter/openai/gpt-oss-120b
     # Learner generation helper: infer a Declared Domain from the learner's
     # topic inside source-less concept generation. Stays on the production
     # extractor (AGENTS rule 5).
@@ -464,17 +548,17 @@ router_settings:
     # quality parity, so the incumbent stays.
     kg-prerequisite-ordering: openrouter/openai/gpt-oss-120b
     # Independent production judge (ADR-0007/0005): the concept-vs-proposition admission judge, the
-    # optional-assertion entailment judge, grounding factuality revision, semantic-dedup merge
-    # adjudication, and Study Item Key Verification. DeepSeek v4 flash is cross-family independent of
+    # optional-assertion entailment judge, semantic-dedup merge adjudication, and Study Item Key
+    # Verification. Grounding factuality is deliberately owned by the claim-specific alias above
+    # after its separate U1 qualification. DeepSeek v4 flash is cross-family independent of
     # the MiMo extractor, so the judge is never the extractor grading its own output, and it is
     # cheaper than the gpt-oss-120b it replaced ($0.09/$0.18 vs $0.15/$0.60 per Mtok).
     # ONE judge model, deliberately, with NO deployment fallback: our operation_run_stages rows record
     # only the alias, so a two-model judge mix cannot be attributed from our own records and every
     # quality gate that ranges over judge verdicts (ADR-0013, ADR-0028) becomes unreadable. Moving off
     # the Groq-pinned gpt-oss-120b also removes the shared-account request-rate ceiling that took out
-    # every judge stage at once on 2026-08-07. If first-party DeepSeek throttles, widen to other
-    # **fp8** tags only (baseten/fp8, novita/fp8, parasail/fp8) — never to an fp4 endpoint, which would
-    # drift quantization and make verdicts non-reproducible.
+    # every judge stage at once on 2026-08-07. Provider qualification and the FP8-only lock are owned
+    # by the deployment above; never widen this alias to an unmeasured provider or quantization.
     # (The off-core oracle triangle and label aligner were retired after the admission-precision fix;
     # see ADR-0013.)
     kg-independent-judge: openrouter/deepseek/deepseek-v4-flash-0731

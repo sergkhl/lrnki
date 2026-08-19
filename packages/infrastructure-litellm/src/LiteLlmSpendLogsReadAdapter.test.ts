@@ -8,7 +8,12 @@ import {
   shapeOperationStageSpend,
   type SpendLogAggregateRow
 } from "./LiteLlmSpendLogsReadAdapter";
-import { deploymentTokenPrices, mimoRoutedAliases, readLitellmProxyConfig } from "./litellmProxyConfig";
+import {
+  deploymentTokenPrices,
+  mimoRoutedAliases,
+  modelRoutingBehaviorIdentity,
+  readLitellmProxyConfig
+} from "./litellmProxyConfig";
 
 // Deterministic price fixture mirroring the real litellm/config.yaml MiMo deployment
 // (input 0.14/M, output 0.28/M, cache read 0.0028/M).
@@ -158,6 +163,13 @@ test("every MiMo-routed production deployment declares token prices in litellm/c
     assert.ok((prices?.cacheReadInputTokenCost ?? 0) < (prices?.inputCostPerToken ?? 0),
       `deployment ${target} should declare a cache-read discount below the input price`);
   }
+});
+
+test("routing behavior identity contains provider policy but never config credentials", () => {
+  const identity = modelRoutingBehaviorIdentity("kg-claim-verification-answerer", readLitellmProxyConfig());
+  const serialized = JSON.stringify(identity);
+  assert.match(serialized, /provider/);
+  assert.doesNotMatch(serialized, /api_key|OPENROUTER_API_KEY|authorization/i);
 });
 
 test("uses the application Operation Timeline LLM stage catalog for spend reads", () => {

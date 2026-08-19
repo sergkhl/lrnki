@@ -5,6 +5,16 @@ export type { GraphEnrichmentConfig } from "./runGraphEnrichment";
 export { runSyntheticGeneration, DEFAULT_SYNTHETIC_GENERATION_CONFIG } from "./runSyntheticGeneration";
 export type { SyntheticGenerationConfig } from "./runSyntheticGeneration";
 export {
+  createSourceLessGroundingAdmission,
+  DEFAULT_SOURCE_LESS_GROUNDING_ADMISSION_POLICY,
+  type BoundaryProbeSummary,
+  type CoreProbeSummary,
+  type GroundingAdmissionCandidate,
+  type GroundingAdmissionOutcome,
+  type SourceLessGroundingAdmission,
+  type SourceLessGroundingAdmissionPolicy
+} from "./sourceLessGroundingAdmission";
+export {
   calibrateKnowledgeBoundaryProbe,
   parseKnowledgeBoundaryLadder,
   scoreKnowledgeBoundaryVectors,

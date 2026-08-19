@@ -287,7 +287,7 @@ async function generateSteps(input: {
   // 3. Execute the settled plan. Verified parent definition passages travel ONLY as grounding
   // anchors (KTD5) — every generated label is probed, then grounded with its OWN generated
   // definitions; boundary verdicts and empty generated definitions drop the step.
-  const parentAnchors = scaffoldedAnchorsFor(parent);
+  const parentAnchor = scaffoldedAnchorFor(parent);
   const steps: ScaffoldStep[] = [];
   for (const item of plan.planned) {
     if (item.kind === "reference") {
@@ -306,11 +306,11 @@ async function generateSteps(input: {
     if (verdict.disposition === "boundary") continue;
     const bundle = await runStage(STAGE_TAGS.groundingGeneration, () =>
       construction.groundingGeneration.generate({
-        derivedNodeId: newId(),
         declaredDomain: parent.declaredDomain,
-        nodeLabel: item.label,
-        scaffoldedAnchors: parentAnchors,
-        topic: item.label
+        canonicalLabel: item.label,
+        context: parentAnchor
+          ? { kind: "scaffolded_anchor", anchor: parentAnchor }
+          : { kind: "originating_topic", topic: item.label }
       })
     );
     const groundingText = bundle.definitions.map((passage) => passage.text).join("\n\n").trim();
@@ -335,13 +335,22 @@ function referenceStep(pin: ReferencePin, ordinal: number, newId: () => string):
 
 // The parent's verified definition passages as grounding-generation anchors (KTD5). They steer
 // the child bundle but are never returned directly as child grounding.
-function scaffoldedAnchorsFor(parent: DerivedGraphNode): { conceptId: string; canonicalLabel: string; definitionQuotes: string[] }[] {
+function scaffoldedAnchorFor(parent: DerivedGraphNode): {
+  reference: string;
+  canonicalLabel: string;
+  definitionPassages: [string, ...string[]];
+} | null {
   const definitionQuotes = (parent.grounding?.passages ?? [])
     .filter((passage) => passage.passageType === "definition")
     .map((passage) => passage.text.trim())
     .filter((text) => text.length > 0);
-  if (definitionQuotes.length === 0) return [];
-  return [{ conceptId: parent.derivedNodeId, canonicalLabel: parent.label, definitionQuotes }];
+  const [firstDefinition, ...remainingDefinitions] = definitionQuotes;
+  if (!firstDefinition) return null;
+  return {
+    reference: parent.derivedNodeId,
+    canonicalLabel: parent.label,
+    definitionPassages: [firstDefinition, ...remainingDefinitions]
+  };
 }
 
 // Draft one lower-level scaffold node for `stepLabel` and gate it with the congruence re-pick

@@ -55,14 +55,14 @@ function proposer(byAnchor: Record<string, MissingPrerequisiteProposal[]>): Miss
 const grounder: GroundingGenerationPort = {
   model: "mock-gen",
   async generate(input): Promise<GeneratedGroundingBundle> {
+    const anchor = input.context.kind === "scaffolded_anchor" ? input.context.anchor : undefined;
     return {
-      derivedNodeId: input.derivedNodeId,
       groundingOrigin: "llm_grounded",
-      definitions: [{ passageType: "definition", text: `${input.nodeLabel} explained.`, groundingOrigin: "llm_grounded", headingPath: [], locator: {}, verbatimCheck: { disposition: "not_applicable_by_grounding", rationale: "generated" } }],
+      definitions: [{ passageType: "definition", text: `${input.canonicalLabel} explained.`, groundingOrigin: "llm_grounded", headingPath: [], locator: {}, verbatimCheck: { disposition: "not_applicable_by_grounding", rationale: "generated" } }],
       mentions: [],
-      scaffoldedAnchorConceptIds: input.scaffoldedAnchors.map((a) => a.conceptId),
+      groundingAnchorReferences: anchor ? [anchor.reference] : [],
       generatingModel: "mock-gen",
-      rationale: `scaffolds ${input.scaffoldedAnchors[0]?.canonicalLabel}`
+      rationale: `scaffolds ${anchor?.canonicalLabel}`
     };
   }
 };
@@ -71,7 +71,7 @@ function recordingGrounder(calls: string[]): GroundingGenerationPort {
   return {
     model: "mock-gen",
     async generate(input) {
-      calls.push(input.nodeLabel);
+      calls.push(input.canonicalLabel);
       return grounder.generate(input);
     }
   };
@@ -141,7 +141,7 @@ test("an anchor yields llm_grounded minted nodes within the per-anchor cap", asy
   });
   assert.equal(mintedNodes.length, 2, "per-anchor cap honored");
   assert.ok(mintedNodes.every((node) => node.groundingOrigin === "llm_grounded"));
-  assert.ok(mintedNodes[0].groundingBundle.scaffoldedAnchorConceptIds.includes("a"));
+  assert.ok(mintedNodes[0].groundingBundle.groundingAnchorReferences.includes("a"));
 });
 
 test("the per-run cap bounds total minting across anchors", async () => {

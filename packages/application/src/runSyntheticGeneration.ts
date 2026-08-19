@@ -12,96 +12,62 @@ import type {
   DeclaredDomainInferencePort,
   DifficultyPort,
   EnrichmentRunStorePort,
-  GroundingFactualityRevisionPort,
-  GroundingGenerationPort,
-  GroundingVerificationAnswer,
-  GroundingVerificationAnsweringPort,
-  GroundingVerificationQuestion,
-  GroundingVerificationQuestionPlanningPort,
-  KnowledgeBoundaryProbePort,
-  NodeEmbeddingPort,
   PrerequisiteOrderingPort,
   RunProgressReporterPort
 } from "@lrnki/ports";
 import { randomUUID } from "node:crypto";
-import { noopRunProgressReporter, runInstrumentedOperation } from "./runProgressReporter";
 import {
   createDerivedGraphLayerCompletion,
   DEFAULT_DERIVED_GRAPH_COMPLETION_CONFIG,
   type DerivedGraphCompletionConfig
 } from "./completeDerivedGraphLayer";
-import { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
-import { mapWithConcurrency } from "./mapWithConcurrency";
 import {
-  DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG,
-  probeKnowledgeBoundary,
-  type KnowledgeBoundaryProbeConfig
-} from "./knowledgeBoundaryProbe";
+  DEFAULT_SOURCE_LESS_GROUNDING_ADMISSION_POLICY,
+  type GroundingAdmissionOutcome,
+  type SourceLessGroundingAdmission,
+  type SourceLessGroundingAdmissionPolicy
+} from "./sourceLessGroundingAdmission";
+import { noopRunProgressReporter, runInstrumentedOperation } from "./runProgressReporter";
+import { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
 
-// The shared completion fields (config authority in completeDerivedGraphLayer.ts) plus
-// the synthetic front half's producer-specific knobs. Concurrency fields are execution
-// policy and are deliberately excluded from derived-layer identity (ADR-0019); all
-// behavioral fields remain mechanically hashed.
+// The completion behavior plus the one canonical admission policy identity. The admission module
+// binds and executes this policy; the operation config retains the same value so the immutable
+// Derived Graph Layer hash identifies every behavioral decision that admitted its source-less
+// grounding. Execution-only widths are removed mechanically by the infrastructure hash builder.
 export type SyntheticGenerationConfig = DerivedGraphCompletionConfig & {
-  // The knowledge-boundary probe knobs (K, per-concept draw concurrency, agreement
-  // threshold). Calibrated by real-use inspection in U8, never assumed (ADR-0013).
-  probe: KnowledgeBoundaryProbeConfig;
-  // Bounded fan-out ACROSS concepts for the probe stage (each concept itself fans K
-  // draws inside probeKnowledgeBoundary) and for the grounding stage.
-  conceptConcurrency: number;
-  // Verification calls are one per concept with no nested K fan-out, so they can use
-  // a wider execution-only lane without increasing the probe burst width.
-  verificationConcurrency: number;
-  // Total generated-grounding draft attempts per admitted concept. A draft whose
-  // factuality review removes every definition is rejected and selectively redrafted.
-  groundingDraftAttempts: number;
+  sourceLessGroundingAdmission: SourceLessGroundingAdmissionPolicy;
 };
 
 export const DEFAULT_SYNTHETIC_GENERATION_CONFIG: SyntheticGenerationConfig = {
   enrichmentConfigHash: "synthetic-topic-generation",
-  // The shared calibrated completion defaults (K=8 gpt-oss-120b ordering draws).
-  // Synthetic sets are small and single-domain, so the ordering budget is generous.
   ...DEFAULT_DERIVED_GRAPH_COMPLETION_CONFIG,
-  probe: DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG,
-  conceptConcurrency: 8,
-  verificationConcurrency: 16,
-  groundingDraftAttempts: 2
+  sourceLessGroundingAdmission: DEFAULT_SOURCE_LESS_GROUNDING_ADMISSION_POLICY
 };
 
-// Synthetic topic generation — the SECOND pipeline arm (ADR-0019 amended, plan
-// 2026-06-30-001). A sibling to runGraphEnrichment with a different SOURCE-LESS front half
-// (synthesize → probe → ground) that assembles the same DerivedGraphLayer artifact, then
-// hands off to the identical reused back half (ordering, difficulty). The asserted graph
-// is never touched and no graph version is read: the layer's `graphVersionId` is NULL
-// (KTD2, R4). Every trusted node is an `llm_grounded` `synthetic_primary` node with a
-// generated Grounding Bundle recording `not_applicable_by_grounding` — no node claims
-// source-verbatim provenance (R3, AE3).
-//
-// A concept the knowledge-boundary probe scores `boundary` is held out of the trusted
-// surface as an `uncertain` disposition: retained in the run trace, inspectable, never a
-// node (R8, AE2). The future `web_grounded` retrieval branch replaces this boundary route
-// at the same seam (KTD5, R12) — it would ground the boundary concept via retrieval
-// instead of dropping it. Fails the operation WITHOUT persistence if any stage exhausts
-// its forced-tool budget or a domain blows the ordering token budget (no partial layer).
+// Synthetic Topic Generation owns topic/domain resolution, concept identity, Derived Graph Layer
+// assembly, completion, and persistence. Every source-less concept crosses one finished admission
+// interface; probe, grounding, draft-blind claim verification, selective retries, and their neural
+// dependencies are deliberately absent from this caller.
 export async function runSyntheticGeneration(input: {
   enrichmentId: string;
   topic: string;
   declaredDomain?: string | null;
   declaredDomainInference?: DeclaredDomainInferencePort;
   conceptSetSynthesis: ConceptSetSynthesisPort;
-  knowledgeBoundaryProbe: KnowledgeBoundaryProbePort;
-  embedding: NodeEmbeddingPort;
-  groundingGeneration: GroundingGenerationPort;
-  groundingVerificationQuestionPlanning: GroundingVerificationQuestionPlanningPort;
-  groundingVerificationAnswering: GroundingVerificationAnsweringPort;
-  groundingFactualityRevision: GroundingFactualityRevisionPort;
+  sourceLessGroundingAdmission: SourceLessGroundingAdmission;
   prerequisiteOrdering: PrerequisiteOrderingPort;
   difficulty: DifficultyPort;
   enrichmentStore: EnrichmentRunStorePort;
   config?: SyntheticGenerationConfig;
   reporter?: RunProgressReporterPort;
-  // Optional operator-visibility hook: counts of core/boundary concepts and derived edges.
-  onSummary?: (summary: { concepts: number; core: number; boundary: number; nodes: number; committedEdges: number; uncertainEdges: number }) => void;
+  onSummary?: (summary: {
+    concepts: number;
+    core: number;
+    boundary: number;
+    nodes: number;
+    committedEdges: number;
+    uncertainEdges: number;
+  }) => void;
   onDeclaredDomain?: (declaredDomain: string) => Promise<void>;
   newNodeId?: () => string;
 }): Promise<DerivedGraphLayer> {
@@ -109,195 +75,69 @@ export async function runSyntheticGeneration(input: {
   const reporter = input.reporter ?? noopRunProgressReporter;
   const operationId = input.enrichmentId;
   const newNodeId = input.newNodeId ?? randomUUID;
-  if (!Number.isInteger(config.groundingDraftAttempts) || config.groundingDraftAttempts < 1) {
-    throw new Error("Synthetic generation groundingDraftAttempts must be a positive integer.");
-  }
 
   return runInstrumentedOperation(reporter, "enrichment", operationId, async (runStage) => {
-    // The synthetic operation persists a DerivedGraphLayer through the enrichment store, so
-    // its timeline rides the `enrichment` operation type; its own fine STAGE_TAGS
-    // (concept-set-synthesis, knowledge-boundary-probe, grounding-generation, ...) keep the
-    // cost split separable in spend (ADR-0029).
-
     const declaredDomain = await resolveDeclaredDomain(input, runStage);
 
-    // Stage 1 — synthesize the concept set from topic + Declared Domain alone (R1, R2).
     const synthesized = await runStage(STAGE_TAGS.conceptSetSynthesis, () =>
       input.conceptSetSynthesis.synthesize({ topic: input.topic, declaredDomain })
     );
-    // Deterministic, deduplicated concept order: drop empty/duplicate normalized labels so
-    // two synthesized surface forms never mint two nodes for one concept.
     const concepts = dedupeConcepts(synthesized);
-
-    // Stage 2 — knowledge-boundary probe per concept (R6, R7). Each concept fans K draws
-    // inside probeKnowledgeBoundary; concepts fan out with bounded concurrency.
-    const verdicts = await runStage(STAGE_TAGS.knowledgeBoundaryProbe, () =>
-      mapWithConcurrency(concepts, config.conceptConcurrency, (concept) =>
-        probeKnowledgeBoundary({
-          conceptLabel: concept.canonicalLabel,
-          declaredDomain,
-          probe: input.knowledgeBoundaryProbe,
-          embedding: input.embedding,
-          config: config.probe
-        }).then((verdict) => ({ concept, verdict }))
-      ), concepts.length
+    const outcomes = await input.sourceLessGroundingAdmission.forOperation(runStage).admitBatch(
+      concepts.map((concept) => ({
+        candidateKey: concept.conceptKey,
+        canonicalLabel: concept.canonicalLabel,
+        declaredDomain,
+        context: { kind: "originating_topic", topic: input.topic }
+      }))
     );
+    assertOutcomeCorrelation(concepts, outcomes);
 
-    // Stage 3 — for each `core_knowledge` concept generate a Grounding Bundle and assemble a
-    // `synthetic_primary` `llm_grounded` node (AE1); a `boundary` concept is recorded as an
-    // uncertain disposition and NEVER becomes a node (AE2, KTD5). Grounding is anchor-less:
-    // scaffoldedAnchors is empty and the topic carries the context (KTD3).
-    const coreVerdicts = verdicts.filter((entry) => entry.verdict.disposition === "core_knowledge");
-    const coreNodeIdByConceptKey = new Map<string, string>(
-      coreVerdicts.map((entry) => [entry.concept.conceptKey, newNodeId()] as const)
-    );
-    const groundedNodeByConceptKey = new Map<string, LlmGroundedEnrichmentNode>();
-    const rejectionByConceptKey = new Map<string, string>();
-    let pending = coreVerdicts;
-
-    // A claim-level veto that removes every definition rejects the whole draft. Use
-    // bounded rejection sampling to regenerate only those concepts, then repeat the
-    // same context-isolated verification. The reviewer still cannot author text, and
-    // exhausting the draft budget fails the operation without persistence.
-    for (let attempt = 0; attempt < config.groundingDraftAttempts && pending.length > 0; attempt += 1) {
-      const groundingDrafts = await runStage(STAGE_TAGS.groundingGeneration, () =>
-        mapWithConcurrency(pending, config.conceptConcurrency, async (entry) => {
-          const derivedNodeId = coreNodeIdByConceptKey.get(entry.concept.conceptKey)!;
-          const draft = await input.groundingGeneration.generate({
-            derivedNodeId,
-            declaredDomain,
-            nodeLabel: entry.concept.canonicalLabel,
-            scaffoldedAnchors: [],
-            topic: input.topic,
-            rejectionFeedback: rejectionByConceptKey.get(entry.concept.conceptKey)
-          });
-          return { entry, draft };
-        }), pending.length
+    const rejected = outcomes.filter((outcome) => outcome.disposition === "rejected");
+    if (rejected.length > 0) {
+      throw new Error(
+        `Source-less Grounding Admission rejected Synthetic Topic Generation: ${rejected
+          .map((outcome) => `${outcome.candidateKey}: ${outcome.rationale}`)
+          .join("; ")}`
       );
-
-      // Plan claim-targeted verification questions FROM each draft. Every passage
-      // must be covered before the source-less bundle can advance.
-      const verificationPlans = await runStage(STAGE_TAGS.groundingVerificationQuestionPlanning, () =>
-        mapWithConcurrency(groundingDrafts, config.verificationConcurrency, async ({ entry, draft }) => {
-          const questions = await input.groundingVerificationQuestionPlanning.plan({
-            declaredDomain,
-            topic: input.topic,
-            nodeLabel: entry.concept.canonicalLabel,
-            draft
-          });
-          validateVerificationPlan(draft, questions);
-          return { entry, draft, questions };
-        }), groundingDrafts.length
-      );
-
-      // Answer only the planned question text in a separate call. The answer port's
-      // input has no draft field, making isolation an application-boundary contract.
-      const verifiedDrafts = await runStage(STAGE_TAGS.groundingVerificationAnswering, () =>
-        mapWithConcurrency(verificationPlans, config.verificationConcurrency, async ({ entry, draft, questions }) => {
-          const answers = await input.groundingVerificationAnswering.answer({
-            declaredDomain,
-            topic: input.topic,
-            nodeLabel: entry.concept.canonicalLabel,
-            questions: questions.map((question) => question.question)
-          });
-          if (answers.length !== questions.length) {
-            throw new Error(`Grounding verification returned ${answers.length} answers for ${questions.length} questions on ${draft.derivedNodeId}.`);
-          }
-          const verificationAnswers: GroundingVerificationAnswer[] = questions.map((question, index) => ({
-            ...question,
-            answer: answers[index]
-          }));
-          return { entry, draft, verificationAnswers };
-        }), verificationPlans.length
-      );
-
-      // Compare every original passage to its draft-blind answers. Accepted output
-      // remains monotonic/drop-only; rejected drafts become the next attempt's input.
-      const reviewed = await runStage(STAGE_TAGS.groundingFactualityRevision, () =>
-        mapWithConcurrency(verifiedDrafts, config.verificationConcurrency, async ({ entry, draft, verificationAnswers }) => ({
-          entry,
-          draft,
-          revision: await input.groundingFactualityRevision.revise({
-            declaredDomain,
-            topic: input.topic,
-            nodeLabel: entry.concept.canonicalLabel,
-            draft,
-            verificationAnswers
-          })
-        })), verifiedDrafts.length
-      );
-
-      const rejected: typeof coreVerdicts = [];
-      for (const { entry, draft, revision } of reviewed) {
-        if (revision.disposition === "rejected") {
-          rejectionByConceptKey.set(entry.concept.conceptKey, revision.rationale);
-          rejected.push(entry);
-          continue;
-        }
-        const groundingBundle = revision.bundle;
-        if (groundingBundle.derivedNodeId !== draft.derivedNodeId) {
-          throw new Error(`Grounding factuality revision changed derivedNodeId ${draft.derivedNodeId}.`);
-        }
-        const draftTexts = new Set([...draft.definitions, ...draft.mentions].map((passage) => passage.text));
-        const introduced = [...groundingBundle.definitions, ...groundingBundle.mentions]
-          .find((passage) => !draftTexts.has(passage.text));
-        if (introduced) {
-          throw new Error(`Grounding factuality revision introduced new passage text for ${draft.derivedNodeId}.`);
-        }
-        groundedNodeByConceptKey.set(entry.concept.conceptKey, {
-          nodeKind: "enrichment",
-          derivedNodeId: draft.derivedNodeId,
-          groundingOrigin: "llm_grounded",
-          // No mintingReason: a synthetic_primary node is a first-class topic concept, not a
-          // prerequisite minted to fill a source gap (KTD3).
-          role: "synthetic_primary",
-          layer: "derived",
-          canonicalLabel: entry.concept.canonicalLabel,
-          normalizedLabel: normalizeConceptLabel(entry.concept.canonicalLabel),
-          declaredDomain,
-          aliases: entry.concept.aliases,
-          groundingBundle
-        });
-      }
-      pending = rejected;
     }
 
-    if (pending.length > 0) {
-      const rejected = pending.map((entry) =>
-        `${entry.concept.canonicalLabel}: ${rejectionByConceptKey.get(entry.concept.conceptKey) ?? "all definitions rejected"}`
-      );
-      throw new Error(`Grounding factuality revision exhausted ${config.groundingDraftAttempts} draft attempts: ${rejected.join("; ")}`);
+    const conceptByKey = new Map(concepts.map((concept) => [concept.conceptKey, concept] as const));
+    const nodeIdByKey = new Map<string, string>();
+    const groundedNodes: LlmGroundedEnrichmentNode[] = [];
+    for (const outcome of outcomes) {
+      if (outcome.disposition !== "admitted") continue;
+      const concept = conceptByKey.get(outcome.candidateKey)!;
+      const derivedNodeId = newNodeId();
+      nodeIdByKey.set(outcome.candidateKey, derivedNodeId);
+      groundedNodes.push({
+        nodeKind: "enrichment",
+        derivedNodeId,
+        groundingOrigin: "llm_grounded",
+        role: "synthetic_primary",
+        layer: "derived",
+        canonicalLabel: concept.canonicalLabel,
+        normalizedLabel: normalizeConceptLabel(concept.canonicalLabel),
+        declaredDomain,
+        aliases: concept.aliases,
+        groundingBundle: outcome.bundle
+      });
     }
-    const groundedNodes = coreVerdicts.map((entry) => groundedNodeByConceptKey.get(entry.concept.conceptKey)!);
 
-    // Verbatim floor by grounding: every synthetic node is `llm_grounded`, so the floor
-    // exempts it and RECORDS the `not_applicable_by_grounding` disposition — never silent
-    // (R3, AE3). No source blocks exist, so blockTextById is empty.
     const floored = applyVerbatimFloorByGrounding({ nodes: groundedNodes, blockTextById: new Map() });
     const derivedNodes: DerivedGraphNode[] = floored.nodes;
     const groundingDispositions: GroundingVerbatimDisposition[] = floored.dispositions;
-
-    // The probe trace records BOTH branches for inspection (R8): core concepts carry their
-    // node id; boundary concepts carry null (uncertain disposition, held out).
-    const syntheticProbeDispositions: SyntheticProbeDisposition[] = verdicts.map((entry) => ({
-      conceptKey: entry.concept.conceptKey,
-      canonicalLabel: entry.concept.canonicalLabel,
+    const syntheticProbeDispositions: SyntheticProbeDisposition[] = outcomes.map((outcome) => ({
+      conceptKey: outcome.candidateKey,
+      canonicalLabel: conceptByKey.get(outcome.candidateKey)!.canonicalLabel,
       declaredDomain,
-      disposition: entry.verdict.disposition,
-      agreementScore: entry.verdict.agreementScore,
-      rationale: entry.verdict.rationale,
-      derivedNodeId: entry.verdict.disposition === "core_knowledge"
-        ? coreNodeIdByConceptKey.get(entry.concept.conceptKey) ?? null
-        : null
+      disposition: outcome.disposition === "admitted" ? "core_knowledge" : "boundary",
+      agreementScore: outcome.probe.agreementScore,
+      rationale: outcome.probe.rationale,
+      derivedNodeId: outcome.disposition === "admitted" ? nodeIdByKey.get(outcome.candidateKey)! : null
     }));
+    const admittedCount = groundedNodes.length;
 
-    // The shared Derived Graph Layer completion owns the back half from here (plan
-    // 2026-07-11-001, KTD1/KTD2): judgment contexts from the generated bundles, K-sampled
-    // consensus ordering (a synthetic layer is single-domain by construction), transitive
-    // reduction, intrinsic difficulty, common trace dispositions, structural validation,
-    // and the single atomic persistence — bracketed onto THIS operation's timeline via
-    // runStage (KTD6). The combined summary hook keeps its post-difficulty,
-    // pre-persistence position.
     const completion = createDerivedGraphLayerCompletion({
       prerequisiteOrdering: input.prerequisiteOrdering,
       difficulty: input.difficulty,
@@ -315,8 +155,8 @@ export async function runSyntheticGeneration(input: {
         syntheticProbeDispositions,
         frontHalfCounts: {
           concepts: concepts.length,
-          core: coreVerdicts.length,
-          boundary: verdicts.length - coreVerdicts.length
+          core: admittedCount,
+          boundary: outcomes.length - admittedCount
         },
         onSummary: input.onSummary
       }
@@ -324,23 +164,17 @@ export async function runSyntheticGeneration(input: {
   });
 }
 
-function validateVerificationPlan(
-  draft: { definitions: readonly unknown[]; mentions: readonly unknown[]; derivedNodeId: string },
-  questions: readonly GroundingVerificationQuestion[]
+function assertOutcomeCorrelation(
+  concepts: readonly SynthesizedConcept[],
+  outcomes: readonly GroundingAdmissionOutcome[]
 ): void {
-  const passageCount = draft.definitions.length + draft.mentions.length;
-  const covered = new Set<number>();
-  for (const question of questions) {
-    if (!Number.isInteger(question.passageIndex) || question.passageIndex < 0 || question.passageIndex >= passageCount) {
-      throw new Error(`Grounding verification planned an invalid passage index for ${draft.derivedNodeId}.`);
-    }
-    if (!question.question.trim()) {
-      throw new Error(`Grounding verification planned an empty question for ${draft.derivedNodeId}.`);
-    }
-    covered.add(question.passageIndex);
+  if (outcomes.length !== concepts.length) {
+    throw new Error(`Source-less Grounding Admission returned ${outcomes.length} outcomes for ${concepts.length} Synthetic candidates.`);
   }
-  if (questions.length === 0 || covered.size !== passageCount) {
-    throw new Error(`Grounding verification did not cover every passage for ${draft.derivedNodeId}.`);
+  for (let index = 0; index < concepts.length; index += 1) {
+    if (outcomes[index].candidateKey !== concepts[index].conceptKey) {
+      throw new Error(`Source-less Grounding Admission perturbed Synthetic candidate order at index ${index}.`);
+    }
   }
 }
 
@@ -358,15 +192,15 @@ async function resolveDeclaredDomain(
   if (!input.declaredDomainInference) {
     throw new Error("Declared Domain inference port is required when declaredDomain is missing.");
   }
-  const inferred = await runStage(STAGE_TAGS.declaredDomainInference, () => input.declaredDomainInference!.infer({ topic: input.topic }));
+  const inferred = await runStage(STAGE_TAGS.declaredDomainInference, () =>
+    input.declaredDomainInference!.infer({ topic: input.topic })
+  );
   const declaredDomain = inferred.declaredDomain.trim();
   if (!declaredDomain) throw new Error("Declared Domain inference returned an empty domain.");
   await input.onDeclaredDomain?.(declaredDomain);
   return declaredDomain;
 }
 
-// Drop empty/duplicate normalized labels, preserving first-seen order, so two synthesized
-// surface forms of one concept never mint two nodes.
 function dedupeConcepts(concepts: SynthesizedConcept[]): SynthesizedConcept[] {
   const seen = new Set<string>();
   const kept: SynthesizedConcept[] = [];

@@ -4,6 +4,7 @@ import path from "node:path";
 import { STAGE_TAGS, type ConceptIdentityDecision } from "@lrnki/domain-core";
 import {
   buildGraphVersion,
+  createSourceLessGroundingAdmission,
   createIntrinsicDifficultyPort,
   DEFAULT_ENRICHMENT_CONFIG,
   DEFAULT_SYNTHETIC_GENERATION_CONFIG,
@@ -54,10 +55,11 @@ import {
   LiteLlmSpendLogsReadAdapter,
   LiteLlmNodeEmbeddingAdapter,
   createNodeMergeAdjudicationPort,
-  createGroundingFactualityRevisionPort,
+  createClaimFactualityChallengePort,
+  createClaimFactualityJudgmentPort,
+  createClaimVerificationAnsweringPort,
+  createClaimVerificationQuestionPlanningPort,
   createGroundingGenerationPort,
-  createGroundingVerificationAnsweringPort,
-  createGroundingVerificationQuestionPlanningPort,
   createConceptSetSynthesisPort,
   createKnowledgeBoundaryProbePort,
   createIntrinsicDifficultyJudgmentPort,
@@ -135,6 +137,22 @@ function buildContext() {
   // embedding sampling decisions and their rationale) lives once in createNeuralClients,
   // shared with the Admin Lab learner generation root.
   const { discoveryClient, deterministicClient, probeClient, embeddingClient } = createNeuralClients();
+  const groundingGeneration = createGroundingGenerationPort(deterministicClient);
+  const knowledgeBoundaryProbe = createKnowledgeBoundaryProbePort(probeClient);
+  const nodeEmbedding = new LiteLlmNodeEmbeddingAdapter(embeddingClient);
+  const syntheticConfig = withSyntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG);
+  const sourceLessGroundingAdmission = createSourceLessGroundingAdmission({
+    knowledgeBoundaryProbe,
+    embedding: nodeEmbedding,
+    groundingGeneration,
+    claimVerificationQuestionPlanning: createClaimVerificationQuestionPlanningPort(deterministicClient),
+    claimVerificationAnswering: createClaimVerificationAnsweringPort(deterministicClient),
+    claimFactualityJudgments: [
+      createClaimFactualityJudgmentPort(deterministicClient),
+      createClaimFactualityChallengePort(deterministicClient)
+    ],
+    policy: syntheticConfig.sourceLessGroundingAdmission
+  });
   const spendLogsRead = process.env.LITELLM_DATABASE_URL
     ? new LiteLlmSpendLogsReadAdapter(process.env.LITELLM_DATABASE_URL)
     : undefined;
@@ -176,7 +194,7 @@ function buildContext() {
     admission: createConceptAdmissionPort(deterministicClient),
     evidenceProfileExtraction: createEvidenceProfileExtractionPort(deterministicClient),
     // Assertion-entailment judge (ADR-0007 reset). Independent production judge
-    // (gpt-oss-120b via kg-independent-judge) so the judge is not the extractor
+    // (kg-independent-judge) so the judge is not the extractor
     // re-grading itself; deterministic decoding for stable re-derivation. Guards
     // only the optional typed assertions inside a Concept Evidence Profile.
     assertionEntailmentJudge: createAssertionEntailmentJudgmentPort(deterministicClient),
@@ -191,31 +209,30 @@ function buildContext() {
     // distinct reason code.
     definitionPassageQualityJudge: createDefinitionPassageQualityJudgmentPort(deterministicClient),
     // Graph Enrichment ports (ADR-0019 amended — whole-set ordering, plan U5). ONE
-    // non-DeepSeek ordering call per Declared Domain (kg-prerequisite-ordering) returns
-    // the directed prerequisite DAG over the deduplicated node set; it is cross-family
-    // from the DeepSeek extractor + grounding generator (ADR-0023), so a single judge
+    // kg-prerequisite-ordering call per Declared Domain returns the directed prerequisite
+    // DAG over the deduplicated node set; it is cross-family from the proposal and grounding
+    // generators (ADR-0023), so a single judge
     // never grades its own minted output and the per-pair routing split is gone.
     // Deterministic decoding for stable re-derivation. Difficulty is learner-neutral
     // intrinsic: a cross-family neural subscore fused with deterministic components.
     prerequisiteOrdering: createPrerequisiteOrderingPort(deterministicClient),
-    // Node-minting ports (U5): explicit prerequisite proposal (node identity) +
-    // anchor-conditioned grounding generation, both DeepSeek-family (AGENTS rule 5).
+    // Node-minting ports (U5): explicit prerequisite proposal (node identity) plus
+    // anchor-conditioned grounding generation on the production generation aliases.
     missingPrerequisiteProposal: createMissingPrerequisiteProposalPort(deterministicClient),
-    groundingGeneration: createGroundingGenerationPort(deterministicClient),
-    groundingVerificationQuestionPlanning: createGroundingVerificationQuestionPlanningPort(deterministicClient),
-    groundingVerificationAnswering: createGroundingVerificationAnsweringPort(deterministicClient),
-    groundingFactualityRevision: createGroundingFactualityRevisionPort(deterministicClient),
+    groundingGeneration,
     // Synthetic topic generation, second pipeline arm (plan 2026-06-30-001, ADR-0019
-    // amended). Concept-set synthesis stays DeepSeek-family with deterministic decoding
-    // for a stable concept set (AGENTS rule 5); the knowledge-boundary probe rides the
+    // amended). Concept-set synthesis stays on the production extractor family with deterministic
+    // decoding for a stable concept set (AGENTS rule 5); the knowledge-boundary probe rides the
     // MODERATE-temperature cross-family client so its K draws disperse at the model's
     // knowledge boundary (KTD4).
     conceptSetSynthesis: createConceptSetSynthesisPort(deterministicClient),
-    knowledgeBoundaryProbe: createKnowledgeBoundaryProbePort(probeClient),
+    knowledgeBoundaryProbe,
+    sourceLessGroundingAdmission,
+    syntheticConfig,
     // Measured rescue durability judge (U3): cross-family independent judge
     // (kg-independent-judge) decides whether each aggregated source_mentioned rescue
     // candidate is a durable prerequisite before it becomes a derived node. Drop-only,
-    // fail-open-with-flag; the DeepSeek generator never grades rescue durability.
+    // fail-open-with-flag; the generator never grades rescue durability.
     rescueDurabilityJudge: createRescueDurabilityJudgmentPort(deterministicClient),
     // Measured Rescued-Node Canonical Labeling step (TODO #1): the SAME cross-family
     // independent judge (kg-independent-judge) re-names each durable rescued node — labeled
@@ -234,16 +251,16 @@ function buildContext() {
     // judge-off baseline.
     mintingDurabilityJudge: createMintingDurabilityJudgmentPort(deterministicClient),
     // Semantic-dedup ports (plan U1/U2, AGENTS rule 20). Embeddings PROPOSE within-domain
-    // near-duplicate pairs (qwen3-embedding-8b via kg-node-embedding); a cross-family
-    // adjudicator DECIDES each merge (kg-independent-judge / gpt-oss-120b, deterministic
-    // decoding) so the DeepSeek family never decides its own merges. Both opt-in: enrich
+    // near-duplicate pairs (kg-node-embedding); a cross-family adjudicator DECIDES each
+    // merge (kg-independent-judge, deterministic decoding), so the generation family
+    // never decides its own merges. Both opt-in: enrich
     // without them for the U7 baseline.
-    nodeEmbedding: new LiteLlmNodeEmbeddingAdapter(embeddingClient),
+    nodeEmbedding,
     nodeMergeAdjudicator: createNodeMergeAdjudicationPort(deterministicClient),
     difficulty: createIntrinsicDifficultyPort(createIntrinsicDifficultyJudgmentPort(deterministicClient), DEFAULT_ENRICHMENT_CONFIG.difficultySampleCount),
     enrichmentStore: new PostgresEnrichmentRunStore(sql),
-    // Learner Study Loop (ADR-0026): option-select study-item generation stays
-    // DeepSeek-family (AGENTS rule 5). Deterministic decoding for stable re-derivation.
+    // Learner Study Loop (ADR-0026): option-select study-item generation stays on the
+    // production generation alias. Deterministic decoding for stable re-derivation.
     // The Concept Lesson substrate (ADR-0031) is generated in the same operation, before
     // option-select, and persisted through its own store; option-select derives FROM it.
     conceptLessonGeneration: createConceptLessonGenerationPort(deterministicClient),
@@ -468,17 +485,11 @@ async function generateSyntheticLayer(ctx: Context, topic?: string, declaredDoma
     topic,
     declaredDomain,
     conceptSetSynthesis: ctx.conceptSetSynthesis,
-    knowledgeBoundaryProbe: ctx.knowledgeBoundaryProbe,
-    // The probe's semantic-agreement signal reuses the existing embedding port (ADR-0012).
-    embedding: ctx.nodeEmbedding,
-    groundingGeneration: ctx.groundingGeneration,
-    groundingVerificationQuestionPlanning: ctx.groundingVerificationQuestionPlanning,
-    groundingVerificationAnswering: ctx.groundingVerificationAnswering,
-    groundingFactualityRevision: ctx.groundingFactualityRevision,
+    sourceLessGroundingAdmission: ctx.sourceLessGroundingAdmission,
     prerequisiteOrdering: ctx.prerequisiteOrdering,
     difficulty: ctx.difficulty,
     enrichmentStore: ctx.enrichmentStore,
-    config: withSyntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG),
+    config: ctx.syntheticConfig,
     reporter: ctx.runProgressReporter,
     // Concept/verdict + edge summary line for operator visibility: how many concepts were
     // synthesized, how many the probe kept as core vs held out as boundary, and the DAG size.

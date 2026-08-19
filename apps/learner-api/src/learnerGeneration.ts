@@ -1,5 +1,6 @@
 import {
   createTopicExpeditionGeneration,
+  createSourceLessGroundingAdmission,
   createIntrinsicDifficultyPort,
   generateStudyItemBank,
   runSyntheticGeneration,
@@ -11,10 +12,11 @@ import {
   createConceptLessonGenerationPort,
   createConceptLessonRedundancyJudgmentPort,
   createConceptSetSynthesisPort,
-  createGroundingFactualityRevisionPort,
+  createClaimFactualityChallengePort,
+  createClaimFactualityJudgmentPort,
+  createClaimVerificationAnsweringPort,
+  createClaimVerificationQuestionPlanningPort,
   createGroundingGenerationPort,
-  createGroundingVerificationAnsweringPort,
-  createGroundingVerificationQuestionPlanningPort,
   createStudyItemKeyVerificationPort,
   createMatchingAssignmentVerificationPort,
   createIntrinsicDifficultyJudgmentPort,
@@ -53,6 +55,18 @@ export function createLearnerTopicExpeditionGeneration(sql: DatabaseClient): Top
   const enrichmentStore = new PostgresEnrichmentRunStore(sql);
   const reporter = new PostgresRunProgressReporter(sql);
   const syntheticConfig = withSyntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG);
+  const sourceLessGroundingAdmission = createSourceLessGroundingAdmission({
+    knowledgeBoundaryProbe: createKnowledgeBoundaryProbePort(probeClient),
+    embedding: new LiteLlmNodeEmbeddingAdapter(embeddingClient),
+    groundingGeneration: createGroundingGenerationPort(deterministicClient),
+    claimVerificationQuestionPlanning: createClaimVerificationQuestionPlanningPort(deterministicClient),
+    claimVerificationAnswering: createClaimVerificationAnsweringPort(deterministicClient),
+    claimFactualityJudgments: [
+      createClaimFactualityJudgmentPort(deterministicClient),
+      createClaimFactualityChallengePort(deterministicClient)
+    ],
+    policy: syntheticConfig.sourceLessGroundingAdmission
+  });
   const bankConfigHash = studyItemBankConfigHash();
   return createTopicExpeditionGeneration({
     expeditionProgress: new PostgresLearnerExpeditionStore(sql),
@@ -64,12 +78,7 @@ export function createLearnerTopicExpeditionGeneration(sql: DatabaseClient): Top
         onDeclaredDomain: activity.onDeclaredDomain,
         declaredDomainInference: createDeclaredDomainInferencePort(deterministicClient),
         conceptSetSynthesis: createConceptSetSynthesisPort(deterministicClient),
-        knowledgeBoundaryProbe: createKnowledgeBoundaryProbePort(probeClient),
-        embedding: new LiteLlmNodeEmbeddingAdapter(embeddingClient),
-        groundingGeneration: createGroundingGenerationPort(deterministicClient),
-        groundingVerificationQuestionPlanning: createGroundingVerificationQuestionPlanningPort(deterministicClient),
-        groundingVerificationAnswering: createGroundingVerificationAnsweringPort(deterministicClient),
-        groundingFactualityRevision: createGroundingFactualityRevisionPort(deterministicClient),
+        sourceLessGroundingAdmission,
         prerequisiteOrdering: createPrerequisiteOrderingPort(deterministicClient),
         difficulty: createIntrinsicDifficultyPort(
           createIntrinsicDifficultyJudgmentPort(deterministicClient),

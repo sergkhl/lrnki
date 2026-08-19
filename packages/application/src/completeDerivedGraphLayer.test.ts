@@ -91,11 +91,10 @@ function grounded(derivedNodeId: string, label: string, role: "prerequisite" | "
     declaredDomain: domain,
     aliases: [],
     groundingBundle: {
-      derivedNodeId,
       groundingOrigin: "llm_grounded",
       definitions: [{ passageType: "definition", text: `${label} means something.`, groundingOrigin: "llm_grounded", headingPath: [], locator: {}, verbatimCheck: notApplicable }],
       mentions: [{ passageType: "mention", text: `${label} relates to the topic.`, groundingOrigin: "llm_grounded", headingPath: [], locator: {}, verbatimCheck: notApplicable }],
-      scaffoldedAnchorConceptIds: [],
+      groundingAnchorReferences: [],
       generatingModel: "fake-gen",
       rationale: "generated"
     }

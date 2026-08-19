@@ -88,53 +88,48 @@ test("a single stray divergent draw at K=5 does not flip a robust core_knowledge
   assert.ok(verdict.agreementScore !== null && verdict.agreementScore > 0.82);
 });
 
-test("embedding-port failure fails safe to boundary, never silently core_knowledge", async () => {
+test("embedding-port failure propagates instead of fabricating a boundary measurement", async () => {
   const throwingEmbedding: NodeEmbeddingPort = {
     model: "fake-embedding",
     async embed() {
       throw new Error("embedding transport down");
     }
   };
-  const verdict = await probeKnowledgeBoundary({
+  await assert.rejects(() => probeKnowledgeBoundary({
     conceptLabel: "Concept D",
     declaredDomain: "some domain",
     probe: fakeProbe(["x"]),
     embedding: throwingEmbedding,
     config
-  });
-  assert.equal(verdict.disposition, "boundary");
-  assert.equal(verdict.agreementScore, null);
-  assert.match(verdict.rationale, /embedding port unavailable/);
+  }), /embedding transport down/);
 });
 
-test("a single draw carries no dispersion signal and fails safe to boundary", async () => {
-  const verdict = await probeKnowledgeBoundary({
+test("a single-draw policy fails before opening the probe", async () => {
+  let probeCalled = false;
+  await assert.rejects(() => probeKnowledgeBoundary({
     conceptLabel: "Concept E",
     declaredDomain: "some domain",
-    probe: fakeProbe(["only"]),
+    probe: { model: "fake", async probe() { probeCalled = true; return { answer: "only" }; } },
     embedding: fakeEmbedding({ only: [1, 0] }),
     config: { ...config, sampleCount: 1 }
-  });
-  assert.equal(verdict.disposition, "boundary");
-  assert.equal(verdict.agreementScore, null);
+  }), /sampleCount must be an integer of at least 2/);
+  assert.equal(probeCalled, false);
 });
 
-test("a mismatched embedding count fails safe to boundary", async () => {
+test("a mismatched embedding count propagates as a contract error", async () => {
   const shortEmbedding: NodeEmbeddingPort = {
     model: "fake-embedding",
     async embed(texts: string[]) {
       return texts.slice(1).map(() => [1, 0]); // one fewer vector than answers
     }
   };
-  const verdict = await probeKnowledgeBoundary({
+  await assert.rejects(() => probeKnowledgeBoundary({
     conceptLabel: "Concept F",
     declaredDomain: "some domain",
     probe: fakeProbe(["p", "q", "r"]),
     embedding: shortEmbedding,
     config: { ...config, sampleCount: 3 }
-  });
-  assert.equal(verdict.disposition, "boundary");
-  assert.equal(verdict.agreementScore, null);
+  }), /embedding returned 2 vectors for 3 answers/);
 });
 
 test("thresholds and K are config-driven, not hard-coded", () => {
