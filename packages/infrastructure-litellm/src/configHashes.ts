@@ -66,7 +66,12 @@ export const neuralOperationRegistry = {
     descriptors: [
       prerequisiteOrderingDescriptor,
       missingPrerequisiteProposalDescriptor,
+      knowledgeBoundaryProbeDescriptor,
       groundingGenerationDescriptor,
+      claimVerificationQuestionPlanningDescriptor,
+      claimVerificationAnsweringDescriptor,
+      claimFactualityJudgmentDescriptor,
+      claimFactualityChallengeDescriptor,
       rescueDurabilityDescriptor,
       rescuedNodeLabelingDescriptor,
       mintingDurabilityDescriptor,
@@ -157,7 +162,7 @@ export function extractionConfigHash(): string {
 export function graphEnrichmentConfigHash(config: GraphEnrichmentConfig): string {
   const entry = neuralOperationRegistry.graphEnrichment;
   return operationConfigHash(entry.configSeed, entry.descriptors, {
-    ...withoutEnrichmentConfigHash(config),
+    ...graphEnrichmentBehaviorConfig(config),
     nodeEmbeddingModel: NODE_EMBEDDING_MODEL
   }, {
     additionalModels: [NODE_EMBEDDING_MODEL]
@@ -207,15 +212,32 @@ function withoutEnrichmentConfigHash<T extends { enrichmentConfigHash: string }>
   return rest;
 }
 
-// Synthetic concept fan-out and the per-concept probe draw width alter scheduling,
+// Admission candidate fan-out and the per-concept probe draw width alter scheduling,
 // never the prompts, samples, thresholds, or artifact semantics. Keeping them out of
 // the operation identity lets execution tuning reuse the same Derived Graph Layer
 // behavioral identity while every neural-policy knob remains hashed (ADR-0019).
+function graphEnrichmentBehaviorConfig(config: GraphEnrichmentConfig) {
+  const { sourceLessGroundingAdmission, ...behavior } = withoutEnrichmentConfigHash(config);
+  return {
+    ...behavior,
+    sourceLessGroundingAdmission: sourceLessGroundingAdmissionBehavior(sourceLessGroundingAdmission)
+  };
+}
+
 function syntheticBehaviorConfig(config: SyntheticGenerationConfig) {
   const {
     sourceLessGroundingAdmission,
     ...behavior
   } = withoutEnrichmentConfigHash(config);
+  return {
+    ...behavior,
+    sourceLessGroundingAdmission: sourceLessGroundingAdmissionBehavior(sourceLessGroundingAdmission)
+  };
+}
+
+function sourceLessGroundingAdmissionBehavior(
+  sourceLessGroundingAdmission: SyntheticGenerationConfig["sourceLessGroundingAdmission"]
+) {
   const {
     candidateConcurrency: _candidateConcurrency,
     verificationConcurrency: _verificationConcurrency,
@@ -227,21 +249,18 @@ function syntheticBehaviorConfig(config: SyntheticGenerationConfig) {
   void _verificationConcurrency;
   void _probeConcurrency;
   return {
-    ...behavior,
-    sourceLessGroundingAdmission: {
-      ...admissionBehavior,
-      probe: probeBehavior
-    }
+    ...admissionBehavior,
+    probe: probeBehavior
   };
 }
 
-// Two registry entries may hold the same descriptor value (probe/grounding are SHARED_STAGES) or
+// Two registry entries may hold the same descriptor value when operations reuse a deep module, or
 // distinct instances of one parameterized factory; identity here is the (promptPath, stageTag,
 // modelOverride) triple that also keys `stageConfigHash`'s inputs per prompt file.
 function dedupeDescriptors(descriptors: readonly AnyNeuralStageDescriptor[]): AnyNeuralStageDescriptor[] {
   const seen = new Map<string, AnyNeuralStageDescriptor>();
   for (const descriptor of descriptors) {
-    const key = `${descriptor.promptPath} ${descriptor.stageTag} ${descriptor.modelOverride ?? ""}`;
+    const key = `${descriptor.promptPath}\0${descriptor.stageTag}\0${descriptor.modelOverride ?? ""}`;
     if (!seen.has(key)) seen.set(key, descriptor);
   }
   return [...seen.values()];

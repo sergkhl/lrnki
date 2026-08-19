@@ -12,9 +12,9 @@ export type ReservedMintingProposal = {
 };
 
 // Measured minting durability stage. Runs AFTER proposal labels are reserved and
-// BEFORE generated grounding is created, so a dropped proposal never spends a
-// grounding call and never becomes a node. Drop-only and fail-open: unavailable or
-// schema-invalid judge output keeps the proposal and records why.
+// BEFORE source-less grounding admission, so a dropped proposal spends no probe,
+// generation, or verification work and never becomes a node. Drop-only and fail-open:
+// unavailable or schema-invalid judge output keeps the proposal and records why.
 export async function applyMintingDurabilityJudge(input: {
   proposals: ReservedMintingProposal[];
   judge: MintingDurabilityJudgmentPort;

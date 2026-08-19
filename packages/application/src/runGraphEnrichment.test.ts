@@ -4,7 +4,10 @@ import type {
   AnchorProjectionNode,
   DerivedGraphLayer,
   EnrichmentRunTrace,
+  GeneratedGroundingBundle,
   GraphSnapshot,
+  MissingPrerequisiteProposal,
+  NonCoreRescueCandidate,
   PrerequisiteConceptContext,
   WholeSetOrdering
 } from "@lrnki/domain-core";
@@ -14,6 +17,10 @@ import type {
   DifficultyPort,
   EnrichmentRunStorePort,
   GraphVersionStorePort,
+  MintingDurabilityJudgmentPort,
+  MissingPrerequisiteProposalPort,
+  NodeEmbeddingPort,
+  NodeMergeAdjudicationPort,
   PrerequisiteOrderingPort,
   DefinitionPassageQualityJudgmentPort
 } from "@lrnki/ports";
@@ -22,6 +29,11 @@ import type { RunProgressReporterPort } from "@lrnki/ports";
 import { DEFAULT_ENRICHMENT_CONFIG, runGraphEnrichment, type GraphEnrichmentConfig } from "./runGraphEnrichment";
 import { DEFAULT_DEDUP_CONFIG } from "./deduplicateDerivedNodes";
 import { NON_LLM_STAGES } from "./runProgressReporter";
+import type {
+  GroundingAdmissionCandidate,
+  GroundingAdmissionOutcome,
+  SourceLessGroundingAdmission
+} from "./sourceLessGroundingAdmission";
 
 installNodeOperationTagContext();
 
@@ -202,7 +214,7 @@ function configWith(overrides: Partial<GraphEnrichmentConfig>): GraphEnrichmentC
 const K = DEFAULT_ENRICHMENT_CONFIG.orderingSampleCount;
 
 function run(ports: ReturnType<typeof buildPorts>, overrides: Partial<Parameters<typeof runGraphEnrichment>[0]> = {}) {
-  return runGraphEnrichment({
+  const input = {
     enrichmentId: "e1",
     graphVersionId: "v1",
     graphStore: ports.graphStore as GraphVersionStorePort,
@@ -210,7 +222,8 @@ function run(ports: ReturnType<typeof buildPorts>, overrides: Partial<Parameters
     difficulty: ports.difficulty,
     enrichmentStore: ports.enrichmentStore as EnrichmentRunStorePort,
     ...overrides
-  });
+  } as Parameters<typeof runGraphEnrichment>[0];
+  return runGraphEnrichment(input);
 }
 
 const idByLabel = (layer: DerivedGraphLayer) =>
@@ -303,11 +316,9 @@ test("anchor derived node ids are per enrichment run, while concept ids stay sta
   assert.notEqual(firstAnchor.derivedNodeId, secondAnchor.derivedNodeId);
 });
 
-// --- Node minting + rescue (sub-stages unchanged; ordering consumes their nodes) ------
+// --- Node minting + rescue (ordering consumes their nodes) -----------------------------
 
-import type { GeneratedGroundingBundle, NonCoreRescueCandidate, MissingPrerequisiteProposal } from "@lrnki/domain-core";
 import { isStageTag } from "@lrnki/domain-core";
-import type { GroundingGenerationPort, MissingPrerequisiteProposalPort, NodeEmbeddingPort, NodeMergeAdjudicationPort } from "@lrnki/ports";
 
 // A one-anchor sparse snapshot: only "Move Semantics" is defined. Enrichment must
 // expand it with a rescued node and a minted node, then order all three together.
@@ -318,10 +329,43 @@ const sparseSnapshot: GraphSnapshot = {
   evidenceProfiles: [{ conceptId: "a1", definitions: [passage("b1", "Move Semantics transfers ownership")], mentions: [], assertions: [] }]
 };
 
+function admittedBundle(candidate: GroundingAdmissionCandidate): GeneratedGroundingBundle {
+  const anchor = candidate.context.kind === "scaffolded_anchor" ? candidate.context.anchor : undefined;
+  return {
+    groundingOrigin: "llm_grounded",
+    definitions: [
+      {
+        passageType: "definition",
+        text: `${candidate.canonicalLabel} explained.`,
+        groundingOrigin: "llm_grounded",
+        headingPath: [],
+        locator: {},
+        verbatimCheck: { disposition: "not_applicable_by_grounding", rationale: "generated" }
+      }
+    ],
+    mentions: [],
+    groundingAnchorReferences: anchor ? [anchor.reference] : [],
+    generatingModel: "mock-gen",
+    rationale: "r"
+  };
+}
+
+function admittedOutcome(candidate: GroundingAdmissionCandidate): GroundingAdmissionOutcome {
+  return {
+    candidateKey: candidate.candidateKey,
+    disposition: "admitted",
+    probe: { disposition: "core_knowledge", agreementScore: 1, rationale: "stable" },
+    bundle: admittedBundle(candidate)
+  };
+}
+
 function buildNodePorts(options: {
   rescue?: NonCoreRescueCandidate[];
   proposals?: MissingPrerequisiteProposal[];
   responder?: Responder;
+  admit?: (candidate: GroundingAdmissionCandidate) => GroundingAdmissionOutcome;
+  sourceLessGroundingAdmission?: SourceLessGroundingAdmission;
+  mintingDurabilityJudge?: MintingDurabilityJudgmentPort;
 }) {
   const orderedLabels: string[][] = [];
   let drawIndex = 0;
@@ -338,18 +382,26 @@ function buildNodePorts(options: {
     model: "mock-proposer",
     async propose(input) { return (options.proposals ?? []).slice(0, input.maxProposals); }
   };
-  const groundingPort: GroundingGenerationPort = {
-    model: "mock-gen",
-    async generate(input): Promise<GeneratedGroundingBundle> {
-      const anchor = input.context.kind === "scaffolded_anchor" ? input.context.anchor : undefined;
+  let admissionOperationCount = 0;
+  const sourceLessGroundingAdmission: SourceLessGroundingAdmission = options.sourceLessGroundingAdmission ?? {
+    forOperation(stage) {
+      admissionOperationCount += 1;
       return {
-        groundingOrigin: "llm_grounded",
-        definitions: [{ passageType: "definition", text: `${input.canonicalLabel} explained.`, groundingOrigin: "llm_grounded", headingPath: [], locator: {}, verbatimCheck: { disposition: "not_applicable_by_grounding", rationale: "generated" } }],
-        mentions: [], groundingAnchorReferences: anchor ? [anchor.reference] : [], generatingModel: "mock-gen", rationale: "r"
+        async admitBatch(candidates) {
+          return stage(STAGE_TAGS.groundingGeneration, async () =>
+            candidates.map(options.admit ?? admittedOutcome)
+          );
+        }
       };
     }
   };
+  const mintingDurabilityJudge: MintingDurabilityJudgmentPort = options.mintingDurabilityJudge ?? {
+    model: "kg-independent-judge",
+    judge: async () => ({ verdict: "durable", rationale: "foundation" })
+  };
   let persisted: DerivedGraphLayer | undefined;
+  let trace: EnrichmentRunTrace | undefined;
+  let persistCalls = 0;
   const graphStore: Pick<GraphVersionStorePort, "getPublishedSnapshot"> = {
     async getPublishedSnapshot(id) { return id === sparseSnapshot.graphVersionId ? sparseSnapshot : undefined; }
   };
@@ -360,10 +412,28 @@ function buildNodePorts(options: {
     }
   };
   const enrichmentStore: Pick<EnrichmentRunStorePort, "persist" | "nonCoreRescueCandidates"> = {
-    async persist(input) { persisted = input.layer; },
+    async persist(input) {
+      persistCalls += 1;
+      persisted = input.layer;
+      trace = input.artifact.payload;
+    },
     async nonCoreRescueCandidates() { return options.rescue ?? []; }
   };
-  return { orderedLabels, newNodeId, proposalPort, groundingPort, prerequisiteOrdering, graphStore, difficulty, enrichmentStore, getPersisted: () => persisted };
+  return {
+    orderedLabels,
+    newNodeId,
+    proposalPort,
+    mintingDurabilityJudge,
+    sourceLessGroundingAdmission,
+    prerequisiteOrdering,
+    graphStore,
+    difficulty,
+    enrichmentStore,
+    getPersisted: () => persisted,
+    getTrace: () => trace,
+    getPersistCalls: () => persistCalls,
+    getAdmissionOperationCount: () => admissionOperationCount
+  };
 }
 
 function rescueCandidate(label: string): NonCoreRescueCandidate {
@@ -380,12 +450,30 @@ function runNodes(ports: ReturnType<typeof buildNodePorts>) {
     graphStore: ports.graphStore as GraphVersionStorePort,
     prerequisiteOrdering: ports.prerequisiteOrdering,
     missingPrerequisiteProposal: ports.proposalPort,
-    groundingGeneration: ports.groundingPort,
+    mintingDurabilityJudge: ports.mintingDurabilityJudge,
+    sourceLessGroundingAdmission: ports.sourceLessGroundingAdmission,
     difficulty: ports.difficulty,
     enrichmentStore: ports.enrichmentStore as EnrichmentRunStorePort,
     newNodeId: ports.newNodeId
   });
 }
+
+test("the minting path requires proposal, durability, and finished admission together", async () => {
+  const ports = buildNodePorts({});
+  await assert.rejects(
+    () => runGraphEnrichment({
+      enrichmentId: "e1",
+      graphVersionId: "v1",
+      graphStore: ports.graphStore as GraphVersionStorePort,
+      prerequisiteOrdering: ports.prerequisiteOrdering,
+      missingPrerequisiteProposal: ports.proposalPort,
+      difficulty: ports.difficulty,
+      enrichmentStore: ports.enrichmentStore as EnrichmentRunStorePort
+    } as Parameters<typeof runGraphEnrichment>[0]),
+    /requires prerequisite proposal, minting durability, and Source-less Grounding Admission together/
+  );
+  assert.equal(ports.getPersistCalls(), 0);
+});
 
 test("rescues a source_mentioned node from a member-run mention and orders it as an edge", async () => {
   const ports = buildNodePorts({
@@ -426,7 +514,8 @@ test("U3: a hollow rescued definition passage is dropped before it becomes learn
     graphStore: ports.graphStore as GraphVersionStorePort,
     prerequisiteOrdering: ports.prerequisiteOrdering,
     missingPrerequisiteProposal: ports.proposalPort,
-    groundingGeneration: ports.groundingPort,
+    mintingDurabilityJudge: ports.mintingDurabilityJudge,
+    sourceLessGroundingAdmission: ports.sourceLessGroundingAdmission,
     rescuedDefinitionQualityJudge: judge,
     difficulty: ports.difficulty,
     enrichmentStore: ports.enrichmentStore as EnrichmentRunStorePort,
@@ -455,7 +544,8 @@ test("U3: a genuinely defining rescued passage is kept when the judge is wired",
     graphStore: ports.graphStore as GraphVersionStorePort,
     prerequisiteOrdering: ports.prerequisiteOrdering,
     missingPrerequisiteProposal: ports.proposalPort,
-    groundingGeneration: ports.groundingPort,
+    mintingDurabilityJudge: ports.mintingDurabilityJudge,
+    sourceLessGroundingAdmission: ports.sourceLessGroundingAdmission,
     rescuedDefinitionQualityJudge: keepAll,
     difficulty: ports.difficulty,
     enrichmentStore: ports.enrichmentStore as EnrichmentRunStorePort,
@@ -475,6 +565,58 @@ test("mints an llm_grounded node for an anchor and never publishes it asserted",
   const asserted = layer.derivedNodes.filter((node) => node.layer === "asserted");
   assert.equal(asserted.length, 1);
   assert.equal(asserted[0].nodeKind, "anchor");
+});
+
+test("persists durability and admission dispositions separately and excludes a holdout node", async () => {
+  const ports = buildNodePorts({
+    proposals: [
+      { proposedLabel: "Stack allocation", rationale: "needed" },
+      { proposedLabel: "Boundary concept", rationale: "uncertain" }
+    ],
+    admit: (candidate) =>
+      candidate.canonicalLabel === "Boundary concept"
+        ? {
+            candidateKey: candidate.candidateKey,
+            disposition: "held_out",
+            reason: "knowledge_boundary",
+            probe: { disposition: "boundary", agreementScore: 0.4, rationale: "unstable" }
+          }
+        : admittedOutcome(candidate)
+  });
+  const layer = await runNodes(ports);
+  const trace = ports.getTrace();
+  assert.ok(trace);
+  assert.deepEqual(trace.mintingDispositions.map((item) => [item.proposedLabel, item.disposition]), [
+    ["Stack allocation", "accepted"],
+    ["Boundary concept", "accepted"]
+  ]);
+  assert.deepEqual(trace.groundingAdmissionDispositions.map((item) => [item.proposedLabel, item.disposition]), [
+    ["Stack allocation", "admitted"],
+    ["Boundary concept", "held_out"]
+  ]);
+  assert.ok(layer.derivedNodes.some((node) => node.canonicalLabel === "Stack allocation"), "the admitted proposal created a node");
+  assert.equal(layer.derivedNodes.some((node) => node.canonicalLabel === "Boundary concept"), false, "the holdout created no node");
+});
+
+test("an admission dependency failure aborts Graph Enrichment without a partial layer", async () => {
+  const failingAdmission: SourceLessGroundingAdmission = {
+    forOperation() {
+      return {
+        async admitBatch() {
+          throw new Error("verification dependency unavailable");
+        }
+      };
+    }
+  };
+  const ports = buildNodePorts({
+    proposals: [{ proposedLabel: "Stack allocation", rationale: "needed" }],
+    sourceLessGroundingAdmission: failingAdmission
+  });
+
+  await assert.rejects(() => runNodes(ports), /verification dependency unavailable/);
+  assert.equal(ports.getPersistCalls(), 0);
+  assert.equal(ports.getPersisted(), undefined);
+  assert.deepEqual(ports.orderedLabels, [], "the failure never reaches the completion back half");
 });
 
 test("orders the rescued + minted + anchor node set in each of the K whole-set draws", async () => {
@@ -501,7 +643,7 @@ test("records the verbatim-floor grounding dispositions on the run", async () =>
 // AE1: a minting run's timeline names the fine rescue/mint stages and NO coarse `rescue-mint`.
 // Every enrichment LLM stage that fires is a STAGE_TAG, so the cost half of the cost & timings report
 // join meets it on one key — the join-alignment contract (R1).
-test("U1 integration: a minting run's timeline uses fine names, never `rescue-mint`", async () => {
+test("a minting run hands its operation bracket to admission and uses fine timeline names", async () => {
   const ports = buildNodePorts({ rescue: [rescueCandidate("Pointer")], proposals: [{ proposedLabel: "Stack allocation", rationale: "r" }] });
   const { reporter, calls } = recordingReporter();
   await runGraphEnrichment({
@@ -509,7 +651,8 @@ test("U1 integration: a minting run's timeline uses fine names, never `rescue-mi
     graphStore: ports.graphStore as GraphVersionStorePort,
     prerequisiteOrdering: ports.prerequisiteOrdering,
     missingPrerequisiteProposal: ports.proposalPort,
-    groundingGeneration: ports.groundingPort,
+    mintingDurabilityJudge: ports.mintingDurabilityJudge,
+    sourceLessGroundingAdmission: ports.sourceLessGroundingAdmission,
     difficulty: ports.difficulty,
     enrichmentStore: ports.enrichmentStore as EnrichmentRunStorePort,
     newNodeId: ports.newNodeId,
@@ -519,6 +662,7 @@ test("U1 integration: a minting run's timeline uses fine names, never `rescue-mi
   assert.ok(!entered.includes("rescue-mint"), "the coarse composite stage is gone");
   assert.ok(entered.includes(STAGE_TAGS.missingPrerequisiteProposal));
   assert.ok(entered.includes(STAGE_TAGS.groundingGeneration));
+  assert.equal(ports.getAdmissionOperationCount(), 1, "the consumer opens one finished admission module per operation");
   // Join-alignment: every entered stage that is not a non-LLM tail (symbolic-disposal,
   // persist) is a STAGE_TAG, so its wall-clock joins the cost the LLM call self-tags.
   const nonLlmTail = new Set<string>([NON_LLM_STAGES.symbolicDisposal, NON_LLM_STAGES.persist]);

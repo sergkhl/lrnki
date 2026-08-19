@@ -4,10 +4,10 @@
 
 ## TODO
 
-- **Source-less Grounding Admission — U1 complete; U2 next.** The
+- **Source-less Grounding Admission — U3 next.** The
   [plan](./2026-08-19-001-deepen-source-less-grounding-admission.md) owns implementation design and
-  validation. Cut model-grounded prerequisite minting over to the shared module, then run U2's Rust
-  curated-fixture gate; do not implement Candidate 2.
+  validation. U1–U2 are closed `PASS`; implement generated Support Step assurance, Answer-Key
+  Verification reuse, and durable Grounding Bundle evidence next. Do not implement Candidate 2.
 
 - **Generation model evaluation — shaping; no implementation plan is ready.** The
   [brainstorm](../brainstorms/2026-08-08-002-generation-model-evaluation.md) owns the dated evidence,

@@ -4,6 +4,7 @@ import type {
   DerivedGraphLayer,
   DerivedGraphNode,
   EnrichmentNode,
+  GroundingAdmissionDisposition,
   GroundingVerbatimDisposition,
   MintingDisposition,
   NodeMergeRecord,
@@ -13,7 +14,6 @@ import { STAGE_TAGS } from "@lrnki/domain-core";
 import type {
   DifficultyPort,
   EnrichmentRunStorePort,
-  GroundingGenerationPort,
   MintingDurabilityJudgmentPort,
   MissingPrerequisiteProposalPort,
   NodeEmbeddingPort,
@@ -37,10 +37,14 @@ import { deduplicateDerivedNodes, DEFAULT_DEDUP_CONFIG, type DedupConfig, type D
 import { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMintingBounds, type MintingAnchor } from "./enrichmentNodeMinting";
 import { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
 import { applyRescuedDefinitionQualityJudge } from "./applyRescuedDefinitionQualityJudge";
+import {
+  DEFAULT_SOURCE_LESS_GROUNDING_ADMISSION_POLICY,
+  type SourceLessGroundingAdmission,
+  type SourceLessGroundingAdmissionPolicy
+} from "./sourceLessGroundingAdmission";
 
 // The shared completion fields (config authority in completeDerivedGraphLayer.ts) plus
-// Graph Enrichment's producer-specific knobs. The flat runtime shape and field names are
-// unchanged, so the operation's config-hash identity is stable (plan 2026-07-11-001 AE6).
+// Graph Enrichment's producer-specific knobs.
 export type GraphEnrichmentConfig = DerivedGraphCompletionConfig & {
   // K for the comparative difficulty BANDING draws per Declared Domain (ADR-0024).
   // Band consensus needs fewer draws than per-edge direction votes: bands are 5
@@ -49,6 +53,9 @@ export type GraphEnrichmentConfig = DerivedGraphCompletionConfig & {
   difficultySampleCount: number;
   // Bounds on the anchor-driven node-minting pass (KTD6, R7).
   mintingBounds: EnrichmentMintingBounds;
+  // The complete policy used by the structurally paired prerequisite-admission dependency.
+  // Shared with Synthetic Topic Generation; execution-only widths are removed by the hash owner.
+  sourceLessGroundingAdmission: SourceLessGroundingAdmissionPolicy;
   // Semantic-dedup knobs (plan U3). Only consulted when both dedup ports are provided;
   // tuned in the U7 rule-14 pass against the largest domain.
   dedup: DedupConfig;
@@ -63,8 +70,21 @@ export const DEFAULT_ENRICHMENT_CONFIG: GraphEnrichmentConfig = {
   ...DEFAULT_DERIVED_GRAPH_COMPLETION_CONFIG,
   difficultySampleCount: 5,
   mintingBounds: DEFAULT_MINTING_BOUNDS,
+  sourceLessGroundingAdmission: DEFAULT_SOURCE_LESS_GROUNDING_ADMISSION_POLICY,
   dedup: DEFAULT_DEDUP_CONFIG
 };
+
+type GraphEnrichmentMintingDependencies =
+  | {
+      missingPrerequisiteProposal?: undefined;
+      mintingDurabilityJudge?: undefined;
+      sourceLessGroundingAdmission?: undefined;
+    }
+  | {
+      missingPrerequisiteProposal: MissingPrerequisiteProposalPort;
+      mintingDurabilityJudge: MintingDurabilityJudgmentPort;
+      sourceLessGroundingAdmission: SourceLessGroundingAdmission;
+    };
 
 // Graph Enrichment — the third operation, generalized to NODE + EDGE derivation
 // (ADR-0019, amended for whole-set ordering — plan U4). The asserted snapshot supplies
@@ -81,8 +101,8 @@ export const DEFAULT_ENRICHMENT_CONFIG: GraphEnrichmentConfig = {
 // CERTAIN edges; intrinsic difficulty scores ALL
 // derived nodes from the same evidence contexts. The asserted core is never touched (R5):
 // no enrichment node is ever published. Node minting + rescue are OPT-IN — when the
-// proposal/grounding ports are omitted the run is anchor-only. Fails the run WITHOUT
-// persistence if any ordering call exhausts the forced-tool retry budget, if an edge
+// paired proposal/durability/admission dependencies are omitted the run is anchor-only. Fails
+// the run WITHOUT persistence if any ordering call exhausts the forced-tool retry budget, if an edge
 // cites an ordinal outside the judged set (rule 6), or if a domain blows the token budget
 // (R16, KTD6) — no partial layer is ever persisted.
 export async function runGraphEnrichment(input: {
@@ -93,10 +113,9 @@ export async function runGraphEnrichment(input: {
   difficulty: DifficultyPort;
   enrichmentStore: EnrichmentRunStorePort;
   config?: GraphEnrichmentConfig;
-  // U5/U7 enrichment-node ports. Provide both to enable rescue + mint; omit them for an
-  // anchor-only run.
-  missingPrerequisiteProposal?: MissingPrerequisiteProposalPort;
-  groundingGeneration?: GroundingGenerationPort;
+  // The proposal path is structurally paired with its durability judge and the finished
+  // admission module below. Either all three dependencies are present or the operation is
+  // anchor-only; direct grounding is not a Graph Enrichment dependency any more.
   // Optional measured rescue durability judge (U3). When provided, aggregated
   // `source_mentioned` rescue candidates are durability-judged against their
   // same-domain anchors before becoming derived nodes; omit it to leave rescue
@@ -114,10 +133,6 @@ export async function runGraphEnrichment(input: {
   // (prior behavior). Same `kg-independent-judge` meaning judge as the extraction-time core
   // gate — no new alias.
   rescuedDefinitionQualityJudge?: DefinitionPassageQualityJudgmentPort;
-  // Optional measured minting durability judge. When provided, each reserved
-  // assumed-prerequisite proposal is judged before generated grounding is created;
-  // omit it to preserve prior minting behavior.
-  mintingDurabilityJudge?: MintingDurabilityJudgmentPort;
   // Optional semantic-dedup ports (plan U3, AGENTS rule 20). Provide BOTH to enable the
   // dedup sub-stage: the embedding PROPOSES near-duplicate pairs and the cross-family
   // adjudicator DECIDES each merge. Omit either to leave enrichment behavior identical to
@@ -139,7 +154,15 @@ export async function runGraphEnrichment(input: {
   // timeline. Absent → no-op (anchor-only/test runs behave unchanged).
   reporter?: RunProgressReporterPort;
   newNodeId?: () => string;
-}): Promise<DerivedGraphLayer> {
+} & GraphEnrichmentMintingDependencies): Promise<DerivedGraphLayer> {
+  const mintingDependencyCount = [
+    input.missingPrerequisiteProposal,
+    input.mintingDurabilityJudge,
+    input.sourceLessGroundingAdmission
+  ].filter(Boolean).length;
+  if (mintingDependencyCount !== 0 && mintingDependencyCount !== 3) {
+    throw new Error("runGraphEnrichment requires prerequisite proposal, minting durability, and Source-less Grounding Admission together.");
+  }
   const config = input.config ?? DEFAULT_ENRICHMENT_CONFIG;
   const reporter = input.reporter ?? noopRunProgressReporter;
   const operationId = input.enrichmentId;
@@ -174,7 +197,8 @@ export async function runGraphEnrichment(input: {
     let rescueDispositions: RescueDisposition[] = [];
     let rescuedDefinitionDispositions: DefinitionPassageDisposition[] = [];
     let mintingDispositions: MintingDisposition[] = [];
-    if (input.missingPrerequisiteProposal && input.groundingGeneration) {
+    let groundingAdmissionDispositions: GroundingAdmissionDisposition[] = [];
+    if (input.missingPrerequisiteProposal && input.mintingDurabilityJudge && input.sourceLessGroundingAdmission) {
       // No coarse `rescue-mint` bracket: assembleEnrichmentNodes brackets each inner LLM
       // call onto its fine STAGE_TAGS name (U1), so wall-clock joins the cost the calls
       // already self-tag. The surrounding candidate fetch + verbatim floor are deterministic
@@ -191,7 +215,7 @@ export async function runGraphEnrichment(input: {
         anchors: mintingAnchors,
         rescueCandidates,
         proposalPort: input.missingPrerequisiteProposal!,
-        groundingPort: input.groundingGeneration!,
+        sourceLessGroundingAdmission: input.sourceLessGroundingAdmission,
         rescueDurabilityJudge: input.rescueDurabilityJudge,
         rescuedNodeLabelingJudge: input.rescuedNodeLabelingJudge,
         mintingDurabilityJudge: input.mintingDurabilityJudge,
@@ -201,6 +225,7 @@ export async function runGraphEnrichment(input: {
       });
       rescueDispositions = assembled.rescueDispositions;
       mintingDispositions = assembled.mintingDispositions;
+      groundingAdmissionDispositions = assembled.groundingAdmissionDispositions;
       input.onMintingSummary?.({
         accepted: mintingDispositions.filter((disposition) => disposition.disposition === "accepted").length,
         dropped: mintingDispositions.filter((disposition) => disposition.disposition === "dropped").length,
@@ -298,6 +323,7 @@ export async function runGraphEnrichment(input: {
         rescueDispositions,
         rescuedDefinitionDispositions,
         mintingDispositions,
+        groundingAdmissionDispositions,
         nodeMerges,
         onOrderingSummary: input.onOrderingSummary
       }
@@ -313,4 +339,3 @@ function deterministicUuid(...parts: string[]): string {
   hash[16] = (8 + (Number.parseInt(hash[16], 16) % 4)).toString(16);
   return `${hash.slice(0, 8).join("")}-${hash.slice(8, 12).join("")}-${hash.slice(12, 16).join("")}-${hash.slice(16, 20).join("")}-${hash.slice(20, 32).join("")}`;
 }
-

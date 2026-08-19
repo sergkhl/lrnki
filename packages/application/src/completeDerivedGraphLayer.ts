@@ -4,6 +4,7 @@ import type {
   DerivedGraphNode,
   DifficultyNodeContext,
   EnrichmentRunTrace,
+  GroundingAdmissionDisposition,
   GroundingVerbatimDisposition,
   InferredPrerequisiteEdge,
   MintingDisposition,
@@ -98,6 +99,7 @@ export type SourceGroundedContribution = {
   rescueDispositions: RescueDisposition[];
   rescuedDefinitionDispositions: DefinitionPassageDisposition[];
   mintingDispositions: MintingDisposition[];
+  groundingAdmissionDispositions: GroundingAdmissionDisposition[];
   nodeMerges: NodeMergeRecord[];
   // Graph Enrichment's K-sampling ordering summary hook, invoked inside the ordering
   // branch after consensus/reduction. Difficulty runs independently in parallel; the
@@ -291,9 +293,10 @@ export function createDerivedGraphLayerCompletion(ports: {
         rescueDispositions: contribution.kind === "source_grounded" ? contribution.rescueDispositions : [],
         rescuedDefinitionDispositions: contribution.kind === "source_grounded" ? contribution.rescuedDefinitionDispositions : [],
         mintingDispositions: contribution.kind === "source_grounded" ? contribution.mintingDispositions : [],
+        groundingAdmissionDispositions: contribution.kind === "source_grounded" ? contribution.groundingAdmissionDispositions : [],
         nodeMerges: contribution.kind === "source_grounded" ? contribution.nodeMerges : [],
-        // Present only for the synthetic variant; ABSENT (not empty) for source-grounded
-        // enrichment, which runs no probe — the persisted artifact shape is unchanged.
+        // Present only for the synthetic variant; source-grounded enrichment records its
+        // distinct prerequisite-admission outcomes above instead.
         ...(contribution.kind === "synthetic" ? { syntheticProbeDispositions: contribution.syntheticProbeDispositions } : {})
       };
 
@@ -388,9 +391,54 @@ function validateRequest(request: DerivedGraphCompletionRequest): Set<string> {
         fail(`rescue disposition ("${d.disposition}") names node "${d.derivedNodeId}" with no proven lifecycle`);
       }
     }
+    const mintingById = new Map<string, MintingDisposition>();
     for (const d of contribution.mintingDispositions) {
-      if (d.disposition !== "dropped" && !provenLifecycle(d.derivedNodeId)) {
-        fail(`minting disposition ("${d.disposition}") names node "${d.derivedNodeId}" with no proven lifecycle`);
+      if (mintingById.has(d.derivedNodeId)) {
+        fail(`duplicate minting disposition for "${d.derivedNodeId}"`);
+      }
+      mintingById.set(d.derivedNodeId, d);
+    }
+    const admissionById = new Map<string, GroundingAdmissionDisposition>();
+    for (const d of contribution.groundingAdmissionDispositions) {
+      if (admissionById.has(d.derivedNodeId)) {
+        fail(`duplicate grounding-admission disposition for "${d.derivedNodeId}"`);
+      }
+      admissionById.set(d.derivedNodeId, d);
+      const durability = mintingById.get(d.derivedNodeId);
+      if (!durability || durability.disposition === "dropped") {
+        fail(`grounding-admission disposition for "${d.derivedNodeId}" has no durability-kept proposal`);
+      }
+      if (
+        durability.proposedLabel !== d.proposedLabel ||
+        durability.normalizedLabel !== d.normalizedLabel ||
+        durability.declaredDomain !== d.declaredDomain ||
+        durability.anchorConceptId !== d.anchorConceptId
+      ) {
+        fail(`grounding-admission disposition for "${d.derivedNodeId}" disagrees with its minting disposition`);
+      }
+      if (d.disposition === "admitted" && !provenLifecycle(d.derivedNodeId)) {
+        fail(`admitted grounding disposition names node "${d.derivedNodeId}" with no proven lifecycle`);
+      }
+      if (d.disposition !== "admitted" && provenLifecycle(d.derivedNodeId)) {
+        fail(`${d.disposition} grounding disposition names node "${d.derivedNodeId}" that entered the derived layer`);
+      }
+    }
+    for (const d of contribution.mintingDispositions) {
+      const admission = admissionById.get(d.derivedNodeId);
+      if (d.disposition === "dropped" && admission) {
+        fail(`dropped minting disposition for "${d.derivedNodeId}" reached grounding admission`);
+      }
+      if (d.disposition !== "dropped" && !admission) {
+        fail(`minting disposition ("${d.disposition}") names proposal "${d.derivedNodeId}" with no grounding-admission outcome`);
+      }
+    }
+    for (const node of nodes) {
+      if (node.groundingOrigin !== "llm_grounded") continue;
+      if (node.mintingReason !== "assumed_prerequisite") {
+        fail(`source-grounded llm node "${node.derivedNodeId}" lacks the assumed-prerequisite minting reason`);
+      }
+      if (admissionById.get(node.derivedNodeId)?.disposition !== "admitted") {
+        fail(`source-grounded llm node "${node.derivedNodeId}" has no admitted grounding disposition`);
       }
     }
     for (const d of contribution.rescuedDefinitionDispositions) {

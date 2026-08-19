@@ -1,5 +1,6 @@
 import { normalizeConceptLabel } from "@lrnki/domain-core";
 import type {
+  GroundingAdmissionDisposition,
   LlmGroundedEnrichmentNode,
   NonCoreRescueCandidate,
   MintingDisposition,
@@ -8,7 +9,6 @@ import type {
   SourceMentionGroundingPassage
 } from "@lrnki/domain-core";
 import type {
-  GroundingGenerationPort,
   MintingDurabilityJudgmentPort,
   MissingPrerequisiteProposalPort,
   RescueDurabilityJudgmentPort,
@@ -19,6 +19,11 @@ import { applyMintingDurabilityJudge, type ReservedMintingProposal } from "./app
 import { applyRescueDurabilityJudge } from "./applyRescueDurabilityJudge";
 import { applyRescuedNodeLabeling } from "./applyRescuedNodeLabeling";
 import { passthroughStageBracket, type StageBracket } from "./runProgressReporter";
+import type {
+  GroundingAdmissionCandidate,
+  GroundingAdmissionOutcome,
+  SourceLessGroundingAdmission
+} from "./sourceLessGroundingAdmission";
 
 // Bounds on the anchor-driven minting pass (KTD6, R7). Defaults keep minting
 // bounded so a thin source cannot explode into a runaway derived graph; both knobs
@@ -51,14 +56,15 @@ export type MintingAnchor = {
 // Domain so the minter cannot regenerate a rescued concept. MINT (KTD6): each anchor drives
 // a bounded, explicit proposal pass — the proposal port NAMES assumed-prior concepts
 // (handoff constraint: node identity is an inspectable operation, not local string
-// construction), then the grounding port fills a CEP-shaped bundle for each accepted
-// label. Both caps are enforced deterministically. Nothing here enters the asserted
-// layer (R5); the verbatim floor (U6) runs over the result before pair judging.
+// construction), then the finished Source-less Grounding Admission module checks every
+// durability-kept label before a node can exist. Both caps are enforced deterministically.
+// Nothing here enters the asserted layer (R5); the verbatim floor (U6) runs over the result
+// before pair judging.
 export async function assembleEnrichmentNodes(input: {
   anchors: MintingAnchor[];
   rescueCandidates: NonCoreRescueCandidate[];
   proposalPort: MissingPrerequisiteProposalPort;
-  groundingPort: GroundingGenerationPort;
+  sourceLessGroundingAdmission: SourceLessGroundingAdmission;
   // Optional measured rescue durability judge (U3). When provided, each AGGREGATED
   // rescued node is judged against its same-domain anchors before minting runs; a
   // node judged non-durable (confident + grounded) is dropped with a recorded
@@ -70,22 +76,22 @@ export async function assembleEnrichmentNodes(input: {
   // per-domain call, and minting adopts the proposal when its normalized form is unclaimed
   // (demoting the original sentence to an alias). Omitted -> rescued labels stay as-is.
   rescuedNodeLabelingJudge?: RescuedNodeLabelingPort;
-  // Optional measured minting durability judge. When provided, each reserved
-  // assumed-prerequisite proposal is judged before grounding generation. Omitted ->
-  // minting is identical to prior behavior and emits no minting dispositions.
-  mintingDurabilityJudge?: MintingDurabilityJudgmentPort;
+  // Every reserved assumed-prerequisite proposal is durability-judged before it may
+  // cross source-less grounding admission. The Graph Enrichment boundary structurally
+  // pairs this dependency with proposal and admission, so there is no bypass path.
+  mintingDurabilityJudge: MintingDurabilityJudgmentPort;
   bounds?: EnrichmentMintingBounds;
   newNodeId: () => string;
-  // Stage-bracket seam (U1): each inner LLM port call is wrapped with its fine STAGE_TAGS
-  // name so its wall-clock joins the cost the call already self-tags. The assembly is a
-  // sequential `await` loop, so only one bracket of a given name is ever open at once
-  // (KTD2/KTD3). Defaults to a passthrough so a direct unit test runs un-instrumented.
+  // Stage-bracket seam (U1): local LLM ports use their fine STAGE_TAGS names and the
+  // finished admission module receives the same operation-scoped bracket. Defaults to
+  // a passthrough so a direct unit test runs un-instrumented.
   stage?: StageBracket;
 }): Promise<{
   rescuedNodes: SourceMentionedEnrichmentNode[];
   mintedNodes: LlmGroundedEnrichmentNode[];
   rescueDispositions: RescueDisposition[];
   mintingDispositions: MintingDisposition[];
+  groundingAdmissionDispositions: GroundingAdmissionDisposition[];
 }> {
   const bounds = input.bounds ?? DEFAULT_MINTING_BOUNDS;
   const stage = input.stage ?? passthroughStageBracket;
@@ -93,12 +99,12 @@ export async function assembleEnrichmentNodes(input: {
   // A label is "taken" when an anchor, a rescued node, or an already-minted node in
   // the same Declared Domain already carries it — the single dedupe authority for the
   // whole enrichment-node space (deterministic identity, ADR-0015 spirit).
-  const takenByDomain = new Map<string, Set<string>>();
+  const takenByDomain = new Map<string, Map<string, string>>();
   const isTaken = (domain: string, normalized: string) => takenByDomain.get(domain)?.has(normalized) ?? false;
-  const take = (domain: string, normalized: string) => {
-    const set = takenByDomain.get(domain) ?? new Set<string>();
-    set.add(normalized);
-    takenByDomain.set(domain, set);
+  const take = (domain: string, normalized: string, label: string) => {
+    const labels = takenByDomain.get(domain) ?? new Map<string, string>();
+    if (!labels.has(normalized)) labels.set(normalized, label);
+    takenByDomain.set(domain, labels);
   };
   // Release a reservation. Used only to un-reserve a minting label whose proposal was
   // dropped: a minting verdict is anchor-scoped, so the label must stay available for a
@@ -108,7 +114,7 @@ export async function assembleEnrichmentNodes(input: {
   const untake = (domain: string, normalized: string) => {
     takenByDomain.get(domain)?.delete(normalized);
   };
-  for (const anchor of input.anchors) take(anchor.declaredDomain, anchor.normalizedLabel);
+  for (const anchor of input.anchors) take(anchor.declaredDomain, anchor.normalizedLabel, anchor.canonicalLabel);
 
   // --- Rescue: source_mentioned nodes from member-run non-core mentions ----------
   const rescuedByKey = new Map<string, SourceMentionedEnrichmentNode>();
@@ -120,7 +126,7 @@ export async function assembleEnrichmentNodes(input: {
       if (existing) existing.groundingPassages.push(...rescuePassages(candidate));
       continue;
     }
-    take(candidate.declaredDomain, candidate.normalizedLabel);
+    take(candidate.declaredDomain, candidate.normalizedLabel, candidate.canonicalLabel);
     rescuedByKey.set(`${candidate.declaredDomain}|${candidate.normalizedLabel}`, {
       nodeKind: "enrichment",
       derivedNodeId: input.newNodeId(),
@@ -190,7 +196,7 @@ export async function assembleEnrichmentNodes(input: {
       if (!proposal) continue;
       const normalized = normalizeConceptLabel(proposal);
       if (normalized.length === 0 || normalized === node.normalizedLabel || isTaken(node.declaredDomain, normalized)) continue;
-      take(node.declaredDomain, normalized);
+      take(node.declaredDomain, normalized, proposal);
       const original = node.canonicalLabel;
       node.aliases = [original, ...node.aliases.filter((alias) => alias !== original)];
       node.canonicalLabel = proposal;
@@ -207,13 +213,15 @@ export async function assembleEnrichmentNodes(input: {
   // --- Mint: anchor-driven bounded llm_grounded nodes ----------------------------
   const mintedNodes: LlmGroundedEnrichmentNode[] = [];
   const mintingDispositions: MintingDisposition[] = [];
+  const groundingAdmissionDispositions: GroundingAdmissionDisposition[] = [];
+  const admission = input.sourceLessGroundingAdmission.forOperation(stage);
   let runBudget = bounds.maxMintedPerRun;
   // Deterministic anchor order so a replayed run proposes in the same sequence.
   const anchors = [...input.anchors].sort((a, b) => a.conceptId.localeCompare(b.conceptId));
   for (const anchor of anchors) {
     if (runBudget <= 0) break;
     const maxProposals = Math.min(bounds.maxMintedPerAnchor, runBudget);
-    const existingLabels = labelsInDomain(takenByDomain, anchor.declaredDomain, input, rescuedNodes, mintedNodes);
+    const existingLabels = labelsInDomain(takenByDomain, anchor.declaredDomain);
     const proposals = await stage(STAGE_TAGS.missingPrerequisiteProposal, () =>
       input.proposalPort.propose({
         declaredDomain: anchor.declaredDomain,
@@ -232,7 +240,7 @@ export async function assembleEnrichmentNodes(input: {
       if (reserved.length >= maxProposals) break;
       const normalized = normalizeConceptLabel(proposal.proposedLabel);
       if (normalized.length === 0 || isTaken(anchor.declaredDomain, normalized)) continue;
-      take(anchor.declaredDomain, normalized);
+      take(anchor.declaredDomain, normalized, proposal.proposedLabel);
       const derivedNodeId = input.newNodeId();
       reserved.push({
         derivedNodeId,
@@ -244,9 +252,9 @@ export async function assembleEnrichmentNodes(input: {
       });
     }
 
-    const keptProposals = input.mintingDurabilityJudge && reserved.length > 0
+    const keptProposals = reserved.length > 0
       ? await stage(STAGE_TAGS.mintingDurability, () =>
-          applyMintingDurabilityJudge({ proposals: reserved, judge: input.mintingDurabilityJudge! })
+          applyMintingDurabilityJudge({ proposals: reserved, judge: input.mintingDurabilityJudge })
         )
       : { keptProposals: reserved, dispositions: [] };
     mintingDispositions.push(...keptProposals.dispositions);
@@ -258,27 +266,35 @@ export async function assembleEnrichmentNodes(input: {
       if (disposition.disposition === "dropped") untake(disposition.declaredDomain, disposition.normalizedLabel);
     }
 
+    const admissionCandidates = keptProposals.keptProposals.map(toAdmissionCandidate);
+    const outcomes = admissionCandidates.length > 0
+      ? await admission.admitBatch(admissionCandidates)
+      : [];
+    if (outcomes.length !== keptProposals.keptProposals.length) {
+      throw new Error("Source-less Grounding Admission returned a result-count mismatch for prerequisite minting.");
+    }
+
     let mintedForAnchor = 0;
-    for (const proposal of keptProposals.keptProposals) {
-      if (runBudget <= 0 || mintedForAnchor >= bounds.maxMintedPerAnchor) break;
-      const [firstDefinition, ...remainingDefinitions] = anchor.definitionQuotes;
-      if (!firstDefinition) {
-        throw new Error(`Cannot ground ${proposal.proposedLabel} on anchor ${anchor.conceptId} without a Definition Passage.`);
+    for (const [index, proposal] of keptProposals.keptProposals.entries()) {
+      const outcome = outcomes[index];
+      if (!outcome || outcome.candidateKey !== proposal.derivedNodeId) {
+        throw new Error(`Source-less Grounding Admission returned an out-of-order prerequisite outcome for ${JSON.stringify(proposal.derivedNodeId)}.`);
       }
-      const groundingBundle = await stage(STAGE_TAGS.groundingGeneration, () =>
-        input.groundingPort.generate({
-          declaredDomain: anchor.declaredDomain,
-          canonicalLabel: proposal.proposedLabel,
-          context: {
-            kind: "scaffolded_anchor",
-            anchor: {
-              reference: anchor.conceptId,
-              canonicalLabel: anchor.canonicalLabel,
-              definitionPassages: [firstDefinition, ...remainingDefinitions]
-            }
-          }
-        })
-      );
+      groundingAdmissionDispositions.push(recordGroundingAdmissionDisposition(proposal, outcome));
+      if (outcome.disposition === "held_out") {
+        // Knowledge-boundary uncertainty is domain/label scoped: keep the reservation so a later
+        // same-domain anchor cannot turn the same ungrounded concept into a trusted node.
+        continue;
+      }
+      if (outcome.disposition === "rejected") {
+        // Factual rejection is label + anchor-context scoped. Release the reservation so a later
+        // same-domain anchor may propose and independently ground the concept in its own context.
+        untake(proposal.declaredDomain, proposal.normalizedLabel);
+        continue;
+      }
+      if (runBudget <= 0 || mintedForAnchor >= bounds.maxMintedPerAnchor) {
+        throw new Error("Source-less Grounding Admission admitted more prerequisite nodes than the reserved minting budget permits.");
+      }
       mintedNodes.push({
         nodeKind: "enrichment",
         derivedNodeId: proposal.derivedNodeId,
@@ -290,14 +306,58 @@ export async function assembleEnrichmentNodes(input: {
         normalizedLabel: proposal.normalizedLabel,
         declaredDomain: anchor.declaredDomain,
         aliases: [],
-        groundingBundle
+        groundingBundle: outcome.bundle
       });
       mintedForAnchor += 1;
       runBudget -= 1;
     }
   }
 
-  return { rescuedNodes, mintedNodes, rescueDispositions, mintingDispositions };
+  return { rescuedNodes, mintedNodes, rescueDispositions, mintingDispositions, groundingAdmissionDispositions };
+}
+
+function toAdmissionCandidate(proposal: ReservedMintingProposal): GroundingAdmissionCandidate {
+  const [firstDefinition, ...remainingDefinitions] = proposal.anchor.definitionQuotes;
+  if (!firstDefinition) {
+    throw new Error(`Cannot ground ${proposal.proposedLabel} on anchor ${proposal.anchor.conceptId} without a Definition Passage.`);
+  }
+  return {
+    candidateKey: proposal.derivedNodeId,
+    canonicalLabel: proposal.proposedLabel,
+    declaredDomain: proposal.declaredDomain,
+    context: {
+      kind: "scaffolded_anchor",
+      anchor: {
+        reference: proposal.anchor.conceptId,
+        canonicalLabel: proposal.anchor.canonicalLabel,
+        definitionPassages: [firstDefinition, ...remainingDefinitions]
+      }
+    }
+  };
+}
+
+function recordGroundingAdmissionDisposition(
+  proposal: ReservedMintingProposal,
+  outcome: GroundingAdmissionOutcome
+): GroundingAdmissionDisposition {
+  const base = {
+    derivedNodeId: proposal.derivedNodeId,
+    proposedLabel: proposal.proposedLabel,
+    normalizedLabel: proposal.normalizedLabel,
+    declaredDomain: proposal.declaredDomain,
+    anchorConceptId: proposal.anchor.conceptId
+  };
+  if (outcome.disposition === "admitted") return { ...base, disposition: outcome.disposition, probe: outcome.probe };
+  if (outcome.disposition === "held_out") {
+    return { ...base, disposition: outcome.disposition, reason: outcome.reason, probe: outcome.probe };
+  }
+  return {
+    ...base,
+    disposition: outcome.disposition,
+    reason: outcome.reason,
+    probe: outcome.probe,
+    rationale: outcome.rationale
+  };
 }
 
 function rescuePassages(candidate: NonCoreRescueCandidate): SourceMentionGroundingPassage[] {
@@ -327,15 +387,8 @@ function rescuePassages(candidate: NonCoreRescueCandidate): SourceMentionGroundi
 // The labels already present in one domain, as canonical strings, so the proposer can
 // avoid re-proposing an anchor, a rescued node, or an earlier-minted node.
 function labelsInDomain(
-  _takenByDomain: Map<string, Set<string>>,
-  domain: string,
-  input: { anchors: MintingAnchor[] },
-  rescuedNodes: SourceMentionedEnrichmentNode[],
-  mintedNodes: LlmGroundedEnrichmentNode[]
+  takenByDomain: Map<string, Map<string, string>>,
+  domain: string
 ): string[] {
-  const labels: string[] = [];
-  for (const anchor of input.anchors) if (anchor.declaredDomain === domain) labels.push(anchor.canonicalLabel);
-  for (const node of rescuedNodes) if (node.declaredDomain === domain) labels.push(node.canonicalLabel);
-  for (const node of mintedNodes) if (node.declaredDomain === domain) labels.push(node.canonicalLabel);
-  return labels;
+  return [...(takenByDomain.get(domain)?.values() ?? [])];
 }

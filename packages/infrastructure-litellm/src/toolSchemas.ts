@@ -462,7 +462,7 @@ export const rescueDurabilityJudgmentSchema: JsonSchema = toForcedToolSchema(res
 
 // --- Minting durability judgment: submit_minting_durability_judgment -------
 // One bounded judgment over a single proposed assumed-prerequisite label before
-// grounding generation. The model decides whether the proposed label is a DURABLE
+// source-less grounding admission. The model decides whether the proposed label is a DURABLE
 // prerequisite for the anchor or merely tangential/named in passing. Decision-only:
 // there is no generated-node source span to ground against, so the application stage
 // owns drop-only fail-open semantics. Domain-neutral rubric — no fixture-specific

@@ -4,8 +4,11 @@ import type {
   AnchorProjectionNode,
   ArtifactEnvelope,
   DerivedGraphLayer,
+  DerivedGraphNode,
   EnrichmentRunTrace,
+  GroundingAdmissionDisposition,
   LlmGroundedEnrichmentNode,
+  MintingDisposition,
   NodeMergeRecord,
   PrerequisiteConceptContext,
   PublishedConceptEvidenceProfile,
@@ -84,6 +87,7 @@ function grounded(derivedNodeId: string, label: string, role: "prerequisite" | "
     nodeKind: "enrichment",
     derivedNodeId,
     groundingOrigin: "llm_grounded",
+    ...(role === "prerequisite" ? { mintingReason: "assumed_prerequisite" as const } : {}),
     role,
     layer: "derived",
     canonicalLabel: label,
@@ -126,6 +130,58 @@ function mergeRecord(canonical: string, absorbed: string): NodeMergeRecord {
     proposingScore: 0.95,
     rationale: "same concept",
     canonicalSelectionReason: "anchor_over_enrichment"
+  };
+}
+
+function mintingDisposition(
+  derivedNodeId: string,
+  proposedLabel: string,
+  disposition: MintingDisposition["disposition"] = "accepted"
+): MintingDisposition {
+  return {
+    derivedNodeId,
+    proposedLabel,
+    normalizedLabel: proposedLabel.toLowerCase(),
+    declaredDomain: "d",
+    anchorConceptId: "c1",
+    disposition,
+    rationale: "measured"
+  };
+}
+
+function admissionDisposition(
+  derivedNodeId: string,
+  proposedLabel: string,
+  disposition: GroundingAdmissionDisposition["disposition"] = "admitted"
+): GroundingAdmissionDisposition {
+  const base = {
+    derivedNodeId,
+    proposedLabel,
+    normalizedLabel: proposedLabel.toLowerCase(),
+    declaredDomain: "d",
+    anchorConceptId: "c1"
+  };
+  if (disposition === "admitted") {
+    return {
+      ...base,
+      disposition,
+      probe: { disposition: "core_knowledge", agreementScore: 1, rationale: "stable" }
+    };
+  }
+  if (disposition === "held_out") {
+    return {
+      ...base,
+      disposition,
+      reason: "knowledge_boundary",
+      probe: { disposition: "boundary", agreementScore: 0.4, rationale: "unstable" }
+    };
+  }
+  return {
+    ...base,
+    disposition,
+    reason: "grounding_verification_exhausted",
+    probe: { disposition: "core_knowledge", agreementScore: 1, rationale: "stable" },
+    rationale: "claims rejected"
   };
 }
 
@@ -213,6 +269,7 @@ function sourceContribution(overrides: Partial<SourceGroundedContribution> = {})
     rescueDispositions: [],
     rescuedDefinitionDispositions: [],
     mintingDispositions: [],
+    groundingAdmissionDispositions: [],
     nodeMerges: [],
     ...overrides
   };
@@ -277,7 +334,31 @@ test("a source_mentioned node's context is its verbatim mention quotes; an llm_g
   ];
   await harness.completion.complete(request({
     nodes,
-    contribution: sourceContribution({ evidenceProfiles: [profile("c1", ["Alpha is defined"])] })
+    contribution: sourceContribution({
+      evidenceProfiles: [profile("c1", ["Alpha is defined"])],
+      mintingDispositions: [
+        {
+          derivedNodeId: "n3",
+          proposedLabel: "Stack",
+          normalizedLabel: "stack",
+          declaredDomain: "d",
+          anchorConceptId: "c1",
+          disposition: "accepted",
+          rationale: "durable"
+        }
+      ],
+      groundingAdmissionDispositions: [
+        {
+          derivedNodeId: "n3",
+          proposedLabel: "Stack",
+          normalizedLabel: "stack",
+          declaredDomain: "d",
+          anchorConceptId: "c1",
+          disposition: "admitted",
+          probe: { disposition: "core_knowledge", agreementScore: 1, rationale: "stable" }
+        }
+      ]
+    })
   }));
   const call = harness.orderCalls[0];
   const pointer = call.nodes.find((node) => node.canonicalLabel === "Pointer");
@@ -468,6 +549,7 @@ test("a synthetic completion keeps null provenance, empty source-only arrays, an
   assert.deepEqual(trace.rescueDispositions, []);
   assert.deepEqual(trace.rescuedDefinitionDispositions, []);
   assert.deepEqual(trace.mintingDispositions, []);
+  assert.deepEqual(trace.groundingAdmissionDispositions, []);
   assert.deepEqual(trace.nodeMerges, []);
   assert.equal(trace.syntheticProbeDispositions?.length, 3);
   assert.equal(trace.groundingDispositions.length, 2);
@@ -483,6 +565,33 @@ test("a source-grounded trace has NO syntheticProbeDispositions key at all", asy
     contribution: sourceContribution({ evidenceProfiles: [profile("c1", ["Alpha def"])] })
   }));
   assert.ok(!("syntheticProbeDispositions" in harness.getPersisted()!.artifact.payload));
+});
+
+test("a source-grounded trace preserves durability and admission as separate proposal histories", async () => {
+  const harness = buildHarness();
+  const mintingDispositions = [
+    mintingDisposition("n2", "Stack"),
+    mintingDisposition("held", "Boundary"),
+    mintingDisposition("rejected", "Refuted")
+  ];
+  const groundingAdmissionDispositions = [
+    admissionDisposition("n2", "Stack"),
+    admissionDisposition("held", "Boundary", "held_out"),
+    admissionDisposition("rejected", "Refuted", "rejected")
+  ];
+  await harness.completion.complete(request({
+    nodes: [anchor("n1", "c1", "Alpha"), grounded("n2", "Stack", "prerequisite")],
+    contribution: sourceContribution({
+      evidenceProfiles: [profile("c1", ["Alpha def"])],
+      mintingDispositions,
+      groundingAdmissionDispositions
+    })
+  }));
+
+  const trace = harness.getPersisted()!.artifact.payload;
+  assert.deepEqual(trace.mintingDispositions, mintingDispositions);
+  assert.deepEqual(trace.groundingAdmissionDispositions, groundingAdmissionDispositions);
+  assert.equal(trace.derivedNodes.some((node) => node.derivedNodeId === "held" || node.derivedNodeId === "rejected"), false);
 });
 
 test("the synthetic summary hook fires after difficulty and before persistence with front-half + layer counts", async () => {
@@ -683,6 +792,93 @@ test("rescue/minting dispositions: dropped and floor-failed absences are valid h
       ]
     })
   }), /rescue disposition/);
+});
+
+test("grounding-admission lifecycle mismatches fail closed before neural work or persistence", async (t) => {
+  const cases: {
+    name: string;
+    nodes: DerivedGraphNode[];
+    mintingDispositions: MintingDisposition[];
+    groundingAdmissionDispositions: GroundingAdmissionDisposition[];
+    message: RegExp;
+  }[] = [
+    {
+      name: "admission without durability",
+      nodes: [anchor("n1", "c1", "Alpha")],
+      mintingDispositions: [],
+      groundingAdmissionDispositions: [admissionDisposition("held", "Boundary", "held_out")],
+      message: /no durability-kept proposal/
+    },
+    {
+      name: "durability drop reaching admission",
+      nodes: [anchor("n1", "c1", "Alpha")],
+      mintingDispositions: [mintingDisposition("dropped", "Noise", "dropped")],
+      groundingAdmissionDispositions: [admissionDisposition("dropped", "Noise", "rejected")],
+      message: /no durability-kept proposal/
+    },
+    {
+      name: "trace correlation disagreement",
+      nodes: [anchor("n1", "c1", "Alpha")],
+      mintingDispositions: [mintingDisposition("held", "Boundary")],
+      groundingAdmissionDispositions: [
+        { ...admissionDisposition("held", "Boundary", "held_out"), normalizedLabel: "different" }
+      ],
+      message: /disagrees with its minting disposition/
+    },
+    {
+      name: "held-out proposal entering the layer",
+      nodes: [anchor("n1", "c1", "Alpha"), grounded("held", "Boundary", "prerequisite")],
+      mintingDispositions: [mintingDisposition("held", "Boundary")],
+      groundingAdmissionDispositions: [admissionDisposition("held", "Boundary", "held_out")],
+      message: /held_out grounding disposition.*entered the derived layer/
+    },
+    {
+      name: "admitted proposal with no lifecycle",
+      nodes: [anchor("n1", "c1", "Alpha")],
+      mintingDispositions: [mintingDisposition("ghost", "Ghost")],
+      groundingAdmissionDispositions: [admissionDisposition("ghost", "Ghost")],
+      message: /admitted grounding disposition.*no proven lifecycle/
+    },
+    {
+      name: "durability-kept proposal without admission",
+      nodes: [anchor("n1", "c1", "Alpha")],
+      mintingDispositions: [mintingDisposition("ghost", "Ghost")],
+      groundingAdmissionDispositions: [],
+      message: /no grounding-admission outcome/
+    },
+    {
+      name: "source-less node without admission",
+      nodes: [anchor("n1", "c1", "Alpha"), grounded("n2", "Stack", "prerequisite")],
+      mintingDispositions: [],
+      groundingAdmissionDispositions: [],
+      message: /no admitted grounding disposition/
+    },
+    {
+      name: "duplicate admission outcome",
+      nodes: [anchor("n1", "c1", "Alpha")],
+      mintingDispositions: [mintingDisposition("held", "Boundary")],
+      groundingAdmissionDispositions: [
+        admissionDisposition("held", "Boundary", "held_out"),
+        admissionDisposition("held", "Boundary", "held_out")
+      ],
+      message: /duplicate grounding-admission disposition/
+    }
+  ];
+
+  for (const item of cases) {
+    await t.test(item.name, async () => {
+      const harness = buildHarness();
+      await rejectsWithoutPersist(harness, request({
+        nodes: item.nodes,
+        contribution: sourceContribution({
+          evidenceProfiles: [profile("c1", ["Alpha def"])],
+          mintingDispositions: item.mintingDispositions,
+          groundingAdmissionDispositions: item.groundingAdmissionDispositions
+        })
+      }), item.message);
+      assert.equal(harness.orderCalls.length, 0, "trace validation precedes neural work");
+    });
+  }
 });
 
 test("a rescued-definition disposition naming an unproven node fails; an absorbed node is a valid reference (AE5)", async () => {

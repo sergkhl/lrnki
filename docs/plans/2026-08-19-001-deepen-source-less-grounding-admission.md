@@ -7,15 +7,16 @@ execution: code
 
 # Deepen Source-less Grounding Admission
 
-**Status:** In progress — U1 complete; U2 next
+**Status:** In progress — U1–U2 complete; U3 next
 
 **Decision state:** Grilling-locked. The user accepted the external interface direction and then
 delegated every remaining Candidate 1 decision to the recommended answer. The linked brainstorm is
 the canonical owner of the accepted problem framing, requirements, outcome policy, and scope.
 
-**Implementation state:** Not started. This plan was created in a documentation-only turn; no
-application code, source type, port, prompt, schema, adapter, generated migration, or test has been
-changed or validated as implementation evidence.
+**Implementation state:** U1 is committed as `bac34bf`. U2's prerequisite-minting cutover,
+durability/admission lifecycle trace, mechanically derived stage ownership, and complete Graph
+Enrichment config identity passed focused automation and the production-model Rust-fixture gate.
+U3's generated Support Step assurance and durable evidence cutover is next.
 
 ## Goal capsule
 
@@ -449,6 +450,53 @@ physical-device evidence.
 - **Evidence boundary:** this is production-model local application-pipeline and persisted-database
   evidence. It is not intercepted or real-backend web, deployed, native emulator/simulator, or
   physical-device evidence. Safe to continue to U2: **yes**.
+
+### U2 — Model-grounded prerequisite minting cutover — PASS (2026-08-19)
+
+- **Milestone:** prerequisite minting now applies durability before one per-anchor batch through the
+  shared Source-less Grounding Admission module. The caller retains proposal, reservation, and
+  budget policy; only an admitted outcome can create an LLM-grounded node. Minting durability and
+  Grounding Admission have separate durable trace dispositions, and Graph Enrichment derives its
+  complete stage ownership and config identity mechanically.
+- **Automated evidence:** `@lrnki/application` passed 778/778 tests, the focused Graph Enrichment
+  config-hash suite passed 11/11, and root `pnpm typecheck` passed all 11 typed workspace projects.
+  Focused lint reported no errors. The suites prove durability-before-admission ordering, one batch
+  per anchor, admitted-only budget consumption, held-out reservation retention, rejected reservation
+  release, atomic dependency failure, count/order correlation, lifecycle-complete trace validation,
+  persisted trace handoff, mandatory dependency pairing, mechanically exact registry/catalog owner
+  sets, and behavior-versus-execution config identity.
+- **Production-model real use:** local Graph Enrichment over the curated Rust ownership fixture
+  succeeded as enrichment/operation `18f46eb4-49fa-424c-8b5f-89c264b23746` over graph version
+  `fa5c319b-b070-4484-b2e1-bdb57587acc2`. The persisted artifact hash is
+  `graph-enrichment-8a590f9eaf0a`. Seven source anchors produced 22 enrichment nodes; whole-set
+  ordering committed 25 certain edges and retained nine contested edges.
+- **Lifecycle inspection:** the complete trace contains eight proposals: seven durability-accepted
+  and one durability-dropped. All seven kept proposals received distinct `admitted` dispositions;
+  the same query supplied the seven-row positive control beside zero holdouts, zero factual
+  rejections, zero missing durability links, zero admitted nodes missing from the graph, zero
+  LLM-grounded nodes lacking admission, and zero leaked non-admitted nodes. The dropped `Memory
+  Allocator` proposal correctly remained absent. Automated tests retain the reservation proof for
+  the held-out and rejected branches this run did not produce.
+- **Persisted inspection:** artifact and relational persistence agree on all 29 derived nodes and all
+  eight minting dispositions. All seven admitted Grounding Bundles and all 14 generated passages
+  were read. Every bundle has at least one Definition Passage, exactly its expected anchor
+  reference, generated provenance, and no false source quote or locator. The definitions and
+  adjacent claims agree with the official [Rust ownership chapter](https://doc.rust-lang.org/book/ch04-01-what-is-ownership.html),
+  [function chapter](https://doc.rust-lang.org/book/ch03-03-how-functions-work.html),
+  [trait chapter](https://doc.rust-lang.org/book/ch10-02-traits.html), and
+  [`Copy` reference](https://doc.rust-lang.org/std/marker/trait.Copy.html). No content defect was
+  found.
+- **Routing and timeline:** the claim answerer completed 21 provider calls and the primary
+  factuality judge 57 on exact model `deepseek/deepseek-v4-flash-0731`, all through Parasail. The
+  planner completed 21 calls and challenger 57 on GPT-OSS-120B through DigitalOcean. The explicit
+  same-model DeepInfra and Groq backups remained configured but were not needed. Knowledge-Boundary
+  Probe completed 62 Llama 4 Scout calls through Groq and exercised its retained Qwen3-30B fallback
+  for eight calls through StreamLake; Qwen3 Embedding completed eight embeddings. Every recorded
+  operation stage succeeded; there were ten complete verification rounds over the seven admitted
+  candidates and no failed stage row.
+- **Evidence boundary:** this is production-model local application-pipeline and persisted-database
+  evidence. It is not intercepted or real-backend web, deployed, native emulator/simulator, or
+  physical-device evidence. Safe to continue to U3: **yes**.
 
 ### Open findings
 

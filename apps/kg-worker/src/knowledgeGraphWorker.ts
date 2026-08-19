@@ -140,6 +140,7 @@ function buildContext() {
   const groundingGeneration = createGroundingGenerationPort(deterministicClient);
   const knowledgeBoundaryProbe = createKnowledgeBoundaryProbePort(probeClient);
   const nodeEmbedding = new LiteLlmNodeEmbeddingAdapter(embeddingClient);
+  const graphConfig = withGraphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG);
   const syntheticConfig = withSyntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG);
   const sourceLessGroundingAdmission = createSourceLessGroundingAdmission({
     knowledgeBoundaryProbe,
@@ -151,7 +152,7 @@ function buildContext() {
       createClaimFactualityJudgmentPort(deterministicClient),
       createClaimFactualityChallengePort(deterministicClient)
     ],
-    policy: syntheticConfig.sourceLessGroundingAdmission
+    policy: graphConfig.sourceLessGroundingAdmission
   });
   const spendLogsRead = process.env.LITELLM_DATABASE_URL
     ? new LiteLlmSpendLogsReadAdapter(process.env.LITELLM_DATABASE_URL)
@@ -216,10 +217,9 @@ function buildContext() {
     // Deterministic decoding for stable re-derivation. Difficulty is learner-neutral
     // intrinsic: a cross-family neural subscore fused with deterministic components.
     prerequisiteOrdering: createPrerequisiteOrderingPort(deterministicClient),
-    // Node-minting ports (U5): explicit prerequisite proposal (node identity) plus
-    // anchor-conditioned grounding generation on the production generation aliases.
+    // Node-minting identity proposal plus the finished source-less admission module below.
+    // The raw grounding generator is construction-only and cannot bypass admission here.
     missingPrerequisiteProposal: createMissingPrerequisiteProposalPort(deterministicClient),
-    groundingGeneration,
     // Synthetic topic generation, second pipeline arm (plan 2026-06-30-001, ADR-0019
     // amended). Concept-set synthesis stays on the production extractor family with deterministic
     // decoding for a stable concept set (AGENTS rule 5); the knowledge-boundary probe rides the
@@ -228,6 +228,7 @@ function buildContext() {
     conceptSetSynthesis: createConceptSetSynthesisPort(deterministicClient),
     knowledgeBoundaryProbe,
     sourceLessGroundingAdmission,
+    graphConfig,
     syntheticConfig,
     // Measured rescue durability judge (U3): cross-family independent judge
     // (kg-independent-judge) decides whether each aggregated source_mentioned rescue
@@ -245,10 +246,9 @@ function buildContext() {
     // its spend joins the enrichment operation (ADR-0029). Drops hollow rescued optional
     // definitions before they reach study items; fails closed = preserve.
     rescuedDefinitionQualityJudge: createDefinitionPassageQualityJudgmentPort(deterministicClient, STAGE_TAGS.rescueDefinitionQuality),
-    // Measured minting durability judge: cross-family independent judge gates
-    // reserved assumed-prerequisite proposals before grounding generation. Drop-only,
-    // fail-open-with-flag; disable with ENRICH_DISABLE_MINTING_DURABILITY for the
-    // judge-off baseline.
+    // Measured minting durability judge: cross-family independent judge gates every
+    // reserved assumed-prerequisite proposal before source-less admission. Drop-only,
+    // fail-open-with-flag; the enabled minting path requires this dependency.
     mintingDurabilityJudge: createMintingDurabilityJudgmentPort(deterministicClient),
     // Semantic-dedup ports (plan U1/U2, AGENTS rule 20). Embeddings PROPOSE within-domain
     // near-duplicate pairs (kg-node-embedding); a cross-family adjudicator DECIDES each
@@ -431,18 +431,18 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
     graphStore: ctx.graphStore,
     prerequisiteOrdering: ctx.prerequisiteOrdering,
     missingPrerequisiteProposal: ctx.missingPrerequisiteProposal,
-    groundingGeneration: ctx.groundingGeneration,
+    sourceLessGroundingAdmission: ctx.sourceLessGroundingAdmission,
     rescueDurabilityJudge: ctx.rescueDurabilityJudge,
     rescuedNodeLabelingJudge: ctx.rescuedNodeLabelingJudge,
     rescuedDefinitionQualityJudge: ctx.rescuedDefinitionQualityJudge,
-    mintingDurabilityJudge: process.env.ENRICH_DISABLE_MINTING_DURABILITY ? undefined : ctx.mintingDurabilityJudge,
+    mintingDurabilityJudge: ctx.mintingDurabilityJudge,
     // Dedup is opt-in (plan U3): ENRICH_DISABLE_DEDUP unsets both ports to produce the
     // exact-label baseline run for the U7 rule-14 comparison (same command, ports unset).
     nodeEmbedding: process.env.ENRICH_DISABLE_DEDUP ? undefined : ctx.nodeEmbedding,
     nodeMergeAdjudicator: process.env.ENRICH_DISABLE_DEDUP ? undefined : ctx.nodeMergeAdjudicator,
     difficulty: ctx.difficulty,
     enrichmentStore: ctx.enrichmentStore,
-    config: withGraphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG),
+    config: ctx.graphConfig,
     // Per-sub-stage wall-clock now lands in the durable operation_run_stages timeline
     // via the reporter (ADR-0029) — supersedes the old onStageTiming stdout sink.
     reporter: ctx.runProgressReporter,

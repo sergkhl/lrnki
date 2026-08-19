@@ -1139,9 +1139,10 @@ export type RescueDisposition = {
 };
 
 // The recorded disposition of one reserved minting proposal after durability judging.
-// `accepted` — the proposal was kept and minted as an `llm_grounded` node; `dropped`
+// `accepted` — the proposal may proceed to source-less grounding admission; `dropped`
 // — vetoed by a clear `not_durable` verdict; `kept_judge_unavailable` — transport or
-// schema failure, so the proposal is kept and flagged (fail-open). A minting verdict is
+// schema failure, so the proposal proceeds and is flagged (fail-open). Only a separate
+// admitted GroundingAdmissionDisposition permits an `llm_grounded` node. A minting verdict is
 // scoped to ONE anchor, so a `dropped` proposal's label is RELEASED, not kept reserved:
 // a later same-domain anchor that genuinely depends on the concept can re-propose it and
 // be judged independently (unlike rescue, whose verdict is judged against all same-domain
@@ -1155,6 +1156,38 @@ export type MintingDisposition = {
   disposition: RescueDispositionKind;
   rationale: string;
 };
+
+// The source-less grounding outcome for one durability-kept prerequisite proposal. This is
+// deliberately separate from MintingDisposition: durability decides whether a proposal is worth
+// checking, while admission decides whether generated evidence is safe enough to become a node.
+// `derivedNodeId` is durable correlation for all three outcomes; held-out/rejected ids never name
+// a node. The nested probe record preserves the measured boundary evidence without flattening or
+// restating its meaning.
+type GroundingAdmissionDispositionBase = {
+  derivedNodeId: string;
+  proposedLabel: string;
+  normalizedLabel: string;
+  declaredDomain: string;
+  anchorConceptId: string;
+};
+
+export type GroundingAdmissionDisposition = GroundingAdmissionDispositionBase & (
+  | {
+      disposition: "admitted";
+      probe: { disposition: "core_knowledge"; agreementScore: number; rationale: string };
+    }
+  | {
+      disposition: "held_out";
+      reason: "knowledge_boundary";
+      probe: { disposition: "boundary"; agreementScore: number; rationale: string };
+    }
+  | {
+      disposition: "rejected";
+      reason: "grounding_verification_exhausted";
+      probe: { disposition: "core_knowledge"; agreementScore: number; rationale: string };
+      rationale: string;
+    }
+);
 
 // Each Concept's published CEP reduced to what the prerequisite judge needs (R11):
 // meaning-bearing definition passages, bounded salience-ordered mention passages,
@@ -1369,6 +1402,10 @@ export type EnrichmentRunTrace = {
   // assumed-prerequisite proposals were accepted, dropped before grounding, or kept
   // fail-open, so an operator can audit minting without recompute.
   mintingDispositions: MintingDisposition[];
+  // Per-durability-kept prerequisite proposal outcome from Source-less Grounding Admission.
+  // Present for source-grounded enrichment and empty for synthetic generation, whose distinct
+  // SyntheticProbeDisposition already owns the concept-set holdout trace.
+  groundingAdmissionDispositions: GroundingAdmissionDisposition[];
   // Per-absorbed-node semantic merge records (plan U3/U4, R5). One per derived node the
   // dedup sub-stage absorbed into a canonical near-duplicate, with full propose + decide
   // + canonical-selection provenance. Empty when dedup did not run (opt-in). Persisted in
@@ -1882,11 +1919,10 @@ export const STAGE_TAGS = {
   // the catalog claim under `extraction` only satisfies stage-tag set-equality and
   // names the owning pipeline arm.
   discoveryCoverageAudit: "discovery-coverage-audit",
-  // Learner-Scoped Scaffold generation (plan 2026-07-12-002 U3). Two stages WITHIN the new
-  // `scaffold` operation: a minimal outline proposal and a compact lesson/item content
-  // generation. Scaffold generation ALSO reuses the `knowledge-boundary-probe` and
-  // `grounding-generation` descriptors unchanged — those are SHARED_STAGES claimed by both
-  // enrichment and scaffold (KTD7); spend stays exact through the (operation_id, stage) join.
+  // Learner-Scoped Scaffold generation (plan 2026-07-12-002 U3): a minimal outline proposal
+  // and compact lesson/item content generation. Scaffold also reuses deeper-module stage
+  // descriptors; registry/catalog owner sets derive that sharing mechanically, while spend
+  // stays exact through the (operation_id, stage) join.
   scaffoldOutlineGeneration: "scaffold-outline-generation",
   scaffoldContentGeneration: "scaffold-content-generation",
   // Scaffold-content congruence audit (plan 2026-07-16-001, KTD2): a MEASUREMENT stage, not a

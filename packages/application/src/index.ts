@@ -108,7 +108,6 @@ export {
 export {
   NON_LLM_STAGES,
   OPERATION_TIMELINE_CATALOG,
-  SHARED_STAGES,
   operationTimelineLlmSpendStageTags,
   stageBelongsToOperation,
   spendStageBelongsToOperation

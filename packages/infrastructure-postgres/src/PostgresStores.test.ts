@@ -318,6 +318,7 @@ maybe("enrichment round-trips anchor projection nodes and derived-node edges", a
       rescueDispositions: [],
       rescuedDefinitionDispositions: [],
       mintingDispositions: [],
+      groundingAdmissionDispositions: [],
       nodeMerges: []
     };
     const store = new PostgresEnrichmentRunStore(sql);
@@ -430,6 +431,9 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
     mintingDispositions: [
       { derivedNodeId: mintedId, proposedLabel: "Stack allocation", normalizedLabel: "stack allocation", declaredDomain: "software engineering", anchorConceptId: anchorId, disposition: "accepted", rationale: "durable prerequisite" },
       { derivedNodeId: droppedMintingId, proposedLabel: "Incidental Label", normalizedLabel: "incidental label", declaredDomain: "software engineering", anchorConceptId: anchorId, disposition: "dropped", rationale: "tangential to the anchor" }
+    ],
+    groundingAdmissionDispositions: [
+      { derivedNodeId: mintedId, proposedLabel: "Stack allocation", normalizedLabel: "stack allocation", declaredDomain: "software engineering", anchorConceptId: anchorId, disposition: "admitted", probe: { disposition: "core_knowledge", agreementScore: 1, rationale: "stable" } }
     ],
     // U4: one merge — the anchor (surviving canonical, FK-resolved) absorbed a removed
     // near-duplicate enrichment node (absorbed id correlation-only, no FK violation).
@@ -730,7 +734,7 @@ maybe("round-trips a synthetic layer with a null version and synthetic_primary n
         { derivedNodeId: coreId, groundingOrigin: "llm_grounded", outcome: "not_applicable_by_grounding", rationale: "generated" },
         { derivedNodeId: secondId, groundingOrigin: "llm_grounded", outcome: "not_applicable_by_grounding", rationale: "generated" }
       ],
-      rescueDispositions: [], rescuedDefinitionDispositions: [], mintingDispositions: [], nodeMerges: [],
+      rescueDispositions: [], rescuedDefinitionDispositions: [], mintingDispositions: [], groundingAdmissionDispositions: [], nodeMerges: [],
       syntheticProbeDispositions: [
         { conceptKey: "photosynthesis", canonicalLabel: "Photosynthesis", declaredDomain: "biology", disposition: "core_knowledge", agreementScore: 0.95, rationale: "high agreement", derivedNodeId: coreId },
         { conceptKey: "chloroplast", canonicalLabel: "Chloroplast", declaredDomain: "biology", disposition: "core_knowledge", agreementScore: 0.91, rationale: "high agreement", derivedNodeId: secondId },

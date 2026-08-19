@@ -4,8 +4,7 @@ import {
   DEFAULT_ENRICHMENT_CONFIG,
   DEFAULT_SCAFFOLD_GENERATION_CONFIG,
   DEFAULT_SYNTHETIC_GENERATION_CONFIG,
-  OPERATION_TIMELINE_CATALOG,
-  SHARED_STAGES
+  OPERATION_TIMELINE_CATALOG
 } from "@lrnki/application";
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import type { OperationType } from "@lrnki/ports";
@@ -48,24 +47,57 @@ test("registered operation stages union-equal the catalog's LLM stage set per ti
   }
 });
 
-// Each SHARED_STAGE has exactly the accepted owners {enrichment, scaffold} on the registry side
-// too; every other registered LLM stage resolves to a single timeline type.
-test("shared stages have exactly the accepted registry owners; all other stages one owner", () => {
-  const ownersByStage = new Map<string, Set<OperationType>>();
+// Stage sharing is derived from the two authorities themselves. There is no hand-maintained
+// SHARED_STAGES exception list that can drift when another consumer adopts a deep module.
+test("registry stage-owner sets exactly match the Operation Timeline catalog", () => {
+  const registryOwners = new Map<string, Set<OperationType>>();
   for (const entry of Object.values(neuralOperationRegistry)) {
     for (const stage of [...entry.descriptors.map((descriptor) => descriptor.stageTag), ...entry.embeddingStages]) {
-      const owners = ownersByStage.get(stage) ?? new Set<OperationType>();
+      const owners = registryOwners.get(stage) ?? new Set<OperationType>();
       owners.add(entry.timelineType);
-      ownersByStage.set(stage, owners);
+      registryOwners.set(stage, owners);
     }
   }
-  for (const [stage, owners] of ownersByStage) {
-    if (SHARED_STAGES.has(stage)) {
-      assert.deepEqual([...owners].sort(), ["enrichment", "scaffold"], stage);
-    } else {
-      assert.equal(owners.size, 1, `${stage} is owned by ${[...owners].join(", ")}`);
+  for (const measurement of measurementNeuralStageDescriptors) {
+    const stage = measurement.descriptor.stageTag;
+    const owners = registryOwners.get(stage) ?? new Set<OperationType>();
+    owners.add(measurement.claimedTimelineType);
+    registryOwners.set(stage, owners);
+  }
+  const catalogOwners = new Map<string, Set<OperationType>>();
+  for (const [operationType, stages] of Object.entries(OPERATION_TIMELINE_CATALOG)) {
+    for (const descriptor of stages) {
+      if (descriptor.kind !== "llm") continue;
+      const owners = catalogOwners.get(descriptor.stage) ?? new Set<OperationType>();
+      owners.add(operationType as OperationType);
+      catalogOwners.set(descriptor.stage, owners);
     }
   }
+  const stages = new Set([...registryOwners.keys(), ...catalogOwners.keys()]);
+  for (const stage of stages) {
+    assert.deepEqual(
+      [...(registryOwners.get(stage) ?? [])].sort(),
+      [...(catalogOwners.get(stage) ?? [])].sort(),
+      stage
+    );
+  }
+});
+
+test("Graph Enrichment registers the complete shared admission stage family", () => {
+  const stageTags = neuralOperationRegistry.graphEnrichment.descriptors.map((descriptor) => descriptor.stageTag);
+  for (const expected of [
+    STAGE_TAGS.knowledgeBoundaryProbe,
+    STAGE_TAGS.groundingGeneration,
+    STAGE_TAGS.groundingVerificationQuestionPlanning,
+    STAGE_TAGS.groundingVerificationAnswering
+  ]) {
+    assert.ok(stageTags.includes(expected), expected);
+  }
+  assert.equal(
+    stageTags.filter((stage) => stage === STAGE_TAGS.groundingFactualityRevision).length,
+    2,
+    "both factuality model identities are registered"
+  );
 });
 
 // The Scaffold entry carries its five runtime stages exactly once each (KTD7): outline, probe,
@@ -227,13 +259,76 @@ test("operation identity follows effective model, provider, fallback, and router
   assert.throws(() => hash(missingDeployment), /has no declared deployment/);
 });
 
-// Exact identity regression (plan 2026-07-11-001 AE6): U1 deliberately re-baselined both hashes
-// because Grounding Generation now consumes the closed owner-neutral context, Synthetic Topic
-// Generation binds the complete Source-less Grounding Admission policy, and v2 binds every stage's
-// effective LiteLLM model/provider/fallback behavior. Future non-behavioral refactors must not
-// perturb these identities.
+test("Graph Enrichment hashes every admission behavior knob but not execution fan-out", () => {
+  const base = graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG);
+  const hashWith = (
+    sourceLessGroundingAdmission: typeof DEFAULT_ENRICHMENT_CONFIG.sourceLessGroundingAdmission
+  ) => graphEnrichmentConfigHash({ ...DEFAULT_ENRICHMENT_CONFIG, sourceLessGroundingAdmission });
+  const policy = DEFAULT_ENRICHMENT_CONFIG.sourceLessGroundingAdmission;
+
+  for (const [name, sourceLessGroundingAdmission] of [
+    ["candidate fan-out", { ...policy, candidateConcurrency: policy.candidateConcurrency + 1 }],
+    ["verification fan-out", { ...policy, verificationConcurrency: policy.verificationConcurrency + 1 }],
+    ["probe fan-out", { ...policy, probe: { ...policy.probe, probeConcurrency: policy.probe.probeConcurrency + 1 } }]
+  ] as const) {
+    assert.equal(hashWith(sourceLessGroundingAdmission), base, `${name} is execution policy`);
+  }
+
+  const behaviorVariants: readonly [string, typeof policy][] = [
+    ["probe sample count", { ...policy, probe: { ...policy.probe, sampleCount: policy.probe.sampleCount + 1 } }],
+    ["probe threshold", { ...policy, probe: { ...policy.probe, agreementThreshold: policy.probe.agreementThreshold + 0.01 } }],
+    ["draft attempts", { ...policy, groundingDraftAttempts: policy.groundingDraftAttempts + 1 }],
+    ["verification samples", { ...policy, verificationSampleCount: policy.verificationSampleCount + 1 }],
+    ["rejection quorum", { ...policy, verificationRejectionSampleQuorum: policy.verificationRejectionSampleQuorum + 1 }],
+    [
+      "verification decision",
+      { ...policy, verificationDecision: "unanimous" as typeof policy.verificationDecision }
+    ],
+    [
+      "claim projection",
+      { ...policy, groundingClaimProjection: "whole_passage" as typeof policy.groundingClaimProjection }
+    ],
+    [
+      "judgment batch size",
+      { ...policy, judgmentTargetBatchSize: 2 as typeof policy.judgmentTargetBatchSize }
+    ]
+  ];
+  for (const [name, variant] of behaviorVariants) {
+    assert.notEqual(hashWith(variant), base, `${name} is behavioral identity`);
+  }
+});
+
+test("dropping any shared admission descriptor changes Graph Enrichment identity", () => {
+  const entry = neuralOperationRegistry.graphEnrichment;
+  const admissionStages = new Set<string>([
+    STAGE_TAGS.knowledgeBoundaryProbe,
+    STAGE_TAGS.groundingGeneration,
+    STAGE_TAGS.groundingVerificationQuestionPlanning,
+    STAGE_TAGS.groundingVerificationAnswering,
+    STAGE_TAGS.groundingFactualityRevision
+  ]);
+  const admissionIndexes = entry.descriptors
+    .map((descriptor, index) => ({ descriptor, index }))
+    .filter(({ descriptor }) => admissionStages.has(descriptor.stageTag));
+  assert.equal(admissionIndexes.length, 6, "probe, generation, planner, answerer, and both factuality identities");
+
+  const knobs = { sourceLessGroundingAdmission: DEFAULT_ENRICHMENT_CONFIG.sourceLessGroundingAdmission };
+  const full = operationConfigHash(entry.configSeed, entry.descriptors, knobs);
+  for (const { descriptor, index } of admissionIndexes) {
+    const narrowed = entry.descriptors.filter((_, position) => position !== index);
+    assert.notEqual(
+      operationConfigHash(entry.configSeed, narrowed, knobs),
+      full,
+      `${descriptor.stageTag}:${descriptor.modelOverride ?? "default"}`
+    );
+  }
+});
+
+// Exact identity regression: U2 deliberately re-baselines Graph Enrichment because it now binds
+// the complete Source-less Grounding Admission descriptor family and policy. Synthetic Topic
+// Generation is unchanged. Future non-behavioral refactors must not perturb these identities.
 test("default operation config hashes are stable across the registry derivation", () => {
-  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-6fe9557d11f3");
+  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-8a590f9eaf0a");
   assert.equal(syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG), "synthetic-topic-generation-2c7d199e35c5");
 });
 
