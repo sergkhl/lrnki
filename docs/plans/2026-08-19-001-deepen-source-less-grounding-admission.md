@@ -416,6 +416,9 @@ not weaken the admission invariants or turn a failed gate into `PASS`.
 
 ## Validation Log
 
+Unless a unit states otherwise, its production-model evidence is local application-pipeline and
+persisted-development-DB evidence—not deployed, browser, native, or physical-device evidence.
+
 ### U1 — Deep admission module and Synthetic Topic Generation cutover — PASS (2026-08-19)
 
 - **Milestone:** Synthetic Topic Generation now crosses the one Source-less Grounding Admission
@@ -425,10 +428,9 @@ not weaken the admission invariants or turn a failed gate into `PASS`.
   Flash 0731; the planner and challenger use GPT-OSS-120B.
 - **Automated evidence:** `@lrnki/domain-core` 39/39, `@lrnki/application` 762/762, and
   `@lrnki/infrastructure-litellm` 163/163 passed. Root `pnpm typecheck` passed all 11 typed workspace
-  projects. The suites cover invalid and empty batches, propagated embedding failure, complete
-  passage coverage, draft-blind answering, answer correlation, monotonic settlement, bounded
-  regeneration, atomic dependency failure, deterministic ordering, exact stage waves, the synthetic
-  consumer seam, and model/provider/fallback-sensitive operation hashes.
+  projects. Coverage includes batch validation, embedding failure, draft-blind exhaustive claims,
+  monotonic bounded settlement, atomicity/order/stage waves, the consumer seam, and routing-sensitive
+  config identity.
 - **Model qualification:** the pinned 0731 claim route passed the exact answer and judgment schemas,
   a five-target production-style smoke, and the full 22-target matrix: all 12 unsafe claims were
   rejected and all 10 safe controls accepted. Parasail FP8 is primary and DeepInfra FP8 is its
@@ -448,17 +450,10 @@ not weaken the admission invariants or turn a failed gate into `PASS`.
   supplies the primer-removal role. The first origin-of-replication draft overgeneralized origins as
   specific sequences; the panel rejected it, the sole bounded regeneration replaced it with a
   functionally defined genomic region, and only that accepted bundle persisted.
-- **Routing and timeline:** the run exercised 40 answer packets (Parasail 39, DeepInfra fallback 1)
-  and 106 primary-judge calls (Parasail 105, DeepInfra fallback 1), all on exact model
-  `deepseek/deepseek-v4-flash-0731`. The independent challenger completed 106 logical judgments on
-  DigitalOcean GPT-OSS; one schema-correction request made 107 provider calls. The 17 persisted
-  Operation Timeline rows record the initial two-sample wave, six disputed third samples, the one
-  regenerated candidate, ordering, difficulty, symbolic disposal, and atomic persistence.
-  Knowledge-Boundary Probe also exercised its existing Qwen3-30B backup for 38 of 160 draws; the
-  Qwen embedding route completed 16 node embeddings.
-- **Evidence boundary:** this is production-model local application-pipeline and persisted-database
-  evidence. It is not intercepted or real-backend web, deployed, native emulator/simulator, or
-  physical-device evidence. Safe to continue to U2: **yes**.
+- **Routing and timeline:** exact 0731 handled 40 answer packets and 106 primary judgments, with one
+  DeepInfra fallback in each set; DigitalOcean GPT-OSS completed 106 challenger judgments plus one
+  schema correction. The 17 timeline rows include six disputed third samples and one regeneration.
+  Qwen3-30B backed up 38/160 boundary draws; Qwen produced 16 embeddings.
 
 ### U2 — Model-grounded prerequisite minting cutover — PASS (2026-08-19)
 
@@ -469,11 +464,9 @@ not weaken the admission invariants or turn a failed gate into `PASS`.
   complete stage ownership and config identity mechanically.
 - **Automated evidence:** `@lrnki/application` passed 778/778 tests, the focused Graph Enrichment
   config-hash suite passed 11/11, and root `pnpm typecheck` passed all 11 typed workspace projects.
-  Focused lint reported no errors. The suites prove durability-before-admission ordering, one batch
-  per anchor, admitted-only budget consumption, held-out reservation retention, rejected reservation
-  release, atomic dependency failure, count/order correlation, lifecycle-complete trace validation,
-  persisted trace handoff, mandatory dependency pairing, mechanically exact registry/catalog owner
-  sets, and behavior-versus-execution config identity.
+  Focused lint passed. Coverage proves durability/admission order, one batch per anchor, exact budget
+  and reservation outcomes, atomicity/correlation, complete persisted traces, dependency pairing,
+  registry/catalog ownership, and behavior-versus-execution identity.
 - **Production-model real use:** local Graph Enrichment over the curated Rust ownership fixture
   succeeded as enrichment/operation `18f46eb4-49fa-424c-8b5f-89c264b23746` over graph version
   `fa5c319b-b070-4484-b2e1-bdb57587acc2`. The persisted artifact hash is
@@ -495,17 +488,10 @@ not weaken the admission invariants or turn a failed gate into `PASS`.
   [trait chapter](https://doc.rust-lang.org/book/ch10-02-traits.html), and
   [`Copy` reference](https://doc.rust-lang.org/std/marker/trait.Copy.html). No content defect was
   found.
-- **Routing and timeline:** the claim answerer completed 21 provider calls and the primary
-  factuality judge 57 on exact model `deepseek/deepseek-v4-flash-0731`, all through Parasail. The
-  planner completed 21 calls and challenger 57 on GPT-OSS-120B through DigitalOcean. The explicit
-  same-model DeepInfra and Groq backups remained configured but were not needed. Knowledge-Boundary
-  Probe completed 62 Llama 4 Scout calls through Groq and exercised its retained Qwen3-30B fallback
-  for eight calls through StreamLake; Qwen3 Embedding completed eight embeddings. Every recorded
-  operation stage succeeded; there were ten complete verification rounds over the seven admitted
-  candidates and no failed stage row.
-- **Evidence boundary:** this is production-model local application-pipeline and persisted-database
-  evidence. It is not intercepted or real-backend web, deployed, native emulator/simulator, or
-  physical-device evidence. Safe to continue to U3: **yes**.
+- **Routing and timeline:** Parasail 0731 handled 21 answer and 57 primary-judge calls;
+  DigitalOcean GPT-OSS handled 21 planner and 57 challenger calls. Groq Llama 4 Scout handled 62
+  boundary calls and StreamLake Qwen3-30B eight fallbacks; Qwen produced eight embeddings. All
+  stages and ten verification rounds succeeded; the pinned DeepInfra/Groq backups were not needed.
 
 ### U3 — Generated Support Step assurance and durable evidence — PASS (2026-08-20)
 
@@ -517,11 +503,9 @@ not weaken the admission invariants or turn a failed gate into `PASS`.
 - **Automated evidence:** `pnpm db:generate` mechanically regenerated the single baseline;
   `pnpm db:check` confirmed the 58-table Drizzle schema and committed baseline are identical. The 43
   focused application/config/adapter tests, root `pnpm typecheck` across all 11 typed projects, and
-  full `pnpm test:db` gate passed. Tests cover admission bypass/omission, exhaustive positive-field
-  projection, distractor exclusion from factual targets, key-independent all-option verification,
-  single-owner retries, required-unavailability escape, safe-peer survival, no-survivor and stale-
-  fence atomicity, generated/reference database shape checks, exact bundle round trip, immutable
-  hide/restore, grading, audit read, and no partial publication.
+  full `pnpm test:db` gate passed. Coverage includes exhaustive positive-field/key checks, attempt
+  ownership and unavailability, safe-peer/zero-survivor/stale-fence atomicity, database shape and
+  bundle round trip, hide/restore, grading, audit reads, and no partial publication.
 - **Production-model real use:** local Scaffold Generation against the ready curated Rust expedition
   succeeded as detour `de0ac6d3-a119-4de5-90b2-9bc3668757a5`, operation
   `3bbf0d24-fef0-47a2-987a-9a3faa5f2d39`, with config identity
@@ -545,16 +529,10 @@ not weaken the admission invariants or turn a failed gate into `PASS`.
   silently supplies missing scope nor demands universality from scoped claims, retry feedback cannot
   replace an accurate type/unit/value with a generic placeholder, and content receives the exact
   admission context. The corrected final artifact passed independent inspection.
-- **Routing and timeline:** all 19 persisted stage rows succeeded: two outlines, one boundary probe,
-  one grounding draft, three complete claim-verification rounds, two content drafts, two congruence
-  checks, and two Answer-Key Verifications. MiMo v2.5 ran extraction through Xiaomi; exact DeepSeek
-  V4 Flash 0731 ran the answerer, primary factuality judge, and independent judge through Parasail;
-  GPT-OSS-120B ran planning/challenge through DigitalOcean; Llama 4 Scout ran the boundary probe
-  through Groq; Qwen3 Embedding produced the two embeddings. The pinned DeepInfra and GPT-OSS Groq
-  backups remained configured and were not needed by this final successful operation.
-- **Evidence boundary:** this is production-model local application-pipeline and persisted-database
-  evidence. It is not intercepted or real-backend web, deployed, native emulator/simulator, or
-  physical-device evidence. Safe to continue to U4: **yes**.
+- **Routing and timeline:** all 19 stage rows succeeded across outline, boundary, grounding, three
+  claim rounds, content, congruence, and key verification. Xiaomi MiMo generated; Parasail 0731
+  answered/judged; DigitalOcean GPT-OSS planned/challenged; Groq Llama 4 Scout probed; Qwen embedded.
+  The configured DeepInfra/Groq backups were not needed.
 
 ### U4 — Cross-consumer regression and real-use closure — FIX_FIRST (2026-08-20)
 
@@ -574,7 +552,7 @@ not weaken the admission invariants or turn a failed gate into `PASS`.
   checks, leaving two target-aware planner questions; support targets leave three. Both judges must
   return an independent `categoryBoundaryAudit`, and prompt/schema scans exclude the observed fixture
   terms. The focused adapter/schema/hash gate passed 36/36; the owning package passed 175/175 plus
-  typecheck. Current identities are `graph-enrichment-9adc5aa9b9e4`,
+  typecheck. Identities for this category-boundary panel were `graph-enrichment-9adc5aa9b9e4`,
   `learner-scaffold-generation-0a31c5ce6c9d`, and `synthetic-topic-generation-e93a7bf1889c`.
 - **Targeted production-model panel — `PASS`:** four exact safe/unsafe `Value`/`Trait` targets each
   received six questions over two independently planned samples. All four expected settlements
@@ -600,21 +578,37 @@ not weaken the admission invariants or turn a failed gate into `PASS`.
   fallback. No provider or schema stage failed. This is production-model local application-pipeline
   and persisted-development-DB evidence, not deployed, browser, native, or physical-device evidence.
   Safe to continue downstream: **no**.
+- **Counterexample-repair implementation:** the sole replacement now requires strict non-persisted
+  `rejectedPredicateAudit` and `surfaceScopeAudit` fields, treats objections as accumulated
+  predicate-dimension constraints, and requires anchor scope in the learner-facing sentence rather
+  than context metadata. The adapter discards both audits. The focused adapter/schema/hash gate
+  passed 36/36, the owning package passed 175/175 plus typecheck and focused lint, and whitespace
+  checks passed. Current identities are `graph-enrichment-e0447a30be1d`,
+  `learner-scaffold-generation-33e8b793b3e0`, and `synthetic-topic-generation-bcfd4431ea5b`.
+- **Two-candidate production panel — `FIX_FIRST`:** operation tag
+  `91fac43d-87b7-4ea2-b11e-57ca4b75668c` regenerated the observed lifecycle and anchored-purpose
+  classes, then ran each result through two independently planned samples and both judge families.
+  `Buffer` correctly became an explicitly scoped Rust `String` byte-storage definition with the
+  transfer/purpose predicates deleted. `Heap Allocation` deleted the rejected lifetime predicate
+  but introduced “dynamically sized storage”; fixed-size values are still heap allocations, as the
+  Rust [`Box<T>` documentation](https://doc.rust-lang.org/std/boxed/index.html) and fixed-type
+  [`Layout::new::<T>()`](https://doc.rust-lang.org/std/alloc/struct.Layout.html#method.new) examples
+  establish. Its self-audit missed that new size predicate and all four terminal verdicts accepted
+  it. Routing was two MiMo/Xiaomi generation calls, four GPT-OSS/DigitalOcean planner calls, four
+  DeepSeek/Parasail answer calls, and four verdicts from each of DeepSeek/Parasail and
+  GPT-OSS/DigitalOcean. No provider/schema failure occurred. This is production-model local
+  application-pipeline evidence only. Per stop-loss, no post-repair Scaffold gate ran.
 
 ### Open findings
 
-- **Bounded regeneration-repair handoff:** the established problem class is counterexample-repair
-  overfitting: the replacement removed a rejected phrase but invented a new predicate in the same
-  lifecycle/purpose dimension. Follow counterexample-guided synthesis practice by treating every
-  material objection as an accumulated constraint on the next candidate, not as a paraphrase hint
-  ([CEGIS reference](https://people.csail.mit.edu/asolar/papers/thesis.pdf)). Keep both independent
-  judges and the category-boundary repair unchanged. Deepen only the sole replacement contract so an
-  objection deletes its predicate dimension unless one invariant is independently established, and
-  so an anchor-specific truth carries the exact limiting type/system/representation in the sentence
-  itself. Require strict non-persisted `rejectedPredicateAudit` and `surfaceScopeAudit` fields beside
-  the replacement, then discard them at the adapter boundary: the first names each deleted predicate
-  dimension, while the second quotes the sentence's explicit anchor scope or explains why the retained
-  relationship is invariant. Keep all descriptors domain-neutral and add schema/prompt/hash coverage.
-  First run a two-candidate production regeneration/admission panel for the observed lifecycle and
-  anchored-purpose classes. Only if it passes may one new-hash post-repair Scaffold gate run; another
-  material failure stops U4. Never rerun full Synthetic or Graph or weaken a judge/settlement rule.
+- **Stop-loss decision handoff:** counterexample constraints repaired the original lifetime/purpose
+  dimensions but model self-attestation did not prevent a new unsupported size predicate, and the
+  unchanged independent admission panel did not catch it. Do not patch this prompt again or run
+  Synthetic, Graph, or Scaffold under the current replacement. The recommended safe workaround is
+  to retire the bounded replacement entirely: use one initial grounding draft, preserve every
+  consumer's existing fail-closed handling of a rejected outcome, and delete the replacement prompt,
+  schema, descriptor, feedback/evidence retry plumbing, policy knob, tests, and config ownership in
+  the same change. This trades neural recall for factual safety, lower latency, and a finite path to
+  close U4. If that recall trade-off is rejected, stop this plan and shape a separate deep module for
+  independently verified predicate conservation; do not resume prompt-only iteration. The required
+  user decision is recorded in [BLOCKERS.md](./BLOCKERS.md).

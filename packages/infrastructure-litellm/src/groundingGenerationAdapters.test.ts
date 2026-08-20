@@ -16,6 +16,8 @@ function groundingAdapterReturning(canned: {
   definitions: { text: string }[];
   mentions: { text: string }[];
   rationale: string;
+  rejectedPredicateAudit?: string;
+  surfaceScopeAudit?: string;
 }) {
   const calls: unknown[] = [];
   const client = {
@@ -85,7 +87,9 @@ test("bounded replacement uses draft-blind verification evidence under its exact
   const { adapter, calls } = groundingAdapterReturning({
     definitions: [{ text: "A feedback loop routes part of a system output back as an input." }],
     mentions: [],
-    rationale: "Independent samples support only the output-to-input relationship."
+    rationale: "Independent samples support only the output-to-input relationship.",
+    rejectedPredicateAudit: "The rejected implementation-mechanism dimension is absent; the sentence states only the output-to-input relationship.",
+    surfaceScopeAudit: "The output-to-input relationship is invariant across the supplied context and evidence."
   });
 
   const bundle = await adapter.generate({
@@ -111,6 +115,8 @@ test("bounded replacement uses draft-blind verification evidence under its exact
 
   assert.equal(bundle.definitions.length, 1);
   assert.equal(bundle.mentions.length, 0);
+  assert.equal("rejectedPredicateAudit" in bundle, false);
+  assert.equal("surfaceScopeAudit" in bundle, false);
   const call = calls[0] as { toolName: string; messages: { content: string }[] };
   assert.equal(call.toolName, "submit_regenerated_grounding_bundle");
   assert.ok(call.messages.some((message) => message.content.includes("sole bounded replacement")));
@@ -120,6 +126,11 @@ test("bounded replacement uses draft-blind verification evidence under its exact
   assert.ok(call.messages.some((message) => message.content.includes("Unanimous optional detail is still optional")));
   assert.ok(call.messages.some((message) => message.content.includes("Absence of a disagreement is not support")));
   assert.ok(call.messages.some((message) => message.content.includes("Do not add a fact from your own recollection")));
+  assert.ok(call.messages.some((message) => message.content.includes("Delete that whole dimension")));
+  assert.ok(call.messages.some((message) => message.content.includes("Do not exchange one rejected value for a different value in the same dimension")));
+  assert.ok(call.messages.some((message) => message.content.includes("Context metadata does not silently scope learner-facing text")));
+  assert.ok(call.messages.some((message) => message.content.includes("rejectedPredicateAudit")));
+  assert.ok(call.messages.some((message) => message.content.includes("surfaceScopeAudit")));
   assert.ok(call.messages.some((message) => message.content.includes("do not reuse that narrower term as an umbrella")));
   assert.ok(call.messages.some((message) => message.content.includes("minimum evidence-backed alternatives")));
   assert.ok(call.messages.some((message) => message.content.includes("Preserve the candidate's level of abstraction")));
@@ -138,7 +149,15 @@ test("bounded replacement uses draft-blind verification evidence under its exact
     userMessage.indexOf("Mandatory exclusion constraints") < userMessage.indexOf("Call submit_regenerated_grounding_bundle"),
     "the negative constraints remain adjacent to the final tool instruction"
   );
+  assert.ok(
+    userMessage.lastIndexOf("prior definition universalized one implementation mechanism") > userMessage.indexOf("Final accumulated counterexample constraints"),
+    "the accumulated counterexample is repeated adjacent to the final tool instruction"
+  );
   assert.match(userMessage, /the conflict makes that detail unsupported: omit it/i);
+  const modelFacing = call.messages.map((message) => message.content).join("\n").toLowerCase();
+  for (const fixtureTerm of ["heap allocation", "string memory representation", "rust string", "allocating scope", "producer and consumer"]) {
+    assert.equal(modelFacing.includes(fixtureTerm), false, `fixture-derived term leaked: ${fixtureTerm}`);
+  }
 });
 
 test("originating-topic grounding produces no anchor references", async () => {

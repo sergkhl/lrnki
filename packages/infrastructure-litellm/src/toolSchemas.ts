@@ -236,7 +236,9 @@ export const generatedGroundingBundleSchema: JsonSchema = toForcedToolSchema(gen
 export const regeneratedGroundingBundleValidator = z.object({
   definitions: z.array(generatedGroundingPassage).length(1).describe("Exactly one minimal meaning-bearing replacement definition supported by the supplied draft-blind verification evidence."),
   mentions: z.array(generatedGroundingPassage).length(0).describe("Must be empty for a bounded replacement so no optional factual surface is introduced."),
-  rationale: z.string().min(1).describe("One terse sentence identifying the shared evidence-backed defining relationship retained in the replacement.")
+  rationale: z.string().min(1).describe("One terse sentence identifying the shared evidence-backed defining relationship retained in the replacement."),
+  rejectedPredicateAudit: z.string().min(1).describe("Name every predicate dimension excluded by the rejection feedback and identify the exact wording in the replacement that demonstrates each dimension is absent. A dimension includes a scope, lifecycle, purpose, location, mechanism, representation, cardinality, participant, or comparable factual slot; do not replace a rejected value with another value in the same dimension."),
+  surfaceScopeAudit: z.string().min(1).describe("Quote the exact words in the replacement sentence that limit an anchor-specific relationship to its supported type, system, implementation, or representation. If the relationship needs no limiting words, explain why it is an invariant across the supplied context and evidence rather than relying on context metadata to scope the sentence.")
 }).strict();
 
 export const regeneratedGroundingBundleSchema: JsonSchema = toForcedToolSchema(regeneratedGroundingBundleValidator);

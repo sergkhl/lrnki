@@ -31,6 +31,10 @@ type GroundingGenerationArgs = {
   mentions: { text: string }[];
   rationale: string;
 };
+type GroundingRegenerationArgs = GroundingGenerationArgs & {
+  rejectedPredicateAudit: string;
+  surfaceScopeAudit: string;
+};
 type ClaimQuestionPlanningInput = Parameters<ClaimVerificationQuestionPlanningPort["plan"]>[0];
 type ClaimQuestionPlanningArgs = { questions: ClaimVerificationQuestion[] };
 type ClaimAnsweringInput = Parameters<ClaimVerificationAnsweringPort["answer"]>[0];
@@ -84,7 +88,7 @@ export const groundingGenerationDescriptor: NeuralStageDescriptor<
 
 export const groundingRegenerationDescriptor: NeuralStageDescriptor<
   GroundingRegenerationInput,
-  GroundingGenerationArgs,
+  GroundingRegenerationArgs,
   GeneratedGroundingBundle
 > = {
   promptPath: "grounding-regeneration.prompt",

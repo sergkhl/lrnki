@@ -6,13 +6,14 @@
 
 - **Source-less Grounding Admission — U4 in progress.** The
   [plan](./2026-08-19-001-deepen-source-less-grounding-admission.md) owns implementation design and
-  validation. U1–U3 are closed `PASS`. The category-boundary repair and its four-target production
-  panel pass, but the single current-hash Scaffold gate is `FIX_FIRST`: both otherwise useful
-  prerequisites failed their bounded replacement after substituting new lifetime/purpose predicates.
-  Resume from the plan's counterexample-repair handoff. Keep both judges unchanged; deepen only the
-  domain-neutral replacement contract, run its two-candidate targeted production panel, and permit
-  one new-hash Scaffold gate only after that panel passes. Do not rerun full Synthetic or Graph, and
-  do not implement Candidate 2.
+  validation. U1–U3 are closed `PASS`; U4 is stopped at `FIX_FIRST`. Structured replacement audits
+  repaired the exact lifetime/purpose failures, but the targeted production panel introduced a new
+  size predicate in `Heap Allocation`, its self-audit missed it, and all four terminal verdicts
+  accepted it. No post-repair Scaffold ran. Resolve the one decision in
+  [BLOCKERS.md](./BLOCKERS.md). Recommended: delete bounded regeneration and preserve each
+  consumer's existing fail-closed handling after one rejected draft; do not patch the prompt or
+  rerun Synthetic, Graph, or Scaffold. If neural recall must be retained, stop this plan and shape an
+  independently verified predicate-conservation module instead.
 
 - **Generation model evaluation — shaping; no implementation plan is ready.** The
   [brainstorm](../brainstorms/2026-08-08-002-generation-model-evaluation.md) owns the dated evidence,

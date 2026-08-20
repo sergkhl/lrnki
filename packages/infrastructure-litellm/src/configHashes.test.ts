@@ -360,13 +360,13 @@ test("dropping any shared admission descriptor changes Graph Enrichment identity
 });
 
 // Exact identity regression: U4 re-baselines all three consumers because their shared Source-less
-// Grounding Admission now independently elicits and judges explicit category boundaries while
-// preserving the six-question cap. Future non-behavioral refactors must not perturb these
-// identities.
+// Grounding Admission independently elicits and judges category boundaries and its sole replacement
+// now carries counterexample-deletion and surface-scope audits. Future non-behavioral refactors must
+// not perturb these identities.
 test("default operation config hashes are stable across the registry derivation", () => {
-  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-9adc5aa9b9e4");
-  assert.equal(scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG), "learner-scaffold-generation-0a31c5ce6c9d");
-  assert.equal(syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG), "synthetic-topic-generation-e93a7bf1889c");
+  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-e0447a30be1d");
+  assert.equal(scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG), "learner-scaffold-generation-33e8b793b3e0");
+  assert.equal(syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG), "synthetic-topic-generation-bcfd4431ea5b");
 });
 
 test("synthetic execution widths do not change identity while probe behavior still does", () => {
