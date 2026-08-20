@@ -29,6 +29,7 @@
     "e2e:web:realuse": "pnpm --filter @lrnki/learner-app e2e:realuse",
     "e2e:native:maestro": "pnpm --filter @lrnki/learner-app e2e:native:maestro",
     "tmp:clean": "node scripts/cleanup-tmp.mjs --days 3",
+    "clean:macos": "scripts/cleanup-macos-dev.py",
     "db:generate": "scripts/regenerate-initial-migration.sh",
     "db:check": "scripts/check-drizzle-schema.sh",
     "db:migrate": "scripts/migrate-db.sh",

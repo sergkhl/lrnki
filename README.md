@@ -111,6 +111,21 @@ The native gate drives a standalone e2e-profile APK on a booted Android emulator
 Its current scenario claims, prerequisites, and setup are in
 [apps/learner-app/e2e-native/README.md](apps/learner-app/e2e-native/README.md).
 
+Reclaim developer-toolchain disk space on a macOS host — orphaned iOS simulator runtimes, Xcode
+build products, and package-manager caches:
+
+```bash
+pnpm clean:macos              # interactive picker; nothing is removed until you confirm
+pnpm clean:macos --json       # print what it found and exit; never removes anything
+```
+
+The picker starts with the reversible targets checked — anything a lockfile or a re-download
+restores — and leaves the costly ones (Gradle caches, iOS DeviceSupport, erasing simulators)
+unchecked. The Android AVD and Docker are reported but never modified, and a target macOS will not
+let the tool remove is shown as blocked rather than counted toward the total.
+`scripts/cleanup-macos-dev.py` explains why each target is or is not collectable; `--help` lists the
+non-interactive flags.
+
 ## Database schema
 
 Persisted shape is code-first: edit the internal Drizzle schema, regenerate the sole baseline, and

@@ -8,6 +8,7 @@ dist-e2e/
 dist-realuse/
 .expo/
 .venv/
+__pycache__/
 .data/
 .cache/
 .local/
