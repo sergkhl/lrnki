@@ -19,6 +19,7 @@ import {
 import { claimVerificationAnsweringDescriptor } from "./groundingGenerationAdapters";
 import type { LitellmProxyConfig } from "./litellmProxyConfig";
 import { operationConfigHash } from "./operationConfigHash";
+import { readPromptFile } from "./promptFile";
 
 // KTD7 (plan 2026-07-16-004 U3): the registry is CLOSED against the Operation Timeline catalog.
 // For each timeline operation type, the union of registered runtime LLM stages (descriptor stage
@@ -193,10 +194,13 @@ test("the all-descriptor inventory deduplicates shared descriptors", () => {
     (descriptor) => descriptor.stageTag === STAGE_TAGS.groundingFactualityRevision
   );
   assert.equal(claimJudges.length, 2, "the factuality panel keeps both model identities");
-  assert.deepEqual(
-    claimJudges.map((descriptor) => descriptor.modelOverride),
-    [undefined, "kg-claim-factuality-challenger"]
-  );
+  assert.deepEqual(claimJudges.map((descriptor) => descriptor.promptPath), [
+    "claim-factuality-judgment.prompt",
+    "claim-factuality-challenge.prompt"
+  ]);
+  assert.deepEqual(claimJudges.map(
+    (descriptor) => descriptor.modelOverride ?? readPromptFile(descriptor.promptPath).model
+  ), ["kg-claim-factuality-judge", "kg-claim-factuality-challenger"]);
   assert.equal(
     allNeuralOperationDescriptors.filter(
       (descriptor) => descriptor.stageTag === STAGE_TAGS.groundingFactualityRevision
@@ -349,14 +353,13 @@ test("dropping any shared admission descriptor changes Graph Enrichment identity
   }
 });
 
-// Exact identity regression: U2 re-baselines Graph Enrichment and U3 re-baselines Scaffold
-// Generation because both now bind the complete Source-less Grounding Admission descriptor family
-// and policy. Synthetic Topic Generation is unchanged. Future non-behavioral refactors must not
-// perturb these identities.
+// Exact identity regression: U4 re-baselines all three consumers because their shared Source-less
+// Grounding Admission prompts now require cross-system variation evidence and reject common-case
+// universalization. Future non-behavioral refactors must not perturb these identities.
 test("default operation config hashes are stable across the registry derivation", () => {
-  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-71b00df89a80");
-  assert.equal(scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG), "learner-scaffold-generation-8aa02884e68c");
-  assert.equal(syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG), "synthetic-topic-generation-7e144cf49f93");
+  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-6cd02c38fcab");
+  assert.equal(scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG), "learner-scaffold-generation-f29e4a9c4846");
+  assert.equal(syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG), "synthetic-topic-generation-9604e3fb4ca4");
 });
 
 test("synthetic execution widths do not change identity while probe behavior still does", () => {

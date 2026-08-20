@@ -112,9 +112,15 @@ export const claimVerificationQuestionPlanningDescriptor: NeuralStageDescriptor<
       input.declaredDomain,
       input.context
     );
+    const variationQuestion = scopeVariationQuestion(
+      input.canonicalLabel,
+      input.declaredDomain,
+      input.context
+    );
     const required = [
       { targetKey: firstTarget.targetKey, question: identityQuestion },
-      ...input.targets.map((target) => ({ targetKey: target.targetKey, question: applicationQuestion }))
+      ...input.targets.map((target) => ({ targetKey: target.targetKey, question: applicationQuestion })),
+      ...input.targets.map((target) => ({ targetKey: target.targetKey, question: variationQuestion }))
     ];
     return [
       ...required,
@@ -200,16 +206,17 @@ export const claimFactualityJudgmentDescriptor: NeuralStageDescriptor<
   mapResult: (result) => result.judgments
 };
 
-// A second model family evaluates the same evidence packet through the same forced-tool contract.
-// Keeping one prompt and schema prevents policy drift while modelOverride makes both deployment
-// identities explicit in the operation config hash and the LiteLLM request record.
+// A second model family evaluates the same evidence packet through the same forced-tool schema but
+// an intentionally adversarial prompt. The primary establishes factual support; this challenger
+// tries to falsify literal scope and definition adequacy so familiar common-case wording cannot
+// outvote a material objection. Both descriptors remain explicit config-hash identities.
 export const claimFactualityChallengeDescriptor: NeuralStageDescriptor<
   ClaimJudgmentInput,
   ClaimJudgmentArgs,
   ClaimJudgmentArgs["judgments"]
 > = {
   ...claimFactualityJudgmentDescriptor,
-  modelOverride: "kg-claim-factuality-challenger"
+  promptPath: "claim-factuality-challenge.prompt"
 };
 
 export function createClaimFactualityJudgmentPort(
@@ -225,7 +232,7 @@ export function createClaimFactualityChallengePort(
   client: LiteLlmForcedToolClient
 ): ClaimFactualityJudgmentPort {
   return {
-    model: claimFactualityChallengeDescriptor.modelOverride!,
+    model: readPromptFile(claimFactualityChallengeDescriptor.promptPath).model,
     judge: (input) => executeForcedToolStage(client, claimFactualityChallengeDescriptor, input)
   };
 }
@@ -258,6 +265,17 @@ function contextApplicationQuestion(
     ? `the originating topic "${context.topic}"`
     : `the scaffolded anchor "${context.anchor.canonicalLabel}"`;
   return `Within ${owningContext}, how does "${canonicalLabel}" in ${declaredDomain} apply? State its mechanism or behavior, required conditions, material outputs or effects, and limits. Identify commonly attributed consequences that do not actually follow in this context, and separate any named senses, entities, or implementations that behave differently.`;
+}
+
+function scopeVariationQuestion(
+  canonicalLabel: string,
+  declaredDomain: string,
+  context: GroundingAdmissionContext
+): string {
+  const owningContext = context.kind === "originating_topic"
+    ? `the originating topic "${context.topic}"`
+    : `the exact scaffolded anchor "${context.anchor.canonicalLabel}"`;
+  return `Across the systems, types, implementations, populations, or cases relevant to ${owningContext} in ${declaredDomain}, which features of "${canonicalLabel}" are invariant, which vary, and what explicit scope qualifiers are required before stating a classification, mechanism, or effect as an unqualified explanation?`;
 }
 
 function generatedBundleFromResult(

@@ -69,6 +69,8 @@ test("generates an owner-neutral bundle conditioned on one closed scaffolded anc
   assert.ok(call.messages.some((message) => message.content.includes("criterion that makes something a member of that category")));
   assert.ok(call.messages.some((message) => message.content.includes("including 0, 1, 2, and 3 when meaningful")));
   assert.ok(call.messages.some((message) => message.content.includes("necessary, sufficient, typical")));
+  assert.ok(call.messages.some((message) => message.content.includes("state only a cross-system invariant without qualification")));
+  assert.ok(call.messages.some((message) => message.content.includes("Never turn a common or textbook case into a universal definition")));
   assert.ok(call.messages.some((message) => message.content.includes("component operation from a total outcome")));
   assert.ok(call.messages.some((message) => message.content.includes("absolute or exact language")));
   assert.ok(call.messages.some((message) => message.content.includes("observations, not correction authority")));
@@ -162,12 +164,19 @@ test("planning sees owner-neutral targets while the external answer model receiv
   assert.ok(calls[0].messages.some((message) => message.content.includes("target text itself carries every material scope limitation")));
   assert.ok(calls[0].messages.some((message) => message.content.includes("boundary cases and counterexamples")));
   assert.ok(calls[0].messages.some((message) => message.content.includes("candidate's established defining conditions or mechanism")));
+  assert.ok(calls[0].messages.some((message) => message.content.includes("cross-system scope-variation checks")));
+  assert.ok(calls[0].messages.some((message) => message.content.includes("neutrally try to falsify")));
+  assert.ok(calls[0].messages.some((message) => message.content.includes("assumes the draft's category, value, or universal scope")));
   assert.match(questions[0].question, /necessary defining features/);
   assert.match(questions[1].question, /originating topic "A broad topic"/);
   assert.match(questions[1].question, /commonly attributed consequences that do not actually follow/);
   assert.match(questions[1].question, /mechanism or behavior, required conditions/);
+  assert.match(questions[3].question, /which features of "Mechanism contrast" are invariant, which vary/);
+  assert.match(questions[3].question, /explicit scope qualifiers/);
   assert.deepEqual(questions.map((question) => question.targetKey), [
     "definition:0",
+    "definition:0",
+    "mention:0",
     "definition:0",
     "mention:0",
     "definition:0",
@@ -185,6 +194,7 @@ test("planning sees owner-neutral targets while the external answer model receiv
   assert.ok(calls[1].messages.some((message) => message.content.includes("state the named concept's defining condition or mechanism")));
   assert.ok(calls[1].messages.some((message) => message.content.includes("multiple established senses")));
   assert.ok(calls[1].messages.some((message) => message.content.includes("mutually exclusive branches")));
+  assert.ok(calls[1].messages.some((message) => message.content.includes("state the cross-system invariant separately from material variations")));
   assert.equal(calls[1].messages.some((message) => message.content.includes("Draft-only marker")), false);
   assert.equal(calls[1].messages.some((message) => message.content.includes("definition:0")), false);
   for (const fixtureTerm of ["binary search", "pivot", "linked list", "logarithmic", "half-open interval"]) {
@@ -231,15 +241,16 @@ test("the factuality adapter returns judgments only and cannot settle or rewrite
   assert.equal(judgments.some((judgment) => "text" in judgment), false);
   assert.deepEqual(challengerJudgments, judgments);
   const call = calls[0] as { model: string; toolName: string; tags: string[]; messages: { content: string }[] };
-  const challengeCall = calls[1] as { model: string; toolName: string; tags: string[] };
+  const challengeCall = calls[1] as { model: string; toolName: string; tags: string[]; messages: { content: string }[] };
   assert.equal(call.model, "kg-claim-factuality-judge");
   assert.equal(challengeCall.model, "kg-claim-factuality-challenger");
   assert.equal(call.toolName, "submit_claim_factuality_judgments");
   assert.equal(challengeCall.toolName, call.toolName);
   assert.deepEqual(call.tags, ["grounding-factuality-revision"]);
   assert.deepEqual(challengeCall.tags, call.tags);
-  assert.equal(claimFactualityChallengeDescriptor.promptPath, claimFactualityJudgmentDescriptor.promptPath);
-  assert.equal(claimFactualityChallengeDescriptor.modelOverride, "kg-claim-factuality-challenger");
+  assert.notEqual(claimFactualityChallengeDescriptor.promptPath, claimFactualityJudgmentDescriptor.promptPath);
+  assert.equal(claimFactualityChallengeDescriptor.promptPath, "claim-factuality-challenge.prompt");
+  assert.equal(claimFactualityChallengeDescriptor.modelOverride, undefined);
   assert.ok(call.messages.some((message) => message.content.includes("Draft definition.")));
   assert.ok(call.messages.some((message) => message.content.includes('{"targetKey":"definition:0","targetPurpose":"definition","text":"Draft definition."}')));
   assert.ok(call.messages.some((message) => message.content.includes("Independent characterization of the distinction.")));
@@ -251,8 +262,19 @@ test("the factuality adapter returns judgments only and cannot settle or rewrite
   assert.ok(call.messages.some((message) => message.content.includes("Resolve coordinated subjects and predicates distributively")));
   assert.ok(call.messages.some((message) => message.content.includes("component behavior from total outcome")));
   assert.ok(call.messages.some((message) => message.content.includes("boundary and counterexample cases")));
+  assert.ok(call.messages.some((message) => message.content.includes("Evidence is not a vote")));
+  assert.ok(call.messages.some((message) => message.content.includes("material exception, alternate classification, system variation, or narrower scope")));
+  assert.ok(call.messages.some((message) => message.content.includes("textbook, common, approximate, or pedagogically convenient")));
   assert.ok(call.messages.some((message) => message.content.includes("targetPurpose `definition` target must itself state the candidate concept's defining condition or mechanism")));
   assert.ok(call.messages.some((message) => message.content.includes("application code owns settlement")));
+  assert.ok(challengeCall.messages.some((message) => message.content.includes("adversarial falsifier")));
+  assert.ok(challengeCall.messages.some((message) => message.content.includes("Context congruence")));
+  assert.ok(challengeCall.messages.some((message) => message.content.includes("selects a different sense from the anchor")));
+  assert.ok(challengeCall.messages.some((message) => message.content.includes("genuinely cross-context invariant")));
+  assert.ok(challengeCall.messages.some((message) => message.content.includes("Definition adequacy")));
+  assert.ok(challengeCall.messages.some((message) => message.content.includes("factually true comparison")));
+  assert.ok(challengeCall.messages.some((message) => message.content.includes("If your reasoning finds such an objection, the disposition must be `rejected`")));
+  assert.ok(challengeCall.messages.some((message) => message.content.includes("standard, textbook, typical, commonly taught")));
   const judgmentFacing = call.messages.map((message) => message.content).join("\n").toLowerCase();
   for (const fixtureTerm of ["binary search", "pivot", "linked list", "logarithmic", "half-open interval"]) {
     assert.equal(judgmentFacing.includes(fixtureTerm), false, `fixture-derived term leaked: ${fixtureTerm}`);

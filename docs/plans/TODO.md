@@ -4,11 +4,11 @@
 
 ## TODO
 
-- **Source-less Grounding Admission — U4 next.** The
+- **Source-less Grounding Admission — U4 in progress.** The
   [plan](./2026-08-19-001-deepen-source-less-grounding-admission.md) owns implementation design and
-  validation. U1–U3 are closed `PASS`; run the cross-consumer automated and production-model matrix,
-  inspect the final artifacts, and consolidate the completed plan next. Do not implement Candidate
-  2.
+  validation. U1–U3 are closed `PASS`; resume from its `Open findings` by recovering the shared
+  Docker runtime, then run the current-hash cross-consumer matrix, inspect the final artifacts, and
+  consolidate the completed plan. Do not implement Candidate 2.
 
 - **Generation model evaluation — shaping; no implementation plan is ready.** The
   [brainstorm](../brainstorms/2026-08-08-002-generation-model-evaluation.md) owns the dated evidence,

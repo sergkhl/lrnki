@@ -7,16 +7,16 @@ execution: code
 
 # Deepen Source-less Grounding Admission
 
-**Status:** In progress — U1–U3 complete; U4 next
+**Status:** In progress — U1–U3 complete; U4 in progress
 
 **Decision state:** Grilling-locked. The user accepted the external interface direction and then
 delegated every remaining Candidate 1 decision to the recommended answer. The linked brainstorm is
 the canonical owner of the accepted problem framing, requirements, outcome policy, and scope.
 
-**Implementation state:** U1 is committed as `bac34bf`; U2 is committed as `67247b3`. U3's
-generated Support Step assurance, shared Answer-Key Verification, durable Grounding Bundle evidence,
-and complete Scaffold Generation identity passed automation and the production-model Rust-fixture
-gate. Cross-consumer regression and closure in U4 are next.
+**Implementation state:** U1 is committed as `bac34bf`; U2 is committed as `67247b3`; U3 is
+committed as `ab17bd6`. U4 corrected a cross-domain scope-drift defect with code-owned variation
+questions and a distinct adversarial challenger prompt. Focused production-model controls and the
+non-database repository gates pass; the final current-hash three-consumer matrix remains open.
 
 ## Goal capsule
 
@@ -549,4 +549,9 @@ physical-device evidence.
 
 ### Open findings
 
-- None recorded.
+- **Runtime recovery required before final real-use evidence.** Docker Desktop stopped its Linux VM
+  after its host log write failed with `no space left on device`; PostgreSQL on port 5433 and LiteLLM
+  on port 4000 are therefore unresponsive. Synthetic operation
+  `e976ebdd-115d-47a5-af19-b9a723115518` was interrupted and is explicitly not evidence. Free host
+  disk space, restart Docker Desktop, verify both endpoints, and rerun the complete current-hash
+  Synthetic, Graph, and Scaffold matrix before closing U4.
