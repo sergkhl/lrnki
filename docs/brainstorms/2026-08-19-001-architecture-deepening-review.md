@@ -6,9 +6,8 @@ date: 2026-08-19
 
 # Architecture deepening review
 
-**Status:** Candidate 1 is accepted and has a Ready
-[implementation plan](../plans/2026-08-19-001-deepen-source-less-grounding-admission.md). Its problem
-framing, requirements, and scope remain canonical here; the other candidates remain shaping findings.
+**Status:** Candidates 2–7 remain shaping findings. Their original numbering is retained for stable
+references.
 
 ## Review question
 
@@ -23,247 +22,14 @@ Historical architecture reviews were checked only to avoid proposing work that h
 
 ## Recommendation summary
 
-| Rank | Candidate | Strength | Why it made the cut |
+| Original rank | Candidate | Strength | Why it made the cut |
 | ---: | --- | --- | --- |
-| 1 | Put source-less synthesis admission behind one shared module | **Strong — top recommendation** | One accepted policy has three consumers, but only one has the complete implementation. |
-| 2 | Give Topic Expedition generation one application-owned stage profile | **Strong** | A hand-maintained second representation has already omitted three running stages and reports false indeterminate progress. |
+| 2 | Give Topic Expedition generation one application-owned stage profile | **Strong — top remaining recommendation** | A hand-maintained second representation has already omitted three running stages and reports false indeterminate progress. |
 | 3 | Move Topic Expedition commands out of the Hono adapter | **Strong** | Presentation facts are accepted as authority, one transport field is unused, and successful command policy has no application test surface. |
 | 4 | Own navigation memory once over raw platform storage adapters | **Strong** | Native and web files duplicate policy, and leaked identity construction has already caused a collision defect. |
 | 5 | Deepen the Learner App's Support Path interaction lifecycle | **Worth exploring** | Important sequencing and projected-state replacement are spread across two entry paths, rendering modules, and transport-shaped wrappers. |
 | 6 | Deepen persisted Study Item and Concept Lesson loading | **Worth exploring** | Raw row shapes and current-versus-pinned selection policy leak across three Postgres implementations. |
 | 7 | Narrow the Study Session reader's construction seam | **Worth exploring** | The implementation is deep, but its interface accepts broad write-capable ports and optional wiring that changes projection completeness. |
-
-Candidates 1 and 2 are related but not the same decision. Candidate 1 owns factual admission of
-source-less content; candidate 2 owns Topic Expedition's observable generation sequence. If candidate
-1 changes stage orchestration, candidate 2 should be assessed in the same implementation plan or its
-immediate follow-up so progress cannot drift again.
-
-## Candidate 1 — Put source-less synthesis admission behind one shared module
-
-**Recommendation strength:** Strong — top recommendation
-
-### Files
-
-- [ADR-0030](../adr/0030-confidence-gated-synthesis.md) and
-  [ADR-0037](../adr/0037-persist-learner-scoped-scaffold-detours.md)
-- [`runSyntheticGeneration.ts`](../../packages/application/src/runSyntheticGeneration.ts), especially
-  `runSyntheticGeneration` and `validateVerificationPlan`
-- [`enrichmentNodeMinting.ts`](../../packages/application/src/enrichmentNodeMinting.ts), especially
-  `assembleEnrichmentNodes`
-- [`learnerScaffoldGeneration.ts`](../../packages/application/src/learnerScaffoldGeneration.ts),
-  especially `ScaffoldGenerationConstruction` and the generated Support Step path
-- [`learnerScaffoldGeneration.ts` composition](../../apps/learner-api/src/learnerScaffoldGeneration.ts)
-- [`packages/ports/src/index.ts`](../../packages/ports/src/index.ts), especially the Grounding Generation
-  and grounding-verification ports
-- [`runSyntheticGeneration.test.ts`](../../packages/application/src/runSyntheticGeneration.test.ts),
-  [`enrichmentNodeMinting.test.ts`](../../packages/application/src/enrichmentNodeMinting.test.ts), and
-  [`learnerScaffoldGeneration.test.ts`](../../packages/application/src/learnerScaffoldGeneration.test.ts)
-
-### Problem
-
-[ADR-0030](../adr/0030-confidence-gated-synthesis.md) is the canonical decision for admitting
-learner-facing source-less world knowledge. Current consumers implement different subsets of that
-decision:
-
-| Consumer | Knowledge-Boundary Probe | Grounding Generation | Independent claim verification | Bounded verified regeneration |
-| --- | --- | --- | --- | --- |
-| Synthetic Topic Generation | Yes | Yes | Yes | Yes |
-| Model-grounded prerequisite minting | No | Yes | No | No |
-| Generated Support Steps | Yes | Yes | No | No |
-
-The complete probe → draft → claim-targeted plan → draft-blind answer → drop-only comparison → bounded
-regeneration implementation lives inside `runSyntheticGeneration`. Model-grounded prerequisite
-minting passes a durability-approved proposal directly through Grounding Generation and admits the
-result into a Derived Graph Layer. Scaffold Generation probes and grounds a generated label, then
-uses the unchecked Grounding Bundle to generate a Support Step.
-
-The current port requests and comments also expose Synthetic Topic Generation's `topic` context as if
-it were the shared concept. Tests mirror the fragmentation: the synthetic tests prove passage
-coverage, draft isolation, drop-only output, and retries, while the other two consumers can prove only
-their shorter local sequences.
-
-### Deletion test
-
-Positive. Deleting the roughly 139-line admission implementation inside `runSyntheticGeneration`
-does not eliminate its complexity. Conforming implementations would have to recreate the same probe,
-verification, monotonicity, rejection-feedback, and retry behavior in three callers. The fact that
-two callers currently omit parts of it is direct evidence that the seam is misplaced.
-
-### Solution direction
-
-Put the complete source-less synthesis admission implementation behind one small interface and have
-all three consumers cross that seam. Keep minting durability separate: durability and factual
-admission judge different harm classes. The accepted external interface and Scaffold-specific
-artifact policy are recorded below.
-
-The neural dependencies are true external dependencies with production LiteLLM/embedding adapters
-and focused in-memory test adapters. Deterministic plan coverage, drop-only enforcement, retry
-accounting, and admission stay inside the module as implementation rather than becoming more ports.
-
-### Benefits and test surface
-
-- **Locality:** probe policy, claim verification, rejection sampling, and monotonic admission change
-  in one module.
-- **Leverage:** Synthetic Topic Generation, prerequisite minting, and Scaffold Generation receive the
-  same guarantees from one implementation.
-- **Tests:** move detailed admission cases from the synthetic caller to the deeper interface. Keep
-  consumer tests focused on their own behavior: Derived Graph Layer assembly and persistence,
-  prerequisite proposal/durability, and fenced Support Step publication.
-- **End-to-end application invariant:** no unadmitted source-less draft can reach a Derived Graph
-  Layer or an immutable generated Support Step.
-
-### Before / after
-
-```mermaid
-flowchart LR
-  subgraph Before
-    STG["Synthetic Topic Generation"] --> Full["complete admission implementation"]
-    Mint["Prerequisite minting"] --> Ground1["Grounding Generation only"]
-    Scaffold["Scaffold Generation"] --> Ground2["probe + Grounding Generation"]
-  end
-
-  subgraph After
-    STG2["Synthetic Topic Generation"] --> Admit["deep source-less synthesis admission module"]
-    Mint2["Prerequisite minting"] --> Admit
-    Scaffold2["Scaffold Generation"] --> Admit
-    Admit --> Neural["LiteLLM and embedding adapters"]
-  end
-```
-
-### ADR fit and accepted scope
-
-This directly enforces [ADR-0001](../adr/0001-adopt-greenfield-deep-module-architecture.md),
-[ADR-0030](../adr/0030-confidence-gated-synthesis.md), and the generated Support Step requirement in
-[ADR-0037](../adr/0037-persist-learner-scoped-scaffold-detours.md). It preserves the distinct
-operation identities and Grounding Origin rules owned by
-[ADR-0019](../adr/0019-graph-enrichment-derived-layer.md) and
-[ADR-0023](../adr/0023-grounding-origin-model-and-cross-family-generated-node-judge.md).
-
-**Accepted 2026-08-19 — admission target:** Candidate 1 must cover every positive factual claim in
-the final generated Support Step persisted for the learner. An admitted Grounding Bundle is necessary
-grounding, but it cannot attest to factual claims introduced by the later neural content draft. The
-treatment of intentionally incorrect distractors and answer-key correctness remains a separate harm
-class governed by the accepted decision below.
-
-**Accepted 2026-08-19 — rejection unit:** Any rejected positive factual claim rejects the complete
-structured Support Step content draft. Verification may return a rejection reason, but it may not
-delete, rewrite, or partially salvage learner-facing fields. A subsequent bounded attempt starts from
-the admitted Grounding Bundle and produces a fresh complete draft.
-
-**Accepted 2026-08-19 — exercise verification:** Intentionally incorrect distractors are outside
-positive-claim factual admission. After factual admission, the complete exercise must pass a separate
-answer-key verification stage that checks the keyed answer and all distractors without exposing the
-key to the judge. Either stage rejects the complete Support Step content draft. The design should
-reuse or deepen the existing Study Item key-verification behavior rather than mixing the two harm
-classes into the source-less admission module; the accepted interface boundary is recorded below.
-
-**Accepted 2026-08-19 — attempt ownership:** Grounding Bundle admission remains an earlier bounded
-process. One `contentDraftAttempts` envelope owns each complete Support Step content attempt across
-generation, structural validation, congruence, positive-claim factual admission, and answer-key
-verification; those checks do not add nested regeneration loops. Exhaustion omits that generated
-step, preserving other safe steps. If none survive, the existing atomic Scaffold Detour failure
-behavior remains authoritative.
-
-**Accepted 2026-08-19 — durable evidence:** Each immutable generated Support Step persists its final
-payload and admitted Grounding Bundle. The existing Scaffold Detour link to the publishing operation,
-config hash, and timeline remains the operation identity; step rows do not duplicate it. The final
-positive-claim projection is mechanically derived from the payload. Raw verification questions and
-answers, rejected drafts, rejection feedback, discarded attempts, and redundant pass flags do not
-persist.
-
-**Accepted 2026-08-19 — unavailable dependencies:** Required factual-admission and answer-key
-dependencies never fail open. Their unavailability aborts the claimed generation attempt without
-consuming a content-draft attempt or publishing any steps. Infrastructure-only failure follows the
-existing fenced release and supervisor retry; deterministic forced-tool exhaustion follows the
-existing failed disposition. A resolved factual or key rejection remains content evidence and
-consumes the owning artifact's draft budget.
-
-**Accepted 2026-08-19 — module scope:** The external shared module owns the complete
-Knowledge-Boundary Probe, Grounding Generation, draft-blind claim verification, rejection feedback,
-and bounded Grounding Bundle regeneration sequence. Callers retain durability judgments, domain role
-and identity assembly, final Support Step content generation and answer-key verification, persistence,
-and fenced publication. A narrower claim-admission implementation remains an internal seam reused by
-both Grounding Bundle admission and the Support Step content-attempt implementation.
-
-**Accepted 2026-08-19 — external interface direction:** Source-less Grounding Admission is a
-constructed application module whose factory binds the required neural and embedding ports plus one
-shared policy configuration. An operation binds its required `StageBracket` once and receives one
-batch-only `admitBatch` method; a singleton is a one-candidate batch. The module owns input
-validation, bounded concurrency, stable result ordering, stage waves, selective retry, and
-all-or-nothing dependency failure. It exposes no `one` convenience method, caller callbacks,
-artifact-kind switch, per-caller attempt tuning, or speculative grounding-strategy registry.
-
-Each batch candidate supplies an opaque run-local correlation key, Canonical Concept Label, Declared
-Domain, and exactly one closed grounding context: an originating topic or one scaffolded anchor with
-admitted Definition Passages. The context belongs to each candidate because anchor-less generated
-Support Steps use their own labels as topics. Both current anchored consumers have exactly one real
-anchor; a multi-anchor variant waits for a second implemented shape.
-
-The ordered outcome union is `admitted`, `held_out / knowledge_boundary`, or
-`rejected / grounding_verification_exhausted`. All resolved outcomes carry the correlation key and
-measured Knowledge-Boundary Probe summary; admission carries the Generated Grounding Bundle and
-rejection may carry a reason. Raw probe draws, verification questions and answers, rejected drafts,
-feedback, and attempt counts remain hidden. Required dependency unavailability and deterministic
-contract violations throw without returning a partial batch.
-
-The Generated Grounding Bundle becomes owner-neutral: its enclosing Enrichment Node or generated
-Support Step owns durable identity. The bundle retains its generated passages, Grounding Origin,
-generating model, rationale, and owner-neutral grounding references rather than repeating
-`derivedNodeId` or graph-specific `scaffoldedAnchorConceptIds`. Web-grounded retrieval remains
-deferred; no public union or strategy seam is added before that policy and a second implementation
-exist.
-
-**Accepted 2026-08-19 — caller dispositions:** Synthetic Topic Generation retains a measured
-Knowledge-Boundary Probe holdout in its existing trace and treats exhausted factual rejection as a
-deterministic whole-operation failure before persistence. Prerequisite minting creates no node for
-either non-admission and records a new Source-less Grounding Admission disposition separately from
-the durability disposition. Scaffold Generation omits either non-admitted generated step and keeps
-safe reference/generated peers; its existing no-surviving-step failure remains the aggregate rule.
-
-For prerequisite minting, reservation scope follows judgment scope. A `knowledge_boundary` holdout
-is Canonical Concept Label + Declared Domain scoped because the probe never receives an anchor, so
-the label remains reserved for the Enrichment Run. A `grounding_verification_exhausted` rejection is
-label + grounding-context scoped, so the reservation is released and a later same-domain anchor may
-propose and independently admit a different anchor-conditioned bundle within the existing run
-bounds.
-
-**Accepted 2026-08-19 — internal claim admission:** The package-internal claim-admission seam owns
-claim-targeted planning, complete target coverage, draft-blind answering, exact answer correlation,
-and independent factual judgments; it returns judgments over code-owned target identities, never a
-rewritten artifact. The Grounding Bundle policy may drop rejected original passages monotonically
-and requires a surviving Definition Passage. The generated Support Step policy rejects the complete
-structured payload when any positive target is rejected.
-
-The Support Step positive-claim projection is pure and exhaustive over learner-facing positive
-content: generated lesson section text and items, any generated diagram caption/specification,
-question text including its presuppositions, explanation, and the server-keyed correct option. The
-step label is the already-admitted grounding subject rather than a second projected claim; ids,
-provenance markers, and intentionally incorrect distractors are excluded. Unsupported new payload
-fields fail closed until the projection handles them.
-
-**Accepted 2026-08-19 — Answer-Key Verification:** Generalize the existing candidate-truth port and
-deterministic option-select veto policy so neutral Study Items and generated Support Steps share the
-same key-hidden question. Present every candidate in deterministic key-independent order and never
-send `isCorrect` or positional key information. A confidently false key or confidently true
-distractor rejects the whole draft; a resolved `unclear` verdict does not become a neural hard veto
-under rule 16. Neutral Study Items retain their existing two-round `verifyGuardedItems` envelope and
-unavailability policy. Scaffold Generation invokes only the one-shot judgment inside its owning
-`contentDraftAttempts` envelope, and required unavailability throws without consuming another
-content draft.
-
-The congruence judgment remains a fail-open quality re-pick, not an assurance gate. Its resolved
-negative verdict consumes the current content attempt; its unavailability skips only that veto and
-continues to required positive-claim admission and Answer-Key Verification rather than admitting the
-draft early.
-
-**Accepted 2026-08-19 — shared policy and attribution:** One canonical Source-less Grounding
-Admission policy supplies the probe behavior and Grounding Bundle attempt budget to all three
-consumers; callers cannot tune behavioral admission independently. Candidate/probe/verification
-concurrency remains execution policy. Every affected operation config hash includes the shared
-behavioral policy, embedding model, and exact neural descriptors while excluding execution-only
-widths. The Operation Timeline catalogs every admission and Answer-Key Verification stage under each
-operation that can execute it; shared-stage ownership is derived and compared mechanically rather
-than maintained as a second hand list.
 
 ## Candidate 2 — Give Topic Expedition generation one application-owned stage profile
 
@@ -821,8 +587,6 @@ and wire the existing adapter; it should not wait for an architecture candidate 
 - **Topic Expedition lifecycle construction:** `generateTopicExpedition.ts` already hides the
   process-lived lifecycle behind a small constructed interface. Re-proposing that completed
   deepening would add no leverage.
-- **Scaffold Generation lifecycle construction:** `learnerScaffoldGeneration.ts` is likewise already
-  deep. Candidate 1 concerns missing shared source-less admission, not moving its lifecycle again.
 - **Learner map and long `CheckpointPath`:** deterministic route geometry and Android bitmap-cap
   behavior already sit behind small interfaces with regression tests. File length alone is not a
   depth signal.
@@ -835,18 +599,10 @@ and wire the existing adapter; it should not wait for an architecture candidate 
   seam or merely move composition. Existing owned/external adapters already sit at the justified
   seams.
 
-## Top recommendation
+## Top remaining recommendation
 
-Start with candidate 1: one source-less synthesis admission module.
-
-It is the only candidate where an accepted cross-consumer policy is fully implemented in one caller
-and observably absent from two others. The deepening therefore improves architecture and closes a
-current learner-facing assurance gap at the same time. It also has clear leverage across three
-consumers, real production and test adapters, a positive deletion test, and a precise existing body of
-tests that can move to the deeper interface.
-
-Candidate 2 should follow closely because the missing verification stages already demonstrate that
-Topic Expedition progress cannot safely depend on a hand-maintained partial list.
+Start with candidate 2. The missing verification stages already demonstrate that Topic Expedition
+progress cannot safely depend on a hand-maintained partial list.
 
 ## Open decisions
 
@@ -854,7 +610,3 @@ Topic Expedition progress cannot safely depend on a hand-maintained partial list
    profile?
 2. For candidate 5, which interaction transitions are genuinely shared and which close/open timings
    must remain inside rendering modules?
-
-Candidate 1 has no remaining product or module-shape decision. Its accepted interface direction,
-outcomes, evidence, retry, caller, and policy requirements above are ready for an implementation
-plan; exact file layout, migration sequence, and implementation units belong to that plan.

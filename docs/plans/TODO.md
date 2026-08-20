@@ -4,14 +4,6 @@
 
 ## TODO
 
-- **Source-less Grounding Admission — implementation complete; consolidate.** The
-  [plan](./2026-08-19-001-deepen-source-less-grounding-admission.md) closes U1–U4 `PASS`. Bounded
-  Grounding Bundle regeneration is retired: one rejected initial draft now reaches each consumer's
-  existing fail-closed outcome policy. Repository, isolated-DB, and one current-hash production-model
-  Scaffold gate pass. Preserve the detailed record in the implementation commit, then update
-  ADR-0030 and this file, retire Candidate 1 from the shared brainstorm, remove the plan from the
-  index, and delete it in a separate consolidation commit.
-
 - **Generation model evaluation — shaping; no implementation plan is ready.** The
   [brainstorm](../brainstorms/2026-08-08-002-generation-model-evaluation.md) owns the dated evidence,
   candidate options, carried generation changes, and open decisions. Resume with a planning
@@ -19,6 +11,14 @@
   grounding generation moves.
 
 ## COMPLETED
+
+- **Source-less Grounding Admission is shared and one-pass (2026-08-19–20).** Synthetic Topic
+  Generation, model-grounded prerequisite minting, and generated Support Steps now cross one deep
+  admission module. Generated Support Steps also require exhaustive positive-claim admission and
+  key-hidden Answer-Key Verification before atomic publication. Grounding verification may drop
+  rejected passages, but a draft with no surviving Definition Passage fails closed without
+  regeneration under [ADR-0030](../adr/0030-confidence-gated-synthesis.md). Detailed implementation
+  record: commits bac34bf, 67247b3, ab17bd6, and 24fc8a0.
 
 - **The native flows navigate exactly at 320 dp (2026-08-10–12).** Support Path scrolls to, fully
   verifies, and taps its exact term action, while Crystal Guardian now does the same for every
@@ -60,38 +60,33 @@
   inspection confirmed the repaired bank. Durable policy:
   [ADR-0026](../adr/0026-typed-study-item-bank.md). Detailed record: commit 7fb9a2d.
 
-- **The public API now serves only from its deployed container (2026-08-05).** The dev-first fallback
-  and host runtime are gone; deployment and development use the container path. Durable decision:
-  [ADR-0040](../adr/0040-serve-public-api-only-from-the-deployed-container.md).
-
 ## VALIDATION
 
-### Real-use quality evaluation — 2026-08-12
+### Real-use quality evaluation — 2026-08-20
 
-- Milestone: Crystal Guardian navigation reaches every visual-evidence state at 320 dp without
-  changing the neighboring Support Path authority claim.
-- Fixture and source type: the standalone e2e-profile APK against deterministic loopback Better Auth
-  and learner-api response shapes; `emulator-5554`, AVD `Medium_Phone_API_36.1`, Android API 36,
-  1080×2400 px, density override 540 dpi (320 dp) and physical 420 dpi (~411 dp); Maestro 2.6.1.
-- Real model calls used: not applicable; no generated content is evaluated.
-- Result: PASS.
-- Useful output observed: the full directory passed at physical density and 320 dp. At 320 dp the
-  Guardian reached entry, partial, miss, Last Stand, Final Ward, final reveal, and the seven-ward
-  Expedition Guardian; inspection showed the intended shield and ward progression, a distinct
-  destructive Last Stand ring, a lit Final Ward crown, and a distinct summit crown and palette. A
-  later complete 320 dp rerun with the macOS display awake and `UserIsActive=1` passed again without
-  a System UI ANR.
-- Defects observed: answer-only scrolling first exposed an offscreen outcome banner after a lower
-  option was centered. The initial boot also produced a System UI ANR and was excluded from evidence;
-  its absence during the awake-host rerun is consistent with a host/AVD lifecycle issue but does not
-  isolate display sleep as the cause.
-- Changes made after inspection: every deterministic answer, outcome, and Continue action now uses
-  exact-target full-visibility scrolling before assertion or activation. Native execution and
-  failure triage now live in the
-  [validation skill](../../.agents/skills/validate-lrnki/SKILL.md), while the rig
-  contract retains scenario mechanics; density was restored to physical 420 dpi after the runs.
-- Remaining caveats: this is native-emulator fixture evidence — not real-backend, deployed,
-  production, or new physical-device evidence. Guardian remains human/agent-judged visual evidence
-  without a measured negative control, and the Support Path touch-responder class stays physically
-  owned.
+- Milestone: one-pass Source-less Grounding Admission and generated Support Step assurance.
+- Fixture and source type: the curated Rust ownership Markdown fixture, using its capital-S `String`
+  pointer, byte length, and byte capacity definitions through a persisted development enrichment and
+  scaffolded anchor.
+- Real model calls used: yes. Xiaomi MiMo v2.5 generated the outline, grounding, and content; Groq
+  Llama 4 Scout probed the boundary; Qwen3 produced embeddings; DigitalOcean GPT-OSS-120B planned
+  and challenged; Parasail DeepSeek V4 Flash 0731 answered, judged, checked congruence, and verified
+  the answer key. No configured backup was needed.
+- Result: PASS. Local Scaffold operation `62cb46f1-5fad-44a8-a5be-6750fe21234e` completed all 19
+  stages under config identity `learner-scaffold-generation-7ab16c2fc80e`.
+- Useful output observed: one complete generated `Length vs Capacity` step persisted with one
+  nonblank Grounding Bundle definition and the exact anchor reference. Its lesson, question,
+  explanation, key, and three false distractors consistently retain Rust `String` scope and byte
+  units; the `"hi"` example correctly distinguishes two used bytes from capacity eight.
+- Defects observed: the retired bounded replacement path could replace one rejected predicate with a
+  different unsupported predicate while its intrinsic self-audit and both judge families accepted
+  the substitution. No content or persistence defect was found in the final one-pass run.
+- Changes made after inspection: Grounding Generation now runs exactly once per core candidate;
+  factual rejection cannot re-enter generation and reaches each consumer's existing fail-closed
+  outcome. The replacement prompt, schema, adapter, descriptor, evidence transcript, attempt knob,
+  and stale tests were deleted.
+- Remaining caveats: this is production-model local application-pipeline and persisted-development-DB
+  evidence, not deployed, browser, native, or physical-device evidence. The cleanup query retained
+  the operation and its 19 stage rows, with nine existing-user positive controls beside zero reserved
+  user, detour, or step rows.
 - Safe to continue downstream: yes.

@@ -13,7 +13,9 @@ Passing the probe is necessary but not sufficient. Generated grounding is checke
 claim-targeted verification sequence: plan atomic questions from the draft, answer them without the
 draft, then compare the answers to the original passages. The correction boundary is monotonic and
 drop-only—verification may reject grounded problematic passages or the draft, but may not author
-replacement learner text. Bounded regeneration still has to pass the complete check.
+replacement learner text. Grounding generation is one-pass: if verification leaves no Definition
+Passage, factual rejection ends admission and never re-enters generation. Each consumer retains its
+own fail-closed outcome policy for that rejection.
 
 This policy covers model-grounded prerequisite nodes, Synthetic Topic Generation, and generated
 Support Steps. Source-cited content uses its source-verification contract instead. Web-grounded
@@ -30,4 +32,6 @@ intrinsic verifier is not a trustworthy replacement author.
 
 Long-tail source-less synthesis can be confidently wrong, and the generator cannot validate itself.
 Selective abstention plus independent claim verification limits that risk without presenting generated
-content as source evidence.
+content as source evidence. An intrinsic verifier or self-audit cannot reliably conserve the rejected
+draft's predicates while authoring a replacement, so finite one-pass admission trades recall for a
+clear safety boundary.
