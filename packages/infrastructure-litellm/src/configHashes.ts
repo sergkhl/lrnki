@@ -11,6 +11,7 @@ import {
   claimVerificationAnsweringDescriptor,
   claimVerificationQuestionPlanningDescriptor,
   groundingGenerationDescriptor,
+  groundingRegenerationDescriptor,
 } from "./groundingGenerationAdapters";
 import { intrinsicDifficultyBandingDescriptor, intrinsicDifficultyComparisonDescriptor } from "./intrinsicDifficultyAdapters";
 import { conceptSetSynthesisDescriptor, knowledgeBoundaryProbeDescriptor } from "./syntheticGenerationAdapters";
@@ -68,6 +69,7 @@ export const neuralOperationRegistry = {
       missingPrerequisiteProposalDescriptor,
       knowledgeBoundaryProbeDescriptor,
       groundingGenerationDescriptor,
+      groundingRegenerationDescriptor,
       claimVerificationQuestionPlanningDescriptor,
       claimVerificationAnsweringDescriptor,
       claimFactualityJudgmentDescriptor,
@@ -90,6 +92,7 @@ export const neuralOperationRegistry = {
       conceptSetSynthesisDescriptor,
       knowledgeBoundaryProbeDescriptor,
       groundingGenerationDescriptor,
+      groundingRegenerationDescriptor,
       claimVerificationQuestionPlanningDescriptor,
       claimVerificationAnsweringDescriptor,
       claimFactualityJudgmentDescriptor,
@@ -127,6 +130,7 @@ export const neuralOperationRegistry = {
       scaffoldOutlineGenerationDescriptor,
       knowledgeBoundaryProbeDescriptor,
       groundingGenerationDescriptor,
+      groundingRegenerationDescriptor,
       claimVerificationQuestionPlanningDescriptor,
       claimVerificationAnsweringDescriptor,
       claimFactualityJudgmentDescriptor,

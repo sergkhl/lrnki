@@ -99,6 +99,11 @@ test("Graph Enrichment registers the complete shared admission stage family", ()
     2,
     "both factuality model identities are registered"
   );
+  assert.equal(
+    stageTags.filter((stage) => stage === STAGE_TAGS.groundingGeneration).length,
+    2,
+    "initial generation and evidence-backed replacement identities are registered"
+  );
 });
 
 // The Scaffold entry carries its complete runtime descriptor family. The factuality stage appears
@@ -108,6 +113,7 @@ test("the scaffold operation registers shared admission, content assurance, and 
   assert.deepEqual(stageTags, [
     STAGE_TAGS.groundingFactualityRevision,
     STAGE_TAGS.groundingFactualityRevision,
+    STAGE_TAGS.groundingGeneration,
     STAGE_TAGS.groundingGeneration,
     STAGE_TAGS.groundingVerificationAnswering,
     STAGE_TAGS.groundingVerificationQuestionPlanning,
@@ -339,7 +345,7 @@ test("dropping any shared admission descriptor changes Graph Enrichment identity
   const admissionIndexes = entry.descriptors
     .map((descriptor, index) => ({ descriptor, index }))
     .filter(({ descriptor }) => admissionStages.has(descriptor.stageTag));
-  assert.equal(admissionIndexes.length, 6, "probe, generation, planner, answerer, and both factuality identities");
+  assert.equal(admissionIndexes.length, 7, "probe, initial/replacement generation, planner, answerer, and both factuality identities");
 
   const knobs = { sourceLessGroundingAdmission: DEFAULT_ENRICHMENT_CONFIG.sourceLessGroundingAdmission };
   const full = operationConfigHash(entry.configSeed, entry.descriptors, knobs);
@@ -354,12 +360,13 @@ test("dropping any shared admission descriptor changes Graph Enrichment identity
 });
 
 // Exact identity regression: U4 re-baselines all three consumers because their shared Source-less
-// Grounding Admission prompts now require cross-system variation evidence and reject common-case
-// universalization. Future non-behavioral refactors must not perturb these identities.
+// Grounding Admission now has a separately attributed evidence-backed replacement plus factored,
+// structured claim falsification and recency-salient replacement exclusions. Future
+// non-behavioral refactors must not perturb these identities.
 test("default operation config hashes are stable across the registry derivation", () => {
-  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-6cd02c38fcab");
-  assert.equal(scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG), "learner-scaffold-generation-f29e4a9c4846");
-  assert.equal(syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG), "synthetic-topic-generation-9604e3fb4ca4");
+  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-46e7b2fc6ce7");
+  assert.equal(scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG), "learner-scaffold-generation-2d100fa4ecc5");
+  assert.equal(syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG), "synthetic-topic-generation-c4f425e264b8");
 });
 
 test("synthetic execution widths do not change identity while probe behavior still does", () => {

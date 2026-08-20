@@ -198,6 +198,67 @@ test("schema-invalid retry adds corrective paths and a redacted argument snippet
   assert.match(secondMessages[1]!.content, /"ok":"wrong"/);
   assert.equal(secondMessages[2]!.role, "user");
   assert.match(secondMessages[2]!.content, /Violated schema paths: ok/);
+  assert.match(secondMessages[2]!.content, /submit_thing/);
+});
+
+test("unknown-tool retry names the observed deviation and requires the exact tool", async () => {
+  const capture = captureBodies([
+    new Response(
+      JSON.stringify({ choices: [{ message: { tool_calls: [{ function: { name: "submit_thong", arguments: JSON.stringify({ ok: true }) } }] } }] }),
+      { status: 200, headers: { "content-type": "application/json" } }
+    ),
+    new Response(
+      JSON.stringify({ choices: [{ message: { tool_calls: [{ function: { name: "submit_thing", arguments: JSON.stringify({ ok: true }) } }] } }] }),
+      { status: 200, headers: { "content-type": "application/json" } }
+    )
+  ]);
+  assert.deepEqual(await client().call({ ...baseInput, maxRetries: 1 }), { ok: true });
+  const secondMessages = capture.read()[1]!.body.messages as Array<{ role: string; content: string }>;
+  assert.equal(secondMessages.length, 3);
+  assert.match(secondMessages[1]!.content, /submit_thong/);
+  assert.match(secondMessages[2]!.content, /Call exactly submit_thing/);
+});
+
+test("missing-arguments retry requires the exact tool with schema-valid arguments", async () => {
+  const capture = captureBodies([
+    new Response(
+      JSON.stringify({ choices: [{ message: { tool_calls: [{ function: { name: "submit_thing" } }] } }] }),
+      { status: 200, headers: { "content-type": "application/json" } }
+    ),
+    new Response(
+      JSON.stringify({ choices: [{ message: { tool_calls: [{ function: { name: "submit_thing", arguments: JSON.stringify({ ok: true }) } }] } }] }),
+      { status: 200, headers: { "content-type": "application/json" } }
+    )
+  ]);
+  assert.deepEqual(await client().call({ ...baseInput, maxRetries: 1 }), { ok: true });
+  const secondMessages = capture.read()[1]!.body.messages as Array<{ role: string; content: string }>;
+  assert.equal(secondMessages.length, 3);
+  assert.match(secondMessages[1]!.content, /submit_thing call omitted its arguments/);
+  assert.match(secondMessages[2]!.content, /Call exactly submit_thing with arguments/);
+});
+
+test("unknown tool names are bounded in fail-closed attempt evidence", async () => {
+  const oversized = `wrong_${"x".repeat(200)}`;
+  setLiteLlmFetchForTests(async () => new Response(
+    JSON.stringify({ choices: [{ message: { tool_calls: [
+      { function: { name: `${oversized}\u0000`, arguments: "{}" } },
+      { function: { name: oversized, arguments: "{}" } },
+      { function: { name: "\u0000\u001f", arguments: "{}" } }
+    ] } }] }),
+    { status: 200, headers: { "content-type": "application/json" } }
+  ));
+  await assert.rejects(
+    () => client().call({ ...baseInput, maxRetries: 0 }),
+    (error: unknown) => {
+      assert.ok(error instanceof ForcedToolExhaustionError);
+      const attempt = error.attempts[0]!;
+      assert.equal(attempt.kind, "no_tool_call");
+      assert.equal(attempt.observedToolNames?.length, 1, "dedupe after sanitizing and bounding");
+      assert.equal(attempt.observedToolNames?.[0]?.length, 100);
+      assert.doesNotMatch(attempt.observedToolNames?.[0] ?? "", /[\x00-\x1f\x7f]/);
+      return true;
+    }
+  );
 });
 
 test("HTTP-failure retry sends a byte-identical request body", async () => {
@@ -211,6 +272,24 @@ test("HTTP-failure retry sends a byte-identical request body", async () => {
   assert.deepEqual(await client().call({ ...baseInput, maxRetries: 1 }), { ok: true });
   const bodies = capture.read().map((call) => call.body);
   assert.deepEqual(bodies[1], bodies[0]);
+});
+
+test("HTTP retry after a model correction preserves the corrected request byte-for-byte", async () => {
+  const capture = captureBodies([
+    new Response(
+      JSON.stringify({ choices: [{ message: { tool_calls: [{ function: { name: "submit_thong", arguments: "{}" } }] } }] }),
+      { status: 200, headers: { "content-type": "application/json" } }
+    ),
+    new Response("nope", { status: 503 }),
+    new Response(
+      JSON.stringify({ choices: [{ message: { tool_calls: [{ function: { name: "submit_thing", arguments: JSON.stringify({ ok: true }) } }] } }] }),
+      { status: 200, headers: { "content-type": "application/json" } }
+    )
+  ]);
+  assert.deepEqual(await client().call({ ...baseInput, maxRetries: 2 }), { ok: true });
+  const bodies = capture.read().map((call) => call.body);
+  assert.notDeepEqual(bodies[1], bodies[0], "the model deviation adds one corrective exchange");
+  assert.deepEqual(bodies[2], bodies[1], "the following HTTP retry resends that corrected body exactly");
 });
 
 test("a headers-timeout failure is terminal: exactly one HTTP call, classified kind:timeout", async () => {

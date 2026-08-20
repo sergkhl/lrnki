@@ -17,6 +17,10 @@ import {
   CONCEPT_LESSON_SECTION_TEXT_MAX_LENGTH,
   conceptLessonSchema,
   conceptLessonValidator,
+  generatedGroundingBundleSchema,
+  generatedGroundingBundleValidator,
+  regeneratedGroundingBundleSchema,
+  regeneratedGroundingBundleValidator,
   answerKeyVerificationSchema,
   answerKeyVerificationValidator,
   impostorSchema,
@@ -35,6 +39,54 @@ test("concept-set synthesis enforces the operation's at-most-16 concept budget",
 
   assert.throws(() => conceptSetSynthesisValidator.parse({ concepts }));
   assert.doesNotThrow(() => conceptSetSynthesisValidator.parse({ concepts: concepts.slice(0, 16) }));
+});
+
+test("generated grounding bounds the factual surface while retaining one optional distinct definition", () => {
+  const properties = generatedGroundingBundleSchema.properties as Record<string, { maxItems?: number }>;
+  assert.equal(properties.definitions.maxItems, 2);
+  assert.equal(properties.mentions.maxItems, 1);
+
+  const passage = (text: string) => ({ text });
+  assert.doesNotThrow(() => generatedGroundingBundleValidator.parse({
+    definitions: [passage("The candidate has one defining criterion."), passage("A distinct necessary sense has another criterion.")],
+    mentions: [passage("One necessary context relation.")],
+    rationale: "The bundle supports the grounding context."
+  }));
+  assert.throws(() => generatedGroundingBundleValidator.parse({
+    definitions: [passage("One."), passage("Two."), passage("Three.")],
+    mentions: [],
+    rationale: "Too many definitions."
+  }));
+  assert.throws(() => generatedGroundingBundleValidator.parse({
+    definitions: [passage("One definition.")],
+    mentions: [passage("One mention."), passage("Two mentions.")],
+    rationale: "Too many mentions."
+  }));
+});
+
+test("bounded grounding replacement structurally permits only one definition and no mentions", () => {
+  const properties = regeneratedGroundingBundleSchema.properties as Record<string, { minItems?: number; maxItems?: number }>;
+  assert.equal(properties.definitions.minItems, 1);
+  assert.equal(properties.definitions.maxItems, 1);
+  assert.equal(properties.mentions.minItems, 0);
+  assert.equal(properties.mentions.maxItems, 0);
+
+  const passage = (text: string) => ({ text });
+  assert.doesNotThrow(() => regeneratedGroundingBundleValidator.parse({
+    definitions: [passage("The candidate has one evidence-backed defining relationship.")],
+    mentions: [],
+    rationale: "The replacement retains only the shared relationship."
+  }));
+  assert.throws(() => regeneratedGroundingBundleValidator.parse({
+    definitions: [passage("One."), passage("Two.")],
+    mentions: [],
+    rationale: "Too many definitions."
+  }));
+  assert.throws(() => regeneratedGroundingBundleValidator.parse({
+    definitions: [passage("One definition.")],
+    mentions: [passage("One mention.")],
+    rationale: "Mentions are not allowed."
+  }));
 });
 
 test("all forced-tool schemas satisfy strict object invariants", () => {
@@ -120,6 +172,15 @@ test("claim verification schemas require exact known-target, question, and judgm
       { targetKey: "definition:0", question: "What establishes another claim in the same target?" }
     ]
   }), /missing verification question/);
+  assert.throws(() => plan.parse({
+    questions: [
+      ...Array.from({ length: 7 }, (_, index) => ({
+        targetKey: "definition:0",
+        question: `What establishes definition claim ${index + 1}?`
+      })),
+      { targetKey: "mention:0", question: "What establishes the mention claim?" }
+    ]
+  }), /too many verification questions/);
 
   const answers = buildClaimVerificationAnsweringValidator(["q:0", "q:1"]);
   assert.doesNotThrow(() => answers.parse({ answers: [
@@ -133,13 +194,78 @@ test("claim verification schemas require exact known-target, question, and judgm
 
   const judgments = buildClaimFactualityJudgmentValidator(["definition:0", "mention:0"]);
   assert.doesNotThrow(() => judgments.parse({ judgments: [
-    { targetKey: "mention:0", disposition: "accepted", rationale: "established" },
-    { targetKey: "definition:0", disposition: "rejected", rationale: "not established" }
+    {
+      targetKey: "mention:0",
+      strongestLiteralClaim: "The support claim states one scoped relation.",
+      scopeAudit: "No relevant variation conflicts with the scoped relation.",
+      materialObjection: null,
+      disposition: "accepted",
+      rationale: "established"
+    },
+    {
+      targetKey: "definition:0",
+      strongestLiteralClaim: "The definition assigns one mechanism to the parent category.",
+      scopeAudit: "A descendant uses a different mechanism.",
+      materialObjection: "The descendant contradicts the parent-level predicate.",
+      disposition: "rejected",
+      rationale: "not established"
+    }
   ] }));
   assert.throws(() => judgments.parse({ judgments: [
-    { targetKey: "definition:0", disposition: "accepted", rationale: "established", text: "rewrite" },
-    { targetKey: "mention:0", disposition: "accepted", rationale: "established" }
+    {
+      targetKey: "definition:0",
+      strongestLiteralClaim: "The definition states one mechanism.",
+      scopeAudit: "No conflict found.",
+      materialObjection: null,
+      disposition: "accepted",
+      rationale: "established",
+      text: "rewrite"
+    },
+    {
+      targetKey: "mention:0",
+      strongestLiteralClaim: "The support claim states one relation.",
+      scopeAudit: "No conflict found.",
+      materialObjection: null,
+      disposition: "accepted",
+      rationale: "established"
+    }
   ] }));
+  assert.throws(() => judgments.parse({ judgments: [
+    {
+      targetKey: "definition:0",
+      strongestLiteralClaim: "The definition assigns one mechanism to the parent category.",
+      scopeAudit: "A descendant uses a different mechanism.",
+      materialObjection: "The descendant contradicts the parent-level predicate.",
+      disposition: "accepted",
+      rationale: "accepted despite the conflict"
+    },
+    {
+      targetKey: "mention:0",
+      strongestLiteralClaim: "The support claim states one relation.",
+      scopeAudit: "No conflict found.",
+      materialObjection: null,
+      disposition: "accepted",
+      rationale: "established"
+    }
+  ] }), /cannot retain a materialObjection/);
+  assert.throws(() => judgments.parse({ judgments: [
+    {
+      targetKey: "definition:0",
+      strongestLiteralClaim: "The definition assigns one mechanism to the parent category.",
+      scopeAudit: "A descendant uses a different mechanism.",
+      materialObjection: null,
+      disposition: "rejected",
+      rationale: "rejected without naming the defect"
+    },
+    {
+      targetKey: "mention:0",
+      strongestLiteralClaim: "The support claim states one relation.",
+      scopeAudit: "No conflict found.",
+      materialObjection: null,
+      disposition: "accepted",
+      rationale: "established"
+    }
+  ] }), /requires a materialObjection/);
 });
 
 test("concept evidence profile emits nullable literalValue in forced-tool dialect", () => {

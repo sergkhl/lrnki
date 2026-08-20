@@ -400,13 +400,7 @@ model_list:
       mode: "chat"
       max_input_tokens: 10000000
 
-  # Fallback deployment for kg-knowledge-boundary-probe (see router_settings.fallbacks) and the
-  # claim-verification planner/answerer. Planning may see targets, but answering remains structurally
-  # draft-blind. Both roles are distinct from the Qwen3-235B final factuality judge: U1 real-use
-  # inspection caught correlated single-model confirmation and a DeepSeek provider ceiling, while
-  # this deployment supplied the exact C++/Ruby distinction through the forced answer schema and
-  # sustained ordinary fan-out on 2026-08-19. It supplies questions/evidence only; the larger,
-  # separately qualified judge settles targets through repeated samples.
+  # Fallback deployment for kg-knowledge-boundary-probe (see router_settings.fallbacks).
   # llama-4-scout honors forced tool_choice ONLY via Groq on OpenRouter, and a sustained
   # Groq 429 stalls K=5 generation (real outage 2026-07-06). Qwen3-30B-A3B is a small MoE
   # (~3B active — preserves the "small model K-dispersion reveals the boundary" design),

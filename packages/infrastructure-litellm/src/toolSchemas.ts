@@ -222,35 +222,51 @@ export const knowledgeBoundaryProbeSchema: JsonSchema = toForcedToolSchema(knowl
 // --- Generated grounding: submit_generated_grounding_bundle ---------------
 
 const generatedGroundingPassage = z.object({
-  text: z.string().min(1).describe("Generated explanatory passage for the prerequisite concept. This is not a source quote.")
+  text: z.string().min(1).describe("Source-less generated passage for the candidate concept. This is not a source quote.")
 }).strict();
 
 export const generatedGroundingBundleValidator = z.object({
-  definitions: z.array(generatedGroundingPassage).min(1).max(3).describe("Generated meaning-bearing definition passages for the concept. Every passage stands alone, identifies the candidate, and states its defining condition or mechanism before secondary consequences or costs. Prefer 1-2 precise passages; use a third only for a distinct necessary fact."),
-  mentions: z.array(generatedGroundingPassage).max(2).describe("Optional generated mention-like passages that add a necessary context relation. Prefer none or one; never add broad curriculum analogies to fill the cap."),
-  rationale: z.string().min(1).describe("One terse sentence explaining why this prerequisite scaffolds the provided anchors.")
+  definitions: z.array(generatedGroundingPassage).min(1).max(2).describe("Generated meaning-bearing definition passages for the candidate concept. Every passage stands alone, identifies the candidate, and states its defining condition or mechanism before secondary consequences or costs. Default to exactly one precise passage; use a second only for a distinct necessary sense that cannot be stated safely in the first."),
+  mentions: z.array(generatedGroundingPassage).max(1).describe("Optional generated mention-like passage that adds one necessary context relation. Default to none; never add broad curriculum analogies to fill the cap."),
+  rationale: z.string().min(1).describe("One terse sentence explaining why the bundle makes the candidate useful in the provided Grounding Admission Context.")
 }).strict();
 
 export const generatedGroundingBundleSchema: JsonSchema = toForcedToolSchema(generatedGroundingBundleValidator);
+
+export const regeneratedGroundingBundleValidator = z.object({
+  definitions: z.array(generatedGroundingPassage).length(1).describe("Exactly one minimal meaning-bearing replacement definition supported by the supplied draft-blind verification evidence."),
+  mentions: z.array(generatedGroundingPassage).length(0).describe("Must be empty for a bounded replacement so no optional factual surface is introduced."),
+  rationale: z.string().min(1).describe("One terse sentence identifying the shared evidence-backed defining relationship retained in the replacement.")
+}).strict();
+
+export const regeneratedGroundingBundleSchema: JsonSchema = toForcedToolSchema(regeneratedGroundingBundleValidator);
 
 // --- Positive-claim verification questions: submit_claim_verification_questions ---
 // The planner sees code-owned positive claim targets and turns each into one or more
 // self-contained, non-leading questions. Runtime refinement proves exact known-target coverage;
 // the answer stage later receives only opaque question keys and question text.
+export const MAX_CLAIM_VERIFICATION_QUESTIONS_PER_TARGET = 6;
+
 export function buildClaimVerificationQuestionPlanningValidator(targetKeys: readonly string[]) {
   const known = new Set(targetKeys);
   return z.object({
     questions: z.array(z.object({
       targetKey: z.string().min(1).describe("The exact code-owned targetKey of the positive claim this question verifies."),
       question: z.string().min(1).describe("One self-contained, non-leading factual question that can be answered without seeing the generated draft.")
-    }).strict()).min(targetKeys.length).describe("Claim-targeted verification questions covering every listed target at least once and every independently verifiable atomic claim within it.")
+    }).strict()).min(targetKeys.length).max(targetKeys.length * MAX_CLAIM_VERIFICATION_QUESTIONS_PER_TARGET).describe("Claim-targeted verification questions covering every listed target at least once and every independently verifiable atomic claim within it, with at most six questions per target.")
   }).strict().superRefine((value, ctx) => {
     const covered = new Set<string>();
+    const countByTarget = new Map<string, number>();
     for (const question of value.questions) {
       if (!known.has(question.targetKey)) {
         ctx.addIssue({ code: "custom", message: `unknown targetKey ${question.targetKey}` });
       }
       covered.add(question.targetKey);
+      const count = (countByTarget.get(question.targetKey) ?? 0) + 1;
+      countByTarget.set(question.targetKey, count);
+      if (count > MAX_CLAIM_VERIFICATION_QUESTIONS_PER_TARGET) {
+        ctx.addIssue({ code: "custom", message: `too many verification questions for targetKey ${question.targetKey}` });
+      }
     }
     for (const targetKey of targetKeys) {
       if (!covered.has(targetKey)) ctx.addIssue({ code: "custom", message: `missing verification question for targetKey ${targetKey}` });
@@ -299,6 +315,9 @@ export function buildClaimFactualityJudgmentValidator(targetKeys: readonly strin
   return z.object({
     judgments: z.array(z.object({
       targetKey: z.string().min(1).describe("The exact code-owned targetKey of the positive claim being judged."),
+      strongestLiteralClaim: z.string().min(1).describe("The strongest classification, mechanism, quantifier, causal link, modality, equality, boundary, uniqueness condition, or implication asserted by this target, stated before deciding its disposition."),
+      scopeAudit: z.string().min(1).describe("A compact target-to-evidence audit. For every unqualified parent category or named process in the target, compare its asserted property with materially different descendants, implementations, stages, or alternative paths identified by the verification packet or established knowledge. State that no relevant variation is established only after checking."),
+      materialObjection: z.string().nullable().describe("The smallest applicable counterexample, subtype conflict, process-role error, context mismatch, definition defect, or other material objection. Must be a non-empty string whenever one exists; null only after active falsification finds none."),
       disposition: z.enum(["accepted", "rejected"]).describe("Accept only when every atomic factual claim in the target is accurate within the stated concept and Declared Domain."),
       rationale: z.string().min(1).describe("One terse sentence explaining the factual judgment, including any scope distinction or conflict with the independent checks.")
     }).strict()).length(targetKeys.length).describe("Exactly one factuality judgment for every listed positive-claim target.")
@@ -307,6 +326,15 @@ export function buildClaimFactualityJudgmentValidator(targetKeys: readonly strin
     for (const judgment of value.judgments) {
       if (!known.has(judgment.targetKey)) ctx.addIssue({ code: "custom", message: `unknown targetKey ${judgment.targetKey}` });
       if (seen.has(judgment.targetKey)) ctx.addIssue({ code: "custom", message: `duplicate targetKey ${judgment.targetKey}` });
+      if (judgment.materialObjection === null && judgment.disposition === "rejected") {
+        ctx.addIssue({ code: "custom", message: `rejected targetKey ${judgment.targetKey} requires a materialObjection` });
+      }
+      if (judgment.materialObjection !== null && judgment.materialObjection.trim().length === 0) {
+        ctx.addIssue({ code: "custom", message: `targetKey ${judgment.targetKey} materialObjection must not be empty` });
+      }
+      if (judgment.materialObjection !== null && judgment.disposition === "accepted") {
+        ctx.addIssue({ code: "custom", message: `accepted targetKey ${judgment.targetKey} cannot retain a materialObjection` });
+      }
       seen.add(judgment.targetKey);
     }
     for (const targetKey of targetKeys) {
@@ -780,6 +808,7 @@ export const toolValidators = [
   conceptSetSynthesisValidator,
   knowledgeBoundaryProbeValidator,
   generatedGroundingBundleValidator,
+  regeneratedGroundingBundleValidator,
   claimVerificationQuestionPlanningValidator,
   claimVerificationAnsweringValidator,
   claimFactualityJudgmentValidator,

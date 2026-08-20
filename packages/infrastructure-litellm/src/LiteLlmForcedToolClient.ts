@@ -41,10 +41,18 @@ export class LiteLlmForcedToolClient {
     // server-side — never blind-retried here; the supervisor's attempt budget owns
     // re-runs). The trail rides out on the thrown error so the operator timeline
     // can show WHY a stage failed.
+    let attemptMessages = input.messages;
     return runWithTransportRetries({
       maxRetries,
-      attemptOnce: (_attempt, previousAttempt) =>
-        this.callOnce({ ...input, messages: buildRetryMessages(input.messages, previousAttempt) }),
+      attemptOnce: (_attempt, previousAttempt) => {
+        if (previousAttempt && isCorrectableModelDeviation(previousAttempt.kind)) {
+          attemptMessages = buildRetryMessages(input.messages, previousAttempt, input.toolName);
+        }
+        return this.callOnce({
+          ...input,
+          messages: attemptMessages
+        });
+      },
       classify: classifyForcedToolFailure,
       onExhausted: (attempts, lastError) => {
         throw new ForcedToolExhaustionError(input.toolName, input.model, attempts, lastError);
@@ -73,10 +81,13 @@ export class LiteLlmForcedToolClient {
     }, this.dispatcher));
     if (!response.ok) throw new LiteLlmHttpError(response.status);
     const payload = await response.json() as LiteLlmResponse;
-    const calls = (payload.choices?.[0]?.message?.tool_calls ?? []).filter((call) => call?.function?.name === input.toolName);
+    const toolCalls = payload.choices?.[0]?.message?.tool_calls ?? [];
+    const calls = toolCalls.filter((call) => call?.function?.name === input.toolName);
     // Forced tool_choice should yield exactly one matching call; tolerate the model
     // emitting the same tool more than once by taking the first valid arguments.
-    if (calls.length === 0) throw new ForcedToolNoCallError(input.toolName);
+    if (calls.length === 0) {
+      throw new ForcedToolNoCallError(input.toolName, boundedObservedToolNames(toolCalls));
+    }
     const argumentsText = calls[0]?.function?.arguments;
     if (!argumentsText) throw new ForcedToolNoArgumentsError();
     // The model can emit an escaped ` ` in its JSON arguments, which JSON.parse
@@ -106,7 +117,7 @@ export class LiteLlmForcedToolClient {
 // to the retry loop and never escape the client (the loop wraps the last one in a
 // `ForcedToolExhaustionError`).
 class ForcedToolNoCallError extends Error {
-  constructor(readonly toolName: string) {
+  constructor(readonly toolName: string, readonly observedToolNames: string[]) {
     super(`Expected a forced tool call: ${toolName}.`);
     this.name = "ForcedToolNoCallError";
   }
@@ -171,8 +182,41 @@ function redactArgumentSnippet(argumentsText: string): string {
   return cleaned.length > SNIPPET_CAP ? `${cleaned.slice(0, SNIPPET_CAP)}…[truncated]` : cleaned;
 }
 
-function buildRetryMessages(messages: ToolMessage[], previousAttempt: ForcedToolFailureAttempt | undefined): ToolMessage[] {
-  if (!previousAttempt || (previousAttempt.kind !== "schema_invalid" && previousAttempt.kind !== "invalid_json")) return messages;
+function buildRetryMessages(
+  messages: ToolMessage[],
+  previousAttempt: ForcedToolFailureAttempt | undefined,
+  requiredToolName: string
+): ToolMessage[] {
+  if (!previousAttempt || !isCorrectableModelDeviation(previousAttempt.kind)) return messages;
+  if (previousAttempt.kind === "no_tool_call") {
+    const observed = previousAttempt.observedToolNames?.length
+      ? ` It called unknown tool name(s): ${previousAttempt.observedToolNames.join(", ")}.`
+      : " It emitted no tool call.";
+    return [
+      ...messages,
+      {
+        role: "assistant",
+        content: `The previous response did not call the required tool.${observed}`
+      },
+      {
+        role: "user",
+        content: `Call exactly ${requiredToolName}. Do not emit prose or call another tool. Return arguments that satisfy the provided schema.`
+      }
+    ];
+  }
+  if (previousAttempt.kind === "no_arguments") {
+    return [
+      ...messages,
+      {
+        role: "assistant",
+        content: `The previous ${requiredToolName} call omitted its arguments.`
+      },
+      {
+        role: "user",
+        content: `Call exactly ${requiredToolName} with arguments that satisfy the provided schema.`
+      }
+    ];
+  }
   const issueLine = previousAttempt.kind === "schema_invalid" && previousAttempt.schemaIssuePaths?.length
     ? `Violated schema paths: ${previousAttempt.schemaIssuePaths.join(", ")}.`
     : "The previous tool arguments were not valid JSON.";
@@ -184,9 +228,30 @@ function buildRetryMessages(messages: ToolMessage[], previousAttempt: ForcedTool
     },
     {
       role: "user",
-      content: `${issueLine} Return exactly one valid ${"forced tool"} call that satisfies the provided schema.`
+      content: `${issueLine} Return exactly one valid ${requiredToolName} call that satisfies the provided schema.`
     }
   ];
+}
+
+function isCorrectableModelDeviation(kind: ForcedToolFailureAttempt["kind"]): boolean {
+  return kind === "no_tool_call"
+    || kind === "no_arguments"
+    || kind === "invalid_json"
+    || kind === "schema_invalid";
+}
+
+// Model output is untrusted even when it sits in a function-name slot. Keep only a
+// tiny inspectable/corrective surface so a malformed response cannot inflate the
+// persisted failure detail or the retry prompt.
+function boundedObservedToolNames(
+  calls: Array<{ function?: { name?: string } }>
+): string[] {
+  const names = calls
+    .map((call) => call.function?.name)
+    .filter((name): name is string => typeof name === "string" && name.length > 0)
+    .map((name) => name.replace(/[\x00-\x1f\x7f]/g, "").slice(0, 100))
+    .filter((name) => name.length > 0);
+  return [...new Set(names)].slice(0, 5);
 }
 
 // Classify one caught forced-tool failure into a redacted, serializable attempt record.
@@ -195,7 +260,13 @@ function buildRetryMessages(messages: ToolMessage[], previousAttempt: ForcedTool
 function classifyForcedToolFailure(attempt: number, error: unknown): ForcedToolFailureAttempt {
   const transport = classifyTransportFailure(attempt, error);
   if (transport) return transport;
-  if (error instanceof ForcedToolNoCallError) return { attempt, kind: "no_tool_call" };
+  if (error instanceof ForcedToolNoCallError) {
+    return {
+      attempt,
+      kind: "no_tool_call",
+      ...(error.observedToolNames.length ? { observedToolNames: error.observedToolNames } : {})
+    };
+  }
   if (error instanceof ForcedToolNoArgumentsError) return { attempt, kind: "no_arguments" };
   if (error instanceof ForcedToolInvalidJsonError) {
     return { attempt, kind: "invalid_json", redactedSnippet: redactArgumentSnippet(error.argumentsText) };

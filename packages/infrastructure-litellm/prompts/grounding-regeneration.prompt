@@ -1,0 +1,51 @@
+---
+model: kg-claim-extraction
+lrnki:
+  toolName: submit_regenerated_grounding_bundle
+  toolDescription: Submit one minimal source-less replacement definition supported by draft-blind verification evidence.
+---
+{{#system}}
+{{> grounding-generation-core}}
+
+This is the sole bounded replacement after every Definition Passage in a prior draft failed independent factual verification. It is a last-resort atomic admission candidate, not a compressed comprehensive explanation. Return exactly one concise, one-sentence Definition Passage and no Mention Passages. The forced tool schema enforces that shape.
+
+The supplied questions and answers were produced without access to the rejected draft or its claim text. Use them as fallible external evidence, not as text to copy. Include only the smallest defining proposition that is explicitly and consistently supported across the independent answer samples that address it. The replacement must contain exactly one atomic relationship: identify the candidate and state one cross-context membership criterion, functional role, event-location relation, or whole-process outcome. Do not append an enabling actor, preparatory stage, implementation mechanism, measurement, example, consequence, or other second predicate even when every answer repeats it. Unanimous optional detail is still optional. If answers disagree about a classification, mechanism, direction, participant, count, value, physical realization, or implementation detail, omit that detail. Absence of a disagreement is not support. Do not add a fact from your own recollection merely because it sounds standard.
+
+The rejection feedback is a set of negative constraints, not correction authority. Do not restate a rejected proposition with synonyms, move it into another clause, or replace it with a newly invented mechanism. In a scaffolded context, retain and narrow to the exact applicable type, system, implementation, representation, unit, and condition from the anchor. In a broad originating-topic context, keep only a cross-system defining criterion supported by the draft-blind answers. Do not list variants merely to make a rejected claim look qualified. When an exclusion establishes that a noun, form, extent, representation, mechanism, or implementation covers only one of several valid cases, do not reuse that narrower term as an umbrella. Prefer one established shared superclass or functional relationship; if the evidence establishes no unambiguous shared term, name only the minimum alternatives needed to avoid repeating the exclusion.
+
+Preserve the candidate's level of abstraction. When it names an aggregate quality, process, or outcome, define that whole rather than one component actor's contribution or one stage that affects it. When it names a location, region, boundary, or other place where an event occurs, define the place by that event and omit optional recognition, preparation, enabling, or assembly events that can vary or occur at a different sublocation. When its members perform an operation, state the invariant transformation or input-output relationship at the broadest supported substrate geometry; do not restrict it to one arrangement, boundary condition, pathway, repair context, or subtype unless the candidate or exact context does. A deliberately short relation is sufficient; do not add details merely to make the sentence feel pedagogically complete.
+
+Before calling the tool, internally identify one defining relationship repeated across the evidence samples, remove every modifier not needed for that relationship, and test the remaining sentence against every rejection. If no richer detail survives, stop at the minimal supported relationship.
+{{/system}}
+
+{{#user}}
+Declared domain: {{declaredDomain}}.
+Candidate concept: "{{canonicalLabel}}".
+{{contextLines}}
+
+Draft-blind verification evidence, one JSON record per independently planned question and answer:
+{{verificationEvidence}}
+
+Mandatory exclusion constraints from the rejected draft:
+{{rejectionFeedback}}
+
+Apply those exclusions after reading the evidence. If an evidence answer repeats or implies a
+rejected classification, mechanism, direction, participant, count, value, physical realization, or
+implementation detail, the conflict makes that detail unsupported: omit it. Never average a
+material objection into a qualified version of the same claim. The replacement must retain only a
+smaller defining relationship that does not assert or imply any excluded proposition.
+
+Do not reuse a rejected narrow form as though it were category-wide merely because that form can
+sometimes be read broadly in ordinary language. Use a genuinely unambiguous shared term, or the
+minimum evidence-backed alternatives when no single shared term is available. This exception does
+not authorize an example list or an exhaustive subtype catalogue.
+
+Return one atomic defining relationship only. Preserve a whole quality, process, or outcome as a
+whole, and define an event-location concept by the event it locates. Omit component actors,
+preparatory or enabling stages, implementation mechanisms, measurements, examples, and consequences
+even when the evidence repeats them. For an operation, retain its invariant transformation but omit
+a narrower substrate arrangement, boundary condition, pathway, repair context, or subtype. Those
+details are outside this last-resort replacement.
+
+Call submit_regenerated_grounding_bundle with exactly one generated definition passage, an empty mentions array, and a terse rationale.
+{{/user}}

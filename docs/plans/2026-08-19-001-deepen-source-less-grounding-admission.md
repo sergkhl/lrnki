@@ -369,6 +369,15 @@ evidence boundary. Store generated reports in gitignored `tmp/`; retain only the
 in this plan. This is local real-use quality evidence, not deployed, browser, native, or
 physical-device evidence.
 
+**U4 stop-loss:** The post-recovery Synthetic run already in flight may finish. After its artifact is
+inspected, run at most one final current-hash Graph gate and one final current-hash Scaffold gate;
+do not restart the full matrix for a non-material observation or an upstream transient after the
+persisted operation has been classified. A material learner-content defect, persistence/invariant
+failure, or reproducible code defect remains `FIX_FIRST`, but it stops U4 and becomes one explicitly
+scoped repair-and-targeted-regression handoff instead of starting another unbounded U4 loop. Record
+non-material observations under `Open findings`. This stop-loss limits workflow repetition; it does
+not weaken the admission invariants or turn a failed gate into `PASS`.
+
 ## Acceptance
 
 - All three consumers cross `SourceLessGroundingAdmission`; deleting it would force the complete
@@ -547,11 +556,49 @@ physical-device evidence.
   evidence. It is not intercepted or real-backend web, deployed, native emulator/simulator, or
   physical-device evidence. Safe to continue to U4: **yes**.
 
+### U4 — Cross-consumer regression and real-use closure — FIX_FIRST (2026-08-20)
+
+- **Stop-loss and Synthetic negative result:** runtime recovery succeeded. The one permitted final
+  Synthetic operation `3cba7e7f-0710-4392-ae7d-1f5da656015f` ran the current
+  `synthetic-topic-generation-c4f425e264b8` behavior over `DNA replication` in molecular biology.
+  All 16 stages completed, but two of 16 candidates remained rejected after bounded regeneration,
+  so the consumer failed atomically after 42m35s and persisted no layer. The topoisomerase draft
+  universalized strand passage; the single-strand-binding-protein draft was under-distinguishing.
+  This is safe-negative local real-use evidence, not a successful Synthetic artifact; do not rerun.
+- **Graph operation and structural evidence:** the one permitted final Graph operation
+  `6eb00ca8-019e-481b-b3c4-0dd74d284fe5` succeeded over published nine-anchor curated Rust graph
+  version `dffcd69b-c36c-4f2d-8ea8-fb2a5bbbf8e5` with config identity
+  `graph-enrichment-46e7b2fc6ce7`. All 99 Operation Timeline rows succeeded. Ten durability-accepted
+  proposals crossed Source-less Grounding Admission; five were admitted and five were factually
+  rejected. The persisted layer contains nine anchors, 14 source-mentioned prerequisites, and
+  exactly the five admitted LLM-grounded prerequisites. Same-query positive controls showed five
+  admitted and five rejected dispositions beside zero missing admitted nodes, zero leaked rejected
+  nodes, five LLM-grounded nodes beside zero missing bundles, and five generated Definition Passages
+  beside zero blanks or false source evidence. Every bundle has exactly one anchor reference.
+- **Material content defect:** direct inspection found definition-boundary scope drift in two
+  admitted bundles. `Value` says every Rust value is bound to exactly one "owner variable"; the
+  curated source says only `owner`, while the official Rust model also includes field/place
+  ownership and explicit shared ownership. `Trait` narrows a Rust trait to method signatures or
+  marker conditions, omitting the associated types and constants that are valid interface
+  constituents. See the official Rust [place-expression](https://doc.rust-lang.org/reference/expressions.html#place-expressions-and-value-expressions),
+  [struct-ownership](https://doc.rust-lang.org/book/ch05-01-defining-structs.html#ownership-of-struct-data),
+  [`Rc<T>`](https://doc.rust-lang.org/book/ch15-04-rc.html), and
+  [trait](https://doc.rust-lang.org/reference/items/traits.html) definitions. These admitted claims
+  would contaminate the authoritative graph, so the Graph gate and U4 are `FIX_FIRST` despite the
+  correct persistence invariants.
+- **Routing and evidence boundary:** exact DeepSeek V4 Flash 0731 used Parasail for answering and
+  primary judgment, with three factuality calls exercising the DeepInfra backup. GPT-OSS-120B used
+  DigitalOcean for planning/challenge; its Groq backup was not needed. MiMo v2.5 used Xiaomi; retained
+  Qwen3-30B appeared only in Knowledge-Boundary fallback, and Qwen3 Embedding served embeddings. This
+  is production-model local application-pipeline and persisted-development-DB evidence, not
+  deployed, browser, native, or physical-device evidence. Safe to continue to Scaffold: **no**.
+
 ### Open findings
 
-- **Runtime recovery required before final real-use evidence.** Docker Desktop stopped its Linux VM
-  after its host log write failed with `no space left on device`; PostgreSQL on port 5433 and LiteLLM
-  on port 4000 are therefore unresponsive. Synthetic operation
-  `e976ebdd-115d-47a5-af19-b9a723115518` was interrupted and is explicitly not evidence. Free host
-  disk space, restart Docker Desktop, verify both endpoints, and rerun the complete current-hash
-  Synthetic, Graph, and Scaffold matrix before closing U4.
+- **Bounded U4 repair handoff:** preserve the six-question cap while making definition verification
+  expose category-member forms and allowed interface constituents instead of spending most of the
+  independent budget on inapplicable process/mechanism questions. Keep the prompts domain-neutral;
+  do not encode Rust, `Value`, `Trait`, or fixture answers. Add deterministic descriptor/schema/hash
+  coverage, then run a small production-model regression panel containing safe and unsafe category-
+  boundary pairs for the two observed classes. Do not rerun the full Synthetic or Graph operations.
+  Resume the one remaining Scaffold gate only after the targeted panel is `PASS`.

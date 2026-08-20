@@ -6,9 +6,12 @@
 
 - **Source-less Grounding Admission — U4 in progress.** The
   [plan](./2026-08-19-001-deepen-source-less-grounding-admission.md) owns implementation design and
-  validation. U1–U3 are closed `PASS`; resume from its `Open findings` by recovering the shared
-  Docker runtime, then run the current-hash cross-consumer matrix, inspect the final artifacts, and
-  consolidate the completed plan. Do not implement Candidate 2.
+  validation. U1–U3 are closed `PASS`; the final Synthetic run failed safely and the one final Graph
+  run is `FIX_FIRST` because two over-restricted definitions were admitted despite correct
+  persistence isolation. Resume from the plan's bounded repair handoff: repair category-boundary
+  verification, run only its small production-model regression panel, then run the one remaining
+  Scaffold gate and deterministic closure checks. Do not rerun full Synthetic or Graph and do not
+  implement Candidate 2.
 
 - **Generation model evaluation — shaping; no implementation plan is ready.** The
   [brainstorm](../brainstorms/2026-08-08-002-generation-model-evaluation.md) owns the dated evidence,

@@ -4,6 +4,7 @@ import type {
   ClaimFactualityJudgmentPort,
   ClaimVerificationAnsweringPort,
   ClaimVerificationQuestionPlanningPort,
+  DraftBlindClaimEvidence,
   GroundingGenerationPort,
   KnowledgeBoundaryProbePort,
   NodeEmbeddingPort
@@ -150,16 +151,30 @@ export function createSourceLessGroundingAdmission(construction: {
           }
 
           const rejectionByKey = new Map<string, string>();
+          const verificationEvidenceByKey = new Map<
+            string,
+            readonly [DraftBlindClaimEvidence, ...DraftBlindClaimEvidence[]]
+          >();
           let pending = core;
           for (let attempt = 0; attempt < policy.groundingDraftAttempts && pending.length > 0; attempt += 1) {
             const drafts = await stage(STAGE_TAGS.groundingGeneration, () =>
               mapWithConcurrency(pending, policy.candidateConcurrency, async ({ candidate, verdict }) => {
-                const bundle = await construction.groundingGeneration.generate({
+                const baseInput = {
                   declaredDomain: candidate.declaredDomain,
                   canonicalLabel: candidate.canonicalLabel,
-                  context: candidate.context,
-                  rejectionFeedback: rejectionByKey.get(candidate.candidateKey)
-                });
+                  context: candidate.context
+                };
+                const rejectionFeedback = rejectionByKey.get(candidate.candidateKey);
+                const bundle = await construction.groundingGeneration.generate(rejectionFeedback === undefined
+                  ? baseInput
+                  : {
+                      ...baseInput,
+                      rejectionFeedback,
+                      verificationEvidence: requireRetryEvidence(
+                        candidate.candidateKey,
+                        verificationEvidenceByKey.get(candidate.candidateKey)
+                      )
+                    });
                 validateGeneratedBundle(candidate, bundle);
                 return { candidate, verdict, bundle };
               }), pending.length
@@ -172,17 +187,21 @@ export function createSourceLessGroundingAdmission(construction: {
               context: candidate.context,
               targets: groundingTargets(bundle, policy.groundingClaimProjection)
             })));
-            const judgmentsByKey = new Map(claimResults.map((result) => [result.candidateKey, result.judgments] as const));
+            const claimResultByKey = new Map(claimResults.map((result) => [result.candidateKey, result] as const));
 
             const rejected: typeof pending = [];
             for (const draft of drafts) {
-              const judgments = judgmentsByKey.get(draft.candidate.candidateKey);
-              if (!judgments) {
+              const claimResult = claimResultByKey.get(draft.candidate.candidateKey);
+              if (!claimResult) {
                 throw new Error(`Claim admission omitted candidateKey ${JSON.stringify(draft.candidate.candidateKey)}.`);
               }
-              const settled = settleGroundingBundle(draft.bundle, judgments);
+              const settled = settleGroundingBundle(draft.bundle, claimResult.judgments);
               if (settled.disposition === "rejected") {
                 rejectionByKey.set(draft.candidate.candidateKey, settled.rationale);
+                verificationEvidenceByKey.set(
+                  draft.candidate.candidateKey,
+                  nonEmptyDefinitionEvidence(draft.candidate.candidateKey, claimResult.verificationEvidence)
+                );
                 rejected.push({ candidate: draft.candidate, verdict: draft.verdict });
                 continue;
               }
@@ -217,6 +236,28 @@ export function createSourceLessGroundingAdmission(construction: {
       };
     }
   };
+}
+
+function nonEmptyDefinitionEvidence(
+  candidateKey: string,
+  evidence: readonly DraftBlindClaimEvidence[]
+): readonly [DraftBlindClaimEvidence, ...DraftBlindClaimEvidence[]] {
+  const definitions = evidence.filter((entry) => entry.targetKey.startsWith("definition:"));
+  const first = definitions[0];
+  if (!first) {
+    throw new Error(`Claim admission returned no draft-blind Definition Passage evidence for ${candidateKey}.`);
+  }
+  return [first, ...definitions.slice(1)];
+}
+
+function requireRetryEvidence(
+  candidateKey: string,
+  evidence: readonly [DraftBlindClaimEvidence, ...DraftBlindClaimEvidence[]] | undefined
+): readonly [DraftBlindClaimEvidence, ...DraftBlindClaimEvidence[]] {
+  if (!evidence) {
+    throw new Error(`Source-less Grounding Admission omitted retry evidence for ${candidateKey}.`);
+  }
+  return evidence;
 }
 
 function isCoreProbe(entry: {

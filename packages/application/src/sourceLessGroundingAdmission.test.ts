@@ -6,6 +6,7 @@ import type {
   ClaimFactualityJudgmentPort,
   ClaimVerificationAnsweringPort,
   ClaimVerificationQuestionPlanningPort,
+  DraftBlindClaimEvidence,
   GroundingGenerationPort,
   KnowledgeBoundaryProbePort,
   NodeEmbeddingPort
@@ -637,6 +638,7 @@ test("judgment dependency failure rejects the whole batch without returning part
 test("only candidates whose every definition is rejected regenerate with bounded feedback", async () => {
   const generationCalls: string[] = [];
   const feedbackByLabel = new Map<string, Array<string | undefined>>();
+  const evidenceByLabel = new Map<string, Array<readonly DraftBlindClaimEvidence[] | undefined>>();
   const attempts = new Map<string, number>();
   const h = harness({
     groundingGeneration: {
@@ -646,6 +648,10 @@ test("only candidates whose every definition is rejected regenerate with bounded
         feedbackByLabel.set(input.canonicalLabel, [
           ...(feedbackByLabel.get(input.canonicalLabel) ?? []),
           input.rejectionFeedback
+        ]);
+        evidenceByLabel.set(input.canonicalLabel, [
+          ...(evidenceByLabel.get(input.canonicalLabel) ?? []),
+          input.verificationEvidence
         ]);
         const attempt = (attempts.get(input.canonicalLabel) ?? 0) + 1;
         attempts.set(input.canonicalLabel, attempt);
@@ -675,6 +681,14 @@ test("only candidates whose every definition is rejected regenerate with bounded
     "Panel rationales may conflict and are not correction authority. Re-derive one internally consistent account; omit optional disputed detail rather than copying a proposed replacement. definition:0:claim:0: Rejected because fake-judge-a, fake-judge-b replicated an objection across at least 2 of 2 independently planned verification samples. definition contradicted definition:1:claim:0: Rejected because fake-judge-a, fake-judge-b replicated an objection across at least 2 of 2 independently planned verification samples. definition contradicted"
   ]);
   assert.deepEqual(feedbackByLabel.get("Concept B"), [undefined]);
+  assert.deepEqual(evidenceByLabel.get("Concept B"), [undefined]);
+  const retryEvidence = evidenceByLabel.get("Concept A")?.[1];
+  assert.ok(retryEvidence);
+  assert.equal(retryEvidence.length, 4, "two draft-blind samples for each rejected Definition Passage");
+  assert.ok(retryEvidence.every((entry) => entry.targetKey.startsWith("definition:")));
+  assert.deepEqual([...new Set(retryEvidence.map((entry) => entry.sampleIndex))], [0, 1]);
+  assert.ok(retryEvidence.every((entry) => entry.answer.startsWith("Independent answer to")));
+  assert.ok(retryEvidence.every((entry) => !entry.answer.includes("attempt 1")), "the answer model never sees draft text");
   assert.deepEqual(outcomes.map((outcome) => outcome.candidateKey), ["a", "b"]);
   assert.ok(outcomes[0].disposition === "admitted" && outcomes[0].bundle.definitions[0].text.includes("attempt 2"));
 });

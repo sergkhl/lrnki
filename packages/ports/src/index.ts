@@ -454,19 +454,6 @@ export interface PrerequisiteOrderingPort {
   }): Promise<WholeSetOrdering>;
 }
 
-export interface GroundingGenerationPort {
-  readonly model: string;
-  generate(input: {
-    declaredDomain: string;
-    canonicalLabel: string;
-    context: GroundingAdmissionContext;
-    // Present only for a bounded replacement attempt after independent claim judgments reject
-    // every Definition Passage. The generator produces a fresh draft; it never edits or admits
-    // the rejected text, and the replacement is independently checked again.
-    rejectionFeedback?: string;
-  }): Promise<GeneratedGroundingBundle>;
-}
-
 export type ClaimVerificationQuestion = {
   targetKey: string;
   question: string;
@@ -476,6 +463,40 @@ export type ClaimVerificationAnswer = {
   questionKey: string;
   answer: string;
 };
+
+// Transient evidence from an independently planned, draft-blind verification sample. Source-less
+// Grounding Admission may give this evidence to its one bounded replacement attempt; it is never
+// learner text, persistence data, or admission authority, and the replacement is verified again.
+export type DraftBlindClaimEvidence = {
+  targetKey: string;
+  sampleIndex: number;
+  question: string;
+  answer: string;
+};
+
+export type GroundingGenerationInput = {
+  declaredDomain: string;
+  canonicalLabel: string;
+  context: GroundingAdmissionContext;
+} & (
+  | {
+      rejectionFeedback?: never;
+      verificationEvidence?: never;
+    }
+  | {
+      // Present only for the sole bounded replacement after independent claim judgments reject
+      // every Definition Passage. Negative feedback constrains the replacement; the non-empty,
+      // draft-blind evidence packet supplies positive factual support without exposing the draft
+      // to the answer model.
+      rejectionFeedback: string;
+      verificationEvidence: readonly [DraftBlindClaimEvidence, ...DraftBlindClaimEvidence[]];
+    }
+);
+
+export interface GroundingGenerationPort {
+  readonly model: string;
+  generate(input: GroundingGenerationInput): Promise<GeneratedGroundingBundle>;
+}
 
 // Owner-neutral claim-targeted verification. Planning sees code-owned positive targets so it can
 // atomize their factual content. Answering receives only independently answerable questions and
@@ -1513,8 +1534,9 @@ export type OperationType = "extraction" | "minting" | "enrichment" | "study_ite
 // One forced-tool attempt's redacted failure. `kind` classifies the deviation; the
 // optional fields are populated only when meaningful (`status` for HTTP failures,
 // `schemaIssuePaths` for schema-invalid arguments — PATHS only, never the offending
-// values, which can be large or source-derived). `redactedSnippet` is the offending
-// arguments text bounded, control-char-stripped, and truncated.
+// values, which can be large or source-derived). `observedToolNames` records bounded,
+// control-char-stripped names when the model called only unknown tools. `redactedSnippet`
+// is the offending arguments text bounded, control-char-stripped, and truncated.
 export type ForcedToolFailureKind =
   | "http"
   | "network"
@@ -1530,6 +1552,7 @@ export interface ForcedToolFailureAttempt {
   kind: ForcedToolFailureKind;
   status?: number;
   code?: string;
+  observedToolNames?: string[];
   schemaIssuePaths?: string[];
   redactedSnippet?: string;
 }
