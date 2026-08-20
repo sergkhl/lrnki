@@ -6,12 +6,13 @@
 
 - **Source-less Grounding Admission — U4 in progress.** The
   [plan](./2026-08-19-001-deepen-source-less-grounding-admission.md) owns implementation design and
-  validation. U1–U3 are closed `PASS`; the final Synthetic run failed safely and the one final Graph
-  run is `FIX_FIRST` because two over-restricted definitions were admitted despite correct
-  persistence isolation. Resume from the plan's bounded repair handoff: repair category-boundary
-  verification, run only its small production-model regression panel, then run the one remaining
-  Scaffold gate and deterministic closure checks. Do not rerun full Synthetic or Graph and do not
-  implement Candidate 2.
+  validation. U1–U3 are closed `PASS`. The category-boundary repair and its four-target production
+  panel pass, but the single current-hash Scaffold gate is `FIX_FIRST`: both otherwise useful
+  prerequisites failed their bounded replacement after substituting new lifetime/purpose predicates.
+  Resume from the plan's counterexample-repair handoff. Keep both judges unchanged; deepen only the
+  domain-neutral replacement contract, run its two-candidate targeted production panel, and permit
+  one new-hash Scaffold gate only after that panel passes. Do not rerun full Synthetic or Graph, and
+  do not implement Candidate 2.
 
 - **Generation model evaluation — shaping; no implementation plan is ready.** The
   [brainstorm](../brainstorms/2026-08-08-002-generation-model-evaluation.md) owns the dated evidence,

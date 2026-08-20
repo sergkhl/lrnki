@@ -40,6 +40,7 @@ type ClaimJudgmentArgs = {
   judgments: Array<{
     targetKey: string;
     strongestLiteralClaim: string;
+    categoryBoundaryAudit: string;
     scopeAudit: string;
     materialObjection: string | null;
     disposition: "accepted" | "rejected";
@@ -172,17 +173,12 @@ export const claimVerificationQuestionPlanningDescriptor: NeuralStageDescriptor<
       input.declaredDomain,
       input.context
     );
-    const hierarchyQuestion = scopeHierarchyQuestion(
+    const categoryQuestion = categoryBoundaryQuestion(
       input.canonicalLabel,
       input.declaredDomain,
       input.context
     );
-    const mechanismQuestion = mechanismRelationQuestion(
-      input.canonicalLabel,
-      input.declaredDomain,
-      input.context
-    );
-    const processQuestion = processRoleQuestion(
+    const relationAndProcessQuestion = relationAndProcessAuditQuestion(
       input.canonicalLabel,
       input.declaredDomain,
       input.context
@@ -190,9 +186,8 @@ export const claimVerificationQuestionPlanningDescriptor: NeuralStageDescriptor<
     const required = [
       { targetKey: firstTarget.targetKey, question: identityQuestion },
       ...input.targets.map((target) => ({ targetKey: target.targetKey, question: applicationQuestion })),
-      ...input.targets.map((target) => ({ targetKey: target.targetKey, question: hierarchyQuestion })),
-      ...input.targets.map((target) => ({ targetKey: target.targetKey, question: mechanismQuestion })),
-      ...input.targets.map((target) => ({ targetKey: target.targetKey, question: processQuestion }))
+      ...input.targets.map((target) => ({ targetKey: target.targetKey, question: categoryQuestion })),
+      ...input.targets.map((target) => ({ targetKey: target.targetKey, question: relationAndProcessQuestion }))
     ];
     return appendPlannerQuestionsWithinTargetCap(required, result.questions);
   }
@@ -338,7 +333,7 @@ function contextApplicationQuestion(
   return `Independent code-owned context-application check: Within ${owningContext}, how does "${canonicalLabel}" in ${declaredDomain} apply? State its mechanism or behavior, required conditions, material outputs or effects, and limits. Identify commonly attributed consequences that do not actually follow in this context, and separate any named senses, entities, or implementations that behave differently.`;
 }
 
-function scopeHierarchyQuestion(
+function categoryBoundaryQuestion(
   canonicalLabel: string,
   declaredDomain: string,
   context: GroundingAdmissionContext
@@ -346,10 +341,10 @@ function scopeHierarchyQuestion(
   const owningContext = context.kind === "originating_topic"
     ? `the originating topic "${context.topic}"`
     : `the exact scaffolded anchor "${context.anchor.canonicalLabel}"`;
-  return `Independent code-owned hierarchy check: Across the established systems, types, implementations, populations, or cases relevant to ${owningContext} in ${declaredDomain}, enumerate the subtype hierarchy of "${canonicalLabel}" far enough to include nested or uncommon variants with different mechanisms, inputs, outputs, or classifications. State the membership criterion and keep related, homologous, derived, analogous, precursor, component, inactive, and nonfunctional entities outside the hierarchy unless they satisfy that criterion. Which features are invariant and which vary? Name a concrete counterexample that actually belongs to the category for any familiar classification or mechanism that is not universal, and state the explicit scope qualifiers an unqualified explanation requires. Say so rather than inventing a hierarchy when none is established.`;
+  return `Independent code-owned category-boundary check: Across the established cases relevant to ${owningContext} in ${declaredDomain}, state the defining membership criterion of "${canonicalLabel}". Enumerate materially different valid member forms, constituents or participant roles, holders or containers, representations, cardinalities, subtypes, and implementations; distinguish exhaustive requirements from common examples. Keep related, analogous, precursor, component, inactive, and nonfunctional entities outside the category unless they meet its criterion. Name an actual member that a familiar narrowed definition would exclude or misclassify, and state any qualifier an unqualified explanation requires. Say that no such variation is established rather than inventing one.`;
 }
 
-function mechanismRelationQuestion(
+function relationAndProcessAuditQuestion(
   canonicalLabel: string,
   declaredDomain: string,
   context: GroundingAdmissionContext
@@ -357,18 +352,7 @@ function mechanismRelationQuestion(
   const owningContext = context.kind === "originating_topic"
     ? `the originating topic "${context.topic}"`
     : `the exact scaffolded anchor "${context.anchor.canonicalLabel}"`;
-  return `Independent code-owned mechanism-role check: For each actual subtype or implementation of "${canonicalLabel}" relevant to ${owningContext} in ${declaredDomain}, identify the actor, object acted on or moved, reference object, direction, path, and resulting change. Explicitly distinguish whether a separate entity passes through a boundary, a broken or attached part rotates around another part, an entity slides along a reference, ownership is transferred, a structure deforms, or entities associate or dissociate. Which exact relation applies to each subtype? Do not collapse distinct participant-role or spatial relations under one umbrella verb, and do not invent a mechanism when none applies.`;
-}
-
-function processRoleQuestion(
-  canonicalLabel: string,
-  declaredDomain: string,
-  context: GroundingAdmissionContext
-): string {
-  const owningContext = context.kind === "originating_topic"
-    ? `the originating topic "${context.topic}"`
-    : `the exact scaffolded anchor "${context.anchor.canonicalLabel}"`;
-  return `Independent code-owned process-role check: If "${canonicalLabel}" names or participates in a process relevant to ${owningContext} in ${declaredDomain}, separate the bulk path from initiation, completion, maintenance, repair, and alternative paths, and state what owns each. Which prominent auxiliary or boundary-case mechanism must not be described as owning the whole process? If no such process decomposition is established, say so rather than inventing one.`;
+  return `Independent code-owned relation-and-process check: If "${canonicalLabel}" has a material mechanism or process role relevant to ${owningContext} in ${declaredDomain}, compare its actual variants by actor, object acted on or moved, reference object, direction, path, and resulting change; do not collapse passage, rotation, sliding, transfer, deformation, association, or dissociation under one umbrella relation. Separate the bulk path from initiation, completion, maintenance, repair, and alternatives, and state what owns each. Name any prominent auxiliary or boundary-case mechanism that must not be described as the whole process. Say that no such mechanism or process decomposition is established rather than inventing one.`;
 }
 
 function appendPlannerQuestionsWithinTargetCap(

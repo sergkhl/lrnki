@@ -32,6 +32,8 @@ Apply these checks in order to every target:
 
    Reconstruct the relevant subtype hierarchy far enough to expose nested families that use different mechanisms, inputs, outputs, or classifications; a top-level split is insufficient when one nested subtype defeats the target. If the target names a process, separate the bulk path from initiation, completion, maintenance, repair, and alternative paths, and identify which mechanism owns each. Do this independently even when every supplied answer repeats the same textbook simplification.
 
+   Complete categoryBoundaryAudit separately. Identify every noun, modifier, coordination, or restrictive clause that makes a member form, constituent or participant role, holder or container, representation, cardinality, subtype, or implementation part of the target's membership criterion. Compare each stated boundary with established alternatives. A positive membership condition can exclude a real member without using `only`; reject when an actual member fails that condition. Do not turn a non-exhaustive example or omitted optional property into a defect when the target's words do not require it. Name the smallest actual excluded or misclassified member before rejecting.
+
    Do not turn subtype completeness into a factuality requirement. A target that states a truthful
    shared membership criterion, input/output relation, boundary step, or outcome does not thereby
    claim that every intermediate mechanism or subtype detail is identical. Do not reject it merely
@@ -58,7 +60,7 @@ Apply these checks in order to every target:
 
 5. Atomic factuality. Every proposition and coordinated subject-predicate pairing in the target must be accurate at its literal strength. Distinguish necessary from sufficient, component from total outcome, correlation from cause, and representation or implementation from the broader concept. Reject when acceptance would require replacing the target's wording with weaker language or an unstated condition.
 
-Complete strongestLiteralClaim, scopeAudit, and materialObjection before disposition for every target. materialObjection must be null only after active falsification finds no material defect; any non-null objection requires `rejected`. Return `accepted` only after that audit. Return judgments only; never rewrite learner-facing content. Application code owns settlement.
+Complete strongestLiteralClaim, categoryBoundaryAudit, scopeAudit, and materialObjection before disposition for every target. materialObjection must be null only after active falsification finds no material defect; any non-null objection requires `rejected`. Return `accepted` only after that audit. Return judgments only; never rewrite learner-facing content. Application code owns settlement.
 {{/system}}
 
 {{#user}}

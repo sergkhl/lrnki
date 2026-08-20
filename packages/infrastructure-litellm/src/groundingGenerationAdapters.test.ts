@@ -76,7 +76,7 @@ test("generates an owner-neutral bundle conditioned on one closed scaffolded anc
   assert.ok(call.messages.some((message) => message.content.includes("Preserve exact identifier spelling and casing")));
   assert.ok(call.messages.some((message) => message.content.includes("Never write an unqualified broader-category claim")));
   const modelFacing = call.messages.map((message) => message.content).join("\n").toLowerCase();
-  for (const fixtureTerm of ["binary search", "pivot", "linked list", "logarithmic", "half-open interval", "topoisomerase", "telomerase", "primase", "origin of replication"]) {
+  for (const fixtureTerm of ["binary search", "pivot", "linked list", "logarithmic", "half-open interval", "topoisomerase", "telomerase", "primase", "origin of replication", "owner variable", "associated type", "rust trait"]) {
     assert.equal(modelFacing.includes(fixtureTerm), false, `fixture-derived term leaked: ${fixtureTerm}`);
   }
 });
@@ -221,7 +221,7 @@ test("planning sees owner-neutral targets while the external answer model receiv
   assert.ok(calls[0].messages.some((message) => message.content.includes("target text itself carries every material scope limitation")));
   assert.ok(calls[0].messages.some((message) => message.content.includes("boundary cases and counterexamples")));
   assert.ok(calls[0].messages.some((message) => message.content.includes("candidate's established defining conditions or mechanism")));
-  assert.ok(calls[0].messages.some((message) => message.content.includes("hierarchy, mechanism-role, and process-role checks")));
+  assert.ok(calls[0].messages.some((message) => message.content.includes("category-boundary, and relation-and-process checks")));
   assert.ok(calls[0].messages.some((message) => message.content.includes("neutrally try to falsify")));
   assert.ok(calls[0].messages.some((message) => message.content.includes("assumes the draft's category, value, or universal scope")));
   assert.ok(calls[0].messages.some((message) => message.content.includes("at most six questions per target")));
@@ -231,30 +231,25 @@ test("planning sees owner-neutral targets while the external answer model receiv
   assert.ok(calls[0].messages.some((message) => message.content.includes("actor, object acted on or moved, reference object, direction, path")));
   assert.ok(calls[0].messages.some((message) => message.content.includes("passage through a boundary, rotation around a reference")));
   assert.ok(calls[0].messages.some((message) => message.content.includes("bulk path, initiation, completion, maintenance, repair, and alternative paths")));
+  assert.ok(calls[0].messages.some((message) => message.content.includes("member form, constituent or participant role, holder or container")));
   assert.match(questions[0].question, /necessary defining features/);
   assert.match(questions[0].question, /Independent code-owned concept-identity check/);
   assert.match(questions[1].question, /originating topic "A broad topic"/);
   assert.match(questions[1].question, /Independent code-owned context-application check/);
   assert.match(questions[1].question, /commonly attributed consequences that do not actually follow/);
   assert.match(questions[1].question, /mechanism or behavior, required conditions/);
-  assert.match(questions[3].question, /enumerate the subtype hierarchy of "Mechanism contrast"/);
-  assert.match(questions[3].question, /Independent code-owned hierarchy check/);
-  assert.match(questions[3].question, /nested or uncommon variants/);
-  assert.match(questions[3].question, /State the membership criterion/);
-  assert.match(questions[3].question, /related, homologous, derived, analogous, precursor, component, inactive, and nonfunctional entities outside/);
-  assert.match(questions[3].question, /concrete counterexample/);
-  assert.match(questions[3].question, /explicit scope qualifiers/);
-  assert.match(questions[5].question, /Independent code-owned mechanism-role check/);
+  assert.match(questions[3].question, /Independent code-owned category-boundary check/);
+  assert.match(questions[3].question, /defining membership criterion/);
+  assert.match(questions[3].question, /member forms, constituents or participant roles, holders or containers, representations, cardinalities/);
+  assert.match(questions[3].question, /exhaustive requirements from common examples/);
+  assert.match(questions[3].question, /actual member that a familiar narrowed definition would exclude/);
+  assert.match(questions[5].question, /Independent code-owned relation-and-process check/);
   assert.match(questions[5].question, /actor, object acted on or moved, reference object, direction, path/);
-  assert.match(questions[5].question, /a broken or attached part rotates around another part/);
-  assert.match(questions[5].question, /Do not collapse distinct participant-role or spatial relations/);
-  assert.match(questions[7].question, /Independent code-owned process-role check/);
-  assert.match(questions[7].question, /bulk path from initiation, completion, maintenance, repair, and alternative paths/);
-  assert.match(questions[7].question, /prominent auxiliary or boundary-case mechanism/);
+  assert.match(questions[5].question, /passage, rotation, sliding, transfer, deformation, association, or dissociation/);
+  assert.match(questions[5].question, /bulk path from initiation, completion, maintenance, repair, and alternatives/);
+  assert.match(questions[5].question, /prominent auxiliary or boundary-case mechanism/);
   assert.deepEqual(questions.map((question) => question.targetKey), [
     "definition:0",
-    "definition:0",
-    "mention:0",
     "definition:0",
     "mention:0",
     "definition:0",
@@ -275,6 +270,7 @@ test("planning sees owner-neutral targets while the external answer model receiv
   assert.ok(calls[1].messages.some((message) => message.content.includes("boundary and counterexample cases")));
   assert.ok(calls[1].messages.some((message) => message.content.includes("state the named concept's defining condition or mechanism")));
   assert.ok(calls[1].messages.some((message) => message.content.includes("multiple established senses")));
+  assert.ok(calls[1].messages.some((message) => message.content.includes("valid member forms, constituents or participant roles, holders or containers")));
   assert.ok(calls[1].messages.some((message) => message.content.includes("mutually exclusive branches")));
   assert.ok(calls[1].messages.some((message) => message.content.includes("state the cross-system invariant separately from material variations")));
   assert.ok(calls[1].messages.some((message) => message.content.includes("nested subtype is an exception")));
@@ -286,7 +282,7 @@ test("planning sees owner-neutral targets while the external answer model receiv
   assert.ok(calls[1].messages.some((message) => message.content.includes("instead of inventing one")));
   assert.equal(calls[1].messages.some((message) => message.content.includes("Draft-only marker")), false);
   assert.equal(calls[1].messages.some((message) => message.content.includes("definition:0")), false);
-  for (const fixtureTerm of ["binary search", "pivot", "linked list", "logarithmic", "half-open interval", "topoisomerase", "telomerase", "primase", "origin of replication"]) {
+  for (const fixtureTerm of ["binary search", "pivot", "linked list", "logarithmic", "half-open interval", "topoisomerase", "telomerase", "primase", "origin of replication", "owner variable", "associated type", "rust trait"]) {
     assert.equal(calls[0].messages.some((message) => message.content.toLowerCase().includes(fixtureTerm)), false, `planner fixture-derived term leaked: ${fixtureTerm}`);
     assert.equal(calls[1].messages.some((message) => message.content.toLowerCase().includes(fixtureTerm)), false, `answerer fixture-derived term leaked: ${fixtureTerm}`);
   }
@@ -323,8 +319,8 @@ test("code-owned verification checks preserve the shared six-question cap per ta
       MAX_CLAIM_VERIFICATION_QUESTIONS_PER_TARGET
     );
   }
-  assert.equal(questions.filter((question) => question.question.startsWith("Model-planned definition:0")).length, 1);
-  assert.equal(questions.filter((question) => question.question.startsWith("Model-planned mention:0")).length, 2);
+  assert.equal(questions.filter((question) => question.question.startsWith("Model-planned definition:0")).length, 2);
+  assert.equal(questions.filter((question) => question.question.startsWith("Model-planned mention:0")).length, 3);
 });
 
 test("the factuality adapter returns judgments only and cannot settle or rewrite an artifact", async () => {
@@ -337,6 +333,7 @@ test("the factuality adapter returns judgments only and cannot settle or rewrite
           {
             targetKey: "definition:0",
             strongestLiteralClaim: "One mechanism applies to the whole category.",
+            categoryBoundaryAudit: "One actual category member falls outside that mechanism boundary.",
             scopeAudit: "One established subtype uses another mechanism.",
             materialObjection: "The parent-category mechanism does not apply to that subtype.",
             disposition: "rejected",
@@ -345,6 +342,7 @@ test("the factuality adapter returns judgments only and cannot settle or rewrite
           {
             targetKey: "definition:1",
             strongestLiteralClaim: "The named concept has the stated defining condition.",
+            categoryBoundaryAudit: "No established member is excluded by the defining condition.",
             scopeAudit: "No relevant subtype or process variation conflicts with the condition.",
             materialObjection: null,
             disposition: "accepted",
@@ -405,6 +403,9 @@ test("the factuality adapter returns judgments only and cannot settle or rewrite
   assert.ok(call.messages.some((message) => message.content.includes("cannot outvote a conflicting independent check")));
   assert.ok(call.messages.some((message) => message.content.includes("textbook, common, approximate, or pedagogically convenient")));
   assert.ok(call.messages.some((message) => message.content.includes("reconstruct the established subtype hierarchy")));
+  assert.ok(call.messages.some((message) => message.content.includes("Complete categoryBoundaryAudit independently")));
+  assert.ok(call.messages.some((message) => message.content.includes("member form, constituent or participant role, holder or container")));
+  assert.ok(call.messages.some((message) => message.content.includes("positive membership condition without saying `only`")));
   assert.ok(call.messages.some((message) => message.content.includes("separate the bulk path from initiation, completion, maintenance, repair, and alternative paths")));
   assert.ok(call.messages.some((message) => message.content.includes("prominent auxiliary mechanism impersonate the whole process")));
   assert.ok(call.messages.some((message) => message.content.includes("Do not turn subtype completeness into a factuality requirement")));
@@ -443,6 +444,8 @@ test("the factuality adapter returns judgments only and cannot settle or rewrite
   assert.ok(challengeCall.messages.some((message) => message.content.includes("questions labeled `Independent code-owned`")));
   assert.ok(challengeCall.messages.some((message) => message.content.includes("cannot outvote a conflicting independent check")));
   assert.ok(challengeCall.messages.some((message) => message.content.includes("Reconstruct the relevant subtype hierarchy")));
+  assert.ok(challengeCall.messages.some((message) => message.content.includes("Complete categoryBoundaryAudit separately")));
+  assert.ok(challengeCall.messages.some((message) => message.content.includes("positive membership condition can exclude a real member without using `only`")));
   assert.ok(challengeCall.messages.some((message) => message.content.includes("separate the bulk path from initiation, completion, maintenance, repair, and alternative paths")));
   assert.ok(challengeCall.messages.some((message) => message.content.includes("every supplied answer repeats the same textbook simplification")));
   assert.ok(challengeCall.messages.some((message) => message.content.includes("Do not turn subtype completeness into a factuality requirement")));
@@ -460,7 +463,7 @@ test("the factuality adapter returns judgments only and cannot settle or rewrite
   assert.ok(challengeCall.messages.some((message) => message.content.includes("A broader outcome or umbrella verb cannot erase")));
   assert.ok(challengeCall.messages.some((message) => message.content.includes("Never describe a material variation in scopeAudit and then accept")));
   const judgmentFacing = call.messages.map((message) => message.content).join("\n").toLowerCase();
-  for (const fixtureTerm of ["binary search", "pivot", "linked list", "logarithmic", "half-open interval", "topoisomerase", "telomerase", "primase", "origin of replication"]) {
+  for (const fixtureTerm of ["binary search", "pivot", "linked list", "logarithmic", "half-open interval", "topoisomerase", "telomerase", "primase", "origin of replication", "owner variable", "associated type", "rust trait"]) {
     assert.equal(judgmentFacing.includes(fixtureTerm), false, `fixture-derived term leaked: ${fixtureTerm}`);
   }
 });

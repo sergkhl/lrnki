@@ -558,47 +558,63 @@ not weaken the admission invariants or turn a failed gate into `PASS`.
 
 ### U4 — Cross-consumer regression and real-use closure — FIX_FIRST (2026-08-20)
 
-- **Stop-loss and Synthetic negative result:** runtime recovery succeeded. The one permitted final
-  Synthetic operation `3cba7e7f-0710-4392-ae7d-1f5da656015f` ran the current
-  `synthetic-topic-generation-c4f425e264b8` behavior over `DNA replication` in molecular biology.
-  All 16 stages completed, but two of 16 candidates remained rejected after bounded regeneration,
-  so the consumer failed atomically after 42m35s and persisted no layer. The topoisomerase draft
-  universalized strand passage; the single-strand-binding-protein draft was under-distinguishing.
-  This is safe-negative local real-use evidence, not a successful Synthetic artifact; do not rerun.
-- **Graph operation and structural evidence:** the one permitted final Graph operation
-  `6eb00ca8-019e-481b-b3c4-0dd74d284fe5` succeeded over published nine-anchor curated Rust graph
-  version `dffcd69b-c36c-4f2d-8ea8-fb2a5bbbf8e5` with config identity
-  `graph-enrichment-46e7b2fc6ce7`. All 99 Operation Timeline rows succeeded. Ten durability-accepted
-  proposals crossed Source-less Grounding Admission; five were admitted and five were factually
-  rejected. The persisted layer contains nine anchors, 14 source-mentioned prerequisites, and
-  exactly the five admitted LLM-grounded prerequisites. Same-query positive controls showed five
-  admitted and five rejected dispositions beside zero missing admitted nodes, zero leaked rejected
-  nodes, five LLM-grounded nodes beside zero missing bundles, and five generated Definition Passages
-  beside zero blanks or false source evidence. Every bundle has exactly one anchor reference.
-- **Material content defect:** direct inspection found definition-boundary scope drift in two
-  admitted bundles. `Value` says every Rust value is bound to exactly one "owner variable"; the
-  curated source says only `owner`, while the official Rust model also includes field/place
-  ownership and explicit shared ownership. `Trait` narrows a Rust trait to method signatures or
-  marker conditions, omitting the associated types and constants that are valid interface
-  constituents. See the official Rust [place-expression](https://doc.rust-lang.org/reference/expressions.html#place-expressions-and-value-expressions),
-  [struct-ownership](https://doc.rust-lang.org/book/ch05-01-defining-structs.html#ownership-of-struct-data),
+- **Pre-repair stop-loss evidence:** final Synthetic operation
+  `3cba7e7f-0710-4392-ae7d-1f5da656015f` completed all 16 stages but failed atomically after two of
+  16 candidates remained rejected; it persisted no layer and must not be rerun. Final Graph operation
+  `6eb00ca8-019e-481b-b3c4-0dd74d284fe5` succeeded under historical identity
+  `graph-enrichment-46e7b2fc6ce7`: all 99 stages passed, five proposals were admitted and five
+  rejected, and same-query controls proved exact node/bundle isolation. Direct inspection still
+  found two contaminating admitted definitions: `Value` required an "owner variable", and `Trait`
+  excluded associated types/constants. The official Rust [place-expression](https://doc.rust-lang.org/reference/expressions.html#place-expressions-and-value-expressions),
   [`Rc<T>`](https://doc.rust-lang.org/book/ch15-04-rc.html), and
-  [trait](https://doc.rust-lang.org/reference/items/traits.html) definitions. These admitted claims
-  would contaminate the authoritative graph, so the Graph gate and U4 are `FIX_FIRST` despite the
-  correct persistence invariants.
-- **Routing and evidence boundary:** exact DeepSeek V4 Flash 0731 used Parasail for answering and
-  primary judgment, with three factuality calls exercising the DeepInfra backup. GPT-OSS-120B used
-  DigitalOcean for planning/challenge; its Groq backup was not needed. MiMo v2.5 used Xiaomi; retained
-  Qwen3-30B appeared only in Knowledge-Boundary fallback, and Qwen3 Embedding served embeddings. This
-  is production-model local application-pipeline and persisted-development-DB evidence, not
-  deployed, browser, native, or physical-device evidence. Safe to continue to Scaffold: **no**.
+  [trait](https://doc.rust-lang.org/reference/items/traits.html) definitions establish the missed
+  category boundaries.
+- **Category-boundary repair and automated evidence:** the six-question cap now assigns each
+  Definition Passage concept-identity, context, category-boundary, and combined relation/process
+  checks, leaving two target-aware planner questions; support targets leave three. Both judges must
+  return an independent `categoryBoundaryAudit`, and prompt/schema scans exclude the observed fixture
+  terms. The focused adapter/schema/hash gate passed 36/36; the owning package passed 175/175 plus
+  typecheck. Current identities are `graph-enrichment-9adc5aa9b9e4`,
+  `learner-scaffold-generation-0a31c5ce6c9d`, and `synthetic-topic-generation-e93a7bf1889c`.
+- **Targeted production-model panel — `PASS`:** four exact safe/unsafe `Value`/`Trait` targets each
+  received six questions over two independently planned samples. All four expected settlements
+  matched: both unsafe definitions were rejected and both accurate controls were accepted by all
+  eight control verdicts. The primary DeepSeek judge missed the unsafe `Trait` target, but the
+  independent GPT-OSS challenger rejected it in both samples by naming associated-item-only/auto
+  traits, so the configured same-model replicated-rejection rule failed closed as designed. The
+  answerer received neither targets nor draft text. Routing was four GPT-OSS/DigitalOcean planner
+  calls, three DeepSeek/Parasail plus one DeepInfra answer calls, eight DeepSeek/Parasail primary
+  judgments, and eight GPT-OSS/DigitalOcean challenges.
+- **Single current-hash Scaffold gate — `FIX_FIRST`:** operation
+  `d63c296b-e56a-4afc-8acf-20e4ec8bcfd2` ran against `capacity` under the curated
+  `String Memory Representation` anchor for 8m38s. All 11 persisted stages closed `ok=true`, but the
+  operation failed before content generation because neither `Heap Allocation` nor `Buffer` survived
+  its sole grounding replacement. The first definitions incorrectly limited reclamation to explicit
+  free/GC and Buffer to heap-only string storage. Their replacements substituted new over-narrow
+  predicates: lifetime independence from allocating scope and mandatory producer/consumer transfer.
+  The result published no Support Step. Same-query cleanup evidence retained one operation row while
+  showing nine existing users beside zero reserved U4 users and zero remaining detours/steps.
+- **Routing and evidence boundary:** Scaffold used MiMo v2.5/Xiaomi for outline and grounding,
+  Llama 4 Scout/Groq for Knowledge-Boundary, Qwen3 Embedding for embeddings, GPT-OSS-120B/DigitalOcean
+  for planning/challenge, and DeepSeek V4 Flash 0731 through Parasail with one DeepInfra judgment
+  fallback. No provider or schema stage failed. This is production-model local application-pipeline
+  and persisted-development-DB evidence, not deployed, browser, native, or physical-device evidence.
+  Safe to continue downstream: **no**.
 
 ### Open findings
 
-- **Bounded U4 repair handoff:** preserve the six-question cap while making definition verification
-  expose category-member forms and allowed interface constituents instead of spending most of the
-  independent budget on inapplicable process/mechanism questions. Keep the prompts domain-neutral;
-  do not encode Rust, `Value`, `Trait`, or fixture answers. Add deterministic descriptor/schema/hash
-  coverage, then run a small production-model regression panel containing safe and unsafe category-
-  boundary pairs for the two observed classes. Do not rerun the full Synthetic or Graph operations.
-  Resume the one remaining Scaffold gate only after the targeted panel is `PASS`.
+- **Bounded regeneration-repair handoff:** the established problem class is counterexample-repair
+  overfitting: the replacement removed a rejected phrase but invented a new predicate in the same
+  lifecycle/purpose dimension. Follow counterexample-guided synthesis practice by treating every
+  material objection as an accumulated constraint on the next candidate, not as a paraphrase hint
+  ([CEGIS reference](https://people.csail.mit.edu/asolar/papers/thesis.pdf)). Keep both independent
+  judges and the category-boundary repair unchanged. Deepen only the sole replacement contract so an
+  objection deletes its predicate dimension unless one invariant is independently established, and
+  so an anchor-specific truth carries the exact limiting type/system/representation in the sentence
+  itself. Require strict non-persisted `rejectedPredicateAudit` and `surfaceScopeAudit` fields beside
+  the replacement, then discard them at the adapter boundary: the first names each deleted predicate
+  dimension, while the second quotes the sentence's explicit anchor scope or explains why the retained
+  relationship is invariant. Keep all descriptors domain-neutral and add schema/prompt/hash coverage.
+  First run a two-candidate production regeneration/admission panel for the observed lifecycle and
+  anchored-purpose classes. Only if it passes may one new-hash post-repair Scaffold gate run; another
+  material failure stops U4. Never rerun full Synthetic or Graph or weaken a judge/settlement rule.

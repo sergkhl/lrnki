@@ -197,6 +197,27 @@ test("claim verification schemas require exact known-target, question, and judgm
     {
       targetKey: "mention:0",
       strongestLiteralClaim: "The support claim states one scoped relation.",
+      categoryBoundaryAudit: "The claim imposes no conflicting category boundary.",
+      scopeAudit: "No relevant variation conflicts with the scoped relation.",
+      materialObjection: null,
+      disposition: "accepted",
+      rationale: "established"
+    },
+    {
+      targetKey: "definition:0",
+      strongestLiteralClaim: "The definition assigns one mechanism to the parent category.",
+      categoryBoundaryAudit: "One actual member falls outside the stated mechanism boundary.",
+      scopeAudit: "A descendant uses a different mechanism.",
+      materialObjection: "The descendant contradicts the parent-level predicate.",
+      disposition: "rejected",
+      rationale: "not established"
+    }
+  ] }));
+  assert.throws(() => judgments.parse({ judgments: [
+    {
+      targetKey: "mention:0",
+      strongestLiteralClaim: "The support claim states one scoped relation.",
+      categoryBoundaryAudit: "The claim imposes no conflicting category boundary.",
       scopeAudit: "No relevant variation conflicts with the scoped relation.",
       materialObjection: null,
       disposition: "accepted",
@@ -210,11 +231,12 @@ test("claim verification schemas require exact known-target, question, and judgm
       disposition: "rejected",
       rationale: "not established"
     }
-  ] }));
+  ] }), /categoryBoundaryAudit/);
   assert.throws(() => judgments.parse({ judgments: [
     {
       targetKey: "definition:0",
       strongestLiteralClaim: "The definition states one mechanism.",
+      categoryBoundaryAudit: "No established member conflicts with the stated category boundary.",
       scopeAudit: "No conflict found.",
       materialObjection: null,
       disposition: "accepted",
@@ -224,6 +246,7 @@ test("claim verification schemas require exact known-target, question, and judgm
     {
       targetKey: "mention:0",
       strongestLiteralClaim: "The support claim states one relation.",
+      categoryBoundaryAudit: "The support claim imposes no conflicting category boundary.",
       scopeAudit: "No conflict found.",
       materialObjection: null,
       disposition: "accepted",
@@ -234,6 +257,7 @@ test("claim verification schemas require exact known-target, question, and judgm
     {
       targetKey: "definition:0",
       strongestLiteralClaim: "The definition assigns one mechanism to the parent category.",
+      categoryBoundaryAudit: "One actual member falls outside the stated mechanism boundary.",
       scopeAudit: "A descendant uses a different mechanism.",
       materialObjection: "The descendant contradicts the parent-level predicate.",
       disposition: "accepted",
@@ -242,6 +266,7 @@ test("claim verification schemas require exact known-target, question, and judgm
     {
       targetKey: "mention:0",
       strongestLiteralClaim: "The support claim states one relation.",
+      categoryBoundaryAudit: "The support claim imposes no conflicting category boundary.",
       scopeAudit: "No conflict found.",
       materialObjection: null,
       disposition: "accepted",
@@ -252,6 +277,7 @@ test("claim verification schemas require exact known-target, question, and judgm
     {
       targetKey: "definition:0",
       strongestLiteralClaim: "The definition assigns one mechanism to the parent category.",
+      categoryBoundaryAudit: "One actual member falls outside the stated mechanism boundary.",
       scopeAudit: "A descendant uses a different mechanism.",
       materialObjection: null,
       disposition: "rejected",
@@ -260,6 +286,7 @@ test("claim verification schemas require exact known-target, question, and judgm
     {
       targetKey: "mention:0",
       strongestLiteralClaim: "The support claim states one relation.",
+      categoryBoundaryAudit: "The support claim imposes no conflicting category boundary.",
       scopeAudit: "No conflict found.",
       materialObjection: null,
       disposition: "accepted",
