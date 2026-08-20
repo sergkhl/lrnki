@@ -7,16 +7,20 @@ execution: code
 
 # Deepen Source-less Grounding Admission
 
-**Status:** In progress — U1–U3 complete; U4 in progress
+**Status:** Complete — U1–U4 `PASS`; documentation consolidation pending
 
 **Decision state:** Grilling-locked. The user accepted the external interface direction and then
 delegated every remaining Candidate 1 decision to the recommended answer. The linked brainstorm is
 the canonical owner of the accepted problem framing, requirements, outcome policy, and scope.
 
 **Implementation state:** U1 is committed as `bac34bf`; U2 is committed as `67247b3`; U3 is
-committed as `ab17bd6`. U4 corrected a cross-domain scope-drift defect with code-owned variation
-questions and a distinct adversarial challenger prompt. Focused production-model controls and the
-non-database repository gates pass; the final current-hash three-consumer matrix remains open.
+committed as `ab17bd6`. U4 retires bounded Grounding Bundle regeneration after its replacement path
+proved unable to conserve predicates reliably. The shared module now generates once and fails
+closed through each consumer's existing outcome policy. Repository, isolated-DB, and final
+production-model Scaffold gates pass. After the implementation commit, the exact next action is a
+separate documentation-consolidation commit: update ADR-0030 and `TODO.md`, retire Candidate 1 from
+the shared brainstorm, remove this plan from the index, and delete this completed plan. Then begin
+the Generation Model Evaluation planning interview one decision at a time.
 
 ## Goal capsule
 
@@ -162,10 +166,11 @@ Origin, definitions, mentions, generating model, and rationale. The enclosing En
 generated Support Step owns durable identity; `candidateKey` is run-local correlation only and is
 never persisted in the bundle.
 
-Make `GroundingGenerationPort` consume the same closed context as admission. Rejection feedback is
-created only inside the bounded module and remains hidden. Update every bundle constructor,
-selection/projection helper, persistence mapper, fixture, and test in the same unit; do not accept
-both old and new JSON shapes.
+Make `GroundingGenerationPort` consume the same closed context as admission. Each core candidate
+receives one generated draft; factual rejection returns a resolved rejected outcome and never
+re-enters Grounding Generation. No feedback or verifier transcript crosses the port. Update every
+bundle constructor, selection/projection helper, persistence mapper, fixture, and test in the same
+unit; do not accept both old and new JSON shapes.
 
 ### KTD4 — Map outcomes at the three rightful caller seams
 
@@ -231,9 +236,10 @@ current; do not add a second ADR or change neutral Study Item behavior.
 ### KTD7 — One policy identity and mechanically exact attribution
 
 Add one canonical `SourceLessGroundingAdmissionPolicy` with the existing calibrated probe behavior,
-two Grounding Bundle draft attempts, candidate concurrency, and verification concurrency. All three
-consumers reference the same default. Attempt count, probe sample count, and agreement threshold are
-behavior; candidate/probe/verification widths are execution policy.
+claim-verification behavior, candidate concurrency, and verification concurrency. All three
+consumers reference the same default. Grounding Generation is one-pass and has no attempt knob.
+Probe sample count, agreement threshold, and verification settlement are behavior;
+candidate/probe/verification widths are execution policy.
 
 Include behavior plus the embedding model and exact descriptors in Graph Enrichment, Synthetic Topic
 Generation, and Scaffold Generation config hashes. Exclude execution widths. Register the probe,
@@ -289,11 +295,11 @@ synthetic-shaped ports.
 
 **Tests:** Invalid policy/candidates fail before neural work; empty batch is inert; measured boundary
 never grounds; embedding unavailability throws; every passage is planned; answering cannot receive a
-draft; answer mismatch fails; judgments can only drop original passages; only rejected candidates
-regenerate with feedback; exhaustion returns `rejected`; thrown dependencies return no partial
-array; completion order cannot perturb result order; stage waves and totals are exact. The Synthetic
-consumer test proves holdout trace mapping, node assembly, factual-rejection atomic failure, and one
-module seam rather than neural-port orchestration.
+draft; answer mismatch fails; judgments can only drop original passages; every core candidate is
+generated exactly once; rejected definitions return `rejected`; thrown dependencies return no
+partial array; completion order cannot perturb result order; stage waves and totals are exact. The
+Synthetic consumer test proves holdout trace mapping, node assembly, factual-rejection atomic
+failure, and one module seam rather than neural-port orchestration.
 
 **Gate:** Focused domain/application/LiteLLM tests and typechecks, config-hash/descriptor exactness,
 then one production-model Synthetic Topic Generation run. Inspect every admitted bundle and holdout;
@@ -385,7 +391,7 @@ not weaken the admission invariants or turn a failed gate into `PASS`.
 - No Derived Graph Layer node or immutable generated Support Step can be assembled from a held-out,
   rejected, unavailable, or unchecked source-less draft.
 - The Grounding Bundle and Support Step policies share one draft-blind claim implementation while
-  retaining their different settlement rules and attempt owners.
+  retaining their different settlement rules; only Scaffold owns content-draft attempts.
 - Generated Support Steps persist exactly the accepted payload and owner-neutral bundle; rejected
   drafts, raw verifier exchanges, feedback, attempt counts, and redundant pass flags do not persist.
 - Answer-Key Verification is key-hidden, checks every option, preserves ADR-0026's neutral Study Item
@@ -423,14 +429,15 @@ persisted-development-DB evidence—not deployed, browser, native, or physical-d
 
 - **Milestone:** Synthetic Topic Generation now crosses the one Source-less Grounding Admission
   seam. Knowledge-Boundary Probe failure propagates; draft-blind claim planning, answering, and the
-  two-family factuality panel settle only original passages; one bounded rejected-draft regeneration
-  remains application-owned. The claim answerer and primary factuality judge use pinned DeepSeek V4
-  Flash 0731; the planner and challenger use GPT-OSS-120B.
+  two-family factuality panel settle only original passages. U4 later retired the bounded
+  rejected-draft regeneration path without changing this external seam. The claim answerer and
+  primary factuality judge use pinned DeepSeek V4 Flash 0731; the planner and challenger use
+  GPT-OSS-120B.
 - **Automated evidence:** `@lrnki/domain-core` 39/39, `@lrnki/application` 762/762, and
   `@lrnki/infrastructure-litellm` 163/163 passed. Root `pnpm typecheck` passed all 11 typed workspace
   projects. Coverage includes batch validation, embedding failure, draft-blind exhaustive claims,
-  monotonic bounded settlement, atomicity/order/stage waves, the consumer seam, and routing-sensitive
-  config identity.
+  monotonic settlement, atomicity/order/stage waves, the consumer seam, and routing-sensitive config
+  identity; U4 owns the current one-pass regression evidence.
 - **Model qualification:** the pinned 0731 claim route passed the exact answer and judgment schemas,
   a five-target production-style smoke, and the full 22-target matrix: all 12 unsafe claims were
   rejected and all 10 safe controls accepted. Parasail FP8 is primary and DeepInfra FP8 is its
@@ -534,81 +541,42 @@ persisted-development-DB evidence—not deployed, browser, native, or physical-d
   answered/judged; DigitalOcean GPT-OSS planned/challenged; Groq Llama 4 Scout probed; Qwen embedded.
   The configured DeepInfra/Groq backups were not needed.
 
-### U4 — Cross-consumer regression and real-use closure — FIX_FIRST (2026-08-20)
+### U4 — Cross-consumer regression and real-use closure — PASS (2026-08-20)
 
-- **Pre-repair stop-loss evidence:** final Synthetic operation
-  `3cba7e7f-0710-4392-ae7d-1f5da656015f` completed all 16 stages but failed atomically after two of
-  16 candidates remained rejected; it persisted no layer and must not be rerun. Final Graph operation
-  `6eb00ca8-019e-481b-b3c4-0dd74d284fe5` succeeded under historical identity
-  `graph-enrichment-46e7b2fc6ce7`: all 99 stages passed, five proposals were admitted and five
-  rejected, and same-query controls proved exact node/bundle isolation. Direct inspection still
-  found two contaminating admitted definitions: `Value` required an "owner variable", and `Trait`
-  excluded associated types/constants. The official Rust [place-expression](https://doc.rust-lang.org/reference/expressions.html#place-expressions-and-value-expressions),
-  [`Rc<T>`](https://doc.rust-lang.org/book/ch15-04-rc.html), and
-  [trait](https://doc.rust-lang.org/reference/items/traits.html) definitions establish the missed
-  category boundaries.
-- **Category-boundary repair and automated evidence:** the six-question cap now assigns each
-  Definition Passage concept-identity, context, category-boundary, and combined relation/process
-  checks, leaving two target-aware planner questions; support targets leave three. Both judges must
-  return an independent `categoryBoundaryAudit`, and prompt/schema scans exclude the observed fixture
-  terms. The focused adapter/schema/hash gate passed 36/36; the owning package passed 175/175 plus
-  typecheck. Identities for this category-boundary panel were `graph-enrichment-9adc5aa9b9e4`,
-  `learner-scaffold-generation-0a31c5ce6c9d`, and `synthetic-topic-generation-e93a7bf1889c`.
-- **Targeted production-model panel — `PASS`:** four exact safe/unsafe `Value`/`Trait` targets each
-  received six questions over two independently planned samples. All four expected settlements
-  matched: both unsafe definitions were rejected and both accurate controls were accepted by all
-  eight control verdicts. The primary DeepSeek judge missed the unsafe `Trait` target, but the
-  independent GPT-OSS challenger rejected it in both samples by naming associated-item-only/auto
-  traits, so the configured same-model replicated-rejection rule failed closed as designed. The
-  answerer received neither targets nor draft text. Routing was four GPT-OSS/DigitalOcean planner
-  calls, three DeepSeek/Parasail plus one DeepInfra answer calls, eight DeepSeek/Parasail primary
-  judgments, and eight GPT-OSS/DigitalOcean challenges.
-- **Single current-hash Scaffold gate — `FIX_FIRST`:** operation
-  `d63c296b-e56a-4afc-8acf-20e4ec8bcfd2` ran against `capacity` under the curated
-  `String Memory Representation` anchor for 8m38s. All 11 persisted stages closed `ok=true`, but the
-  operation failed before content generation because neither `Heap Allocation` nor `Buffer` survived
-  its sole grounding replacement. The first definitions incorrectly limited reclamation to explicit
-  free/GC and Buffer to heap-only string storage. Their replacements substituted new over-narrow
-  predicates: lifetime independence from allocating scope and mandatory producer/consumer transfer.
-  The result published no Support Step. Same-query cleanup evidence retained one operation row while
-  showing nine existing users beside zero reserved U4 users and zero remaining detours/steps.
-- **Routing and evidence boundary:** Scaffold used MiMo v2.5/Xiaomi for outline and grounding,
-  Llama 4 Scout/Groq for Knowledge-Boundary, Qwen3 Embedding for embeddings, GPT-OSS-120B/DigitalOcean
-  for planning/challenge, and DeepSeek V4 Flash 0731 through Parasail with one DeepInfra judgment
-  fallback. No provider or schema stage failed. This is production-model local application-pipeline
-  and persisted-development-DB evidence, not deployed, browser, native, or physical-device evidence.
-  Safe to continue downstream: **no**.
-- **Counterexample-repair implementation:** the sole replacement now requires strict non-persisted
-  `rejectedPredicateAudit` and `surfaceScopeAudit` fields, treats objections as accumulated
-  predicate-dimension constraints, and requires anchor scope in the learner-facing sentence rather
-  than context metadata. The adapter discards both audits. The focused adapter/schema/hash gate
-  passed 36/36, the owning package passed 175/175 plus typecheck and focused lint, and whitespace
-  checks passed. Current identities are `graph-enrichment-e0447a30be1d`,
-  `learner-scaffold-generation-33e8b793b3e0`, and `synthetic-topic-generation-bcfd4431ea5b`.
-- **Two-candidate production panel — `FIX_FIRST`:** operation tag
-  `91fac43d-87b7-4ea2-b11e-57ca4b75668c` regenerated the observed lifecycle and anchored-purpose
-  classes, then ran each result through two independently planned samples and both judge families.
-  `Buffer` correctly became an explicitly scoped Rust `String` byte-storage definition with the
-  transfer/purpose predicates deleted. `Heap Allocation` deleted the rejected lifetime predicate
-  but introduced “dynamically sized storage”; fixed-size values are still heap allocations, as the
-  Rust [`Box<T>` documentation](https://doc.rust-lang.org/std/boxed/index.html) and fixed-type
-  [`Layout::new::<T>()`](https://doc.rust-lang.org/std/alloc/struct.Layout.html#method.new) examples
-  establish. Its self-audit missed that new size predicate and all four terminal verdicts accepted
-  it. Routing was two MiMo/Xiaomi generation calls, four GPT-OSS/DigitalOcean planner calls, four
-  DeepSeek/Parasail answer calls, and four verdicts from each of DeepSeek/Parasail and
-  GPT-OSS/DigitalOcean. No provider/schema failure occurred. This is production-model local
-  application-pipeline evidence only. Per stop-loss, no post-repair Scaffold gate ran.
+- **Milestone and stop-loss decision:** category-boundary inspection found that the bounded
+  replacement could repair a rejected predicate yet introduce a different unsupported predicate,
+  while its self-audit and both judge families accepted the substitution. The user accepted the
+  finite safety workaround: Source-less Grounding Admission now creates one initial Grounding Bundle
+  per core candidate and returns `grounding_verification_exhausted` when no Definition Passage
+  survives. The replacement prompt, forced-tool schema/validator, descriptor/export, verifier
+  transcript return, retry input union, policy knob, config ownership, and stale tests are deleted.
+  Synthetic still fails atomically on any factual rejection; Graph records the rejection, creates no
+  node, and releases the anchor-scoped reservation; Scaffold omits the rejected generated candidate
+  and fails atomically only when no safe step survives.
+- **Automated evidence:** focused admission/consumer tests passed 83/83 and the LiteLLM deletion and
+  identity surface passed 34/34. The stale-symbol scan and `git diff --check` passed. Root
+  `pnpm check` passed schema identity, all workspace typechecks/tests, lint, both builds, and 70/70
+  intercepted-web Playwright scenarios. Separate `pnpm test:db` reset and migrated only
+  `lrnki_test` and passed the DB-backed repository suite. Current identities are
+  `graph-enrichment-dfb9ae848b85`, `learner-scaffold-generation-7ab16c2fc80e`, and
+  `synthetic-topic-generation-0b1ab66013e0`.
+- **Production-model real use:** local Scaffold operation
+  `62cb46f1-5fad-44a8-a5be-6750fe21234e` succeeded under the current Scaffold identity against
+  `capacity` and the curated `String Memory Representation` anchor. All 19 stages closed `ok=true`.
+  One complete generated `Length vs Capacity` step persisted with one nonblank generated Definition
+  Passage, the exact anchor reference, and no wrong/missing provenance. The lesson, question,
+  explanation, key, and three distractors consistently retain capital-S Rust `String` scope and byte
+  units; the `"hi"` example correctly distinguishes two used bytes from eight allocated bytes. This
+  matches the curated Rust ownership fixture's pointer/length/capacity and byte-unit definitions.
+- **Routing, cleanup, and evidence boundary:** Xiaomi MiMo v2.5 generated outline, grounding, and
+  content; Groq Llama 4 Scout probed the boundary; Qwen3 Embedding produced embeddings;
+  GPT-OSS-120B/DigitalOcean planned and challenged; DeepSeek V4 Flash 0731/Parasail answered,
+  judged, checked congruence, and verified the answer key. No configured backup was needed. The
+  cleanup query retained one operation with 19 stages and nine existing-user positive controls beside
+  zero reserved user, detour, and step rows. This is production-model local application-pipeline and
+  persisted-development-DB evidence—not deployed, browser, native, or physical-device evidence.
+  Safe to continue downstream: **yes**.
 
 ### Open findings
 
-- **Stop-loss decision handoff:** counterexample constraints repaired the original lifetime/purpose
-  dimensions but model self-attestation did not prevent a new unsupported size predicate, and the
-  unchanged independent admission panel did not catch it. Do not patch this prompt again or run
-  Synthetic, Graph, or Scaffold under the current replacement. The recommended safe workaround is
-  to retire the bounded replacement entirely: use one initial grounding draft, preserve every
-  consumer's existing fail-closed handling of a rejected outcome, and delete the replacement prompt,
-  schema, descriptor, feedback/evidence retry plumbing, policy knob, tests, and config ownership in
-  the same change. This trades neural recall for factual safety, lower latency, and a finite path to
-  close U4. If that recall trade-off is rejected, stop this plan and shape a separate deep module for
-  independently verified predicate conservation; do not resume prompt-only iteration. The required
-  user decision is recorded in [BLOCKERS.md](./BLOCKERS.md).
+_None._

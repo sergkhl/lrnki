@@ -12,8 +12,6 @@ import { readPromptFile } from "./promptFile";
 import {
   generatedGroundingBundleSchema,
   generatedGroundingBundleValidator,
-  regeneratedGroundingBundleSchema,
-  regeneratedGroundingBundleValidator,
   buildClaimFactualityJudgmentSchema,
   buildClaimFactualityJudgmentValidator,
   buildClaimVerificationAnsweringSchema,
@@ -24,16 +22,10 @@ import {
 } from "./toolSchemas";
 
 type GroundingGenerationInput = Parameters<GroundingGenerationPort["generate"]>[0];
-type InitialGroundingGenerationInput = Omit<GroundingGenerationInput, "rejectionFeedback" | "verificationEvidence">;
-type GroundingRegenerationInput = Extract<GroundingGenerationInput, { rejectionFeedback: string }>;
 type GroundingGenerationArgs = {
   definitions: { text: string }[];
   mentions: { text: string }[];
   rationale: string;
-};
-type GroundingRegenerationArgs = GroundingGenerationArgs & {
-  rejectedPredicateAudit: string;
-  surfaceScopeAudit: string;
 };
 type ClaimQuestionPlanningInput = Parameters<ClaimVerificationQuestionPlanningPort["plan"]>[0];
 type ClaimQuestionPlanningArgs = { questions: ClaimVerificationQuestion[] };
@@ -54,7 +46,7 @@ type ClaimJudgmentArgs = {
 type ClaimJudgmentOutput = Awaited<ReturnType<ClaimFactualityJudgmentPort["judge"]>>;
 
 export const groundingGenerationDescriptor: NeuralStageDescriptor<
-  InitialGroundingGenerationInput,
+  GroundingGenerationInput,
   GroundingGenerationArgs,
   GeneratedGroundingBundle
 > = {
@@ -86,64 +78,10 @@ export const groundingGenerationDescriptor: NeuralStageDescriptor<
   )
 };
 
-export const groundingRegenerationDescriptor: NeuralStageDescriptor<
-  GroundingRegenerationInput,
-  GroundingRegenerationArgs,
-  GeneratedGroundingBundle
-> = {
-  promptPath: "grounding-regeneration.prompt",
-  stageTag: STAGE_TAGS.groundingGeneration,
-  schema: regeneratedGroundingBundleSchema,
-  validator: regeneratedGroundingBundleValidator,
-  sentinelInput: {
-    declaredDomain: "sentinel domain",
-    canonicalLabel: "Sentinel concept",
-    context: {
-      kind: "scaffolded_anchor",
-      anchor: {
-        reference: "sentinel_anchor",
-        canonicalLabel: "Sentinel anchor",
-        definitionPassages: ["Sentinel definition."]
-      }
-    },
-    rejectionFeedback: "The prior definition asserted an unsupported implementation detail.",
-    verificationEvidence: [{
-      targetKey: "definition:0:claim:0",
-      sampleIndex: 0,
-      question: "What minimally defines the sentinel concept?",
-      answer: "The sentinel concept is defined by its sentinel relationship."
-    }]
-  },
-  templateData: (input) => ({
-    declaredDomain: input.declaredDomain,
-    canonicalLabel: input.canonicalLabel,
-    contextLines: formatGroundingAdmissionContext(input.context),
-    rejectionFeedback: input.rejectionFeedback,
-    verificationEvidence: input.verificationEvidence.map((entry) => JSON.stringify({
-      sample: entry.sampleIndex + 1,
-      targetKey: entry.targetKey,
-      question: entry.question,
-      answer: entry.answer
-    })).join("\n")
-  }),
-  mapResult: (result, input) => generatedBundleFromResult(
-    result,
-    input.context,
-    readPromptFile(groundingRegenerationDescriptor.promptPath).model
-  )
-};
-
 export function createGroundingGenerationPort(client: LiteLlmForcedToolClient): GroundingGenerationPort {
-  const generationModel = readPromptFile(groundingGenerationDescriptor.promptPath).model;
-  const regenerationModel = readPromptFile(groundingRegenerationDescriptor.promptPath).model;
-  if (generationModel !== regenerationModel) {
-    throw new Error("Grounding Generation and its bounded replacement must use the same model alias.");
-  }
   return {
-    model: generationModel,
-    generate: (input) => input.rejectionFeedback === undefined
-      ? executeForcedToolStage(client, groundingGenerationDescriptor, input)
-      : executeForcedToolStage(client, groundingRegenerationDescriptor, input)
+    model: readPromptFile(groundingGenerationDescriptor.promptPath).model,
+    generate: (input) => executeForcedToolStage(client, groundingGenerationDescriptor, input)
   };
 }
 

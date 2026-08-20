@@ -40,7 +40,6 @@ const TEST_CONFIG: ScaffoldGenerationConfig = {
   sourceLessGroundingAdmission: {
     ...DEFAULT_SOURCE_LESS_GROUNDING_ADMISSION_POLICY,
     probe: { sampleCount: 2, probeConcurrency: 1, agreementThreshold: 0.75 },
-    groundingDraftAttempts: 2,
     verificationSampleCount: 2,
     verificationRejectionSampleQuorum: 2,
     candidateConcurrency: 1,

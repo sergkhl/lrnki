@@ -2,8 +2,7 @@ import { STAGE_TAGS, type GroundingAdmissionContext } from "@lrnki/domain-core";
 import type {
   ClaimFactualityJudgmentPort,
   ClaimVerificationAnsweringPort,
-  ClaimVerificationQuestionPlanningPort,
-  DraftBlindClaimEvidence
+  ClaimVerificationQuestionPlanningPort
 } from "@lrnki/ports";
 import { mapWithConcurrency } from "./mapWithConcurrency";
 import type { StageBracket } from "./runProgressReporter";
@@ -36,7 +35,6 @@ export type ClaimAdmission = {
     admitBatch(claimSets: readonly PositiveClaimSet[]): Promise<readonly {
       candidateKey: string;
       judgments: readonly ClaimJudgment[];
-      verificationEvidence: readonly DraftBlindClaimEvidence[];
     }[]>;
   };
 };
@@ -84,7 +82,6 @@ export function createClaimAdmission(construction: {
           validateClaimSets(claimSets);
 
           const samplesByCandidate = new Map<string, ClaimJudgment[][]>();
-          const verificationEvidenceByCandidate = new Map<string, DraftBlindClaimEvidence[]>();
           type VerificationRequest = Readonly<{
             claimSet: PositiveClaimSet;
             sampleIndex: number;
@@ -135,17 +132,6 @@ export function createClaimAdmission(construction: {
                 };
               }), planned.length
             );
-
-            for (const { claimSet, sampleIndex, verificationAnswers } of answered) {
-              const evidence = verificationEvidenceByCandidate.get(claimSet.candidateKey) ?? [];
-              evidence.push(...verificationAnswers.map(({ targetKey, question, answer }) => ({
-                targetKey,
-                sampleIndex,
-                question,
-                answer
-              })));
-              verificationEvidenceByCandidate.set(claimSet.candidateKey, evidence);
-            }
 
             // A judgment call owns exactly one positive target. Returning one verdict per target from
             // a multi-target call is not independent verification: a true neighboring passage can
@@ -242,8 +228,7 @@ export function createClaimAdmission(construction: {
                 initialSampleCount,
                 judgmentModels,
                 construction.verificationRejectionSampleQuorum
-              ),
-              verificationEvidence: verificationEvidenceByCandidate.get(claimSet.candidateKey) ?? []
+              )
             };
           });
         }

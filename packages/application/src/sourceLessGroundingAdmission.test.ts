@@ -6,7 +6,6 @@ import type {
   ClaimFactualityJudgmentPort,
   ClaimVerificationAnsweringPort,
   ClaimVerificationQuestionPlanningPort,
-  DraftBlindClaimEvidence,
   GroundingGenerationPort,
   KnowledgeBoundaryProbePort,
   NodeEmbeddingPort
@@ -20,7 +19,6 @@ import {
 
 const policy: SourceLessGroundingAdmissionPolicy = {
   probe: { sampleCount: 2, probeConcurrency: 1, agreementThreshold: 0.75 },
-  groundingDraftAttempts: 2,
   verificationSampleCount: 3,
   verificationDecision: "same_model_replicated_rejection",
   verificationRejectionSampleQuorum: 2,
@@ -48,16 +46,16 @@ function candidate(candidateKey: string, canonicalLabel = candidateKey): Groundi
   };
 }
 
-function bundle(label: string, context: GroundingAdmissionCandidate["context"], attempt = 1): GeneratedGroundingBundle {
+function bundle(label: string, context: GroundingAdmissionCandidate["context"]): GeneratedGroundingBundle {
   const notApplicable = { disposition: "not_applicable_by_grounding" as const, rationale: "generated" };
   return {
     groundingOrigin: "llm_grounded",
     definitions: [
-      { passageType: "definition", text: `${label} definition one, attempt ${attempt}.`, groundingOrigin: "llm_grounded", headingPath: [], locator: {}, verbatimCheck: notApplicable },
-      { passageType: "definition", text: `${label} definition two, attempt ${attempt}.`, groundingOrigin: "llm_grounded", headingPath: [], locator: {}, verbatimCheck: notApplicable }
+      { passageType: "definition", text: `${label} definition one.`, groundingOrigin: "llm_grounded", headingPath: [], locator: {}, verbatimCheck: notApplicable },
+      { passageType: "definition", text: `${label} definition two.`, groundingOrigin: "llm_grounded", headingPath: [], locator: {}, verbatimCheck: notApplicable }
     ],
     mentions: [
-      { passageType: "mention", text: `${label} mention, attempt ${attempt}.`, groundingOrigin: "llm_grounded", headingPath: [], locator: {}, verbatimCheck: notApplicable }
+      { passageType: "mention", text: `${label} mention.`, groundingOrigin: "llm_grounded", headingPath: [], locator: {}, verbatimCheck: notApplicable }
     ],
     groundingAnchorReferences: context.kind === "scaffolded_anchor" ? [context.anchor.reference] : [],
     generatingModel: "fake-generator",
@@ -83,7 +81,6 @@ function harness(options: HarnessOptions = {}) {
   const planningCalls: Array<Parameters<ClaimVerificationQuestionPlanningPort["plan"]>[0]> = [];
   const answeringCalls: Array<Parameters<ClaimVerificationAnsweringPort["answer"]>[0]> = [];
   const judgmentCalls: Array<Parameters<ClaimFactualityJudgmentPort["judge"]>[0]> = [];
-  const generationAttemptByLabel = new Map<string, number>();
 
   const probe: KnowledgeBoundaryProbePort = {
     model: "fake-probe",
@@ -114,9 +111,7 @@ function harness(options: HarnessOptions = {}) {
     model: "fake-generator",
     async generate(input) {
       groundingCalls.push(input);
-      const attempt = (generationAttemptByLabel.get(input.canonicalLabel) ?? 0) + 1;
-      generationAttemptByLabel.set(input.canonicalLabel, attempt);
-      return bundle(input.canonicalLabel, input.context, attempt);
+      return bundle(input.canonicalLabel, input.context);
     }
   };
   const questionPlanning: ClaimVerificationQuestionPlanningPort = options.questionPlanning ?? {
@@ -169,8 +164,7 @@ function harness(options: HarnessOptions = {}) {
     groundingCalls,
     planningCalls,
     answeringCalls,
-    judgmentCalls,
-    generationAttemptByLabel
+    judgmentCalls
   };
 }
 
@@ -436,7 +430,7 @@ test("bundle settlement can only drop rejected original passages in original ord
   const [outcome] = await h.admission.forOperation(async (_name, fn) => fn()).admitBatch([candidate("a", "Concept A")]);
   assert.equal(outcome.disposition, "admitted");
   if (outcome.disposition !== "admitted") return;
-  assert.deepEqual(outcome.bundle.definitions.map((passage) => passage.text), ["Concept A definition one, attempt 1."]);
+  assert.deepEqual(outcome.bundle.definitions.map((passage) => passage.text), ["Concept A definition one."]);
   assert.deepEqual(outcome.bundle.mentions, []);
   assert.equal(outcome.bundle.rationale, "original rationale for Concept A", "settlement changes no metadata");
 });
@@ -635,38 +629,24 @@ test("judgment dependency failure rejects the whole batch without returning part
   assert.equal(returned, false);
 });
 
-test("only candidates whose every definition is rejected regenerate with bounded feedback", async () => {
+test("each core candidate gets one grounding draft and a rejected draft is not regenerated", async () => {
   const generationCalls: string[] = [];
-  const feedbackByLabel = new Map<string, Array<string | undefined>>();
-  const evidenceByLabel = new Map<string, Array<readonly DraftBlindClaimEvidence[] | undefined>>();
-  const attempts = new Map<string, number>();
   const h = harness({
     groundingGeneration: {
       model: "generator",
       async generate(input) {
         generationCalls.push(input.canonicalLabel);
-        feedbackByLabel.set(input.canonicalLabel, [
-          ...(feedbackByLabel.get(input.canonicalLabel) ?? []),
-          input.rejectionFeedback
-        ]);
-        evidenceByLabel.set(input.canonicalLabel, [
-          ...(evidenceByLabel.get(input.canonicalLabel) ?? []),
-          input.verificationEvidence
-        ]);
-        const attempt = (attempts.get(input.canonicalLabel) ?? 0) + 1;
-        attempts.set(input.canonicalLabel, attempt);
-        return bundle(input.canonicalLabel, input.context, attempt);
+        return bundle(input.canonicalLabel, input.context);
       }
     },
     factualityJudgments: judgmentPanel(async (input) => {
-      const firstAttemptA = input.canonicalLabel === "Concept A"
-        && input.targets[0].text.includes("attempt 1");
+      const rejectConceptA = input.canonicalLabel === "Concept A";
       return input.targets.map((target) => ({
         targetKey: target.targetKey,
-        disposition: firstAttemptA && target.targetKey.startsWith("definition:")
+        disposition: rejectConceptA && target.targetKey.startsWith("definition:")
           ? "rejected" as const
           : "accepted" as const,
-        rationale: firstAttemptA ? "definition contradicted" : "established"
+        rationale: rejectConceptA ? "definition contradicted" : "established"
       }));
     })
   });
@@ -675,25 +655,14 @@ test("only candidates whose every definition is rejected regenerate with bounded
     candidate("b", "Concept B")
   ]);
 
-  assert.deepEqual(generationCalls, ["Concept A", "Concept B", "Concept A"]);
-  assert.deepEqual(feedbackByLabel.get("Concept A"), [
-    undefined,
-    "Panel rationales may conflict and are not correction authority. Re-derive one internally consistent account; omit optional disputed detail rather than copying a proposed replacement. definition:0:claim:0: Rejected because fake-judge-a, fake-judge-b replicated an objection across at least 2 of 2 independently planned verification samples. definition contradicted definition:1:claim:0: Rejected because fake-judge-a, fake-judge-b replicated an objection across at least 2 of 2 independently planned verification samples. definition contradicted"
-  ]);
-  assert.deepEqual(feedbackByLabel.get("Concept B"), [undefined]);
-  assert.deepEqual(evidenceByLabel.get("Concept B"), [undefined]);
-  const retryEvidence = evidenceByLabel.get("Concept A")?.[1];
-  assert.ok(retryEvidence);
-  assert.equal(retryEvidence.length, 4, "two draft-blind samples for each rejected Definition Passage");
-  assert.ok(retryEvidence.every((entry) => entry.targetKey.startsWith("definition:")));
-  assert.deepEqual([...new Set(retryEvidence.map((entry) => entry.sampleIndex))], [0, 1]);
-  assert.ok(retryEvidence.every((entry) => entry.answer.startsWith("Independent answer to")));
-  assert.ok(retryEvidence.every((entry) => !entry.answer.includes("attempt 1")), "the answer model never sees draft text");
+  assert.deepEqual(generationCalls, ["Concept A", "Concept B"]);
   assert.deepEqual(outcomes.map((outcome) => outcome.candidateKey), ["a", "b"]);
-  assert.ok(outcomes[0].disposition === "admitted" && outcomes[0].bundle.definitions[0].text.includes("attempt 2"));
+  assert.equal(outcomes[0].disposition, "rejected");
+  assert.ok(outcomes[0].disposition === "rejected" && outcomes[0].rationale.includes("definition contradicted"));
+  assert.equal(outcomes[1].disposition, "admitted");
 });
 
-test("exhausting Grounding Bundle attempts returns a resolved rejected outcome", async () => {
+test("rejecting every Definition Passage returns a resolved rejected outcome", async () => {
   const h = harness({
     factualityJudgments: judgmentPanel(async (input) => input.targets.map((target) => ({
       targetKey: target.targetKey,
@@ -711,7 +680,7 @@ test("exhausting Grounding Bundle attempts returns a resolved rejected outcome",
       agreementScore: 1,
       rationale: "mean pairwise cosine 1.0000 over 2 draws >= threshold 0.75"
     },
-    rationale: "Panel rationales may conflict and are not correction authority. Re-derive one internally consistent account; omit optional disputed detail rather than copying a proposed replacement. definition:0:claim:0: Rejected because fake-judge-a, fake-judge-b replicated an objection across at least 2 of 2 independently planned verification samples. not established definition:1:claim:0: Rejected because fake-judge-a, fake-judge-b replicated an objection across at least 2 of 2 independently planned verification samples. not established"
+    rationale: "definition:0:claim:0: Rejected because fake-judge-a, fake-judge-b replicated an objection across at least 2 of 2 independently planned verification samples. not established definition:1:claim:0: Rejected because fake-judge-a, fake-judge-b replicated an objection across at least 2 of 2 independently planned verification samples. not established"
   });
 });
 
@@ -754,16 +723,15 @@ test("dependency completion order cannot perturb outcome order", async () => {
   assert.deepEqual(outcomes.map((outcome) => outcome.candidateKey), ["slow", "fast"]);
 });
 
-test("stage waves and totals exactly follow initial and selective-retry batch sizes", async () => {
+test("stage waves and totals contain exactly one grounding-generation wave", async () => {
   const { stage, events } = recordingStage();
   const h = harness({
     factualityJudgments: judgmentPanel(async (input) => {
-      const reject = input.canonicalLabel === "Concept A"
-        && input.targets[0].text.includes("attempt 1");
+      const reject = input.canonicalLabel === "Concept A";
       return input.targets.map((target) => ({
         targetKey: target.targetKey,
         disposition: reject && target.targetKey.startsWith("definition:") ? "rejected" as const : "accepted" as const,
-        rationale: reject ? "retry" : "ok"
+        rationale: reject ? "rejected" : "ok"
       }));
     })
   });
@@ -777,11 +745,7 @@ test("stage waves and totals exactly follow initial and selective-retry batch si
     { stage: STAGE_TAGS.groundingGeneration, total: 2 },
     { stage: STAGE_TAGS.groundingVerificationQuestionPlanning, total: 4 },
     { stage: STAGE_TAGS.groundingVerificationAnswering, total: 4 },
-    { stage: STAGE_TAGS.groundingFactualityRevision, total: 24 },
-    { stage: STAGE_TAGS.groundingGeneration, total: 1 },
-    { stage: STAGE_TAGS.groundingVerificationQuestionPlanning, total: 2 },
-    { stage: STAGE_TAGS.groundingVerificationAnswering, total: 2 },
-    { stage: STAGE_TAGS.groundingFactualityRevision, total: 12 }
+    { stage: STAGE_TAGS.groundingFactualityRevision, total: 24 }
   ]);
 });
 

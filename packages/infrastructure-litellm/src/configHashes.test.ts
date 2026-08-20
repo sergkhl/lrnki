@@ -101,8 +101,8 @@ test("Graph Enrichment registers the complete shared admission stage family", ()
   );
   assert.equal(
     stageTags.filter((stage) => stage === STAGE_TAGS.groundingGeneration).length,
-    2,
-    "initial generation and evidence-backed replacement identities are registered"
+    1,
+    "the one-pass grounding generation identity is registered"
   );
 });
 
@@ -113,7 +113,6 @@ test("the scaffold operation registers shared admission, content assurance, and 
   assert.deepEqual(stageTags, [
     STAGE_TAGS.groundingFactualityRevision,
     STAGE_TAGS.groundingFactualityRevision,
-    STAGE_TAGS.groundingGeneration,
     STAGE_TAGS.groundingGeneration,
     STAGE_TAGS.groundingVerificationAnswering,
     STAGE_TAGS.groundingVerificationQuestionPlanning,
@@ -158,7 +157,6 @@ test("scaffold identity includes every admission behavior and descriptor but exc
   for (const [name, variant] of [
     ["probe sample count", { ...policy, probe: { ...policy.probe, sampleCount: policy.probe.sampleCount + 1 } }],
     ["probe threshold", { ...policy, probe: { ...policy.probe, agreementThreshold: policy.probe.agreementThreshold + 0.01 } }],
-    ["grounding attempts", { ...policy, groundingDraftAttempts: policy.groundingDraftAttempts + 1 }],
     ["verification samples", { ...policy, verificationSampleCount: policy.verificationSampleCount + 1 }],
     ["rejection quorum", { ...policy, verificationRejectionSampleQuorum: policy.verificationRejectionSampleQuorum + 1 }],
     ["verification decision", { ...policy, verificationDecision: "unanimous" as typeof policy.verificationDecision }],
@@ -312,7 +310,6 @@ test("Graph Enrichment hashes every admission behavior knob but not execution fa
   const behaviorVariants: readonly [string, typeof policy][] = [
     ["probe sample count", { ...policy, probe: { ...policy.probe, sampleCount: policy.probe.sampleCount + 1 } }],
     ["probe threshold", { ...policy, probe: { ...policy.probe, agreementThreshold: policy.probe.agreementThreshold + 0.01 } }],
-    ["draft attempts", { ...policy, groundingDraftAttempts: policy.groundingDraftAttempts + 1 }],
     ["verification samples", { ...policy, verificationSampleCount: policy.verificationSampleCount + 1 }],
     ["rejection quorum", { ...policy, verificationRejectionSampleQuorum: policy.verificationRejectionSampleQuorum + 1 }],
     [
@@ -345,7 +342,7 @@ test("dropping any shared admission descriptor changes Graph Enrichment identity
   const admissionIndexes = entry.descriptors
     .map((descriptor, index) => ({ descriptor, index }))
     .filter(({ descriptor }) => admissionStages.has(descriptor.stageTag));
-  assert.equal(admissionIndexes.length, 7, "probe, initial/replacement generation, planner, answerer, and both factuality identities");
+  assert.equal(admissionIndexes.length, 6, "probe, generation, planner, answerer, and both factuality identities");
 
   const knobs = { sourceLessGroundingAdmission: DEFAULT_ENRICHMENT_CONFIG.sourceLessGroundingAdmission };
   const full = operationConfigHash(entry.configSeed, entry.descriptors, knobs);
@@ -360,13 +357,12 @@ test("dropping any shared admission descriptor changes Graph Enrichment identity
 });
 
 // Exact identity regression: U4 re-baselines all three consumers because their shared Source-less
-// Grounding Admission independently elicits and judges category boundaries and its sole replacement
-// now carries counterexample-deletion and surface-scope audits. Future non-behavioral refactors must
-// not perturb these identities.
+// Grounding Admission now generates once and fails closed after factuality rejection. Future
+// non-behavioral refactors must not perturb these identities.
 test("default operation config hashes are stable across the registry derivation", () => {
-  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-e0447a30be1d");
-  assert.equal(scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG), "learner-scaffold-generation-33e8b793b3e0");
-  assert.equal(syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG), "synthetic-topic-generation-bcfd4431ea5b");
+  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-dfb9ae848b85");
+  assert.equal(scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG), "learner-scaffold-generation-7ab16c2fc80e");
+  assert.equal(syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG), "synthetic-topic-generation-0b1ab66013e0");
 });
 
 test("synthetic execution widths do not change identity while probe behavior still does", () => {
@@ -434,17 +430,6 @@ test("synthetic execution widths do not change identity while probe behavior sti
     }),
     base,
     "probe admission threshold remains behavioral identity"
-  );
-  assert.notEqual(
-    syntheticGenerationConfigHash({
-      ...DEFAULT_SYNTHETIC_GENERATION_CONFIG,
-      sourceLessGroundingAdmission: {
-        ...DEFAULT_SYNTHETIC_GENERATION_CONFIG.sourceLessGroundingAdmission,
-        groundingDraftAttempts: DEFAULT_SYNTHETIC_GENERATION_CONFIG.sourceLessGroundingAdmission.groundingDraftAttempts + 1
-      }
-    }),
-    base,
-    "bounded grounding rejection sampling remains behavioral identity"
   );
   assert.notEqual(
     syntheticGenerationConfigHash({

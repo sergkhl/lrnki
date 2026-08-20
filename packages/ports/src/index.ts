@@ -464,34 +464,11 @@ export type ClaimVerificationAnswer = {
   answer: string;
 };
 
-// Transient evidence from an independently planned, draft-blind verification sample. Source-less
-// Grounding Admission may give this evidence to its one bounded replacement attempt; it is never
-// learner text, persistence data, or admission authority, and the replacement is verified again.
-export type DraftBlindClaimEvidence = {
-  targetKey: string;
-  sampleIndex: number;
-  question: string;
-  answer: string;
-};
-
 export type GroundingGenerationInput = {
   declaredDomain: string;
   canonicalLabel: string;
   context: GroundingAdmissionContext;
-} & (
-  | {
-      rejectionFeedback?: never;
-      verificationEvidence?: never;
-    }
-  | {
-      // Present only for the sole bounded replacement after independent claim judgments reject
-      // every Definition Passage. Negative feedback constrains the replacement; the non-empty,
-      // draft-blind evidence packet supplies positive factual support without exposing the draft
-      // to the answer model.
-      rejectionFeedback: string;
-      verificationEvidence: readonly [DraftBlindClaimEvidence, ...DraftBlindClaimEvidence[]];
-    }
-);
+};
 
 export interface GroundingGenerationPort {
   readonly model: string;
@@ -502,8 +479,8 @@ export interface GroundingGenerationPort {
 // atomize their factual content. Answering receives only independently answerable questions and
 // opaque correlation keys: no target text or generated artifact can cross that port. Each final
 // judgment port returns judgments over the original target keys and cannot author replacement
-// learner text. Cross-family panel membership, coverage, exact correlation, settlement, and retry
-// policy stay in application.
+// learner text. Cross-family panel membership, coverage, exact correlation, and settlement policy
+// stay in application.
 export interface ClaimVerificationQuestionPlanningPort {
   readonly model: string;
   plan(input: {

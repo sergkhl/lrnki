@@ -12,8 +12,9 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-19-001 — Deepen Source-less Grounding Admission](./2026-08-19-001-deepen-source-less-grounding-admission.md)
-   — **In progress.** U1–U3 are closed `PASS`; U4 cross-consumer regression and real-use closure is
-   in progress.
+   — **Complete; consolidation next.** U1–U4 are closed `PASS`. Preserve the detailed record in the
+   implementation commit, then consolidate its durable decision/status and delete the plan in a
+   separate commit.
 
 Shaping, not yet a plan:
 [2026-08-08-002 — Generation model evaluation](../brainstorms/2026-08-08-002-generation-model-evaluation.md)

@@ -4,16 +4,13 @@
 
 ## TODO
 
-- **Source-less Grounding Admission — U4 in progress.** The
-  [plan](./2026-08-19-001-deepen-source-less-grounding-admission.md) owns implementation design and
-  validation. U1–U3 are closed `PASS`; U4 is stopped at `FIX_FIRST`. Structured replacement audits
-  repaired the exact lifetime/purpose failures, but the targeted production panel introduced a new
-  size predicate in `Heap Allocation`, its self-audit missed it, and all four terminal verdicts
-  accepted it. No post-repair Scaffold ran. Resolve the one decision in
-  [BLOCKERS.md](./BLOCKERS.md). Recommended: delete bounded regeneration and preserve each
-  consumer's existing fail-closed handling after one rejected draft; do not patch the prompt or
-  rerun Synthetic, Graph, or Scaffold. If neural recall must be retained, stop this plan and shape an
-  independently verified predicate-conservation module instead.
+- **Source-less Grounding Admission — implementation complete; consolidate.** The
+  [plan](./2026-08-19-001-deepen-source-less-grounding-admission.md) closes U1–U4 `PASS`. Bounded
+  Grounding Bundle regeneration is retired: one rejected initial draft now reaches each consumer's
+  existing fail-closed outcome policy. Repository, isolated-DB, and one current-hash production-model
+  Scaffold gate pass. Preserve the detailed record in the implementation commit, then update
+  ADR-0030 and this file, retire Candidate 1 from the shared brainstorm, remove the plan from the
+  index, and delete it in a separate consolidation commit.
 
 - **Generation model evaluation — shaping; no implementation plan is ready.** The
   [brainstorm](../brainstorms/2026-08-08-002-generation-model-evaluation.md) owns the dated evidence,

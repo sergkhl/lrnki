@@ -19,8 +19,6 @@ import {
   conceptLessonValidator,
   generatedGroundingBundleSchema,
   generatedGroundingBundleValidator,
-  regeneratedGroundingBundleSchema,
-  regeneratedGroundingBundleValidator,
   answerKeyVerificationSchema,
   answerKeyVerificationValidator,
   impostorSchema,
@@ -61,46 +59,6 @@ test("generated grounding bounds the factual surface while retaining one optiona
     definitions: [passage("One definition.")],
     mentions: [passage("One mention."), passage("Two mentions.")],
     rationale: "Too many mentions."
-  }));
-});
-
-test("bounded grounding replacement structurally permits only one definition and no mentions", () => {
-  const properties = regeneratedGroundingBundleSchema.properties as Record<string, { minItems?: number; maxItems?: number }>;
-  assert.equal(properties.definitions.minItems, 1);
-  assert.equal(properties.definitions.maxItems, 1);
-  assert.equal(properties.mentions.minItems, 0);
-  assert.equal(properties.mentions.maxItems, 0);
-  const required = regeneratedGroundingBundleSchema.required as unknown;
-  assert.ok(Array.isArray(required));
-  assert.ok(required.includes("rejectedPredicateAudit"));
-  assert.ok(required.includes("surfaceScopeAudit"));
-
-  const passage = (text: string) => ({ text });
-  assert.doesNotThrow(() => regeneratedGroundingBundleValidator.parse({
-    definitions: [passage("The candidate has one evidence-backed defining relationship.")],
-    mentions: [],
-    rationale: "The replacement retains only the shared relationship.",
-    rejectedPredicateAudit: "The rejected mechanism dimension is absent; the sentence states only the defining relationship.",
-    surfaceScopeAudit: "The defining relationship is invariant across the supplied context and evidence."
-  }));
-  assert.throws(() => regeneratedGroundingBundleValidator.parse({
-    definitions: [passage("One."), passage("Two.")],
-    mentions: [],
-    rationale: "Too many definitions.",
-    rejectedPredicateAudit: "The rejected mechanism dimension is absent.",
-    surfaceScopeAudit: "The relationship is invariant."
-  }));
-  assert.throws(() => regeneratedGroundingBundleValidator.parse({
-    definitions: [passage("One definition.")],
-    mentions: [passage("One mention.")],
-    rationale: "Mentions are not allowed.",
-    rejectedPredicateAudit: "The rejected mechanism dimension is absent.",
-    surfaceScopeAudit: "The relationship is invariant."
-  }));
-  assert.throws(() => regeneratedGroundingBundleValidator.parse({
-    definitions: [passage("One definition.")],
-    mentions: [],
-    rationale: "Missing the required audits."
   }));
 });
 

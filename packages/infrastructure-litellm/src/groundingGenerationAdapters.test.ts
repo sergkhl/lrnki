@@ -16,8 +16,6 @@ function groundingAdapterReturning(canned: {
   definitions: { text: string }[];
   mentions: { text: string }[];
   rationale: string;
-  rejectedPredicateAudit?: string;
-  surfaceScopeAudit?: string;
 }) {
   const calls: unknown[] = [];
   const client = {
@@ -78,84 +76,7 @@ test("generates an owner-neutral bundle conditioned on one closed scaffolded anc
   assert.ok(call.messages.some((message) => message.content.includes("Preserve exact identifier spelling and casing")));
   assert.ok(call.messages.some((message) => message.content.includes("Never write an unqualified broader-category claim")));
   const modelFacing = call.messages.map((message) => message.content).join("\n").toLowerCase();
-  for (const fixtureTerm of ["binary search", "pivot", "linked list", "logarithmic", "half-open interval", "topoisomerase", "telomerase", "primase", "origin of replication", "owner variable", "associated type", "rust trait"]) {
-    assert.equal(modelFacing.includes(fixtureTerm), false, `fixture-derived term leaked: ${fixtureTerm}`);
-  }
-});
-
-test("bounded replacement uses draft-blind verification evidence under its exact-one schema", async () => {
-  const { adapter, calls } = groundingAdapterReturning({
-    definitions: [{ text: "A feedback loop routes part of a system output back as an input." }],
-    mentions: [],
-    rationale: "Independent samples support only the output-to-input relationship.",
-    rejectedPredicateAudit: "The rejected implementation-mechanism dimension is absent; the sentence states only the output-to-input relationship.",
-    surfaceScopeAudit: "The output-to-input relationship is invariant across the supplied context and evidence."
-  });
-
-  const bundle = await adapter.generate({
-    declaredDomain: "systems science",
-    canonicalLabel: "Feedback loop",
-    context: { kind: "originating_topic", topic: "Feedback systems" },
-    rejectionFeedback: "The prior definition universalized one implementation mechanism.",
-    verificationEvidence: [
-      {
-        targetKey: "definition:0:claim:0",
-        sampleIndex: 0,
-        question: "What relationship minimally defines a feedback loop?",
-        answer: "Part of a system's output returns as an input to that system."
-      },
-      {
-        targetKey: "definition:0:claim:0",
-        sampleIndex: 1,
-        question: "Which mechanism is invariant across feedback-loop implementations?",
-        answer: "No single physical mechanism is invariant; the output-to-input relationship is."
-      }
-    ]
-  });
-
-  assert.equal(bundle.definitions.length, 1);
-  assert.equal(bundle.mentions.length, 0);
-  assert.equal("rejectedPredicateAudit" in bundle, false);
-  assert.equal("surfaceScopeAudit" in bundle, false);
-  const call = calls[0] as { toolName: string; messages: { content: string }[] };
-  assert.equal(call.toolName, "submit_regenerated_grounding_bundle");
-  assert.ok(call.messages.some((message) => message.content.includes("sole bounded replacement")));
-  assert.ok(call.messages.some((message) => message.content.includes("last-resort atomic admission candidate")));
-  assert.ok(call.messages.some((message) => message.content.includes("exactly one concise, one-sentence Definition Passage and no Mention Passages")));
-  assert.ok(call.messages.some((message) => message.content.includes("exactly one atomic relationship")));
-  assert.ok(call.messages.some((message) => message.content.includes("Unanimous optional detail is still optional")));
-  assert.ok(call.messages.some((message) => message.content.includes("Absence of a disagreement is not support")));
-  assert.ok(call.messages.some((message) => message.content.includes("Do not add a fact from your own recollection")));
-  assert.ok(call.messages.some((message) => message.content.includes("Delete that whole dimension")));
-  assert.ok(call.messages.some((message) => message.content.includes("Do not exchange one rejected value for a different value in the same dimension")));
-  assert.ok(call.messages.some((message) => message.content.includes("Context metadata does not silently scope learner-facing text")));
-  assert.ok(call.messages.some((message) => message.content.includes("rejectedPredicateAudit")));
-  assert.ok(call.messages.some((message) => message.content.includes("surfaceScopeAudit")));
-  assert.ok(call.messages.some((message) => message.content.includes("do not reuse that narrower term as an umbrella")));
-  assert.ok(call.messages.some((message) => message.content.includes("minimum evidence-backed alternatives")));
-  assert.ok(call.messages.some((message) => message.content.includes("Preserve the candidate's level of abstraction")));
-  assert.ok(call.messages.some((message) => message.content.includes("define that whole rather than one component actor's contribution")));
-  assert.ok(call.messages.some((message) => message.content.includes("define the place by that event")));
-  assert.ok(call.messages.some((message) => message.content.includes("broadest supported substrate geometry")));
-  assert.ok(call.messages.some((message) => message.content.includes("prior definition universalized one implementation mechanism")));
-  assert.ok(call.messages.some((message) => message.content.includes('"sample":1')));
-  assert.ok(call.messages.some((message) => message.content.includes("output-to-input relationship is")));
-  const userMessage = call.messages.find((message) => message.content.includes("Draft-blind verification evidence"))!.content;
-  assert.ok(
-    userMessage.indexOf("Draft-blind verification evidence") < userMessage.indexOf("Mandatory exclusion constraints"),
-    "long evidence precedes the decisive negative constraints so they remain recency-salient"
-  );
-  assert.ok(
-    userMessage.indexOf("Mandatory exclusion constraints") < userMessage.indexOf("Call submit_regenerated_grounding_bundle"),
-    "the negative constraints remain adjacent to the final tool instruction"
-  );
-  assert.ok(
-    userMessage.lastIndexOf("prior definition universalized one implementation mechanism") > userMessage.indexOf("Final accumulated counterexample constraints"),
-    "the accumulated counterexample is repeated adjacent to the final tool instruction"
-  );
-  assert.match(userMessage, /the conflict makes that detail unsupported: omit it/i);
-  const modelFacing = call.messages.map((message) => message.content).join("\n").toLowerCase();
-  for (const fixtureTerm of ["heap allocation", "string memory representation", "rust string", "allocating scope", "producer and consumer"]) {
+  for (const fixtureTerm of ["binary search", "pivot", "linked list", "logarithmic", "half-open interval", "topoisomerase", "telomerase", "primase", "origin of replication", "owner variable", "associated type", "rust trait", "heap allocation", "string memory representation", "rust string", "allocating scope", "producer and consumer"]) {
     assert.equal(modelFacing.includes(fixtureTerm), false, `fixture-derived term leaked: ${fixtureTerm}`);
   }
 });

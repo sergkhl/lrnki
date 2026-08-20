@@ -4,7 +4,6 @@ import type {
   ClaimFactualityJudgmentPort,
   ClaimVerificationAnsweringPort,
   ClaimVerificationQuestionPlanningPort,
-  DraftBlindClaimEvidence,
   GroundingGenerationPort,
   KnowledgeBoundaryProbePort,
   NodeEmbeddingPort
@@ -72,7 +71,6 @@ export interface SourceLessGroundingAdmission {
 
 export type SourceLessGroundingAdmissionPolicy = Readonly<{
   probe: KnowledgeBoundaryProbeConfig;
-  groundingDraftAttempts: number;
   verificationSampleCount: number;
   verificationDecision: "same_model_replicated_rejection";
   verificationRejectionSampleQuorum: number;
@@ -84,7 +82,6 @@ export type SourceLessGroundingAdmissionPolicy = Readonly<{
 
 export const DEFAULT_SOURCE_LESS_GROUNDING_ADMISSION_POLICY: SourceLessGroundingAdmissionPolicy = {
   probe: DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG,
-  groundingDraftAttempts: 2,
   verificationSampleCount: 3,
   verificationDecision: "same_model_replicated_rejection",
   verificationRejectionSampleQuorum: 2,
@@ -150,78 +147,48 @@ export function createSourceLessGroundingAdmission(construction: {
             }
           }
 
-          const rejectionByKey = new Map<string, string>();
-          const verificationEvidenceByKey = new Map<
-            string,
-            readonly [DraftBlindClaimEvidence, ...DraftBlindClaimEvidence[]]
-          >();
-          let pending = core;
-          for (let attempt = 0; attempt < policy.groundingDraftAttempts && pending.length > 0; attempt += 1) {
-            const drafts = await stage(STAGE_TAGS.groundingGeneration, () =>
-              mapWithConcurrency(pending, policy.candidateConcurrency, async ({ candidate, verdict }) => {
-                const baseInput = {
-                  declaredDomain: candidate.declaredDomain,
-                  canonicalLabel: candidate.canonicalLabel,
-                  context: candidate.context
-                };
-                const rejectionFeedback = rejectionByKey.get(candidate.candidateKey);
-                const bundle = await construction.groundingGeneration.generate(rejectionFeedback === undefined
-                  ? baseInput
-                  : {
-                      ...baseInput,
-                      rejectionFeedback,
-                      verificationEvidence: requireRetryEvidence(
-                        candidate.candidateKey,
-                        verificationEvidenceByKey.get(candidate.candidateKey)
-                      )
-                    });
-                validateGeneratedBundle(candidate, bundle);
-                return { candidate, verdict, bundle };
-              }), pending.length
-            );
+          const drafts = await stage(STAGE_TAGS.groundingGeneration, () =>
+            mapWithConcurrency(core, policy.candidateConcurrency, async ({ candidate, verdict }) => {
+              const bundle = await construction.groundingGeneration.generate({
+                declaredDomain: candidate.declaredDomain,
+                canonicalLabel: candidate.canonicalLabel,
+                context: candidate.context
+              });
+              validateGeneratedBundle(candidate, bundle);
+              return { candidate, verdict, bundle };
+            }), core.length
+          );
 
-            const claimResults = await operationClaims.admitBatch(drafts.map(({ candidate, bundle }) => ({
-              candidateKey: candidate.candidateKey,
-              canonicalLabel: candidate.canonicalLabel,
-              declaredDomain: candidate.declaredDomain,
-              context: candidate.context,
-              targets: groundingTargets(bundle, policy.groundingClaimProjection)
-            })));
-            const claimResultByKey = new Map(claimResults.map((result) => [result.candidateKey, result] as const));
+          const claimResults = await operationClaims.admitBatch(drafts.map(({ candidate, bundle }) => ({
+            candidateKey: candidate.candidateKey,
+            canonicalLabel: candidate.canonicalLabel,
+            declaredDomain: candidate.declaredDomain,
+            context: candidate.context,
+            targets: groundingTargets(bundle, policy.groundingClaimProjection)
+          })));
+          const claimResultByKey = new Map(claimResults.map((result) => [result.candidateKey, result] as const));
 
-            const rejected: typeof pending = [];
-            for (const draft of drafts) {
-              const claimResult = claimResultByKey.get(draft.candidate.candidateKey);
-              if (!claimResult) {
-                throw new Error(`Claim admission omitted candidateKey ${JSON.stringify(draft.candidate.candidateKey)}.`);
-              }
-              const settled = settleGroundingBundle(draft.bundle, claimResult.judgments);
-              if (settled.disposition === "rejected") {
-                rejectionByKey.set(draft.candidate.candidateKey, settled.rationale);
-                verificationEvidenceByKey.set(
-                  draft.candidate.candidateKey,
-                  nonEmptyDefinitionEvidence(draft.candidate.candidateKey, claimResult.verificationEvidence)
-                );
-                rejected.push({ candidate: draft.candidate, verdict: draft.verdict });
-                continue;
-              }
+          for (const draft of drafts) {
+            const claimResult = claimResultByKey.get(draft.candidate.candidateKey);
+            if (!claimResult) {
+              throw new Error(`Claim admission omitted candidateKey ${JSON.stringify(draft.candidate.candidateKey)}.`);
+            }
+            const settled = settleGroundingBundle(draft.bundle, claimResult.judgments);
+            if (settled.disposition === "rejected") {
               outcomeByKey.set(draft.candidate.candidateKey, {
                 candidateKey: draft.candidate.candidateKey,
-                disposition: "admitted",
+                disposition: "rejected",
+                reason: "grounding_verification_exhausted",
                 probe: probeSummary(draft.verdict),
-                bundle: settled.bundle
+                rationale: settled.rationale
               });
+              continue;
             }
-            pending = rejected;
-          }
-
-          for (const { candidate, verdict } of pending) {
-            outcomeByKey.set(candidate.candidateKey, {
-              candidateKey: candidate.candidateKey,
-              disposition: "rejected",
-              reason: "grounding_verification_exhausted",
-              probe: probeSummary(verdict),
-              rationale: rejectionByKey.get(candidate.candidateKey) ?? "Every generated Definition Passage was rejected."
+            outcomeByKey.set(draft.candidate.candidateKey, {
+              candidateKey: draft.candidate.candidateKey,
+              disposition: "admitted",
+              probe: probeSummary(draft.verdict),
+              bundle: settled.bundle
             });
           }
 
@@ -236,28 +203,6 @@ export function createSourceLessGroundingAdmission(construction: {
       };
     }
   };
-}
-
-function nonEmptyDefinitionEvidence(
-  candidateKey: string,
-  evidence: readonly DraftBlindClaimEvidence[]
-): readonly [DraftBlindClaimEvidence, ...DraftBlindClaimEvidence[]] {
-  const definitions = evidence.filter((entry) => entry.targetKey.startsWith("definition:"));
-  const first = definitions[0];
-  if (!first) {
-    throw new Error(`Claim admission returned no draft-blind Definition Passage evidence for ${candidateKey}.`);
-  }
-  return [first, ...definitions.slice(1)];
-}
-
-function requireRetryEvidence(
-  candidateKey: string,
-  evidence: readonly [DraftBlindClaimEvidence, ...DraftBlindClaimEvidence[]] | undefined
-): readonly [DraftBlindClaimEvidence, ...DraftBlindClaimEvidence[]] {
-  if (!evidence) {
-    throw new Error(`Source-less Grounding Admission omitted retry evidence for ${candidateKey}.`);
-  }
-  return evidence;
 }
 
 function isCoreProbe(entry: {
@@ -336,7 +281,7 @@ function settleGroundingBundle(
   if (definitions.length === 0) {
     return {
       disposition: "rejected",
-      rationale: boundedRejectionFeedback(judgments)
+      rationale: rejectionRationale(judgments)
     };
   }
   const mentions = draft.mentions.filter((_, index) =>
@@ -350,20 +295,18 @@ function settleGroundingBundle(
   };
 }
 
-function boundedRejectionFeedback(judgments: readonly ClaimJudgment[]): string {
+function rejectionRationale(judgments: readonly ClaimJudgment[]): string {
   const reasons = judgments
     .filter((judgment) => judgment.disposition === "rejected")
     .map((judgment) => `${judgment.targetKey}: ${judgment.rationale}`)
     .join(" ");
-  const guidance = "Panel rationales may conflict and are not correction authority. Re-derive one internally consistent account; omit optional disputed detail rather than copying a proposed replacement. ";
-  return `${guidance}${reasons || "Every generated Definition Passage was rejected."}`.slice(0, 2_000);
+  return (reasons || "Every generated Definition Passage was rejected.").slice(0, 2_000);
 }
 
 function validatePolicy(policy: SourceLessGroundingAdmissionPolicy): void {
-  requireExactKeys(policy, ["probe", "groundingDraftAttempts", "verificationSampleCount", "verificationDecision", "verificationRejectionSampleQuorum", "groundingClaimProjection", "judgmentTargetBatchSize", "candidateConcurrency", "verificationConcurrency"], "policy");
+  requireExactKeys(policy, ["probe", "verificationSampleCount", "verificationDecision", "verificationRejectionSampleQuorum", "groundingClaimProjection", "judgmentTargetBatchSize", "candidateConcurrency", "verificationConcurrency"], "policy");
   validateKnowledgeBoundaryProbeConfig(policy.probe);
   for (const [name, value] of [
-    ["groundingDraftAttempts", policy.groundingDraftAttempts],
     ["verificationSampleCount", policy.verificationSampleCount],
     ["verificationRejectionSampleQuorum", policy.verificationRejectionSampleQuorum],
     ["candidateConcurrency", policy.candidateConcurrency],

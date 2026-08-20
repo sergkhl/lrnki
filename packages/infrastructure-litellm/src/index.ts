@@ -146,8 +146,7 @@ export {
   claimFactualityJudgmentDescriptor,
   claimVerificationAnsweringDescriptor,
   claimVerificationQuestionPlanningDescriptor,
-  groundingGenerationDescriptor,
-  groundingRegenerationDescriptor,
+  groundingGenerationDescriptor
 } from "./groundingGenerationAdapters";
 export {
   createConceptSetSynthesisPort,
