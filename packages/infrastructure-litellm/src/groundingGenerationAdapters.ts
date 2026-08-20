@@ -63,7 +63,7 @@ export const groundingGenerationDescriptor: NeuralStageDescriptor<
   templateData: (input) => ({
     declaredDomain: input.declaredDomain,
     canonicalLabel: input.canonicalLabel,
-    contextLines: formatContext(input.context),
+    contextLines: formatGroundingAdmissionContext(input.context),
     rejectionContext: input.rejectionFeedback
       ? `A previous draft was rejected after independent factual verification. Generate a fresh bundle that resolves this bounded feedback, then rely on the later verifier for admission:\n${input.rejectionFeedback}`
       : ""
@@ -100,7 +100,7 @@ export const claimVerificationQuestionPlanningDescriptor: NeuralStageDescriptor<
   templateData: (input) => ({
     declaredDomain: input.declaredDomain,
     canonicalLabel: input.canonicalLabel,
-    contextLines: formatContext(input.context),
+    contextLines: formatGroundingAdmissionContext(input.context),
     claimTargets: formatTargets(input.targets)
   }),
   mapResult: (result, input) => {
@@ -152,7 +152,7 @@ export const claimVerificationAnsweringDescriptor: NeuralStageDescriptor<
   templateData: (input) => ({
     declaredDomain: input.declaredDomain,
     canonicalLabel: input.canonicalLabel,
-    contextLines: formatContext(input.context),
+    contextLines: formatGroundingAdmissionContext(input.context),
     questions: input.questions.map((question) => `[${question.questionKey}] ${question.question}`).join("\n")
   }),
   mapResult: (result) => result.answers
@@ -191,7 +191,7 @@ export const claimFactualityJudgmentDescriptor: NeuralStageDescriptor<
   templateData: (input) => ({
     declaredDomain: input.declaredDomain,
     canonicalLabel: input.canonicalLabel,
-    contextLines: formatContext(input.context),
+    contextLines: formatGroundingAdmissionContext(input.context),
     claimTargets: formatTargets(input.targets),
     verificationChecks: input.verificationAnswers
       .map((check) => `[target ${check.targetKey}; question ${check.questionKey}] ${check.question}\nAnswer: ${check.answer}`)
@@ -230,12 +230,13 @@ export function createClaimFactualityChallengePort(
   };
 }
 
-function formatContext(context: GroundingAdmissionContext): string {
+export function formatGroundingAdmissionContext(context: GroundingAdmissionContext): string {
   if (context.kind === "originating_topic") {
     return `Originating topic: "${context.topic}".`;
   }
   return [
     `Scaffolded anchor: "${context.anchor.canonicalLabel}" (${context.anchor.reference}).`,
+    "The anchor's named or structurally identified scope is a hard limit on every generated claim.",
     ...context.anchor.definitionPassages.map((passage) => `Anchor Definition Passage: "${passage}"`)
   ].join("\n");
 }

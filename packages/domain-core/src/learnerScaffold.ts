@@ -1,4 +1,4 @@
-import type { ConceptLessonSection } from "./index";
+import type { ConceptLessonSection, GeneratedGroundingBundle } from "./index";
 
 // Learner-Scoped Scaffold Detour aggregate (plan 2026-07-12-002 U2, KTD2, ADR-0037).
 // A Scaffold Detour is a learner-owned, optional, one-level support branch off a parent
@@ -65,6 +65,9 @@ export type ScaffoldGeneratedStep = {
   kind: "generated";
   // Whole content home (payload-on-step). Immutable once published.
   payload: ScaffoldNodePayload;
+  // The owner-neutral, admitted evidence used to generate and verify this exact payload.
+  // Immutable beside the payload; never projected to the learner surface.
+  groundingBundle: GeneratedGroundingBundle;
   // Mutable: the moment the learner read this generated micro-lesson (R12). Null until read.
   lessonReadAt: string | null;
 };

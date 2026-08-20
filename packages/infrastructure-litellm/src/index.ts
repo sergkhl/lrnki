@@ -83,7 +83,7 @@ export {
 export {
   createStudyItemBlueprintPort,
   createStudyItemGenerationPort,
-  createStudyItemKeyVerificationPort,
+  createAnswerKeyVerificationPort,
   createMatchingAssignmentVerificationPort,
   studyOptionSelectGenerationDescriptor,
   studyImpostorGenerationDescriptor,

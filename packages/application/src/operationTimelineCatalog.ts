@@ -78,19 +78,23 @@ export const OPERATION_TIMELINE_CATALOG: Record<OperationType, readonly Operatio
   // exact through the (operation_id, stage) join when this operation reuses a descriptor.
   scaffold: [
     llm(STAGE_TAGS.scaffoldOutlineGeneration),
-    llm(STAGE_TAGS.scaffoldContentGeneration),
     llm(STAGE_TAGS.knowledgeBoundaryProbe),
     llm(STAGE_TAGS.groundingGeneration),
+    llm(STAGE_TAGS.groundingVerificationQuestionPlanning),
+    llm(STAGE_TAGS.groundingVerificationAnswering),
+    llm(STAGE_TAGS.groundingFactualityRevision),
     // The probe's K-answer agreement embeds through the embedding client, which tags spend
     // `node-embedding` under the ambient scaffold operation id (plan 2026-07-16-004 U3): before
     // this claim, that real spend was silently dropped from the scaffold cost report.
     llm(STAGE_TAGS.nodeEmbedding),
+    llm(STAGE_TAGS.scaffoldContentGeneration),
     // Label↔content congruence judge (plan 2026-07-16-001). Two call sites share ONE descriptor:
     // the scaffold operation runs it as a generation-time re-pick (KTD4b) — those calls carry this
     // operation_id and DO aggregate under the scaffold cost report — while the standing
     // `audit-scaffold-content` command K-samples the same descriptor with NO operation_id, so
     // audit runs never touch any operation's cost report.
     llm(STAGE_TAGS.scaffoldContentCongruence),
+    llm(STAGE_TAGS.optionSelectKeyVerification),
     nonLlm(NON_LLM_STAGES.persist)
   ]
 } as const;

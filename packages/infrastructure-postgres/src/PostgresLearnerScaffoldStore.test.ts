@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test, { after } from "node:test";
-import type { ScaffoldStep } from "@lrnki/domain-core";
+import type { GeneratedGroundingBundle, ScaffoldStep } from "@lrnki/domain-core";
 import { createDatabaseClient } from "./db";
 import { PostgresLearnerScaffoldStore, PostgresScaffoldReferenceActivityRead } from "./PostgresLearnerScaffoldStore";
 import { PostgresResponseLogStore } from "./PostgresLearnerLoopStores";
@@ -71,11 +71,27 @@ async function claimDetour(sql: Sql, store: PostgresLearnerScaffoldStore, detour
 }
 
 function generatedStep(ordinal: number): ScaffoldStep {
+  const groundingBundle: GeneratedGroundingBundle = {
+    groundingOrigin: "llm_grounded",
+    definitions: [{
+      passageType: "definition",
+      text: "An affine type permits a value to be used at most once.",
+      groundingOrigin: "llm_grounded",
+      headingPath: [],
+      locator: {},
+      verbatimCheck: { disposition: "not_applicable_by_grounding", rationale: "generated" }
+    }],
+    mentions: [],
+    groundingAnchorReferences: ["parent-anchor"],
+    generatingModel: "test-grounding-model",
+    rationale: "test admitted grounding"
+  };
   return {
     scaffoldStepId: randomUUID(),
     ordinal,
     kind: "generated",
     lessonReadAt: null,
+    groundingBundle,
     payload: {
       scaffoldNodeId: randomUUID(),
       label: "Affine types",
@@ -124,6 +140,8 @@ maybe("upsertPending is idempotent per (learner, enrichment, parent, term); hide
     assert.equal(restored.status, "ready", "a hidden detour with content restores to ready");
     assert.equal(restored.steps.length, 1);
     assert.equal(restored.steps[0].scaffoldStepId, step.scaffoldStepId, "the published step id is preserved");
+    assert.ok(restored.steps[0].kind === "generated");
+    assert.deepEqual(restored.steps[0].groundingBundle, step.kind === "generated" ? step.groundingBundle : undefined, "the admitted grounding bundle is restored byte-for-byte beside the payload");
   } finally {
     await sql.end();
   }
@@ -146,6 +164,16 @@ maybe("the schema requires all pinned ids, rejects mixed payloads and non-option
     await assert.rejects(() => sql`
       INSERT INTO learner_scaffold_steps (scaffold_step_id, detour_id, ordinal, kind, referenced_derived_node_id)
       VALUES (${randomUUID()}, ${detour.detourId}, 0, 'reference', ${refNodeId})`, /violates check|check constraint/i, "a reference step cannot omit either pinned asset id");
+
+    const generated = generatedStep(1);
+    assert.ok(generated.kind === "generated");
+    await assert.rejects(() => sql`
+      INSERT INTO learner_scaffold_steps (scaffold_step_id, detour_id, ordinal, kind, payload)
+      VALUES (${generated.scaffoldStepId}, ${detour.detourId}, ${generated.ordinal}, 'generated', ${sql.json(generated.payload)})`, /violates check|check constraint/i, "a generated step cannot omit its admitted grounding bundle");
+
+    await assert.rejects(() => sql`
+      INSERT INTO learner_scaffold_steps (scaffold_step_id, detour_id, ordinal, kind, referenced_derived_node_id, referenced_concept_lesson_id, referenced_study_item_id, grounding_bundle)
+      VALUES (${randomUUID()}, ${detour.detourId}, 2, 'reference', ${refNodeId}, ${assets.conceptLessonId}, ${assets.studyItemId}, ${sql.json(generated.groundingBundle)})`, /violates check|check constraint/i, "a reference step cannot carry generated grounding evidence");
 
     const matchingItemId = randomUUID();
     await sql`
@@ -336,6 +364,8 @@ maybe("listGeneratedStepsForAudit returns generated steps with context and exclu
     assert.equal(row.declaredDomain, "software engineering");
     assert.equal(row.enrichmentId, enrichmentId);
     assert.equal(row.payload.item.question, "Which best describes an affine type?");
+    assert.ok(gen.kind === "generated");
+    assert.deepEqual(row.groundingBundle, gen.groundingBundle, "the audit reads the exact persisted assurance evidence");
 
     // An unrelated enrichment id returns nothing for this detour.
     const otherScoped = await store.listGeneratedStepsForAudit(randomUUID());

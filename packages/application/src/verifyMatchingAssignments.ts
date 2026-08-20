@@ -9,7 +9,7 @@ import {
 
 // Matching Assignment Verification (plan 2026-08-07-001 D5/D6/D7, amending ADR-0026).
 //
-// Matching is the one item type outside Study Item Key Verification, and deliberately so: its
+// Matching is the one item type outside Answer-Key Verification, and deliberately so: its
 // harm class is not a false claim but an AMBIGUOUS BOARD. When two matches both answer one
 // prompt, a learner who knows the material is marked wrong — and every one of those pairs is
 // individually TRUE, so a per-candidate claim judge sees nothing. This phase asks the question

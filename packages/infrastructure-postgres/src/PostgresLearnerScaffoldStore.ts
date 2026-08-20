@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { ScaffoldDetour, ScaffoldNodePayload, ScaffoldStep } from "@lrnki/domain-core";
+import type { GeneratedGroundingBundle, ScaffoldDetour, ScaffoldNodePayload, ScaffoldStep } from "@lrnki/domain-core";
 import type { GeneratedScaffoldStepForAudit, ScaffoldDetourStorePort, ScaffoldReferenceActivity, ScaffoldReferenceActivityReadPort } from "@lrnki/ports";
 import type { Sql, TransactionSql } from "postgres";
 import { hydrateConceptLessonRows, hydrateStudyItemRows, type LessonRow, type StudyItemRow } from "./PostgresLearnerLoopStores";
@@ -35,6 +35,7 @@ type StepRow = {
   referenced_concept_lesson_id: string | null;
   referenced_study_item_id: string | null;
   payload: ScaffoldNodePayload | null;
+  grounding_bundle: GeneratedGroundingBundle | null;
   lesson_read_at: string | null;
 };
 
@@ -54,6 +55,7 @@ function toStep(row: StepRow): ScaffoldStep {
     ordinal: row.ordinal,
     kind: "generated",
     payload: row.payload as ScaffoldNodePayload,
+    groundingBundle: row.grounding_bundle as GeneratedGroundingBundle,
     lessonReadAt: row.lesson_read_at === null ? null : new Date(row.lesson_read_at).toISOString()
   };
 }
@@ -80,7 +82,7 @@ export class PostgresLearnerScaffoldStore implements ScaffoldDetourStorePort {
 
   private async stepsFor(tx: Sql | TransactionSql, detourId: string): Promise<ScaffoldStep[]> {
     const rows = await tx<StepRow[]>`
-      SELECT scaffold_step_id, detour_id, ordinal, kind, referenced_derived_node_id, referenced_concept_lesson_id, referenced_study_item_id, payload, lesson_read_at
+      SELECT scaffold_step_id, detour_id, ordinal, kind, referenced_derived_node_id, referenced_concept_lesson_id, referenced_study_item_id, payload, grounding_bundle, lesson_read_at
       FROM learner_scaffold_steps WHERE detour_id = ${detourId} ORDER BY ordinal`;
     return rows.map(toStep);
   }
@@ -235,8 +237,8 @@ export class PostgresLearnerScaffoldStore implements ScaffoldDetourStorePort {
             VALUES (${step.scaffoldStepId}, ${input.detourId}, ${step.ordinal}, 'reference', ${step.referencedDerivedNodeId}, ${step.referencedConceptLessonId}, ${step.referencedStudyItemId})`;
         } else {
           await tx`
-            INSERT INTO learner_scaffold_steps (scaffold_step_id, detour_id, ordinal, kind, payload, lesson_read_at)
-            VALUES (${step.scaffoldStepId}, ${input.detourId}, ${step.ordinal}, 'generated', ${tx.json(step.payload)}, ${step.lessonReadAt})`;
+            INSERT INTO learner_scaffold_steps (scaffold_step_id, detour_id, ordinal, kind, payload, grounding_bundle, lesson_read_at)
+            VALUES (${step.scaffoldStepId}, ${input.detourId}, ${step.ordinal}, 'generated', ${tx.json(step.payload)}, ${tx.json(step.groundingBundle)}, ${step.lessonReadAt})`;
         }
       }
       await tx`UPDATE learner_scaffold_detours SET status = 'ready', claim_token = NULL, updated_at = now() WHERE detour_id = ${input.detourId}`;
@@ -282,7 +284,7 @@ export class PostgresLearnerScaffoldStore implements ScaffoldDetourStorePort {
 
   async getStep(input: { scaffoldStepId: string; learnerStateRef: string }): Promise<{ step: ScaffoldStep; detourId: string } | undefined> {
     const [row] = await this.sql<StepRow[]>`
-      SELECT s.scaffold_step_id, s.detour_id, s.ordinal, s.kind, s.referenced_derived_node_id, s.referenced_concept_lesson_id, s.referenced_study_item_id, s.payload, s.lesson_read_at
+      SELECT s.scaffold_step_id, s.detour_id, s.ordinal, s.kind, s.referenced_derived_node_id, s.referenced_concept_lesson_id, s.referenced_study_item_id, s.payload, s.grounding_bundle, s.lesson_read_at
       FROM learner_scaffold_steps s
       JOIN learner_scaffold_detours d ON d.detour_id = s.detour_id
       WHERE s.scaffold_step_id = ${input.scaffoldStepId} AND d.learner_state_ref = ${input.learnerStateRef}`;
@@ -307,7 +309,7 @@ export class PostgresLearnerScaffoldStore implements ScaffoldDetourStorePort {
     // Domain). Reference steps are filtered out (they carry no generated payload). Ordered
     // deterministically so re-runs and evidence diffs are stable.
     const rows = await this.sql<AuditStepRow[]>`
-      SELECT s.scaffold_step_id, s.detour_id, s.payload, d.enrichment_id, d.term,
+      SELECT s.scaffold_step_id, s.detour_id, s.payload, s.grounding_bundle, d.enrichment_id, d.term,
              n.canonical_label AS parent_label, n.declared_domain
       FROM learner_scaffold_steps s
       JOIN learner_scaffold_detours d ON d.detour_id = s.detour_id
@@ -322,7 +324,8 @@ export class PostgresLearnerScaffoldStore implements ScaffoldDetourStorePort {
       declaredDomain: row.declared_domain,
       term: row.term,
       parentLabel: row.parent_label,
-      payload: row.payload as ScaffoldNodePayload
+      payload: row.payload as ScaffoldNodePayload,
+      groundingBundle: row.grounding_bundle as GeneratedGroundingBundle
     }));
   }
 }
@@ -397,6 +400,7 @@ type AuditStepRow = {
   scaffold_step_id: string;
   detour_id: string;
   payload: ScaffoldNodePayload | null;
+  grounding_bundle: GeneratedGroundingBundle | null;
   enrichment_id: string;
   term: string;
   parent_label: string;

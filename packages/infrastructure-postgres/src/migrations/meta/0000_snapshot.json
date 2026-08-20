@@ -1,5 +1,5 @@
 {
-  "id": "88773620-474b-4df9-a02d-4f6dbcbacd9e",
+  "id": "06209d3f-8ac2-4dee-898f-b459c8927179",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -5252,6 +5252,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "grounding_bundle": {
+          "name": "grounding_bundle",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
         "lesson_read_at": {
           "name": "lesson_read_at",
           "type": "timestamp with time zone",
@@ -5343,7 +5349,7 @@
         },
         "learner_scaffold_steps_check": {
           "name": "learner_scaffold_steps_check",
-          "value": "(\n        kind = 'reference'\n        AND referenced_derived_node_id IS NOT NULL\n        AND referenced_concept_lesson_id IS NOT NULL\n        AND referenced_study_item_id IS NOT NULL\n        AND payload IS NULL\n        AND lesson_read_at IS NULL\n      ) OR (\n        kind = 'generated'\n        AND referenced_derived_node_id IS NULL\n        AND referenced_concept_lesson_id IS NULL\n        AND referenced_study_item_id IS NULL\n        AND payload IS NOT NULL\n      )"
+          "value": "(\n        kind = 'reference'\n        AND referenced_derived_node_id IS NOT NULL\n        AND referenced_concept_lesson_id IS NOT NULL\n        AND referenced_study_item_id IS NOT NULL\n        AND payload IS NULL\n        AND grounding_bundle IS NULL\n        AND lesson_read_at IS NULL\n      ) OR (\n        kind = 'generated'\n        AND referenced_derived_node_id IS NULL\n        AND referenced_concept_lesson_id IS NULL\n        AND referenced_study_item_id IS NULL\n        AND payload IS NOT NULL\n        AND grounding_bundle IS NOT NULL\n      )"
         }
       },
       "isRLSEnabled": false

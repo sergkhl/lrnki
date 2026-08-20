@@ -12,18 +12,18 @@ import type {
 } from "@lrnki/domain-core";
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import type {
+  AnswerKeyVerificationPort,
   MatchingAssignmentVerificationPort,
   StudyItemBlueprintPort,
-  StudyItemGenerationPort,
-  StudyItemKeyVerificationPort
+  StudyItemGenerationPort
 } from "@lrnki/ports";
 import type { z } from "zod";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import { executeForcedToolStage, type NeuralStageDescriptor } from "./forcedToolStage";
 import { readPromptFile } from "./promptFile";
 import {
-  studyItemKeyVerificationSchema,
-  studyItemKeyVerificationValidator,
+  answerKeyVerificationSchema,
+  answerKeyVerificationValidator,
   matchingAssignmentVerificationSchema,
   matchingAssignmentVerificationValidator,
   impostorSchema,
@@ -58,15 +58,7 @@ type StudyItemBlueprintInput = {
   supportedItemTypes: StudyItemType[];
 };
 
-type StudyItemKeyVerificationInput = {
-  itemType: "option_select" | "impostor";
-  declaredDomain: string;
-  node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
-  question?: string;
-  candidates: { ordinal: number; text: string }[];
-  groundingPassages: GroundingPassage[];
-  siblings: { label: string; snippet: string }[];
-};
+type AnswerKeyVerificationInput = Parameters<AnswerKeyVerificationPort["verify"]>[0];
 
 type MatchingAssignmentVerificationInput = {
   declaredDomain: string;
@@ -82,7 +74,7 @@ type OptionSelectArgs = z.infer<typeof optionSelectValidator>;
 type ImpostorArgs = z.infer<typeof impostorValidator>;
 type MatchingArgs = z.infer<typeof matchingValidator>;
 type StudyItemBlueprintArgs = z.infer<typeof studyItemBlueprintValidator>;
-type StudyItemKeyVerificationArgs = z.infer<typeof studyItemKeyVerificationValidator>;
+type AnswerKeyVerificationArgs = z.infer<typeof answerKeyVerificationValidator>;
 type MatchingAssignmentVerificationArgs = z.infer<typeof matchingAssignmentVerificationValidator>;
 
 export const studyOptionSelectGenerationDescriptor: NeuralStageDescriptor<
@@ -201,43 +193,43 @@ export const studyItemBlueprintDescriptor: NeuralStageDescriptor<
 // split is not decoration: `stageTag` is a hashed descriptor field, so two separately
 // attributable brackets over one prompt necessarily mean two descriptor instances. The
 // factory keeps the prompt, schema, and rendering single-sourced across both.
-function studyItemKeyVerificationDescriptor(stageTag: StageTag): NeuralStageDescriptor<
-  StudyItemKeyVerificationInput,
-  StudyItemKeyVerificationArgs,
+function answerKeyVerificationDescriptor(stageTag: StageTag): NeuralStageDescriptor<
+  AnswerKeyVerificationInput,
+  AnswerKeyVerificationArgs,
   StudyItemCandidateVerdict[]
 > {
   return {
-    promptPath: "study-item-key-verification.prompt",
+    promptPath: "answer-key-verification.prompt",
     stageTag,
-    schema: studyItemKeyVerificationSchema,
-    validator: studyItemKeyVerificationValidator,
+    schema: answerKeyVerificationSchema,
+    validator: answerKeyVerificationValidator,
     sentinelInput: {
       itemType: "option_select",
       declaredDomain: "sentinel domain",
-      node: { derivedNodeId: "sentinel_node", canonicalLabel: "Sentinel node", aliases: ["Sentinel alias"] },
+      subject: { canonicalLabel: "Sentinel subject", aliases: ["Sentinel alias"] },
       question: "A sentinel question?",
       candidates: [{ ordinal: 0, text: "A sentinel candidate claim." }],
-      groundingPassages: [{ passageId: "sentinel_passage", kind: "definition", text: "A sentinel passage.", derivedNodeId: "sentinel_node" }],
-      siblings: [{ label: "Sentinel sibling", snippet: "A nearby concept." }]
+      groundingPassages: [{ passageId: "sentinel_passage", kind: "definition", text: "A sentinel passage." }],
+      relatedConcepts: [{ label: "Sentinel neighbor", snippet: "A related concept." }]
     },
     templateData: (input) => ({
       declaredDomain: input.declaredDomain,
-      nodeLabel: input.node.canonicalLabel,
-      aliasText: aliasText(input.node.aliases),
+      subjectLabel: input.subject.canonicalLabel,
+      aliasText: aliasText(input.subject.aliases),
       // Rendered only for option-select, where the question frames each candidate as a
       // proposed answer. An impostor question is a meta-form ("which is FALSE?") that would
       // invert per-statement judging, so its block renders empty (D8).
       questionBlock: input.question ? `\nThe item asks: "${input.question}" Judge each candidate as a proposed answer to it.` : "",
       candidates: renderCandidates(input.candidates),
       passages: renderPassages(input.groundingPassages),
-      siblings: renderSiblings(input.siblings)
+      relatedConcepts: renderSiblings(input.relatedConcepts)
     }),
     mapResult: (args) => args.verdicts.map((entry) => ({ ordinal: entry.ordinal, verdict: entry.verdict, reason: entry.reason }))
   };
 }
 
-export const optionSelectKeyVerificationDescriptor = studyItemKeyVerificationDescriptor(STAGE_TAGS.optionSelectKeyVerification);
-export const impostorKeyVerificationDescriptor = studyItemKeyVerificationDescriptor(STAGE_TAGS.impostorKeyVerification);
+export const optionSelectKeyVerificationDescriptor = answerKeyVerificationDescriptor(STAGE_TAGS.optionSelectKeyVerification);
+export const impostorKeyVerificationDescriptor = answerKeyVerificationDescriptor(STAGE_TAGS.impostorKeyVerification);
 
 // Matching Assignment Verification (plan 2026-08-07-001 D5). A third judge stage on the SAME
 // cross-family `kg-independent-judge` alias, so no litellm/config.yaml change — but its own
@@ -300,7 +292,7 @@ export function createStudyItemBlueprintPort(client: LiteLlmForcedToolClient): S
 // One port, two stages: the item type selects which descriptor — and therefore which
 // STAGE_TAG the call's spend and wall-clock attribute to — while the prompt and schema are
 // identical. The application never names a stage tag; it names an item type.
-export function createStudyItemKeyVerificationPort(client: LiteLlmForcedToolClient): StudyItemKeyVerificationPort {
+export function createAnswerKeyVerificationPort(client: LiteLlmForcedToolClient): AnswerKeyVerificationPort {
   return {
     model: readPromptFile(optionSelectKeyVerificationDescriptor.promptPath).model,
     verify: (input) => executeForcedToolStage(
@@ -353,7 +345,7 @@ function renderCandidates(candidates: { ordinal: number; text: string }[]): stri
   return candidates.map((candidate) => `${candidate.ordinal}. "${candidate.text}"`).join("\n") || "(none)";
 }
 
-function renderPassages(passages: GroundingPassage[]): string {
+function renderPassages(passages: readonly { passageId: string; kind: "definition" | "mention"; text: string }[]): string {
   return passages.map((passage) => `- [${passage.passageId}] (${passage.kind}) "${passage.text}"`).join("\n") || "(none)";
 }
 

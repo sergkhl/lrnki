@@ -608,15 +608,14 @@ export const impostorValidator = z.object({
 
 export const impostorSchema: JsonSchema = toForcedToolSchema(impostorValidator);
 
-// --- Study Item key verification: submit_study_item_key_verification
-// Cross-family semantic judgment over EVERY candidate answer of one guarded item, after the
-// deterministic grounding checks pass. It answers, per candidate, whether the claim is true
-// of the learning node — never which candidate the item keys, which is the application's
-// deterministic uniqueness rule to enforce over these verdicts. The array shape mirrors the
-// redundancy judgment's: one verdict per numbered candidate, echoed back by ordinal so a
-// reordered or short response cannot be silently misaligned by position.
+// --- Answer-Key Verification: submit_answer_key_verification
+// Cross-family semantic judgment over EVERY candidate answer of one guarded learner activity.
+// It answers, per candidate, whether the claim is true of the learning subject — never which
+// candidate the activity keys. Neutral Study Items and learner-scoped Support Steps share this
+// owner-neutral wire contract. One verdict per numbered candidate is echoed by presentation
+// ordinal so a reordered or short response cannot be silently misaligned.
 
-export const studyItemKeyVerificationValidator = z.object({
+export const answerKeyVerificationValidator = z.object({
   verdicts: z.array(z.object({
     ordinal: z.number().int().describe("The candidate's number, exactly as listed in the prompt."),
     verdict: z.enum(["claim_true", "claim_false", "unclear"]).describe("'claim_true' when the candidate is a correct claim about the learning node. 'claim_false' when it is incorrect for that node. 'unclear' when it cannot be decided from the provided context and general knowledge of the declared domain."),
@@ -624,7 +623,7 @@ export const studyItemKeyVerificationValidator = z.object({
   }).strict())
 }).strict();
 
-export const studyItemKeyVerificationSchema: JsonSchema = toForcedToolSchema(studyItemKeyVerificationValidator);
+export const answerKeyVerificationSchema: JsonSchema = toForcedToolSchema(answerKeyVerificationValidator);
 
 // --- Matching Assignment Verification: submit_matching_assignment_verification
 // Cross-family semantic judgment over the FULL N×N grid of one guarded matching item, after the
@@ -797,7 +796,7 @@ export const toolValidators = [
   studyItemBlueprintValidator,
   matchingValidator,
   impostorValidator,
-  studyItemKeyVerificationValidator,
+  answerKeyVerificationValidator,
   matchingAssignmentVerificationValidator,
   conceptLessonRedundancyJudgmentValidator,
   conceptLessonValidator

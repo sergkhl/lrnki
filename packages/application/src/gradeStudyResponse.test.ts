@@ -269,6 +269,7 @@ test("the use-case imports no graph or enrichment write port", async () => {
 function generatedStep(): ScaffoldStep {
   return {
     scaffoldStepId: "step-1", ordinal: 0, kind: "generated", lessonReadAt: null,
+    groundingBundle: { groundingOrigin: "llm_grounded", definitions: [], mentions: [], groundingAnchorReferences: [], generatingModel: "test", rationale: "test fixture" },
     payload: {
       scaffoldNodeId: "sn-1", label: "Affine types",
       lesson: [{ kind: "definition", text: "def", groundingProvenance: "generated" }],

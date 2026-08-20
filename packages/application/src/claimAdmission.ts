@@ -22,7 +22,7 @@ export type ClaimJudgment = Readonly<{
   rationale: string;
 }>;
 
-type ClaimSet = Readonly<{
+export type PositiveClaimSet = Readonly<{
   candidateKey: string;
   canonicalLabel: string;
   declaredDomain: string;
@@ -30,9 +30,9 @@ type ClaimSet = Readonly<{
   targets: readonly PositiveClaimTarget[];
 }>;
 
-type ClaimAdmission = {
+export type ClaimAdmission = {
   forOperation(stage: StageBracket): {
-    admitBatch(claimSets: readonly ClaimSet[]): Promise<readonly {
+    admitBatch(claimSets: readonly PositiveClaimSet[]): Promise<readonly {
       candidateKey: string;
       judgments: readonly ClaimJudgment[];
     }[]>;
@@ -83,7 +83,7 @@ export function createClaimAdmission(construction: {
 
           const samplesByCandidate = new Map<string, ClaimJudgment[][]>();
           type VerificationRequest = Readonly<{
-            claimSet: ClaimSet;
+            claimSet: PositiveClaimSet;
             sampleIndex: number;
             targetIndexes: readonly number[];
           }>;
@@ -153,7 +153,7 @@ export function createClaimAdmission(construction: {
             );
             return stage(STAGE_TAGS.groundingFactualityRevision, () =>
               mapWithConcurrency(judgmentRequests, construction.verificationConcurrency, async ({ claimSet, target, targetIndex, verificationAnswers, sampleIndex, judgeIndex, judgment }) => {
-                const targetClaimSet: ClaimSet = { ...claimSet, targets: [target] };
+                const targetClaimSet: PositiveClaimSet = { ...claimSet, targets: [target] };
                 const judgments = await judgment.judge({
                   declaredDomain: claimSet.declaredDomain,
                   canonicalLabel: claimSet.canonicalLabel,
@@ -237,7 +237,7 @@ export function createClaimAdmission(construction: {
   };
 }
 
-function validateClaimSets(claimSets: readonly ClaimSet[]): void {
+function validateClaimSets(claimSets: readonly PositiveClaimSet[]): void {
   const candidateKeys = new Set<string>();
   for (const claimSet of claimSets) {
     requireExactKeys(claimSet, ["candidateKey", "canonicalLabel", "declaredDomain", "context", "targets"], "claim set");
@@ -268,7 +268,7 @@ function validateClaimSets(claimSets: readonly ClaimSet[]): void {
 }
 
 function validateQuestionPlan(
-  claimSet: ClaimSet,
+  claimSet: PositiveClaimSet,
   questions: readonly { targetKey: string; question: string }[]
 ): void {
   if (!Array.isArray(questions) || questions.length === 0) {
@@ -321,7 +321,7 @@ function validateAnswers(
 }
 
 function validateJudgments(
-  claimSet: ClaimSet,
+  claimSet: PositiveClaimSet,
   judgments: readonly ClaimJudgment[]
 ): readonly ClaimJudgment[] {
   if (!Array.isArray(judgments)) {
@@ -352,7 +352,7 @@ function validateJudgments(
 }
 
 function aggregateVerificationSamples(
-  claimSet: ClaimSet,
+  claimSet: PositiveClaimSet,
   samples: readonly (readonly ClaimJudgment[])[],
   maximumEvidenceSampleCount: number,
   initialSampleCount: number,
@@ -404,7 +404,7 @@ function aggregateVerificationSamples(
 }
 
 function unresolvedTargetIndexes(
-  claimSet: ClaimSet,
+  claimSet: PositiveClaimSet,
   samples: readonly (readonly ClaimJudgment[])[],
   completedSampleCount: number,
   judgeCount: number,
@@ -430,7 +430,7 @@ function unresolvedTargetIndexes(
 }
 
 function requireTargetPanelSamples(
-  claimSet: ClaimSet,
+  claimSet: PositiveClaimSet,
   samples: readonly (readonly ClaimJudgment[])[],
   targetIndex: number,
   initialSampleCount: number,

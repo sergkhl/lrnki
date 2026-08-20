@@ -100,40 +100,65 @@ test("Graph Enrichment registers the complete shared admission stage family", ()
   );
 });
 
-// The Scaffold entry carries its five runtime stages exactly once each (KTD7): outline, probe,
-// grounding, content, and the generation-time congruence re-pick.
-test("the scaffold operation registers outline, probe, grounding, content, and congruence exactly once", () => {
+// The Scaffold entry carries its complete runtime descriptor family. The factuality stage appears
+// twice because independent primary and challenger model identities are both part of provenance.
+test("the scaffold operation registers shared admission, content assurance, and Answer-Key Verification completely", () => {
   const stageTags = neuralOperationRegistry.scaffoldGeneration.descriptors.map((descriptor) => descriptor.stageTag).sort();
   assert.deepEqual(stageTags, [
+    STAGE_TAGS.groundingFactualityRevision,
+    STAGE_TAGS.groundingFactualityRevision,
     STAGE_TAGS.groundingGeneration,
+    STAGE_TAGS.groundingVerificationAnswering,
+    STAGE_TAGS.groundingVerificationQuestionPlanning,
     STAGE_TAGS.knowledgeBoundaryProbe,
+    STAGE_TAGS.optionSelectKeyVerification,
     STAGE_TAGS.scaffoldContentCongruence,
     STAGE_TAGS.scaffoldContentGeneration,
     STAGE_TAGS.scaffoldOutlineGeneration
   ].sort());
 });
 
-// Complete config identity (KTD7): every application knob — including the nested probe config —
-// the embedding model, and the descriptor set all perturb the scaffold operation hash.
-test("every scaffold knob, the probe config, the embedding model, and the descriptor set change the hash", () => {
+// Complete config identity: every behavior knob and descriptor perturbs the hash, while the three
+// shared admission fan-out widths remain execution policy exactly as they are for other consumers.
+test("scaffold identity includes every admission behavior and descriptor but excludes execution widths", () => {
   const entry = neuralOperationRegistry.scaffoldGeneration;
   const base = scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG);
   assert.equal(base, scaffoldGenerationConfigHash({ ...DEFAULT_SCAFFOLD_GENERATION_CONFIG }), "hash is deterministic");
 
-  const variants = [
+  const operationVariants = [
     { ...DEFAULT_SCAFFOLD_GENERATION_CONFIG, maxSupportSteps: DEFAULT_SCAFFOLD_GENERATION_CONFIG.maxSupportSteps + 1 },
     { ...DEFAULT_SCAFFOLD_GENERATION_CONFIG, outlineAttempts: DEFAULT_SCAFFOLD_GENERATION_CONFIG.outlineAttempts + 1 },
     { ...DEFAULT_SCAFFOLD_GENERATION_CONFIG, contentDraftAttempts: DEFAULT_SCAFFOLD_GENERATION_CONFIG.contentDraftAttempts + 1 },
     {
       ...DEFAULT_SCAFFOLD_GENERATION_CONFIG,
-      knowledgeBoundaryProbe: {
-        ...DEFAULT_SCAFFOLD_GENERATION_CONFIG.knowledgeBoundaryProbe,
-        agreementThreshold: DEFAULT_SCAFFOLD_GENERATION_CONFIG.knowledgeBoundaryProbe.agreementThreshold + 0.01
-      }
+      positiveClaimProjection: "question_answer_pair_v2" as typeof DEFAULT_SCAFFOLD_GENERATION_CONFIG.positiveClaimProjection
     }
   ];
-  for (const variant of variants) {
+  for (const variant of operationVariants) {
     assert.notEqual(scaffoldGenerationConfigHash(variant), base);
+  }
+
+  const policy = DEFAULT_SCAFFOLD_GENERATION_CONFIG.sourceLessGroundingAdmission;
+  const hashWithPolicy = (sourceLessGroundingAdmission: typeof policy) =>
+    scaffoldGenerationConfigHash({ ...DEFAULT_SCAFFOLD_GENERATION_CONFIG, sourceLessGroundingAdmission });
+  for (const [name, variant] of [
+    ["candidate fan-out", { ...policy, candidateConcurrency: policy.candidateConcurrency + 1 }],
+    ["verification fan-out", { ...policy, verificationConcurrency: policy.verificationConcurrency + 1 }],
+    ["probe fan-out", { ...policy, probe: { ...policy.probe, probeConcurrency: policy.probe.probeConcurrency + 1 } }]
+  ] as const) {
+    assert.equal(hashWithPolicy(variant), base, `${name} is execution policy`);
+  }
+  for (const [name, variant] of [
+    ["probe sample count", { ...policy, probe: { ...policy.probe, sampleCount: policy.probe.sampleCount + 1 } }],
+    ["probe threshold", { ...policy, probe: { ...policy.probe, agreementThreshold: policy.probe.agreementThreshold + 0.01 } }],
+    ["grounding attempts", { ...policy, groundingDraftAttempts: policy.groundingDraftAttempts + 1 }],
+    ["verification samples", { ...policy, verificationSampleCount: policy.verificationSampleCount + 1 }],
+    ["rejection quorum", { ...policy, verificationRejectionSampleQuorum: policy.verificationRejectionSampleQuorum + 1 }],
+    ["verification decision", { ...policy, verificationDecision: "unanimous" as typeof policy.verificationDecision }],
+    ["claim projection", { ...policy, groundingClaimProjection: "whole_passage" as typeof policy.groundingClaimProjection }],
+    ["judgment batch size", { ...policy, judgmentTargetBatchSize: 2 as typeof policy.judgmentTargetBatchSize }]
+  ] as const) {
+    assert.notEqual(hashWithPolicy(variant), base, `${name} is behavioral identity`);
   }
 
   // The embedding model is part of the identity: recomputing the same appConfig without it (or
@@ -324,12 +349,14 @@ test("dropping any shared admission descriptor changes Graph Enrichment identity
   }
 });
 
-// Exact identity regression: U2 deliberately re-baselines Graph Enrichment because it now binds
-// the complete Source-less Grounding Admission descriptor family and policy. Synthetic Topic
-// Generation is unchanged. Future non-behavioral refactors must not perturb these identities.
+// Exact identity regression: U2 re-baselines Graph Enrichment and U3 re-baselines Scaffold
+// Generation because both now bind the complete Source-less Grounding Admission descriptor family
+// and policy. Synthetic Topic Generation is unchanged. Future non-behavioral refactors must not
+// perturb these identities.
 test("default operation config hashes are stable across the registry derivation", () => {
-  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-8a590f9eaf0a");
-  assert.equal(syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG), "synthetic-topic-generation-2c7d199e35c5");
+  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-71b00df89a80");
+  assert.equal(scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG), "learner-scaffold-generation-8aa02884e68c");
+  assert.equal(syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG), "synthetic-topic-generation-7e144cf49f93");
 });
 
 test("synthetic execution widths do not change identity while probe behavior still does", () => {

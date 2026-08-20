@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createStudyItemGenerationPort } from "./studyItemGenerationAdapters";
+import { createAnswerKeyVerificationPort, createStudyItemGenerationPort } from "./studyItemGenerationAdapters";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import { impostorValidator, optionSelectValidator } from "./toolSchemas";
 
@@ -139,6 +139,36 @@ test("generateImpostor with lieSource 'generated' returns siblingLabel undefined
   });
   assert.equal(draft.lie.lieSource, "generated");
   assert.equal(draft.lie.siblingLabel, undefined);
+});
+
+test("Answer-Key Verification renders an owner-neutral, key-free option-select request under its stage", async () => {
+  const calls: { toolName: string; tags?: string[]; messages: { content: string }[] }[] = [];
+  const client = {
+    async call(input: { toolName: string; tags?: string[]; messages: { content: string }[] }) {
+      calls.push(input);
+      return { verdicts: [
+        { ordinal: 0, verdict: "claim_true", reason: "true of the subject" },
+        { ordinal: 1, verdict: "claim_false", reason: "false of the subject" }
+      ] };
+    }
+  } as unknown as LiteLlmForcedToolClient;
+  const verdicts = await createAnswerKeyVerificationPort(client).verify({
+    itemType: "option_select",
+    declaredDomain: "software engineering",
+    subject: { canonicalLabel: "Affine type", aliases: ["affine typing"] },
+    question: "Which statement is accurate?",
+    candidates: [{ ordinal: 0, text: "Used at most once." }, { ordinal: 1, text: "Always copied." }],
+    groundingPassages: [{ passageId: "definition:0", kind: "definition", text: "An affine value may be used at most once." }],
+    relatedConcepts: [{ label: "Linear type", snippet: "Must be used exactly once." }]
+  });
+  assert.equal(calls[0].toolName, "submit_answer_key_verification");
+  assert.deepEqual(calls[0].tags, ["option-select-key-verification"]);
+  const rendered = calls[0].messages.map((message) => message.content).join("\n");
+  assert.match(rendered, /Learning subject: "Affine type"/);
+  assert.match(rendered, /Which statement is accurate/);
+  assert.match(rendered, /Linear type/);
+  assert.equal(/derivedNodeId|isCorrect|optionId|answer key/i.test(rendered), false);
+  assert.deepEqual(verdicts.map((verdict) => verdict.verdict), ["claim_true", "claim_false"]);
 });
 
 test("impostorValidator rejects a missing third truth (fail-closed, rule 6)", () => {

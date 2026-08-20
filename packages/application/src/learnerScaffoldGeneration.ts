@@ -1,10 +1,18 @@
 import { randomUUID } from "node:crypto";
-import { normalizeConceptLabel, STAGE_TAGS, type ScaffoldNodePayload, type ScaffoldStep } from "@lrnki/domain-core";
+import {
+  normalizeConceptLabel,
+  STAGE_TAGS,
+  type GeneratedGroundingBundle,
+  type GroundingAdmissionContext,
+  type ScaffoldNodePayload,
+  type ScaffoldStep
+} from "@lrnki/domain-core";
 import type {
+  AnswerKeyVerificationPort,
+  ClaimFactualityJudgmentPort,
+  ClaimVerificationAnsweringPort,
+  ClaimVerificationQuestionPlanningPort,
   DerivedGraphNode,
-  GroundingGenerationPort,
-  KnowledgeBoundaryProbePort,
-  NodeEmbeddingPort,
   RunProgressReporterPort,
   ScaffoldContentCongruencePort,
   ScaffoldContentDraft,
@@ -15,12 +23,24 @@ import type {
 } from "@lrnki/ports";
 import { scaffoldMicroLessonText } from "./auditScaffoldContent";
 import { bestEffort } from "./bestEffort";
+import { createClaimAdmission, type ClaimAdmission } from "./claimAdmission";
 import { isTransientGenerationError } from "./generationFailureClassification";
 import { GenerationClaimLostError } from "./generationClaimLost";
-import { DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG, probeKnowledgeBoundary, type KnowledgeBoundaryProbeConfig } from "./knowledgeBoundaryProbe";
 import { normalizeOptionText } from "./optionSelectGuard";
 import { runInstrumentedOperation, type StageBracket } from "./runProgressReporter";
+import {
+  projectScaffoldPositiveClaims,
+  SCAFFOLD_POSITIVE_CLAIM_PROJECTION,
+  type ScaffoldPositiveClaimProjection
+} from "./scaffoldPositiveClaims";
+import {
+  DEFAULT_SOURCE_LESS_GROUNDING_ADMISSION_POLICY,
+  type GroundingAdmissionCandidate,
+  type SourceLessGroundingAdmission,
+  type SourceLessGroundingAdmissionPolicy
+} from "./sourceLessGroundingAdmission";
 import type { StudySession } from "./studySessionProjection";
+import { verifyOptionSelectAnswerKeyOnce } from "./verifyStudyItemKeys";
 
 // The operation-level behavior knobs of Scaffold Generation (plan 2026-07-16-004 KTD7). This is
 // the application half of the operation's config identity: the infrastructure
@@ -35,26 +55,30 @@ export type ScaffoldGenerationConfig = {
   // re-outlines after an unusable collision/duplicate (KTD5). After the final proposal a
   // still-colliding label is dropped rather than re-outlined.
   outlineAttempts: number;
-  // Content drafts per outline step: each draft is shape-validated then judged by the
-  // label↔content congruence re-pick; a NO drops the draft and retries within this bound.
+  // Complete content attempts per admitted generated label. Each fresh draft runs structural
+  // validation, congruence re-pick, positive-claim admission, and Answer-Key Verification.
   contentDraftAttempts: number;
-  // The Knowledge-Boundary Probe every non-reference outline label must pass (KTD5).
-  knowledgeBoundaryProbe: KnowledgeBoundaryProbeConfig;
+  // Versioned projection of learner-visible positive fields into factual targets. Questions and
+  // keyed answers are one QA-pair claim; interrogatives never enter claim admission alone.
+  positiveClaimProjection: ScaffoldPositiveClaimProjection;
+  // The one canonical Source-less Grounding Admission policy shared by all three consumers.
+  sourceLessGroundingAdmission: SourceLessGroundingAdmissionPolicy;
 };
 
 export const DEFAULT_SCAFFOLD_GENERATION_CONFIG: ScaffoldGenerationConfig = {
   maxSupportSteps: 3,
   outlineAttempts: 2,
   contentDraftAttempts: 2,
-  knowledgeBoundaryProbe: DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG
+  positiveClaimProjection: SCAFFOLD_POSITIVE_CLAIM_PROJECTION,
+  sourceLessGroundingAdmission: DEFAULT_SOURCE_LESS_GROUNDING_ADMISSION_POLICY
 };
 
 // Learner-Scoped Scaffold Generation — the deep process-lived module (plan 2026-07-16-004
 // KTD1/KTD5/KTD6). Constructed ONCE per process with lifecycle-shaped adapters and invoked with
 // only one claimed detour's identity: the operation id IS the attempt identity and fencing value.
 // The callable owns the complete post-claim lifecycle — claim verification, ONE opening Study
-// Session read, exact reuse, bounded feedback re-outline, Knowledge-Boundary Probe + child
-// grounding, content generation, congruence re-pick, validation, failure classification, stage
+// Session read, exact reuse, bounded feedback re-outline, shared Source-less Grounding Admission,
+// content generation, congruence re-pick, validation, failure classification, stage
 // ordering, and the fenced terminal write. It resolves only after a fenced `ready` publish;
 // every other outcome rejects after the correct fenced action. The neutral Study Item Bank and
 // Derived Graph Layer are NEVER written — no such port is reachable from the construction.
@@ -88,11 +112,16 @@ export type ScaffoldGenerationConstruction = {
   // generator never grades its own output. A quality re-pick, not a provable gate — it fails
   // OPEN on judge infra error (rule 16) so a flaky judge call never drops otherwise-valid support.
   congruence: ScaffoldContentCongruencePort;
-  // Every generated label is probed then child-grounded (KTD5): no character threshold can
-  // bypass the Knowledge-Boundary Probe, and parent definitions appear only as anchors.
-  knowledgeBoundaryProbe: KnowledgeBoundaryProbePort;
-  nodeEmbedding: NodeEmbeddingPort;
-  groundingGeneration: GroundingGenerationPort;
+  // Every generated label crosses the finished deep admission interface in one settled-outline
+  // batch. Reference steps bypass it. No raw probe or Grounding Generation port is reachable.
+  sourceLessGroundingAdmission: SourceLessGroundingAdmission;
+  // The same package-internal claim implementation settles all positive fields of each fresh
+  // Support Step draft. These ports are construction-only and never reach caller policy.
+  claimVerificationQuestionPlanning: ClaimVerificationQuestionPlanningPort;
+  claimVerificationAnswering: ClaimVerificationAnsweringPort;
+  claimFactualityJudgments: readonly [ClaimFactualityJudgmentPort, ClaimFactualityJudgmentPort];
+  // One-shot option-select classification/veto. Its required failures escape the content envelope.
+  answerKeyVerification: AnswerKeyVerificationPort;
   reporter: RunProgressReporterPort;
   config: ScaffoldGenerationConfig;
   // The complete operation config identity (KTD7), computed by the composition's infrastructure
@@ -114,6 +143,17 @@ class ScaffoldNoSafeStepError extends Error {
 
 export function createScaffoldGeneration(construction: ScaffoldGenerationConstruction): ScaffoldGeneration {
   const newId = construction.newId ?? randomUUID;
+  const admissionPolicy = construction.config.sourceLessGroundingAdmission;
+  const contentClaimAdmission = createClaimAdmission({
+    questionPlanning: construction.claimVerificationQuestionPlanning,
+    answering: construction.claimVerificationAnswering,
+    factualityJudgments: construction.claimFactualityJudgments,
+    verificationSampleCount: admissionPolicy.verificationSampleCount,
+    verificationDecision: admissionPolicy.verificationDecision,
+    verificationRejectionSampleQuorum: admissionPolicy.verificationRejectionSampleQuorum,
+    judgmentTargetBatchSize: admissionPolicy.judgmentTargetBatchSize,
+    verificationConcurrency: admissionPolicy.verificationConcurrency
+  });
   return async (request) => {
     await runInstrumentedOperation(construction.reporter, "scaffold", request.operationId, async (runStage) => {
       // Claim verification before any neural spend (KTD1/KTD6): the store's claim installed the
@@ -133,7 +173,15 @@ export function createScaffoldGeneration(construction: ScaffoldGenerationConstru
         const parent = session.detail.nodes.find((node) => node.derivedNodeId === detour.parentDerivedNodeId);
         if (!parent) throw new Error(`Scaffold generation: parent node ${detour.parentDerivedNodeId} not in enrichment.`);
 
-        const steps = await generateSteps({ construction, session, parent, detour: { term: detour.term }, runStage, newId });
+        const steps = await generateSteps({
+          construction,
+          contentClaimAdmission,
+          session,
+          parent,
+          detour: { term: detour.term },
+          runStage,
+          newId
+        });
         if (steps.length === 0) throw new ScaffoldNoSafeStepError(detour.term);
         const published = await construction.detours.publishReady({ ...fence, steps });
         if (!published) throw new GenerationClaimLostError(`Scaffold generation claim lost for detour ${request.detourId}.`);
@@ -240,11 +288,11 @@ function planOutline(
 }
 
 // The whole step pipeline for one claimed attempt: direct selected-term reuse, the settled
-// outline plan (with the bounded feedback re-outline), then probe → child grounding → content →
-// congruence per generated label. Returns the ordered surviving steps; the caller owns the
-// fenced terminal write.
+// outline plan (with bounded feedback re-outline), one generated-label admission batch, then the
+// complete content assurance envelope per admitted label. The caller owns the fenced write.
 async function generateSteps(input: {
   construction: ScaffoldGenerationConstruction;
+  contentClaimAdmission: ClaimAdmission;
   session: ScaffoldOpeningStudySession;
   parent: DerivedGraphNode;
   detour: { term: string };
@@ -284,40 +332,78 @@ async function generateSteps(input: {
     plan = planOutline(outline.steps, session, parent, config.maxSupportSteps);
   }
 
-  // 3. Execute the settled plan. Verified parent definition passages travel ONLY as grounding
-  // anchors (KTD5) — every generated label is probed, then grounded with its OWN generated
-  // definitions; boundary verdicts and empty generated definitions drop the step.
+  // 3. Admit every generated label in ONE settled-outline batch. Reference steps bypass the
+  // module. Verified parent definitions travel only as grounding anchors; an admitted bundle is
+  // the generated step's immutable evidence and the only generated label allowed into content.
   const parentAnchor = scaffoldedAnchorFor(parent);
+  const generatedCandidates = plan.planned.flatMap((item, planIndex) => {
+    if (item.kind === "reference") return [];
+    const context: GroundingAdmissionContext = parentAnchor
+      ? { kind: "scaffolded_anchor", anchor: parentAnchor }
+      : { kind: "originating_topic", topic: item.label };
+    const candidate: GroundingAdmissionCandidate = {
+      candidateKey: `scaffold-candidate:${planIndex}`,
+      canonicalLabel: item.label,
+      declaredDomain: parent.declaredDomain,
+      context
+    };
+    return [{ planIndex, item, candidate, context }];
+  });
+  const admission = construction.sourceLessGroundingAdmission.forOperation(runStage);
+  const outcomes = generatedCandidates.length > 0
+    ? await admission.admitBatch(generatedCandidates.map((entry) => entry.candidate))
+    : [];
+  if (outcomes.length !== generatedCandidates.length) {
+    throw new Error("Source-less Grounding Admission returned a result-count mismatch for generated Support Steps.");
+  }
+  const admittedByPlanIndex = new Map<number, {
+    bundle: GeneratedGroundingBundle;
+    context: GroundingAdmissionContext;
+  }>();
+  outcomes.forEach((outcome, index) => {
+    const expected = generatedCandidates[index];
+    if (!expected || outcome.candidateKey !== expected.candidate.candidateKey) {
+      throw new Error("Source-less Grounding Admission returned out-of-order generated Support Step outcomes.");
+    }
+    if (outcome.disposition === "admitted") {
+      admittedByPlanIndex.set(expected.planIndex, { bundle: outcome.bundle, context: expected.context });
+    }
+  });
+
   const steps: ScaffoldStep[] = [];
-  for (const item of plan.planned) {
+  const contentClaims = input.contentClaimAdmission.forOperation(runStage);
+  for (const [planIndex, item] of plan.planned.entries()) {
     if (item.kind === "reference") {
       steps.push(referenceStep(item.pin, steps.length, newId));
       continue;
     }
-    const verdict = await runStage(STAGE_TAGS.knowledgeBoundaryProbe, () =>
-      probeKnowledgeBoundary({
-        conceptLabel: item.label,
-        declaredDomain: parent.declaredDomain,
-        probe: construction.knowledgeBoundaryProbe,
-        embedding: construction.nodeEmbedding,
-        config: config.knowledgeBoundaryProbe
-      })
-    );
-    if (verdict.disposition === "boundary") continue;
-    const bundle = await runStage(STAGE_TAGS.groundingGeneration, () =>
-      construction.groundingGeneration.generate({
-        declaredDomain: parent.declaredDomain,
-        canonicalLabel: item.label,
-        context: parentAnchor
-          ? { kind: "scaffolded_anchor", anchor: parentAnchor }
-          : { kind: "originating_topic", topic: item.label }
-      })
-    );
-    const groundingText = bundle.definitions.map((passage) => passage.text).join("\n\n").trim();
-    if (groundingText.length === 0) continue;
-    const accepted = await generateCongruentStep({ construction, parent, term: input.detour.term, stepLabel: item.label, groundingText, runStage, newId });
+    const admitted = admittedByPlanIndex.get(planIndex);
+    if (!admitted) continue;
+    const groundingText = admitted.bundle.definitions.map((passage) => passage.text).join("\n\n").trim();
+    if (!groundingText) {
+      throw new Error(`Admitted generated Support Step ${JSON.stringify(item.label)} carries no Definition Passage.`);
+    }
+    const accepted = await generateAssuredStep({
+      construction,
+      contentClaims,
+      parent,
+      term: input.detour.term,
+      stepLabel: item.label,
+      groundingText,
+      groundingBundle: admitted.bundle,
+      groundingContext: admitted.context,
+      runStage,
+      newId
+    });
     if (!accepted) continue;
-    steps.push({ scaffoldStepId: newId(), ordinal: steps.length, kind: "generated", payload: accepted, lessonReadAt: null });
+    steps.push({
+      scaffoldStepId: newId(),
+      ordinal: steps.length,
+      kind: "generated",
+      payload: accepted,
+      groundingBundle: admitted.bundle,
+      lessonReadAt: null
+    });
   }
   return steps;
 }
@@ -353,37 +439,50 @@ function scaffoldedAnchorFor(parent: DerivedGraphNode): {
   };
 }
 
-// Draft one lower-level scaffold node for `stepLabel` and gate it with the congruence re-pick
-// (KTD4b). Up to `contentDraftAttempts` content attempts: each builds a valid four-option
-// payload, then the judge checks that the content teaches its own label AND is a simpler
-// prerequisite of `term`. The FIRST accepted payload wins; a NO drops it and retries within the
-// bound; all NO → null (step skipped). The judge grades the teaching not the answer key, so
-// option order is normalized before it sees them. A judge infra error accepts the current draft
-// (fail-open, rule 16); a content-generation error consumes the attempt and retries.
-async function generateCongruentStep(input: {
+// One complete content-attempt envelope. Each attempt starts with a fresh complete draft and then
+// runs, in order: structural validation → congruence re-pick → exhaustive positive-claim admission
+// → one-shot Answer-Key Verification. Every resolved rejection supplies bounded feedback to the
+// next fresh draft. Congruence unavailability skips only that quality veto. Required claim/key
+// unavailability is not caught and therefore consumes no additional content attempt.
+async function generateAssuredStep(input: {
   construction: ScaffoldGenerationConstruction;
+  contentClaims: ReturnType<ClaimAdmission["forOperation"]>;
   parent: DerivedGraphNode;
   term: string;
   stepLabel: string;
   groundingText: string;
+  groundingBundle: GeneratedGroundingBundle;
+  groundingContext: GroundingAdmissionContext;
   runStage: StageBracket;
   newId: () => string;
 }): Promise<ScaffoldNodePayload | null> {
   const { construction, runStage } = input;
+  let retryFeedback: string | undefined;
   for (let attempt = 0; attempt < construction.config.contentDraftAttempts; attempt++) {
     let draft: ScaffoldContentDraft;
     try {
       draft = await runStage(STAGE_TAGS.scaffoldContentGeneration, () =>
-        construction.content.generate({ declaredDomain: input.parent.declaredDomain, label: input.stepLabel, groundingText: input.groundingText })
+        construction.content.generate({
+          declaredDomain: input.parent.declaredDomain,
+          label: input.stepLabel,
+          groundingContext: input.groundingContext,
+          groundingText: input.groundingText,
+          ...(retryFeedback ? { retryFeedback } : {})
+        })
       );
-    } catch {
+    } catch (error) {
+      retryFeedback = boundedContentFeedback(`content generation failed: ${errorText(error)}`);
       continue;
     }
-    const payload = buildScaffoldNodePayload(input.stepLabel, draft, input.newId);
-    if (!payload) continue;
-    let verdict;
+    const built = buildScaffoldNodePayload(input.stepLabel, draft, input.newId);
+    if (!built.ok) {
+      retryFeedback = boundedContentFeedback(built.reason);
+      continue;
+    }
+    const payload = built.payload;
+
     try {
-      verdict = await runStage(STAGE_TAGS.scaffoldContentCongruence, () =>
+      const verdict = await runStage(STAGE_TAGS.scaffoldContentCongruence, () =>
         construction.congruence.judge({
           declaredDomain: input.parent.declaredDomain,
           term: input.term,
@@ -395,31 +494,112 @@ async function generateCongruentStep(input: {
           options: payload.item.options.map((option) => option.text).sort((a, b) => a.localeCompare(b))
         })
       );
+      if (!verdict.teachesStepLabel || !verdict.isSimplerPrerequisite) {
+        retryFeedback = boundedContentFeedback(
+          `content congruence rejected the draft: ${verdict.rationale || "the draft did not teach its label as a simpler prerequisite"}`
+        );
+        continue;
+      }
     } catch {
-      // The judge is a quality re-pick, not a provable guarantee — infra failure never drops
-      // otherwise-valid support (rule 16). Accept this draft.
-      return payload;
+      // Congruence is a fail-open quality re-pick, not an assurance gate. Continue to both
+      // required checks; never admit early merely because this optional judge was unavailable.
     }
-    if (verdict.teachesStepLabel && verdict.isSimplerPrerequisite) return payload;
+
+    const contentCandidateKey = `scaffold-content:${attempt}`;
+    const claimResults = await input.contentClaims.admitBatch([{
+      candidateKey: contentCandidateKey,
+      canonicalLabel: input.stepLabel,
+      declaredDomain: input.parent.declaredDomain,
+      context: input.groundingContext,
+      targets: projectScaffoldPositiveClaims(payload, construction.config.positiveClaimProjection)
+    }]);
+    const claimResult = claimResults[0];
+    if (claimResults.length !== 1 || claimResult?.candidateKey !== contentCandidateKey) {
+      throw new Error("Positive-claim admission returned a mismatched generated Support Step result.");
+    }
+    const rejectedClaims = claimResult.judgments.filter((judgment) => judgment.disposition === "rejected");
+    if (rejectedClaims.length > 0) {
+      retryFeedback = boundedContentFeedback(
+        `positive-claim admission rejected the draft: ${rejectedClaims.map((judgment) => `${judgment.targetKey}: ${judgment.rationale}`).join("; ")}`
+      );
+      continue;
+    }
+
+    const keyOutcome = await runStage(STAGE_TAGS.optionSelectKeyVerification, () =>
+      verifyOptionSelectAnswerKeyOnce({
+        verifier: construction.answerKeyVerification,
+        declaredDomain: input.parent.declaredDomain,
+        subject: { canonicalLabel: input.stepLabel, aliases: [] },
+        item: payload.item,
+        groundingPassages: answerKeyGroundingPassages(input.groundingBundle),
+        relatedConcepts: relatedConceptsFor(input.parent)
+      })
+    );
+    if (!keyOutcome.admitted) {
+      retryFeedback = boundedContentFeedback(keyOutcome.reason);
+      continue;
+    }
+
+    return payload;
   }
   return null;
 }
 
-// Validate a content draft's option shape and build a persistable scaffold node payload, or
-// return null when the four-option one-correct-server-keyed invariant fails (KTD10). Citation-
-// free and labeled generated end to end (the lesson section provenance is always "generated").
-function buildScaffoldNodePayload(label: string, draft: ScaffoldContentDraft, newId: () => string): ScaffoldNodePayload | null {
+type ScaffoldPayloadBuild =
+  | { ok: true; payload: ScaffoldNodePayload }
+  | { ok: false; reason: string };
+
+// Validate a content draft's complete structural shape and build a fresh persistable payload.
+// Citation-free and labeled generated end to end; semantic checks happen only after this succeeds.
+function buildScaffoldNodePayload(label: string, draft: ScaffoldContentDraft, newId: () => string): ScaffoldPayloadBuild {
   const optionTexts = [draft.correctAnswer, ...draft.distractors];
-  if (optionTexts.length !== 4) return null;
-  if (optionTexts.some((text) => text.trim().length === 0)) return null;
+  if (optionTexts.length !== 4) {
+    return { ok: false, reason: `generated Support Step requires exactly four options, got ${optionTexts.length}` };
+  }
+  if (optionTexts.some((text) => text.trim().length === 0)) {
+    return { ok: false, reason: "generated Support Step contains an empty answer option" };
+  }
   const normalized = optionTexts.map(normalizeOptionText);
-  if (new Set(normalized).size !== normalized.length) return null;
-  if (draft.microLesson.trim().length === 0 || draft.question.trim().length === 0) return null;
+  if (new Set(normalized).size !== normalized.length) {
+    return { ok: false, reason: "generated Support Step has duplicate options after normalization" };
+  }
+  if (!draft.microLesson.trim() || !draft.question.trim() || !draft.explanation.trim()) {
+    return { ok: false, reason: "generated Support Step requires non-empty lesson, question, and explanation text" };
+  }
   const options = optionTexts.map((text, index) => ({ optionId: newId(), text, isCorrect: index === 0 }));
   return {
-    scaffoldNodeId: newId(),
-    label,
-    lesson: [{ kind: "definition", text: draft.microLesson, groundingProvenance: "generated" }],
-    item: { scaffoldItemId: newId(), question: draft.question, explanation: draft.explanation, options }
+    ok: true,
+    payload: {
+      scaffoldNodeId: newId(),
+      label,
+      lesson: [{ kind: "definition", text: draft.microLesson, groundingProvenance: "generated" }],
+      item: { scaffoldItemId: newId(), question: draft.question, explanation: draft.explanation, options }
+    }
   };
+}
+
+function answerKeyGroundingPassages(bundle: GeneratedGroundingBundle): {
+  passageId: string;
+  kind: "definition" | "mention";
+  text: string;
+}[] {
+  return [
+    ...bundle.definitions.map((passage, index) => ({ passageId: `definition:${index}`, kind: "definition" as const, text: passage.text })),
+    ...bundle.mentions.map((passage, index) => ({ passageId: `mention:${index}`, kind: "mention" as const, text: passage.text }))
+  ];
+}
+
+function relatedConceptsFor(parent: DerivedGraphNode): { label: string; snippet: string }[] {
+  const snippet = parent.grounding?.passages
+    .find((passage) => passage.passageType === "definition")
+    ?.text.trim() ?? "";
+  return [{ label: parent.label, snippet }];
+}
+
+function boundedContentFeedback(feedback: string): string {
+  return feedback.slice(0, 2_000);
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

@@ -184,7 +184,7 @@ model_list:
   # THE production independent judge (kg-independent-judge, ADR-0007/0005). Replaced gpt-oss-120b on
   # 2026-08-07: that deployment is Groq-pinned for forced tool_choice, and Groq's shared-account
   # request rate is the busiest constraint in the pipeline — a sustained 429 stalls EVERY judge stage
-  # at once, including both Study Item Key Verification brackets, and it failed 3 of 3
+  # at once, including both neutral Answer-Key Verification brackets, and it failed 3 of 3
   # topic-generation attempts. Cross-family independent of the MiMo synthesizer, so ADR-0007/0005's
   # "the judge is never the extractor grading its own output" holds.
   # `reasoning.enabled: false` is REQUIRED: with reasoning on, DeepSeek double-encodes nested

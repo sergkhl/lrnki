@@ -3,6 +3,7 @@ import type { ScaffoldContentDraft, ScaffoldContentPort, ScaffoldOutline, Scaffo
 import type { z } from "zod";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import { executeForcedToolStage, type NeuralStageDescriptor } from "./forcedToolStage";
+import { formatGroundingAdmissionContext } from "./groundingGenerationAdapters";
 import { readPromptFile } from "./promptFile";
 import { scaffoldContentSchema, scaffoldContentValidator, scaffoldOutlineSchema, scaffoldOutlineValidator } from "./toolSchemas";
 
@@ -23,7 +24,9 @@ type ScaffoldOutlineInput = {
 type ScaffoldContentInput = {
   declaredDomain: string;
   label: string;
+  groundingContext: Parameters<ScaffoldContentPort["generate"]>[0]["groundingContext"];
   groundingText: string;
+  retryFeedback?: string;
 };
 
 type ScaffoldOutlineArgs = z.infer<typeof scaffoldOutlineValidator>;
@@ -51,9 +54,30 @@ export const scaffoldContentGenerationDescriptor: NeuralStageDescriptor<Scaffold
   stageTag: STAGE_TAGS.scaffoldContentGeneration,
   schema: scaffoldContentSchema,
   validator: scaffoldContentValidator,
-  sentinelInput: { declaredDomain: "sentinel domain", label: "Sentinel sub-concept", groundingText: "A sentinel grounding paragraph." },
+  sentinelInput: {
+    declaredDomain: "sentinel domain",
+    label: "Sentinel sub-concept",
+    groundingContext: {
+      kind: "scaffolded_anchor",
+      anchor: {
+        reference: "sentinel_anchor",
+        canonicalLabel: "Sentinel anchor",
+        definitionPassages: ["A sentinel anchor definition."]
+      }
+    },
+    groundingText: "A sentinel grounding paragraph.",
+    retryFeedback: "A sentinel rejected-draft reason."
+  },
   maxRetries: 2,
-  templateData: (input) => ({ declaredDomain: input.declaredDomain, label: input.label, groundingText: input.groundingText }),
+  templateData: (input) => ({
+    declaredDomain: input.declaredDomain,
+    label: input.label,
+    contextLines: formatGroundingAdmissionContext(input.groundingContext),
+    groundingText: input.groundingText,
+    retryFeedbackBlock: input.retryFeedback
+      ? `\n\nRetry feedback from the previous rejected complete draft:\n${input.retryFeedback}`
+      : ""
+  }),
   mapResult: (args) => ({
     microLesson: args.microLesson,
     question: args.question,

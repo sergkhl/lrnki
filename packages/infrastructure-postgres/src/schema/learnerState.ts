@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import type { GeneratedGroundingBundle } from "@lrnki/domain-core";
 import {
   boolean,
   check,
@@ -248,6 +249,7 @@ export const learnerScaffoldSteps = pgTable(
       END`,
     ),
     payload: jsonb("payload"),
+    groundingBundle: jsonb("grounding_bundle").$type<GeneratedGroundingBundle>(),
     lessonReadAt: timestamp("lesson_read_at", { withTimezone: true, mode: "string" }),
   },
   (table) => [
@@ -286,6 +288,7 @@ export const learnerScaffoldSteps = pgTable(
         AND referenced_concept_lesson_id IS NOT NULL
         AND referenced_study_item_id IS NOT NULL
         AND payload IS NULL
+        AND grounding_bundle IS NULL
         AND lesson_read_at IS NULL
       ) OR (
         kind = 'generated'
@@ -293,6 +296,7 @@ export const learnerScaffoldSteps = pgTable(
         AND referenced_concept_lesson_id IS NULL
         AND referenced_study_item_id IS NULL
         AND payload IS NOT NULL
+        AND grounding_bundle IS NOT NULL
       )`,
     ),
   ],

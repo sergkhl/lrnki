@@ -24,10 +24,10 @@ import type {
   LayerPurposeGenerationPort,
   MatchingAssignmentVerificationPort,
   RunProgressReporterPort,
+  AnswerKeyVerificationPort,
   StudyItemBlueprintPort,
   StudyItemBankStorePort,
-  StudyItemGenerationPort,
-  StudyItemKeyVerificationPort
+  StudyItemGenerationPort
 } from "@lrnki/ports";
 import { mapWithConcurrency } from "./mapWithConcurrency";
 import { NON_LLM_STAGES, noopRunProgressReporter, runInstrumentedOperation } from "./runProgressReporter";
@@ -35,10 +35,11 @@ import { validateOptionSelectItem, type StudyItemGuardGrounding } from "./option
 import { validateImpostorItem } from "./impostorGuard";
 import { validateMatchingItem } from "./matchingGuard";
 import {
+  answerKeyCandidates,
   impostorKeyVetoReason,
   optionSelectKeyVetoReason,
-  verifyStudyItemKeys,
-  type KeyVerificationSubject
+  verifyAnswerKeys,
+  type AnswerKeyVerificationSubject
 } from "./verifyStudyItemKeys";
 import {
   matchingAssignmentPresentation,
@@ -105,10 +106,10 @@ export async function generateStudyItemBank(input: {
   layerPurposeGeneration?: LayerPurposeGenerationPort;
   layerPurposeStore?: EnrichmentLayerPurposeStorePort;
   studyItemBlueprint?: StudyItemBlueprintPort;
-  // Study Item Key Verification (ADR-0026, plan 2026-08-05-001 D2). Required, not optional:
+  // Answer-Key Verification (ADR-0026, plan 2026-08-19-001 KTD6). Required, not optional:
   // the option-select and impostor guards admit citations through the D9 fallback rung, which
   // is only sound because this judge checks the claims those citations no longer anchor (D6).
-  studyItemKeyVerification: StudyItemKeyVerificationPort;
+  answerKeyVerification: AnswerKeyVerificationPort;
   // Matching Assignment Verification (ADR-0026, plan 2026-08-07-001 D5). Required for the same
   // structural reason: matching is the only type whose defect class is cross-pair ambiguity, and
   // an optional judge would make "the board is assignable" a property some banks silently lack.
@@ -430,17 +431,17 @@ export async function generateStudyItemBank(input: {
     node: DerivedGraphNode,
     context: Extract<NodeItemContext, { kind: "ready" }>,
     item: OptionSelectItem,
-    citationRung: KeyVerificationSubject<OptionSelectItem>["citationRung"]
-  ): KeyVerificationSubject<OptionSelectItem> => ({
+    citationRung: AnswerKeyVerificationSubject<OptionSelectItem>["citationRung"]
+  ): AnswerKeyVerificationSubject<OptionSelectItem> => ({
     request: {
       itemType: "option_select",
       declaredDomain: node.declaredDomain,
-      node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, aliases: node.aliases },
+      subject: { canonicalLabel: node.canonicalLabel, aliases: node.aliases },
       // Option-select passes its question so each option reads as a proposed answer (D8).
       question: item.question,
-      candidates: item.options.map((option, ordinal) => ({ ordinal, text: option.text })),
+      candidates: answerKeyCandidates(item.options),
       groundingPassages: context.grounding.passages,
-      siblings: context.siblings
+      relatedConcepts: context.siblings
     },
     item,
     citationRung,
@@ -455,7 +456,7 @@ export async function generateStudyItemBank(input: {
     context: Extract<NodeItemContext, { kind: "ready" }>,
     attempts: number,
     initialFeedback?: string
-  ): Promise<VerificationRegeneration<KeyVerificationSubject<OptionSelectItem>>> => {
+  ): Promise<VerificationRegeneration<AnswerKeyVerificationSubject<OptionSelectItem>>> => {
     let failureReason: string | null = null;
     let retryFeedback = initialFeedback;
     for (let attempt = 0; attempt < attempts; attempt += 1) {
@@ -472,7 +473,7 @@ export async function generateStudyItemBank(input: {
     }
     return { ok: false, reason: failureReason ?? "no study item could be grounded" };
   };
-  const optionSelectForNode = async (node: DerivedGraphNode): Promise<NodeAttempt<KeyVerificationSubject<OptionSelectItem>>> => {
+  const optionSelectForNode = async (node: DerivedGraphNode): Promise<NodeAttempt<AnswerKeyVerificationSubject<OptionSelectItem>>> => {
     const context = nodeItemContext(node, "option_select", "option-select");
     if (context.kind !== "ready") return context.kind === "skip" ? { kind: "skipped" } : { kind: "rejected", reason: context.reason };
     const drafted = await draftOptionSelect(node, context, OPTION_SELECT_GENERATION_ATTEMPTS);
@@ -494,8 +495,8 @@ export async function generateStudyItemBank(input: {
     const outcomes = await studyStage(
       STAGE_TAGS.optionSelectKeyVerification,
       () =>
-        verifyStudyItemKeys(subjects, {
-          verifier: input.studyItemKeyVerification,
+        verifyAnswerKeys(subjects, {
+          verifier: input.answerKeyVerification,
           concurrency: verificationConcurrency,
           vetoReason: (subject, verdicts) => optionSelectKeyVetoReason(subject.item, verdicts),
           // Pass-through on unavailability is option-select's status quo and the node's only
@@ -514,7 +515,7 @@ export async function generateStudyItemBank(input: {
 
   // --- Stage 4: matching items ---------------------------------------------------
   // Matching's defect class is cross-pair AMBIGUITY, not per-candidate claim truth, which is why
-  // it stays outside Study Item Key Verification and runs its own N×N assignment check instead
+  // it stays outside Answer-Key Verification and runs its own N×N assignment check instead
   // (plan 2026-08-07-001 D5). The generation half is unchanged.
   let matchingDone = 0;
   const matchingSubject = (
@@ -605,17 +606,17 @@ export async function generateStudyItemBank(input: {
     node: DerivedGraphNode,
     context: Extract<NodeItemContext, { kind: "ready" }>,
     item: ImpostorItem,
-    citationRung: KeyVerificationSubject<ImpostorItem>["citationRung"]
-  ): KeyVerificationSubject<ImpostorItem> => ({
+    citationRung: AnswerKeyVerificationSubject<ImpostorItem>["citationRung"]
+  ): AnswerKeyVerificationSubject<ImpostorItem> => ({
     request: {
       itemType: "impostor",
       declaredDomain: node.declaredDomain,
-      node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, aliases: node.aliases },
+      subject: { canonicalLabel: node.canonicalLabel, aliases: node.aliases },
       // No question: an impostor's question is the meta-form "which statement is FALSE?",
       // which would invert per-statement judging (D8). The statements go as standalone claims.
       candidates: item.statements.map((statement) => ({ ordinal: statement.ordinal, text: statement.text })),
       groundingPassages: context.grounding.passages,
-      siblings: context.siblings
+      relatedConcepts: context.siblings
     },
     item,
     citationRung,
@@ -626,7 +627,7 @@ export async function generateStudyItemBank(input: {
     context: Extract<NodeItemContext, { kind: "ready" }>,
     attempts: number,
     initialFeedback?: string
-  ): Promise<VerificationRegeneration<KeyVerificationSubject<ImpostorItem>>> => {
+  ): Promise<VerificationRegeneration<AnswerKeyVerificationSubject<ImpostorItem>>> => {
     let failureReason: string | null = null;
     let retryFeedback = initialFeedback;
     for (let attempt = 0; attempt < attempts; attempt += 1) {
@@ -643,7 +644,7 @@ export async function generateStudyItemBank(input: {
     }
     return { ok: false, reason: failureReason ?? "no impostor item could be grounded" };
   };
-  const generateImpostorForNode = async (node: DerivedGraphNode): Promise<NodeAttempt<KeyVerificationSubject<ImpostorItem>>> => {
+  const generateImpostorForNode = async (node: DerivedGraphNode): Promise<NodeAttempt<AnswerKeyVerificationSubject<ImpostorItem>>> => {
     const context = nodeItemContext(node, "impostor", "impostor");
     if (context.kind !== "ready") return context.kind === "skip" ? { kind: "skipped" } : { kind: "rejected", reason: context.reason };
     const drafted = await draftImpostor(node, context, IMPOSTOR_GENERATION_ATTEMPTS);
@@ -665,8 +666,8 @@ export async function generateStudyItemBank(input: {
     const outcomes = await studyStage(
       STAGE_TAGS.impostorKeyVerification,
       () =>
-        verifyStudyItemKeys(subjects, {
-          verifier: input.studyItemKeyVerification,
+        verifyAnswerKeys(subjects, {
+          verifier: input.answerKeyVerification,
           concurrency: verificationConcurrency,
           vetoReason: (subject, verdicts) => impostorKeyVetoReason(subject.item, verdicts),
           // Fail closed, unchanged from the judge this replaces and for the same reason

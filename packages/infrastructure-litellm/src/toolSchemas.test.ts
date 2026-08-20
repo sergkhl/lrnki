@@ -17,8 +17,8 @@ import {
   CONCEPT_LESSON_SECTION_TEXT_MAX_LENGTH,
   conceptLessonSchema,
   conceptLessonValidator,
-  studyItemKeyVerificationSchema,
-  studyItemKeyVerificationValidator,
+  answerKeyVerificationSchema,
+  answerKeyVerificationValidator,
   impostorSchema,
   impostorValidator,
   optionSelectValidator,
@@ -237,17 +237,17 @@ test("impostorValidator rejects a non-closed lieSource enum", () => {
   }));
 });
 
-test("study item key verification schema is registered and fail-closed", () => {
-  assert.ok(toolValidators.includes(studyItemKeyVerificationValidator));
-  assert.ok(studyItemKeyVerificationSchema.properties);
-  assert.doesNotThrow(() => studyItemKeyVerificationValidator.parse({
+test("owner-neutral Answer-Key Verification schema is registered and fail-closed", () => {
+  assert.ok(toolValidators.includes(answerKeyVerificationValidator));
+  assert.ok(answerKeyVerificationSchema.properties);
+  assert.doesNotThrow(() => answerKeyVerificationValidator.parse({
     verdicts: [
       { ordinal: 0, verdict: "claim_true", reason: "correct for the node" },
       { ordinal: 1, verdict: "claim_false", reason: "true only of a neighbour" },
       { ordinal: 2, verdict: "unclear", reason: "cannot decide" }
     ]
   }));
-  assert.throws(() => studyItemKeyVerificationValidator.parse({ verdicts: [{ ordinal: 0, verdict: "maybe", reason: "unclear" }] }));
+  assert.throws(() => answerKeyVerificationValidator.parse({ verdicts: [{ ordinal: 0, verdict: "maybe", reason: "unclear" }] }));
 });
 
 // Plan 2026-07-13-002 U1 (R2, AE1): Explorable Term capacity is five in BOTH forced-tool

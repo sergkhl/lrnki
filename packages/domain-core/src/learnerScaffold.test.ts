@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { neutralResponses, scaffoldDetourHasPublishedContent, scaffoldStepHasContent, type ResponseLogRow, type ScaffoldDetour, type ScaffoldStep } from "./index";
+import { neutralResponses, scaffoldDetourHasPublishedContent, scaffoldStepHasContent, type GeneratedGroundingBundle, type ResponseLogRow, type ScaffoldDetour, type ScaffoldStep } from "./index";
+
+function groundingBundle(): GeneratedGroundingBundle {
+  return { groundingOrigin: "llm_grounded", definitions: [], mentions: [], groundingAnchorReferences: [], generatingModel: "test", rationale: "test fixture" };
+}
 
 // U2 (KTD4): neutralResponses narrows a mixed log to the neutral observations only, so a
 // scaffold response can never leak into a neutral fold.
@@ -23,6 +27,7 @@ test("a reference step reports content; a generated step reports content only wi
     ordinal: 1,
     kind: "generated",
     lessonReadAt: null,
+    groundingBundle: groundingBundle(),
     payload: {
       scaffoldNodeId: "sn-1",
       label: "Affine types",

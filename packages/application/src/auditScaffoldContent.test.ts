@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { ScaffoldContentCongruenceVerdict, ScaffoldNodePayload } from "@lrnki/domain-core";
+import type { GeneratedGroundingBundle, ScaffoldContentCongruenceVerdict, ScaffoldNodePayload } from "@lrnki/domain-core";
 import type { GeneratedScaffoldStepForAudit, ScaffoldContentCongruencePort } from "@lrnki/ports";
 import { auditScaffoldContent, detectFormattingArtifacts, scaffoldMicroLessonText } from "./auditScaffoldContent";
 
@@ -19,6 +19,10 @@ function payload(overrides: Partial<{ label: string; microLesson: string; questi
   };
 }
 
+function groundingBundle(): GeneratedGroundingBundle {
+  return { groundingOrigin: "llm_grounded", definitions: [], mentions: [], groundingAnchorReferences: [], generatingModel: "test", rationale: "test fixture" };
+}
+
 function step(id: string, over: Parameters<typeof payload>[0] = {}, context: Partial<GeneratedScaffoldStepForAudit> = {}): GeneratedScaffoldStepForAudit {
   return {
     detourId: `d-${id}`,
@@ -27,7 +31,8 @@ function step(id: string, over: Parameters<typeof payload>[0] = {}, context: Par
     declaredDomain: context.declaredDomain ?? "computer science",
     term: context.term ?? "recursion",
     parentLabel: context.parentLabel ?? "Recursive function",
-    payload: payload(over)
+    payload: payload(over),
+    groundingBundle: context.groundingBundle ?? groundingBundle()
   };
 }
 

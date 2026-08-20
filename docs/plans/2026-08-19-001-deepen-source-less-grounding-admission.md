@@ -7,16 +7,16 @@ execution: code
 
 # Deepen Source-less Grounding Admission
 
-**Status:** In progress — U1–U2 complete; U3 next
+**Status:** In progress — U1–U3 complete; U4 next
 
 **Decision state:** Grilling-locked. The user accepted the external interface direction and then
 delegated every remaining Candidate 1 decision to the recommended answer. The linked brainstorm is
 the canonical owner of the accepted problem framing, requirements, outcome policy, and scope.
 
-**Implementation state:** U1 is committed as `bac34bf`. U2's prerequisite-minting cutover,
-durability/admission lifecycle trace, mechanically derived stage ownership, and complete Graph
-Enrichment config identity passed focused automation and the production-model Rust-fixture gate.
-U3's generated Support Step assurance and durable evidence cutover is next.
+**Implementation state:** U1 is committed as `bac34bf`; U2 is committed as `67247b3`. U3's
+generated Support Step assurance, shared Answer-Key Verification, durable Grounding Bundle evidence,
+and complete Scaffold Generation identity passed automation and the production-model Rust-fixture
+gate. Cross-consumer regression and closure in U4 are next.
 
 ## Goal capsule
 
@@ -497,6 +497,55 @@ physical-device evidence.
 - **Evidence boundary:** this is production-model local application-pipeline and persisted-database
   evidence. It is not intercepted or real-backend web, deployed, native emulator/simulator, or
   physical-device evidence. Safe to continue to U3: **yes**.
+
+### U3 — Generated Support Step assurance and durable evidence — PASS (2026-08-20)
+
+- **Milestone:** generated Support Steps now require an admitted Grounding Bundle, exhaustive
+  positive-claim acceptance, and one-shot Answer-Key Verification inside one complete content-draft
+  attempt. Reference steps bypass generation. A generated payload and its owner-neutral bundle
+  publish atomically behind the existing fence; learner projection exposes neither the bundle nor
+  the answer key. Neutral Study Items retain ADR-0026's existing two-round behavior.
+- **Automated evidence:** `pnpm db:generate` mechanically regenerated the single baseline;
+  `pnpm db:check` confirmed the 58-table Drizzle schema and committed baseline are identical. The 43
+  focused application/config/adapter tests, root `pnpm typecheck` across all 11 typed projects, and
+  full `pnpm test:db` gate passed. Tests cover admission bypass/omission, exhaustive positive-field
+  projection, distractor exclusion from factual targets, key-independent all-option verification,
+  single-owner retries, required-unavailability escape, safe-peer survival, no-survivor and stale-
+  fence atomicity, generated/reference database shape checks, exact bundle round trip, immutable
+  hide/restore, grading, audit read, and no partial publication.
+- **Production-model real use:** local Scaffold Generation against the ready curated Rust expedition
+  succeeded as detour `de0ac6d3-a119-4de5-90b2-9bc3668757a5`, operation
+  `3bbf0d24-fef0-47a2-987a-9a3faa5f2d39`, with config identity
+  `learner-scaffold-generation-8aa02884e68c`. It published generated `Buffer` and `Length vs
+  Capacity` steps for the `capacity` term. The exact audit read matched both persisted payloads and
+  bundles; the learner Study Session contained only `optionId` and `text` per option and no
+  `groundingBundle` or `isCorrect` field. The same-row query supplied two generated positive
+  controls beside zero missing bundles, zero missing payloads, and one ready detour.
+- **Artifact inspection:** the accepted lesson, question, correct answer, explanation, and keyed
+  option consistently identify capital-S Rust `String`, its memory representation, and byte units;
+  the `"hi"` example distinguishes two occupied bytes from eight allocated bytes. Both bundles keep
+  the exact scaffolded-anchor reference and the same scope. The claims agree with the official
+  [Rust `String` documentation](https://doc.rust-lang.org/std/string/struct.String.html), which owns
+  the pointer/length/capacity representation and byte-unit behavior. Distractors are plainly false
+  without being admitted as positive facts.
+- **Defect and correction:** an earlier structurally ready artifact at operation
+  `200335a4-b048-431f-b6df-956676cf056b` was `FIX_FIRST`: retry feedback had broadened exact
+  `String`/byte claims into generic `elements/characters`. The established defect class was
+  context-faithfulness scope drift. The shared grounding context now makes the named or structural
+  anchor a hard claim limit; planning asks explicitly about material scope, judgment neither
+  silently supplies missing scope nor demands universality from scoped claims, retry feedback cannot
+  replace an accurate type/unit/value with a generic placeholder, and content receives the exact
+  admission context. The corrected final artifact passed independent inspection.
+- **Routing and timeline:** all 19 persisted stage rows succeeded: two outlines, one boundary probe,
+  one grounding draft, three complete claim-verification rounds, two content drafts, two congruence
+  checks, and two Answer-Key Verifications. MiMo v2.5 ran extraction through Xiaomi; exact DeepSeek
+  V4 Flash 0731 ran the answerer, primary factuality judge, and independent judge through Parasail;
+  GPT-OSS-120B ran planning/challenge through DigitalOcean; Llama 4 Scout ran the boundary probe
+  through Groq; Qwen3 Embedding produced the two embeddings. The pinned DeepInfra and GPT-OSS Groq
+  backups remained configured and were not needed by this final successful operation.
+- **Evidence boundary:** this is production-model local application-pipeline and persisted-database
+  evidence. It is not intercepted or real-backend web, deployed, native emulator/simulator, or
+  physical-device evidence. Safe to continue to U4: **yes**.
 
 ### Open findings
 

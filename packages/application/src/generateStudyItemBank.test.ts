@@ -16,7 +16,7 @@ import type {
 } from "@lrnki/domain-core";
 import { currentOperationTag } from "@lrnki/domain-core/operation-tag-context";
 import { installNodeOperationTagContext } from "@lrnki/domain-core/operation-tag-context-node";
-import type { ConceptLessonGenerationPort, ConceptLessonRedundancyJudgmentPort, ConceptLessonStorePort, EnrichmentRunStorePort, GraphVersionStorePort, MatchingAssignmentVerificationPort, RunProgressReporterPort, StageErrorDetail, StudyItemBankStorePort, StudyItemGenerationPort, StudyItemKeyVerificationPort } from "@lrnki/ports";
+import type { ConceptLessonGenerationPort, ConceptLessonRedundancyJudgmentPort, ConceptLessonStorePort, EnrichmentRunStorePort, GraphVersionStorePort, MatchingAssignmentVerificationPort, RunProgressReporterPort, StageErrorDetail, StudyItemBankStorePort, StudyItemGenerationPort, AnswerKeyVerificationPort } from "@lrnki/ports";
 import { generateStudyItemBank, OPTION_SELECT_GENERATION_ATTEMPTS } from "./generateStudyItemBank";
 import { NON_LLM_STAGES } from "./runProgressReporter";
 
@@ -290,7 +290,7 @@ const FIXTURE_LIE = /\b(lie|false)\b/i;
 // distractor judged true, key not judged false); impostor passes because its one affirmative
 // requirement — the lie is PROVEN false — is met. Every test that composes a bank therefore
 // also asserts, incidentally, that `unclear` never vetoes (D5).
-function keyVerifierPassing(): StudyItemKeyVerificationPort {
+function keyVerifierPassing(): AnswerKeyVerificationPort {
   return {
     model: "mock-verifier",
     async verify(input) {
@@ -393,7 +393,7 @@ test("a node whose lesson grounds an option-select that passes the guard persist
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": goodLessonDraft("b1", ownershipDef) } }),
-    studyItemKeyVerification: keyVerifierPassing(),
+    answerKeyVerification: keyVerifierPassing(),
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: lessonStore.store,
     studyItemGeneration: generationReturning({ optionSelect: { "node-c1": osDraft("rules that govern memory") } }),
@@ -429,7 +429,7 @@ test("structural blueprint pre-gate rejects matching and impostor when the lesso
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": sparseLesson } }),
-    studyItemKeyVerification: keyVerifierPassing(),
+    answerKeyVerification: keyVerifierPassing(),
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: capturingLessonStore().store,
     studyItemGeneration: generationReturning({ optionSelect: { "node-c1": osDraft("rules that govern memory", ["Stack", "Register", "Cache"], lessonPassageId("node-c1", 0)) } }),
@@ -450,7 +450,7 @@ test("redundant non-substantive lesson sections are retried once then dropped", 
     enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": goodLessonDraft("b1", ownershipDef) } }),
     conceptLessonRedundancyJudge: redundancyJudgeReturning([{ sectionKind: "gist", verdict: "redundant", redundantWith: "definition", reason: "repeats the definition" }]),
-    studyItemKeyVerification: keyVerifierPassing(),
+    answerKeyVerification: keyVerifierPassing(),
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: lessonStore.store,
     studyItemGeneration: generationReturning({ optionSelect: { "node-c1": osDraft("rules that govern memory") } }),
@@ -472,7 +472,7 @@ test("the study-item operation context reaches generation calls", async () => {
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": goodLessonDraft("b1", ownershipDef) } }),
-    studyItemKeyVerification: keyVerifierPassing(),
+    answerKeyVerification: keyVerifierPassing(),
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: capturingLessonStore().store,
     studyItemGeneration: generationReturning({
@@ -493,7 +493,7 @@ test("missing enrichment leaves a failed study-item timeline with load-stage err
       graphStore: graphStoreReturning(snapshotWith([])),
       enrichmentStore: { async getLayer() { return undefined; } } as unknown as EnrichmentRunStorePort,
       conceptLessonGeneration: lessonGenerationReturning({}),
-      studyItemKeyVerification: keyVerifierPassing(),
+      answerKeyVerification: keyVerifierPassing(),
       matchingAssignmentVerification: matchingVerifierPassing(),
       conceptLessonStore: capturingLessonStore().store,
       studyItemGeneration: generationReturning({}),
@@ -561,7 +561,7 @@ test("concurrent per-node generation persists items and rejections in input orde
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layerWith(nodes)),
     conceptLessonGeneration,
-    studyItemKeyVerification: keyVerifierPassing(),
+    answerKeyVerification: keyVerifierPassing(),
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: lessonStore.store,
     studyItemGeneration,
@@ -619,7 +619,7 @@ test("option-select, matching, and impostor stages overlap and still persist in 
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": goodLessonDraft("b1", ownershipDef) } }),
-    studyItemKeyVerification: keyVerifierPassing(),
+    answerKeyVerification: keyVerifierPassing(),
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: capturingLessonStore().store,
     studyItemGeneration: generation,
@@ -646,7 +646,7 @@ test("an option-select guard rejection records the node as rejected", async () =
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": goodLessonDraft("b1", ownershipDef) } }),
-    studyItemKeyVerification: keyVerifierPassing(),
+    answerKeyVerification: keyVerifierPassing(),
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: capturingLessonStore().store,
     studyItemGeneration: generationReturning({ optionSelect: { "node-c1": osDraft("rules that govern memory", ["Same", "Same", "Cache"]) } }),
@@ -683,7 +683,7 @@ test("Covers AE3/R3: a node with no usable grounding is recorded lesson-absent a
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
     conceptLessonGeneration: lessonGen,
-    studyItemKeyVerification: keyVerifierPassing(),
+    answerKeyVerification: keyVerifierPassing(),
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: lessonStore.store,
     studyItemGeneration: generation,
@@ -718,7 +718,7 @@ test("an option-select generation that throws rejects only that node and continu
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1"), anchorNode("c2", "Borrowing")])),
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": goodLessonDraft("b1", ownershipDef), "node-c2": goodLessonDraft("b1", ownershipDef) } }),
-    studyItemKeyVerification: keyVerifierPassing(),
+    answerKeyVerification: keyVerifierPassing(),
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: capturingLessonStore().store,
     studyItemGeneration: generationReturning({ optionSelect: { "node-c1": "throw", "node-c2": osDraft("rules that govern memory", ["Stack", "Register", "Cache"], lessonPassageId("node-c2", 1)) } }),
@@ -740,7 +740,7 @@ test("an option-select whose correct answer cites text absent from the lesson gr
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": goodLessonDraft("b1", ownershipDef) } }),
-    studyItemKeyVerification: keyVerifierPassing(),
+    answerKeyVerification: keyVerifierPassing(),
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: capturingLessonStore().store,
     studyItemGeneration: generationReturning({ optionSelect: { "node-c1": osDraft("a fact never stated in the passage") } }),
@@ -788,7 +788,7 @@ test("an option-select guard miss gets one INFORMED retry carrying the first att
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": goodLessonDraft("b1", ownershipDef) } }),
-    studyItemKeyVerification: keyVerifierPassing(),
+    answerKeyVerification: keyVerifierPassing(),
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: capturingLessonStore().store,
     studyItemGeneration: retryingGeneration,
@@ -831,7 +831,7 @@ test("Covers R10: an uncited lesson still grounds generated-labeled items from i
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": synthesizedLesson } }),
-    studyItemKeyVerification: keyVerifierPassing(),
+    answerKeyVerification: keyVerifierPassing(),
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: capturingLessonStore().store,
     studyItemGeneration: generationReturning({ optionSelect: { "node-c1": osDraft("rules that govern memory") } }),
@@ -853,7 +853,7 @@ test("a rescued node with a verified DEFINITION passage yields source_mentioned 
     graphStore: graphStoreReturning(snapshotWith([])),
     enrichmentStore: enrichmentStoreReturning(layerWith([sourceMentionedNode({ quote: def })])),
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-rescued": goodLessonDraft("def-1", def) } }),
-    studyItemKeyVerification: keyVerifierPassing(),
+    answerKeyVerification: keyVerifierPassing(),
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: capturingLessonStore().store,
     studyItemGeneration: generationReturning({ optionSelect: { "node-rescued": osDraft(cite, ["Stack", "Register", "Cache"], lessonPassageId("node-rescued", 1)) } }),
@@ -874,7 +874,7 @@ test("a rescued mention-only node still yields source_mentioned items (no regres
     graphStore: graphStoreReturning(snapshotWith([])),
     enrichmentStore: enrichmentStoreReturning(layerWith([sourceMentionedNode({ id: "node-borrow", label: "Borrowing", passageType: "mention", quote: m, blockId: "m-1" })])),
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-borrow": goodLessonDraft("m-1", m) } }),
-    studyItemKeyVerification: keyVerifierPassing(),
+    answerKeyVerification: keyVerifierPassing(),
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: capturingLessonStore().store,
     studyItemGeneration: generationReturning({ optionSelect: { "node-borrow": osDraft(cite, ["Stack", "Register", "Cache"], lessonPassageId("node-borrow", 1)) } }),
@@ -899,7 +899,7 @@ test("Covers AE5: a minted llm_grounded node yields a generated lesson and gener
     // generated, and option-select grounds in the generated lesson section with the selector's
     // canonical generated passage id.
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-minted": goodLessonDraft("node-minted:definition:0", generatedDef) } }),
-    studyItemKeyVerification: keyVerifierPassing(),
+    answerKeyVerification: keyVerifierPassing(),
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: lessonStore.store,
     studyItemGeneration: generationReturning({ optionSelect: { "node-minted": osDraft(cite, ["Stack", "Register", "Cache"], lessonPassageId("node-minted", 1)) } }),
@@ -939,7 +939,7 @@ test("Covers AE1: a sibling-sourced impostor passes the guard and persists with 
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": goodLessonDraft("b1", ownershipDef) } }),
-    studyItemKeyVerification: keyVerifierPassing(),
+    answerKeyVerification: keyVerifierPassing(),
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: capturingLessonStore().store,
     studyItemGeneration: generationReturning({
@@ -968,7 +968,7 @@ test("Covers AE2: a model returning lieSource 'generated' produces a generated-l
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": goodLessonDraft("b1", ownershipDef) } }),
-    studyItemKeyVerification: keyVerifierPassing(),
+    answerKeyVerification: keyVerifierPassing(),
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: capturingLessonStore().store,
     studyItemGeneration: generationReturning({
@@ -996,7 +996,7 @@ test("Covers AE2: a node whose impostor fails the guard twice is recorded impost
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": goodLessonDraft("b1", ownershipDef) } }),
-    studyItemKeyVerification: keyVerifierPassing(),
+    answerKeyVerification: keyVerifierPassing(),
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: capturingLessonStore().store,
     studyItemGeneration: generationReturning({
@@ -1020,7 +1020,7 @@ test("a vetoed impostor gets one regeneration informed by the offending candidat
   const { store, persisted, persistedRejected } = capturingStore();
   const retryFeedbacks: (string | undefined)[] = [];
   let impostorVerifications = 0;
-  const verifier: StudyItemKeyVerificationPort = {
+  const verifier: AnswerKeyVerificationPort = {
     model: "mock-verifier",
     async verify(input) {
       if (input.itemType === "impostor") impostorVerifications += 1;
@@ -1053,7 +1053,7 @@ test("a vetoed impostor gets one regeneration informed by the offending candidat
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": goodLessonDraft("b1", ownershipDef) } }),
-    studyItemKeyVerification: verifier,
+    answerKeyVerification: verifier,
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: capturingLessonStore().store,
     studyItemGeneration: generation,
@@ -1111,7 +1111,7 @@ test("an ambiguous matching board is vetoed, regenerated with cell-level feedbac
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": goodLessonDraft("b1", ownershipDef) } }),
-    studyItemKeyVerification: keyVerifierPassing(),
+    answerKeyVerification: keyVerifierPassing(),
     matchingAssignmentVerification: matchingVerifier,
     conceptLessonStore: capturingLessonStore().store,
     studyItemGeneration: generation,
@@ -1143,7 +1143,7 @@ test("matching assignment verification unavailable admits the board unverified",
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": goodLessonDraft("b1", ownershipDef) } }),
-    studyItemKeyVerification: keyVerifierPassing(),
+    answerKeyVerification: keyVerifierPassing(),
     matchingAssignmentVerification: {
       model: "mock-matching-verifier",
       async verify() { throw new Error("judge offline"); }
@@ -1160,7 +1160,7 @@ test("matching assignment verification unavailable admits the board unverified",
 test("key verification unavailable drops the impostor and passes a verbatim-anchored option-select through", async () => {
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
   const { store, persisted, persistedRejected } = capturingStore();
-  const verifier: StudyItemKeyVerificationPort = {
+  const verifier: AnswerKeyVerificationPort = {
     model: "mock-verifier",
     async verify() { throw new Error("judge offline"); }
   };
@@ -1170,7 +1170,7 @@ test("key verification unavailable drops the impostor and passes a verbatim-anch
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": goodLessonDraft("b1", ownershipDef) } }),
-    studyItemKeyVerification: verifier,
+    answerKeyVerification: verifier,
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: capturingLessonStore().store,
     studyItemGeneration: generationReturning({
@@ -1197,7 +1197,7 @@ test("key verification unavailable DROPS an option-select admitted only through 
   // check the claim its citation no longer anchors. With no verdict, that expectation failed.
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
   const { store, persisted, persistedRejected } = capturingStore();
-  const verifier: StudyItemKeyVerificationPort = {
+  const verifier: AnswerKeyVerificationPort = {
     model: "mock-verifier",
     async verify() { throw new Error("judge offline"); }
   };
@@ -1207,7 +1207,7 @@ test("key verification unavailable DROPS an option-select admitted only through 
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": goodLessonDraft("b1", ownershipDef) } }),
-    studyItemKeyVerification: verifier,
+    answerKeyVerification: verifier,
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: capturingLessonStore().store,
     studyItemGeneration: generationReturning({
@@ -1242,7 +1242,7 @@ test("source-grounded lesson with no verified substantive citation gets one feed
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
     conceptLessonGeneration: lessonGeneration,
-    studyItemKeyVerification: keyVerifierPassing(),
+    answerKeyVerification: keyVerifierPassing(),
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: lessonStore.store,
     studyItemGeneration: generationReturning({ optionSelect: { "node-c1": osDraft("rules that govern memory") } }),
@@ -1281,7 +1281,7 @@ test("rule 18: both stages derive grounding from the same lesson passages for a 
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": goodLessonDraft("b1", ownershipDef) } }),
-    studyItemKeyVerification: keyVerifierPassing(),
+    answerKeyVerification: keyVerifierPassing(),
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: capturingLessonStore().store,
     studyItemGeneration: recordingGeneration,
@@ -1311,7 +1311,7 @@ test("a minted lesson with no surviving citation can still anchor generated opti
     graphStore: graphStoreReturning(snapshotWith([])),
     enrichmentStore: enrichmentStoreReturning(layerWith([llmGroundedNode()])),
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-minted": uncitedGeneratedLesson } }),
-    studyItemKeyVerification: keyVerifierPassing(),
+    answerKeyVerification: keyVerifierPassing(),
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: lessonStore.store,
     studyItemGeneration: generationReturning({ optionSelect: { "node-minted": osDraft(cite, ["Stack", "Register", "Cache"], lessonPassageId("node-minted", 1)) } }),
@@ -1376,7 +1376,7 @@ test("Covers R9: study items + lessons generate over a synthetic (null-version) 
     graphStore,
     enrichmentStore: enrichmentStoreReturning(syntheticLayer([node])),
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-syn": generatedLessonDraft("node-syn", def) } }),
-    studyItemKeyVerification: keyVerifierPassing(),
+    answerKeyVerification: keyVerifierPassing(),
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: lessonStore.store,
     studyItemGeneration: generationReturning({ optionSelect: { "node-syn": osDraft(def, ["Respiration", "Osmosis", "Diffusion"], lessonPassageId("node-syn", 1)) } }),

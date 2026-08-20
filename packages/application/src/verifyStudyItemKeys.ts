@@ -1,5 +1,13 @@
-import type { ImpostorItem, OptionSelectItem, StudyItemCandidateVerdict, StudyItemClaimVerdict } from "@lrnki/domain-core";
-import type { StudyItemGroundingPassage, StudyItemKeyVerificationPort } from "@lrnki/ports";
+import type {
+  ImpostorItem,
+  OptionSelectItem,
+  StudyItemCandidateVerdict,
+  StudyItemClaimVerdict
+} from "@lrnki/domain-core";
+import type {
+  AnswerKeyGroundingPassage,
+  AnswerKeyVerificationPort
+} from "@lrnki/ports";
 import type { CitationRung } from "./optionSelectGuard";
 import {
   verifyGuardedItems,
@@ -7,38 +15,27 @@ import {
   type VerificationRegeneration
 } from "./verifyGuardedItems";
 
-// Study Item Key Verification (plan 2026-08-05-001 D2/D5/D7, amending ADR-0026). One
-// cross-family judgment per guarded item classifies every candidate answer, and a type-specific
-// deterministic rule then decides whether the answer key is unique.
-//
-// The two-round control flow this phase runs is NOT owned here — `verifyGuardedItems` owns it
-// for every verified item type (rule 18). What this module owns is the key-verification QUESTION
-// (the port and its request shape) and the two answer-key uniqueness RULES.
+// Answer-Key Verification (ADR-0026, amended by plan 2026-08-19-001). The port asks one
+// owner-neutral candidate-truth question. Neutral Study Items retain the shared two-round
+// `verifyGuardedItems` envelope below; generated Support Steps call the exported one-shot
+// option-select function from their own complete content-attempt envelope.
 
-export type KeyVerificationRequest = {
-  itemType: "option_select" | "impostor";
-  declaredDomain: string;
-  node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
-  question?: string;
-  candidates: { ordinal: number; text: string }[];
-  groundingPassages: StudyItemGroundingPassage[];
-  siblings: { label: string; snippet: string }[];
-};
+export type AnswerKeyVerificationRequest = Parameters<AnswerKeyVerificationPort["verify"]>[0];
 
-export type KeyVerificationSubject<TItem> = {
-  request: KeyVerificationRequest;
+export type AnswerKeyVerificationSubject<TItem> = {
+  request: AnswerKeyVerificationRequest;
   item: TItem;
-  // `generated_passage_fallback` = this item has no verbatim grounding anchor at all, so it
-  // exists only because a judge is expected to check it (D6). Read by `onUnavailable`.
+  // `generated_passage_fallback` = this neutral item has no verbatim grounding anchor at all,
+  // so it exists only because a judge is expected to check it. Read by `onUnavailable`.
   citationRung: CitationRung;
-  regenerate: (feedback: string) => Promise<VerificationRegeneration<KeyVerificationSubject<TItem>>>;
+  regenerate: (feedback: string) => Promise<VerificationRegeneration<AnswerKeyVerificationSubject<TItem>>>;
 };
 
-export type KeyVerificationSpec<TItem> = {
-  verifier: StudyItemKeyVerificationPort;
+export type AnswerKeyVerificationSpec<TItem> = {
+  verifier: AnswerKeyVerificationPort;
   concurrency?: number;
-  vetoReason: (subject: KeyVerificationSubject<TItem>, verdicts: readonly StudyItemCandidateVerdict[]) => string | null;
-  onUnavailable: (subject: KeyVerificationSubject<TItem>, error: unknown) => VerificationOutcome<TItem>;
+  vetoReason: (subject: AnswerKeyVerificationSubject<TItem>, verdicts: readonly StudyItemCandidateVerdict[]) => string | null;
+  onUnavailable: (subject: AnswerKeyVerificationSubject<TItem>, error: unknown) => VerificationOutcome<TItem>;
 };
 
 // A verdict the judge never returned for an ordinal is `unclear`, never an error and never a
@@ -52,11 +49,11 @@ export function claimReasonFor(verdicts: readonly StudyItemCandidateVerdict[], o
   return verdicts.find((verdict) => verdict.ordinal === ordinal)?.reason.trim() || "no reason given";
 }
 
-export async function verifyStudyItemKeys<TItem>(
-  subjects: readonly KeyVerificationSubject<TItem>[],
-  spec: KeyVerificationSpec<TItem>
+export async function verifyAnswerKeys<TItem>(
+  subjects: readonly AnswerKeyVerificationSubject<TItem>[],
+  spec: AnswerKeyVerificationSpec<TItem>
 ): Promise<VerificationOutcome<TItem>[]> {
-  return verifyGuardedItems<KeyVerificationSubject<TItem>, StudyItemCandidateVerdict[], TItem>(subjects, {
+  return verifyGuardedItems<AnswerKeyVerificationSubject<TItem>, StudyItemCandidateVerdict[], TItem>(subjects, {
     ...(spec.concurrency === undefined ? {} : { concurrency: spec.concurrency }),
     judge: (subject) => spec.verifier.verify(subject.request),
     vetoReason: spec.vetoReason,
@@ -64,40 +61,80 @@ export async function verifyStudyItemKeys<TItem>(
   });
 }
 
-// --- The two answer-key uniqueness rules (D5) ---------------------------------------
-//
-// Both are deterministic functions of verdicts a judge confidently returned, which is what
-// keeps them inside AGENTS rule 16: the neural half classifies claims, the veto half proves
-// a property over those classifications.
-//
-// Read the asymmetry between them carefully, because it is deliberate and it is NOT
-// "`unclear` vetoes for impostor". Option-select's rule is purely negative — it subtracts an
-// item only on a confident OPPOSING verdict, so `unclear` anywhere admits. Impostor's rule
-// carries one affirmative requirement — the planted lie must be *proven* false — which
-// ADR-0026 already justified by harm long before this plan: a "lie" that is actually true
-// teaches a falsehood, while a missing impostor item is the designed safe state. An
-// `unclear` lie therefore fails to meet a standing requirement rather than being vetoed by
-// the judge's uncertainty. Every NON-keyed candidate in both rules is negative-only.
+type OptionForAnswerKey = Readonly<{ text: string; isCorrect: boolean }>;
 
+type PresentedOption = Readonly<{
+  ordinal: number;
+  option: OptionForAnswerKey;
+}>;
+
+// Presentation ordinals are derived only from normalized candidate text. They do not depend on
+// the server key, generator position, option id, or persisted order. The deterministic structural
+// guard rejects normalized duplicates before either caller reaches this seam.
+function presentOptions(options: readonly OptionForAnswerKey[]): PresentedOption[] {
+  return [...options]
+    .sort((left, right) => {
+      const normalizedOrder = normalizeCandidateText(left.text).localeCompare(normalizeCandidateText(right.text), "en");
+      return normalizedOrder || left.text.localeCompare(right.text, "en");
+    })
+    .map((option, ordinal) => ({ ordinal, option }));
+}
+
+export function answerKeyCandidates(options: readonly OptionForAnswerKey[]): { ordinal: number; text: string }[] {
+  return presentOptions(options).map(({ ordinal, option }) => ({ ordinal, text: option.text }));
+}
+
+function normalizeCandidateText(text: string): string {
+  return text.replace(/\s+/g, " ").trim().toLocaleLowerCase("en");
+}
+
+// The shared option-select veto is purely negative: confidently false key or confidently true
+// distractor rejects. `unclear` never becomes a hard veto (AGENTS rule 16).
 export function optionSelectKeyVetoReason(
-  item: OptionSelectItem,
+  item: Pick<OptionSelectItem, "options"> | { options: readonly OptionForAnswerKey[] },
   verdicts: readonly StudyItemCandidateVerdict[]
 ): string | null {
   const offenders: string[] = [];
-  item.options.forEach((option, ordinal) => {
+  for (const { ordinal, option } of presentOptions(item.options)) {
     const verdict = claimVerdictFor(verdicts, ordinal);
     if (option.isCorrect && verdict === "claim_false") {
-      offenders.push(`the keyed correct answer "${option.text}" was judged false for this concept (${claimReasonFor(verdicts, ordinal)})`);
+      offenders.push(`the keyed correct answer "${option.text}" was judged false for this subject (${claimReasonFor(verdicts, ordinal)})`);
     }
     if (!option.isCorrect && verdict === "claim_true") {
-      offenders.push(`distractor "${option.text}" was judged true for this concept (${claimReasonFor(verdicts, ordinal)})`);
+      offenders.push(`distractor "${option.text}" was judged true for this subject (${claimReasonFor(verdicts, ordinal)})`);
     }
-  });
+  }
   return offenders.length
-    ? `option-select key verification rejected the item: ${offenders.join("; ")}. Rewrite so exactly one option is true of this concept.`
+    ? `option-select key verification rejected the item: ${offenders.join("; ")}. Rewrite so exactly one option is true of this subject.`
     : null;
 }
 
+// One-shot classification/veto seam for generated Support Steps. Required verifier failure is
+// deliberately not caught here: it escapes the caller's content-attempt envelope unchanged.
+export async function verifyOptionSelectAnswerKeyOnce(input: {
+  verifier: AnswerKeyVerificationPort;
+  declaredDomain: string;
+  subject: { canonicalLabel: string; aliases: string[] };
+  item: { question: string; options: readonly OptionForAnswerKey[] };
+  groundingPassages: AnswerKeyGroundingPassage[];
+  relatedConcepts: { label: string; snippet: string }[];
+}): Promise<{ admitted: true } | { admitted: false; reason: string }> {
+  const verdicts = await input.verifier.verify({
+    itemType: "option_select",
+    declaredDomain: input.declaredDomain,
+    subject: input.subject,
+    question: input.item.question,
+    candidates: answerKeyCandidates(input.item.options),
+    groundingPassages: input.groundingPassages,
+    relatedConcepts: input.relatedConcepts
+  });
+  const reason = optionSelectKeyVetoReason(input.item, verdicts);
+  return reason === null ? { admitted: true } : { admitted: false, reason };
+}
+
+// Impostor retains ADR-0026's standing affirmative requirement: its planted lie must be proven
+// false, while non-keyed truths remain negative-only. The item already owns randomized statement
+// ordinals, so the request and settlement correlate through those presentation ordinals.
 export function impostorKeyVetoReason(
   item: ImpostorItem,
   verdicts: readonly StudyItemCandidateVerdict[]
@@ -106,13 +143,13 @@ export function impostorKeyVetoReason(
   for (const statement of item.statements) {
     const verdict = claimVerdictFor(verdicts, statement.ordinal);
     if (statement.isImpostor && verdict !== "claim_false") {
-      offenders.push(`the planted lie "${statement.text}" was not judged false for this concept (${claimReasonFor(verdicts, statement.ordinal)})`);
+      offenders.push(`the planted lie "${statement.text}" was not judged false for this subject (${claimReasonFor(verdicts, statement.ordinal)})`);
     }
     if (!statement.isImpostor && verdict === "claim_false") {
-      offenders.push(`the true statement "${statement.text}" was judged false for this concept (${claimReasonFor(verdicts, statement.ordinal)})`);
+      offenders.push(`the true statement "${statement.text}" was judged false for this subject (${claimReasonFor(verdicts, statement.ordinal)})`);
     }
   }
   return offenders.length
-    ? `impostor key verification rejected the item: ${offenders.join("; ")}. Rewrite so exactly one statement is false of this concept.`
+    ? `impostor key verification rejected the item: ${offenders.join("; ")}. Rewrite so exactly one statement is false of this subject.`
     : null;
 }

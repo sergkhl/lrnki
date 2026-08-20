@@ -1,15 +1,19 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { ResponseLogRow, ScaffoldDetour, ScaffoldStep } from "@lrnki/domain-core";
+import type { GeneratedGroundingBundle, ResponseLogRow, ScaffoldDetour, ScaffoldStep } from "@lrnki/domain-core";
 import { composeScaffoldDetours, type ProjectedScaffoldReference } from "./studySessionTrail";
 
 let seq = 0;
+function groundingBundle(): GeneratedGroundingBundle {
+  return { groundingOrigin: "llm_grounded", definitions: [], mentions: [], groundingAnchorReferences: [], generatingModel: "test", rationale: "test fixture" };
+}
+
 function scaffoldResponse(scaffoldStepId: string, outcome: "correct" | "incorrect"): ResponseLogRow {
   return { scope: "scaffold", scaffoldStepId, responseId: `r${++seq}`, learnerStateRef: "L", signalType: "graded", judgedOutcome: outcome, gradedScore: outcome === "correct" ? 1 : 0, responseSource: "human", graderIdentity: "auto", batchId: null, submittedAnswer: null, attemptSeq: seq };
 }
 
 function generatedStep(id: string, ordinal: number, lessonReadAt: string | null): ScaffoldStep {
-  return { scaffoldStepId: id, ordinal, kind: "generated", lessonReadAt, payload: { scaffoldNodeId: `sn-${id}`, label: `Concept ${id}`, lesson: [{ kind: "definition", text: "d", groundingProvenance: "generated" }], item: { scaffoldItemId: `it-${id}`, question: "q", explanation: "e", options: [{ optionId: "o1", text: "a", isCorrect: true }] } } };
+  return { scaffoldStepId: id, ordinal, kind: "generated", lessonReadAt, groundingBundle: groundingBundle(), payload: { scaffoldNodeId: `sn-${id}`, label: `Concept ${id}`, lesson: [{ kind: "definition", text: "d", groundingProvenance: "generated" }], item: { scaffoldItemId: `it-${id}`, question: "q", explanation: "e", options: [{ optionId: "o1", text: "a", isCorrect: true }] } } };
 }
 
 function detour(overrides: Partial<ScaffoldDetour> & { steps: ScaffoldStep[] }): ScaffoldDetour {
@@ -378,6 +382,7 @@ test("a generated step view carries its micro-lesson and key-free option-select 
 test("generated step option-select options are sorted by id so the answer is not positional", () => {
   const step: ScaffoldStep = {
     scaffoldStepId: "s2", ordinal: 0, kind: "generated", lessonReadAt: null,
+    groundingBundle: groundingBundle(),
     payload: { scaffoldNodeId: "sn", label: "L", lesson: [{ kind: "definition", text: "d", groundingProvenance: "generated" }], item: { scaffoldItemId: "it", question: "q", explanation: "e", options: [
       { optionId: "o3", text: "c", isCorrect: false },
       { optionId: "o1", text: "a", isCorrect: true },

@@ -117,8 +117,8 @@ export const neuralOperationRegistry = {
     ],
     embeddingStages: []
   },
-  // The five Scaffold runtime descriptors (KTD7): outline, Knowledge-Boundary Probe, Grounding
-  // Generation, content, and the generation-time congruence re-pick. The probe's K-answer
+  // The complete Scaffold runtime descriptor family: outline, shared source-less admission,
+  // generated content, congruence, and one-shot Answer-Key Verification. The probe's K-answer
   // agreement embeds through the embedding client under the scaffold operation tag.
   scaffoldGeneration: {
     configSeed: "learner-scaffold-generation",
@@ -127,8 +127,13 @@ export const neuralOperationRegistry = {
       scaffoldOutlineGenerationDescriptor,
       knowledgeBoundaryProbeDescriptor,
       groundingGenerationDescriptor,
+      claimVerificationQuestionPlanningDescriptor,
+      claimVerificationAnsweringDescriptor,
+      claimFactualityJudgmentDescriptor,
+      claimFactualityChallengeDescriptor,
       scaffoldContentGenerationDescriptor,
-      scaffoldContentCongruenceDescriptor
+      scaffoldContentCongruenceDescriptor,
+      optionSelectKeyVerificationDescriptor
     ],
     embeddingStages: [STAGE_TAGS.nodeEmbedding]
   }
@@ -184,14 +189,17 @@ export function studyItemBankConfigHash(): string {
   return operationConfigHash(entry.configSeed, entry.descriptors);
 }
 
-// The complete Scaffold operation identity (KTD7): all five runtime descriptors plus the
-// application behavior knobs and the embedding model the probe agreement uses. Persisted on
+// The complete Scaffold operation identity (KTD7): every runtime descriptor plus the application
+// behavior knobs and the embedding model the probe agreement uses. Execution-only fan-out widths
+// are excluded through the same shared admission projection as the other two consumers. Persisted on
 // every scaffold operation_runs row at operation start — including a direct-reference attempt
 // that opens no neural stage.
 export function scaffoldGenerationConfigHash(config: ScaffoldGenerationConfig): string {
   const entry = neuralOperationRegistry.scaffoldGeneration;
+  const { sourceLessGroundingAdmission, ...scaffoldBehavior } = config;
   return operationConfigHash(entry.configSeed, entry.descriptors, {
-    ...config,
+    ...scaffoldBehavior,
+    sourceLessGroundingAdmission: sourceLessGroundingAdmissionBehavior(sourceLessGroundingAdmission),
     nodeEmbeddingModel: NODE_EMBEDDING_MODEL
   }, {
     additionalModels: [NODE_EMBEDDING_MODEL]

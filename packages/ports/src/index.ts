@@ -250,11 +250,10 @@ export type StudyItemGroundingPassage =
   | { passageId: string; kind: "definition" | "mention"; text: string; sourceResourceId: string; sourceBlockId: string }
   | { passageId: string; kind: "definition" | "mention"; text: string; derivedNodeId: string };
 
-// Study Item key verification judge (ADR-0026, amended by plan 2026-08-05-001). A bounded
-// cross-family judgment over ONE deterministically guarded item: every candidate answer is
-// classified true / false / unclear for the target node in its Declared Domain. It replaces
-// the lie-only judge, whose blind spot was structural — checking the keyed answer alone can
-// never observe a second true option or a second false statement.
+// Answer-Key Verification judge (ADR-0026, amended by plan 2026-08-19-001). A bounded
+// cross-family judgment over ONE deterministically guarded learner activity: every candidate
+// answer is classified true / false / unclear for its learning subject in the Declared Domain.
+// Neutral Study Items and learner-scoped Support Steps share this key-hidden question.
 //
 // The posture is DOMAIN TRUTH, not passage entailment (D4): the grounding passages and
 // sibling concepts are context, and every candidate is visible at once so a contradiction
@@ -263,18 +262,21 @@ export type StudyItemGroundingPassage =
 //
 // Option-select passes its question as framing so each candidate reads as an answer to it;
 // impostor OMITS the question, whose meta-form ("which statement is FALSE?") would corrupt
-// per-statement judging (D8). The application owns the per-type answer-key uniqueness rule
-// and the fail-closed / pass-through split on unavailability (ADR-0026, D5).
-export interface StudyItemKeyVerificationPort {
+// per-statement judging. Candidate ordinals are presentation-only: the application derives them
+// from deterministic key-independent order and never sends a server key, `isCorrect`, a derived
+// node id, or generator position. The application owns settlement and unavailability policy.
+export type AnswerKeyGroundingPassage = Pick<StudyItemGroundingPassage, "passageId" | "kind" | "text">;
+
+export interface AnswerKeyVerificationPort {
   readonly model: string;
   verify(input: {
     itemType: "option_select" | "impostor";
     declaredDomain: string;
-    node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
+    subject: { canonicalLabel: string; aliases: string[] };
     question?: string;
     candidates: { ordinal: number; text: string }[];
-    groundingPassages: StudyItemGroundingPassage[];
-    siblings: { label: string; snippet: string }[];
+    groundingPassages: AnswerKeyGroundingPassage[];
+    relatedConcepts: { label: string; snippet: string }[];
   }): Promise<StudyItemCandidateVerdict[]>;
 }
 
@@ -282,7 +284,7 @@ export interface StudyItemKeyVerificationPort {
 // bounded cross-family judgment over ONE deterministically guarded matching item: every
 // (prompt, match) cell of the N×N grid is classified fits / does_not_fit / unclear.
 //
-// It asks a different question from `StudyItemKeyVerificationPort`, which is why it is a
+// It asks a different question from `AnswerKeyVerificationPort`, which is why it is a
 // second port rather than a third `itemType` on that one: claim truth is per-candidate and
 // says nothing about whether a learner can assign the board, and a tautological or
 // interchangeable pair is individually TRUE. The grid shape (rather than a per-prompt fit
@@ -931,9 +933,15 @@ export interface ScaffoldContentPort {
   generate(input: {
     declaredDomain: string;
     label: string;
+    // The same admitted context used by Source-less Grounding Admission. It gives the writer
+    // the exact anchor/type/system boundary that learner-facing prose must retain.
+    groundingContext: GroundingAdmissionContext;
     // Approved grounding text (verified parent/layer grounding or generated grounding that
     // cleared the Knowledge-Boundary Probe). The generator writes only from this.
     groundingText: string;
+    // Bounded feedback from the preceding complete draft's structural, congruence, factual,
+    // or answer-key rejection. Each call still creates a fresh complete payload.
+    retryFeedback?: string;
   }): Promise<ScaffoldContentDraft>;
 }
 
@@ -1053,6 +1061,7 @@ export interface GeneratedScaffoldStepForAudit {
   term: string;
   parentLabel: string;
   payload: ScaffoldNodePayload;
+  groundingBundle: GeneratedGroundingBundle;
 }
 
 // The generated payloads a publish attempt commits, alongside their step ordering. Reference

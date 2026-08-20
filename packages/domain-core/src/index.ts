@@ -434,7 +434,7 @@ export type AdmissionLabelJudgment = {
   rationale: string;
 };
 
-// Study Item key verification (ADR-0026, amended by plan 2026-08-05-001 D2). One
+// Answer-Key Verification (ADR-0026, amended by plan 2026-08-19-001 KTD6). One
 // cross-family judgment per guarded item classifies EVERY candidate answer, which is what
 // makes answer-key UNIQUENESS decidable: checking the key alone can never observe a second
 // true option or a second false statement, and that hole shipped items that marked a
@@ -1897,7 +1897,7 @@ export const STAGE_TAGS = {
   // new operation type — but carries its own spend tag so its cost ⋈ wall-clock join stays
   // separable from option-select and lesson generation (R7, ADR-0029).
   impostorGeneration: "impostor-generation",
-  // Study Item key verification (plan 2026-08-05-001 D7). One prompt, two stages: the two
+  // Neutral Answer-Key Verification (ADR-0026). One prompt, two stages: the two
   // item-type brackets are separately attributable in the cost ⋈ wall-clock join, and the
   // split is forced anyway — `stageTag` is baked into `stageConfigHash`, so two stages over
   // one prompt file mean two Neural Stage Descriptors (ADR-0034).

@@ -1,10 +1,16 @@
 import {
   createScaffoldGeneration,
+  createSourceLessGroundingAdmission,
   DEFAULT_SCAFFOLD_GENERATION_CONFIG,
   getStudySession,
   type ScaffoldGeneration
 } from "@lrnki/application";
 import {
+  createAnswerKeyVerificationPort,
+  createClaimFactualityChallengePort,
+  createClaimFactualityJudgmentPort,
+  createClaimVerificationAnsweringPort,
+  createClaimVerificationQuestionPlanningPort,
   createGroundingGenerationPort,
   createKnowledgeBoundaryProbePort,
   createNeuralClients,
@@ -38,6 +44,24 @@ export function createLearnerScaffoldGeneration(sql: DatabaseClient): ScaffoldGe
   const conceptLessonStore = new PostgresConceptLessonStore(sql);
   const responseLog = new PostgresResponseLogStore(sql);
   const verdictStore = new PostgresCalibrationVerdictStore(sql);
+  const knowledgeBoundaryProbe = createKnowledgeBoundaryProbePort(probeClient);
+  const nodeEmbedding = new LiteLlmNodeEmbeddingAdapter(embeddingClient);
+  const groundingGeneration = createGroundingGenerationPort(deterministicClient);
+  const claimVerificationQuestionPlanning = createClaimVerificationQuestionPlanningPort(deterministicClient);
+  const claimVerificationAnswering = createClaimVerificationAnsweringPort(deterministicClient);
+  const claimFactualityJudgments = [
+    createClaimFactualityJudgmentPort(deterministicClient),
+    createClaimFactualityChallengePort(deterministicClient)
+  ] as const;
+  const sourceLessGroundingAdmission = createSourceLessGroundingAdmission({
+    knowledgeBoundaryProbe,
+    embedding: nodeEmbedding,
+    groundingGeneration,
+    claimVerificationQuestionPlanning,
+    claimVerificationAnswering,
+    claimFactualityJudgments,
+    policy: DEFAULT_SCAFFOLD_GENERATION_CONFIG.sourceLessGroundingAdmission
+  });
   return createScaffoldGeneration({
     detours: new PostgresLearnerScaffoldStore(sql),
     // The opening Study Session IS the exact-reuse authority (KTD2): the same projection the
@@ -51,9 +75,11 @@ export function createLearnerScaffoldGeneration(sql: DatabaseClient): ScaffoldGe
     // the moderate-temperature client the audit uses — the scaffold generator never grades its
     // own output.
     congruence: createScaffoldContentCongruencePort(probeClient),
-    knowledgeBoundaryProbe: createKnowledgeBoundaryProbePort(probeClient),
-    nodeEmbedding: new LiteLlmNodeEmbeddingAdapter(embeddingClient),
-    groundingGeneration: createGroundingGenerationPort(deterministicClient),
+    sourceLessGroundingAdmission,
+    claimVerificationQuestionPlanning,
+    claimVerificationAnswering,
+    claimFactualityJudgments,
+    answerKeyVerification: createAnswerKeyVerificationPort(deterministicClient),
     reporter: new PostgresRunProgressReporter(sql),
     config: DEFAULT_SCAFFOLD_GENERATION_CONFIG,
     configHash: scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG)

@@ -773,6 +773,7 @@ CREATE TABLE "learner_scaffold_steps" (
         ELSE 'option_select'
       END) STORED,
 	"payload" jsonb,
+	"grounding_bundle" jsonb,
 	"lesson_read_at" timestamp with time zone,
 	CONSTRAINT "learner_scaffold_steps_detour_id_ordinal_key" UNIQUE("detour_id","ordinal"),
 	CONSTRAINT "learner_scaffold_steps_ordinal_check" CHECK (ordinal >= 0),
@@ -783,6 +784,7 @@ CREATE TABLE "learner_scaffold_steps" (
         AND referenced_concept_lesson_id IS NOT NULL
         AND referenced_study_item_id IS NOT NULL
         AND payload IS NULL
+        AND grounding_bundle IS NULL
         AND lesson_read_at IS NULL
       ) OR (
         kind = 'generated'
@@ -790,6 +792,7 @@ CREATE TABLE "learner_scaffold_steps" (
         AND referenced_concept_lesson_id IS NULL
         AND referenced_study_item_id IS NULL
         AND payload IS NOT NULL
+        AND grounding_bundle IS NOT NULL
       ))
 );
 --> statement-breakpoint

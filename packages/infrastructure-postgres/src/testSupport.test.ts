@@ -75,8 +75,9 @@ maybe("deleteLearner removes every learner-owned FK family and leaves shared gra
                 (detour_id, learner_state_ref, enrichment_id, parent_derived_node_id, term, normalized_term, status)
               VALUES (${detourId}, ${ref}, ${enrichment_id}, ${derived_node_id}, 'Term', 'term', 'ready')`;
     const stepId = randomUUID();
-    await sql`INSERT INTO learner_scaffold_steps (scaffold_step_id, detour_id, ordinal, kind, payload)
-              VALUES (${stepId}, ${detourId}, 0, 'generated', ${sql.json({ microLesson: "x" })})`;
+    await sql`INSERT INTO learner_scaffold_steps (scaffold_step_id, detour_id, ordinal, kind, payload, grounding_bundle)
+              VALUES (${stepId}, ${detourId}, 0, 'generated', ${sql.json({ microLesson: "x" })},
+                ${sql.json({ groundingOrigin: "llm_grounded", definitions: [], mentions: [], groundingAnchorReferences: [], generatingModel: "test", rationale: "cleanup fixture" })})`;
 
     // A neutral response row (study_item + node) AND a scaffold response row (step) — the scaffold
     // row is why response_log must be deleted before the detour/steps it references.

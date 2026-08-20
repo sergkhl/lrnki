@@ -60,6 +60,7 @@ test("generates an owner-neutral bundle conditioned on one closed scaffolded anc
   assert.ok(call.messages.some((message) => message.content.includes("Candidate concept: \"Stack allocation\"")));
   assert.ok(call.messages.some((message) => message.content.includes("Copy Trait")));
   assert.ok(call.messages.some((message) => message.content.includes("Types with a known size")));
+  assert.ok(call.messages.some((message) => message.content.includes("hard limit on every generated claim")));
   assert.ok(call.messages.some((message) => message.content.includes("prior definition contained a scope conflation")));
   assert.ok(call.messages.some((message) => message.content.includes("Make every sentence independently checkable")));
   assert.ok(call.messages.some((message) => message.content.includes("one factual proposition per sentence")));
@@ -71,6 +72,10 @@ test("generates an owner-neutral bundle conditioned on one closed scaffolded anc
   assert.ok(call.messages.some((message) => message.content.includes("component operation from a total outcome")));
   assert.ok(call.messages.some((message) => message.content.includes("absolute or exact language")));
   assert.ok(call.messages.some((message) => message.content.includes("observations, not correction authority")));
+  assert.ok(call.messages.some((message) => message.content.includes("Preserve exact identifier spelling and casing")));
+  assert.ok(call.messages.some((message) => message.content.includes("Never write an unqualified broader-category claim")));
+  assert.ok(call.messages.some((message) => message.content.includes("When feedback says a claim is not universal, narrow it")));
+  assert.ok(call.messages.some((message) => message.content.includes("Do not evade a scope objection")));
   const modelFacing = call.messages.map((message) => message.content).join("\n").toLowerCase();
   for (const fixtureTerm of ["binary search", "pivot", "linked list", "logarithmic", "half-open interval"]) {
     assert.equal(modelFacing.includes(fixtureTerm), false, `fixture-derived term leaked: ${fixtureTerm}`);
@@ -153,6 +158,8 @@ test("planning sees owner-neutral targets while the external answer model receiv
   assert.ok(calls[0].messages.some((message) => message.content.includes("Mask every proposed value, count, outcome, consequence")));
   assert.ok(calls[0].messages.some((message) => message.content.includes("Split coordinated entities")));
   assert.ok(calls[0].messages.some((message) => message.content.includes("type, representation, value, unit, scope")));
+  assert.ok(calls[0].messages.some((message) => message.content.includes("exact named or structurally identified anchor subject")));
+  assert.ok(calls[0].messages.some((message) => message.content.includes("target text itself carries every material scope limitation")));
   assert.ok(calls[0].messages.some((message) => message.content.includes("boundary cases and counterexamples")));
   assert.ok(calls[0].messages.some((message) => message.content.includes("candidate's established defining conditions or mechanism")));
   assert.match(questions[0].question, /necessary defining features/);
@@ -238,6 +245,8 @@ test("the factuality adapter returns judgments only and cannot settle or rewrite
   assert.ok(call.messages.some((message) => message.content.includes("Independent characterization of the distinction.")));
   assert.ok(call.messages.some((message) => message.content.includes("verification question as contaminated")));
   assert.ok(call.messages.some((message) => message.content.includes("material omission of a necessary qualifier")));
+  assert.ok(call.messages.some((message) => message.content.includes("does not silently add missing words to the target")));
+  assert.ok(call.messages.some((message) => message.content.includes("do not demand universality from a target that explicitly carries the exact limiting scope")));
   assert.ok(call.messages.some((message) => message.content.includes("different subject, sense, implementation, version")));
   assert.ok(call.messages.some((message) => message.content.includes("Resolve coordinated subjects and predicates distributively")));
   assert.ok(call.messages.some((message) => message.content.includes("component behavior from total outcome")));
