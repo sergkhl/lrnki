@@ -11,7 +11,7 @@ export function Basic() {
       <Card className="gap-2 p-4">
         <Text variant="title">Magma and melt</Text>
         <Text variant="body" color="muted">
-          Four checkpoints, two of them sealed. The Guardian waits at the leg's end.
+          Four checkpoints, two of them sealed. The Guardian waits at the leg&apos;s end.
         </Text>
       </Card>
     </div>

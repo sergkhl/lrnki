@@ -14,6 +14,8 @@ const eslintConfig = [
       "**/dist-e2e/**",
       "dist-realuse/**",
       "**/dist-realuse/**",
+      // Claude Design sync owns `ds-bundle/` as generated, gitignored preview output.
+      "ds-bundle/**",
       "coverage/**",
       "**/coverage/**",
       ".data/**",
