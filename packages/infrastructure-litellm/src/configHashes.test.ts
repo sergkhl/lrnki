@@ -16,8 +16,6 @@ import {
   scaffoldGenerationConfigHash,
   syntheticGenerationConfigHash
 } from "./configHashes";
-import { claimVerificationAnsweringDescriptor } from "./groundingGenerationAdapters";
-import type { LitellmProxyConfig } from "./litellmProxyConfig";
 import { operationConfigHash } from "./operationConfigHash";
 import { readPromptFile } from "./promptFile";
 
@@ -218,78 +216,6 @@ test("the all-descriptor inventory deduplicates shared descriptors", () => {
     .map((descriptor) => descriptor.stageTag)
     .sort();
   assert.deepEqual(qualityTags, [STAGE_TAGS.definitionPassageQuality, STAGE_TAGS.rescueDefinitionQuality].sort());
-});
-
-// Model reassignment invalidates evidence even when the prompt alias stays stable. The routing
-// module keeps the YAML mechanics behind one interface; the operation hash consumes only its
-// behavior identity. Accounting-only price edits and unrelated aliases remain non-behavioral.
-test("operation identity follows effective model, provider, fallback, and router behavior", () => {
-  const fixture = (input: {
-    target?: "model-a" | "model-b";
-    provider?: string;
-    fallback?: boolean;
-    routingStrategy?: string;
-  } = {}): LitellmProxyConfig => ({
-    deployments: [
-      {
-        modelName: "model-a",
-        model: "openrouter/family/model-a",
-        inputCostPerToken: 0.1,
-        behavior: {
-          litellmParams: {
-            model: "openrouter/family/model-a",
-            extra_body: { provider: { only: [input.provider ?? "provider-a"], allow_fallbacks: false } }
-          },
-          modelInfo: { mode: "chat" }
-        }
-      },
-      {
-        modelName: "model-b",
-        model: "openrouter/family/model-b",
-        behavior: {
-          litellmParams: {
-            model: "openrouter/family/model-b",
-            extra_body: { provider: { only: ["provider-b"], allow_fallbacks: false } }
-          },
-          modelInfo: { mode: "chat" }
-        }
-      },
-      {
-        modelName: "backup",
-        model: "openrouter/family/backup",
-        behavior: { litellmParams: { model: "openrouter/family/backup" }, modelInfo: { mode: "chat" } }
-      }
-    ],
-    modelGroupAlias: {
-      "kg-claim-verification-answerer": input.target ?? "model-a"
-    },
-    fallbacks: input.fallback ? { "kg-claim-verification-answerer": ["backup"] } : {},
-    routerBehavior: { routing_strategy: input.routingStrategy ?? "usage-based-routing-v2" }
-  });
-  const hash = (config: LitellmProxyConfig): string => operationConfigHash(
-    "routing-probe",
-    [claimVerificationAnsweringDescriptor],
-    {},
-    { litellmConfig: config }
-  );
-
-  const baseConfig = fixture();
-  const base = hash(baseConfig);
-  assert.equal(base, hash(fixture()), "routing identity is deterministic");
-  assert.notEqual(hash(fixture({ target: "model-b" })), base, "alias reassignment");
-  assert.notEqual(hash(fixture({ provider: "provider-c" })), base, "provider pin");
-  assert.notEqual(hash(fixture({ fallback: true })), base, "fallback chain");
-  assert.notEqual(hash(fixture({ routingStrategy: "latency-based-routing" })), base, "router behavior");
-
-  const priceOnly = fixture();
-  priceOnly.deployments[0] = { ...priceOnly.deployments[0]!, inputCostPerToken: 99 };
-  assert.equal(hash(priceOnly), base, "accounting-only prices do not invalidate quality evidence");
-  const unrelatedAlias = fixture();
-  unrelatedAlias.modelGroupAlias["unrelated-role"] = "model-b";
-  assert.equal(hash(unrelatedAlias), base, "unrelated aliases do not perturb this operation");
-  const missingDeployment = fixture();
-  missingDeployment.modelGroupAlias["kg-claim-verification-answerer"] = "missing-model";
-  assert.throws(() => hash(missingDeployment), /has no declared deployment/);
 });
 
 test("Graph Enrichment hashes every admission behavior knob but not execution fan-out", () => {

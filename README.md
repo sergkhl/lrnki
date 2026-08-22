@@ -248,7 +248,10 @@ curl -s -H "Authorization: Bearer $LITELLM_API_KEY" http://127.0.0.1:4000/models
 ```
 
 A `200` from `/models` is not evidence the config is current — check for the deployment by name. The
-router's own answer is in `LiteLLM_SpendLogs.model`, which records which deployment actually served.
+`/models` response proves which deployment groups were loaded. For a served call,
+`LiteLLM_SpendLogs.model_group` identifies the requested deployment group and
+`response->>'provider'` identifies the hosting provider. The `model` column proves the underlying
+base model, but cannot distinguish primary and backup deployment groups that deliberately share it.
 
 **Shared schema cutover** — the only response to a reset-required deploy, and deliberately manual.
 It **discards the application data** in database `lrnki` (greenfield: no backup or data migration is

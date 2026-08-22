@@ -99,8 +99,11 @@ definitions and repair their references in the same change.
     [real-use quality route](.agents/skills/validate-lrnki/references/real-use-quality.md) in the
     validation skill. A green suite is not quality evidence.
     A model reassignment invalidates prior quality evidence for every affected consumer; re-run the
-    relevant gates or record them as unqualified. Every zero-row inspection assertion must carry a
-    positive control over the same rows in the same query.
+    relevant gates or record them as unqualified. A Provider Route change alone preserves that
+    evidence only when every reachable route mechanically resolves to the same Model Assignment;
+    qualify provider contract and reachability operationally. Undeclared or ambiguous quantization
+    fails closed as route-sensitive Model Assignment identity. Every zero-row inspection assertion
+    must carry a positive control over the same rows in the same query.
     `DATABASE_URL` lives in the repo-root `.env`; the shell and test runner do not auto-load it, so
     `process.env.DATABASE_URL` reads empty until you do. Load it before DB-touching commands
     (`node --env-file=.env …`, `tsx --env-file=.env …`, or `set -a; . ./.env; set +a`). Never defer

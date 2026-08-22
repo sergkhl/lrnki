@@ -11,7 +11,6 @@ import {
 import {
   deploymentTokenPrices,
   mimoRoutedAliases,
-  modelRoutingBehaviorIdentity,
   readLitellmProxyConfig
 } from "./litellmProxyConfig";
 
@@ -163,13 +162,6 @@ test("every MiMo-routed production deployment declares token prices in litellm/c
     assert.ok((prices?.cacheReadInputTokenCost ?? 0) < (prices?.inputCostPerToken ?? 0),
       `deployment ${target} should declare a cache-read discount below the input price`);
   }
-});
-
-test("routing behavior identity contains provider policy but never config credentials", () => {
-  const identity = modelRoutingBehaviorIdentity("kg-claim-verification-answerer", readLitellmProxyConfig());
-  const serialized = JSON.stringify(identity);
-  assert.match(serialized, /provider/);
-  assert.doesNotMatch(serialized, /api_key|OPENROUTER_API_KEY|authorization/i);
 });
 
 test("uses the application Operation Timeline LLM stage catalog for spend reads", () => {

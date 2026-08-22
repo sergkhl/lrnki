@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
 
 // Mechanical read of `litellm/config.yaml`, the declared source of truth for the
-// alias → deployment mapping (AGENTS rule 5) and for deployment token prices. Two
+// alias → deployment mapping (AGENTS rule 5) and for deployment token prices. Several
 // consumers, one parser (rule 18): descriptor-shape tests resolve which aliases route
 // to MiMo, operation hashes bind effective model/provider/fallback behavior to quality
 // evidence, and the spend read path prices zero-spend OpenRouter BYOK rows from the
@@ -34,6 +34,16 @@ export type ModelRoutingBehaviorIdentity = {
   router: Record<string, unknown>;
   primary: ResolvedModelRoute;
   fallbacks: ResolvedModelRoute[];
+};
+
+export type ModelAssignmentIdentity = {
+  assignments: ModelAssignment[];
+};
+
+type ModelAssignment = {
+  model: string;
+  quantization: { value: string } | { unresolvedRoute: Record<string, unknown> };
+  inferenceBehavior: Record<string, unknown>;
 };
 
 type ResolvedModelRoute = {
@@ -110,7 +120,7 @@ export function readLitellmProxyConfig(configPath: string = defaultConfigPath())
         model,
         behavior: {
           litellmParams: sanitizeBehaviorRecord(entry.litellm_params, DEPLOYMENT_ACCOUNTING_KEYS),
-          modelInfo: sanitizeBehaviorRecord(entry.model_info)
+          modelInfo: sanitizeBehaviorRecord(entry.model_info, DEPLOYMENT_ACCOUNTING_KEYS)
         },
         ...priceField(entry.litellm_params, "input_cost_per_token", "inputCostPerToken"),
         ...priceField(entry.litellm_params, "output_cost_per_token", "outputCostPerToken"),
@@ -119,7 +129,7 @@ export function readLitellmProxyConfig(configPath: string = defaultConfigPath())
     }),
     modelGroupAlias,
     fallbacks: parseFallbacks(rawFallbacks, configPath),
-    routerBehavior: sanitizeBehaviorRecord(rawRouterBehavior)
+    routerBehavior: sanitizeBehaviorRecord(rawRouterBehavior, DEPLOYMENT_ACCOUNTING_KEYS)
   };
   configCache.set(configPath, config);
   return config;
@@ -140,9 +150,35 @@ export function modelRoutingBehaviorIdentity(
   const fallbackNames = config.fallbacks?.[requestedModel] ?? [];
   return {
     requestedModel,
-    router: config.routerBehavior ?? {},
+    router: sanitizeBehaviorRecord(config.routerBehavior, DEPLOYMENT_ACCOUNTING_KEYS),
     primary,
     fallbacks: fallbackNames.map((name) => resolveModelRoute(name, config))
+  };
+}
+
+// Quality-relevant identity for the assignment behind one requested model. Provider
+// selection and same-assignment fallback topology are deliberately absent; exact
+// operation provenance continues to use modelRoutingBehaviorIdentity above. A
+// fallback with different inference behavior remains as an additional assignment.
+export function modelAssignmentIdentity(
+  requestedModel: string,
+  config: LitellmProxyConfig = readLitellmProxyConfig()
+): ModelAssignmentIdentity {
+  const routes = [
+    resolveModelRoute(requestedModel, config),
+    ...(config.fallbacks?.[requestedModel] ?? []).map((name) => resolveModelRoute(name, config))
+  ];
+  const unique = new Map<string, ModelAssignment>();
+  for (const route of routes) {
+    for (const deployment of route.deployments) {
+      const assignment = deploymentModelAssignment(deployment);
+      unique.set(stableIdentity(assignment), assignment);
+    }
+  }
+  return {
+    assignments: [...unique.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([, assignment]) => assignment)
   };
 }
 
@@ -200,13 +236,13 @@ function sanitizeBehaviorRecord(
   if (!record) return {};
   return Object.fromEntries(Object.entries(record)
     .filter(([key]) => !omittedKeys.has(key) && !isCredentialKey(key))
-    .map(([key, value]) => [key, sanitizeBehaviorValue(value)]));
+    .map(([key, value]) => [key, sanitizeBehaviorValue(value, omittedKeys)]));
 }
 
-function sanitizeBehaviorValue(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sanitizeBehaviorValue);
+function sanitizeBehaviorValue(value: unknown, omittedKeys: ReadonlySet<string>): unknown {
+  if (Array.isArray(value)) return value.map((item) => sanitizeBehaviorValue(item, omittedKeys));
   if (value && typeof value === "object") {
-    return sanitizeBehaviorRecord(value as Record<string, unknown>);
+    return sanitizeBehaviorRecord(value as Record<string, unknown>, omittedKeys);
   }
   return value;
 }
@@ -258,7 +294,10 @@ function resolveModelRoute(requestedModel: string, config: LitellmProxyConfig): 
     .map((deployment) => ({
       modelName: deployment.modelName,
       model: deployment.model,
-      behavior: deployment.behavior ?? { litellmParams: { model: deployment.model }, modelInfo: {} }
+      behavior: sanitizeBehaviorRecord(
+        deployment.behavior ?? { litellmParams: { model: deployment.model }, modelInfo: {} },
+        DEPLOYMENT_ACCOUNTING_KEYS
+      )
     }));
   if (deployments.length === 0) {
     throw new Error(`LiteLLM model route ${aliasChain.join(" -> ")} has no declared deployment.`);
@@ -268,4 +307,102 @@ function resolveModelRoute(requestedModel: string, config: LitellmProxyConfig): 
     modelGroup,
     deployments
   };
+}
+
+const MODEL_ASSIGNMENT_ROUTING_KEYS = new Set([
+  "api_base",
+  "api_version",
+  "base_url",
+  "custom_llm_provider",
+  "deployment_id",
+  "max_parallel_requests",
+  "max_retries",
+  "model",
+  "organization",
+  "region_name",
+  "rpm",
+  "stream_timeout",
+  "timeout",
+  "tpm"
+]);
+
+const RECOGNIZED_QUANTIZATION = /^(?:bf16|fp(?:4|6|8|16|32)|int(?:4|8)|nf4)$/i;
+
+function deploymentModelAssignment(deployment: ResolvedModelRoute["deployments"][number]): ModelAssignment {
+  const behavior = deployment.behavior;
+  const litellmParams = objectRecord(behavior.litellmParams);
+  const modelInfo = objectRecord(behavior.modelInfo);
+  const extraBody = objectRecord(litellmParams.extra_body);
+  const provider = objectRecord(extraBody.provider);
+  const quantization = resolvedQuantization(provider);
+  const inferenceParams = Object.fromEntries(Object.entries(litellmParams)
+    .filter(([key]) => !MODEL_ASSIGNMENT_ROUTING_KEYS.has(key))
+    .map(([key, value]) => {
+      if (key !== "extra_body") return [key, value];
+      const { provider: _provider, ...inferenceExtraBody } = objectRecord(value);
+      void _provider;
+      return [key, inferenceExtraBody];
+    })
+    .filter(([key, value]) => key !== "extra_body" || Object.keys(objectRecord(value)).length > 0));
+  return {
+    model: deployment.model,
+    quantization: quantization
+      ? { value: quantization }
+      : { unresolvedRoute: modelAssignmentRouteDiscriminator(deployment, litellmParams, provider) },
+    inferenceBehavior: {
+      litellmParams: inferenceParams,
+      modelInfo
+    }
+  };
+}
+
+function resolvedQuantization(provider: Record<string, unknown>): string | undefined {
+  if (Object.hasOwn(provider, "quantizations")) {
+    const declared = Array.isArray(provider.quantizations)
+      ? provider.quantizations
+      : [provider.quantizations];
+    const normalized = [...new Set(declared
+      .filter((value): value is string => typeof value === "string")
+      .map((value) => value.toLowerCase()))];
+    return normalized.length === 1 && RECOGNIZED_QUANTIZATION.test(normalized[0]!)
+      ? normalized[0]
+      : undefined;
+  }
+  if (!Array.isArray(provider.only) || provider.only.length === 0) return undefined;
+  const inferred = provider.only.map((endpoint) => {
+    if (typeof endpoint !== "string") return undefined;
+    const match = endpoint.match(/^[^/]+\/([^/]+)$/);
+    const suffix = match?.[1]?.toLowerCase();
+    return suffix && RECOGNIZED_QUANTIZATION.test(suffix) ? suffix : undefined;
+  });
+  const consistent = new Set(inferred);
+  return consistent.size === 1 && !consistent.has(undefined) ? inferred[0] : undefined;
+}
+
+function modelAssignmentRouteDiscriminator(
+  deployment: ResolvedModelRoute["deployments"][number],
+  litellmParams: Record<string, unknown>,
+  provider: Record<string, unknown>
+): Record<string, unknown> {
+  const routeParams = Object.fromEntries(Object.entries(litellmParams)
+    .filter(([key]) => MODEL_ASSIGNMENT_ROUTING_KEYS.has(key) && key !== "model"));
+  const route = {
+    ...routeParams,
+    ...(Object.keys(provider).length > 0 ? { provider } : {})
+  };
+  return Object.keys(route).length > 0 ? route : { modelGroup: deployment.modelName };
+}
+
+function objectRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function stableIdentity(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableIdentity).join(",")}]`;
+  return `{${Object.keys(value).sort().map((key) =>
+    `${JSON.stringify(key)}:${stableIdentity((value as Record<string, unknown>)[key])}`
+  ).join(",")}}`;
 }

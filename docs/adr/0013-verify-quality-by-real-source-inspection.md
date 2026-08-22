@@ -13,9 +13,12 @@ Benchmarks and labeled harnesses may diagnose one live decision, then are remove
 change it. Stable source fixtures remain in fixtures; generated evaluation artifacts remain
 gitignored.
 
-Quality evidence is scoped to the model assignment and consumer that produced it. Reassigning an
-alias therefore requires the affected consumers to be re-gated or explicitly marked unqualified;
-the enforcement details live in [AGENTS.md](../../AGENTS.md#validation-authority) and rule 14.
+Quality evidence is scoped to the [Model Assignment](../../CONTEXT.md#model-operations) and consumer
+that produced it. Reassigning an alias therefore requires the affected consumers to be re-gated or
+explicitly marked unqualified. A Provider Route change alone does not retire evidence when every
+reachable route has the same Model Assignment; provider contract and reachability still require
+operational qualification. The enforcement details live in
+[AGENTS.md](../../AGENTS.md#validation-authority) and rule 14.
 
 ## Context
 

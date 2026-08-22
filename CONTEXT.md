@@ -6,6 +6,16 @@ prerequisite structure and study assets, and presents them as playable expeditio
 This file is the project glossary. Architectural behavior belongs in ADRs; exact interfaces and
 persisted shapes belong in source.
 
+## Model operations
+
+**Model Assignment**:
+The quality-relevant identity of an exact upstream model revision, its mechanically established
+quantization, and its non-routing inference behavior.
+
+**Provider Route**:
+The hosting-provider selection, ordering, and failover topology through which a Model Assignment is
+served; it is operational provenance rather than model-quality identity.
+
 ## Curated knowledge
 
 **Curated Source**:
