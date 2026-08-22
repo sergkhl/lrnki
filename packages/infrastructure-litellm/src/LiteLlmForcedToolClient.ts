@@ -19,11 +19,10 @@ type LiteLlmResponse = {
 
 export class LiteLlmForcedToolClient {
   private readonly dispatcher;
-  // `temperature`/`seed` are the determinism lever (TODO 1). When set, every
-  // forced-tool call samples greedily with a fixed seed so the neural stages
-  // (discovery/admission/claims) stop drifting across re-runs. Left unset, the
-  // client stays a neutral transport at the model's default sampling — the
-  // composition root chooses the policy, not this transport.
+  // `temperature` and `seed` are optional sampling inputs chosen by the composition
+  // root. Temperature 0 requests low-temperature/greedy behavior; a seed is forwarded
+  // on a best-effort basis and does not guarantee reproducible neural output. Left
+  // unset, this remains a neutral transport at the model's default sampling.
   constructor(private readonly options: { baseUrl: string; apiKey: string; timeoutMs: number; maxRetries?: number; temperature?: number; seed?: number }) {
     this.dispatcher = createLiteLlmDispatcher(options.timeoutMs);
   }

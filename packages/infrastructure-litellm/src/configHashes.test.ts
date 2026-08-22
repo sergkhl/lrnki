@@ -282,13 +282,13 @@ test("dropping any shared admission descriptor changes Graph Enrichment identity
   }
 });
 
-// Exact identity regression: U4 re-baselines all three consumers because their shared Source-less
-// Grounding Admission now generates once and fails closed after factuality rejection. Future
-// non-behavioral refactors must not perturb these identities.
+// Exact identity regression: all three consumers share Source-less Grounding Admission and the
+// same DeepSeek Provider Route, so an intentional route change re-baselines them together even
+// when their Model Assignment is preserved. Non-behavioral refactors must not perturb them.
 test("default operation config hashes are stable across the registry derivation", () => {
-  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-dfb9ae848b85");
-  assert.equal(scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG), "learner-scaffold-generation-7ab16c2fc80e");
-  assert.equal(syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG), "synthetic-topic-generation-0b1ab66013e0");
+  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-725381e8627a");
+  assert.equal(scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG), "learner-scaffold-generation-763117edcb3d");
+  assert.equal(syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG), "synthetic-topic-generation-7b8549a3e0cc");
 });
 
 test("synthetic execution widths do not change identity while probe behavior still does", () => {
