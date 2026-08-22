@@ -12,8 +12,9 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-22-001 — Restore Topic Expedition Generation to Seven Minutes](./2026-08-22-001-repair-topic-expedition-generation-latency.md)
-   — **Ready; U0 baseline complete.** Commit the diagnostic baseline before changing behavior, then
-   begin U1's bounded verification pipeline.
+   — **In progress; U3 is `FIX_FIRST`.** The bounded pipeline and shared stage profile are complete,
+   but widths 8, 12, and 16 all missed the latency/quality contract; U4 is gated pending a
+   qualifying single-run fix.
 
 Shaping, not yet a plan:
 [2026-08-08-002 — Generation model evaluation](../brainstorms/2026-08-08-002-generation-model-evaluation.md)

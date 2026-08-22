@@ -7,7 +7,7 @@ execution: code
 
 # Restore Topic Expedition Generation to Seven Minutes
 
-**Status:** In progress — U0–U2 complete; U3 calibration next
+**Status:** In progress — U0–U2 complete; U3 closed `FIX_FIRST`; U4 gated
 
 **Decision state:** Locked. The accepted problem framing and stage-profile deletion test remain in
 [Candidate 2 of the architecture-deepening brainstorm](../brainstorms/2026-08-19-001-architecture-deepening-review.md#candidate-2--give-topic-expedition-generation-one-application-owned-stage-profile).
@@ -383,9 +383,69 @@ seven-minute threshold does not apply to this contention soak.
   evidence only. It is not live provider, latency, persisted-artifact quality, DB-backed reporter,
   deployed, browser, native, or physical-device evidence.
 
+### U3 — Equal-width calibration — closed `FIX_FIRST`; no default frozen
+
+- Topology/source: the trials used the product source at `b649d06` with only the current trial's
+  execution-only default changed, through a loopback-only composition of the production learner
+  app and its real two-slot supervisors. It targeted a dedicated development database while using
+  the already-running shared LiteLLM route; the shared learner API, Compose services, and LiteLLM
+  process/configuration were not restarted or mutated. Every trial began with zero generating rows
+  in that isolated queue, and focused admission/hash tests passed at widths 8, 12, and 16.
+- Width 8: operation `9d1d8d79-3e75-40ba-ab76-c66d937c9848` had 16 candidates / 15 verification
+  entrants and failed after `602.455 s` when the challenger exhausted three invalid-JSON attempts;
+  all queued work stopped and the other brackets drained with the original stage error. A second
+  request's operation `2d691c18-6c6d-49cc-b14b-36022166332f` had 16 / 15 and failed transiently
+  after `860.291 s` on the answerer's 600-second timeout. The supervisor retained its natural
+  two-minute backoff and reclaimed with a fresh fence as
+  `645d9454-157c-470b-9b48-2271c9a0d274`; that 16 / 16 attempt completed its 32-packet initial and
+  four-packet disagreement waves in `814.358 s`, then failed on replicated semantic objections.
+  The final operation alone had 415 positive SpendLogs, zero logged error rows, role peaks exactly
+  8, and `$0.166704` spend. It is a quality failure and over-budget lower bound, not a latency pass.
+- Width 12: operation `dbe3a18c-4c00-4de4-8837-8fcaeac0fea0` had 16 candidates / 15 verification
+  entrants, completed 30 initial plus four disagreement packets, and failed semantically after
+  `746.865 s`. Its 426 positive SpendLogs had zero error rows; planner, answerer, and combined judges
+  each peaked at 12; spend was `$0.163599`. Enrichment alone crossed 420 seconds before graph
+  completion or Study Item Bank could begin.
+- Width 16: operation `456f3073-affc-4a4c-a5b1-5ab2a513591a` had 16 / 16, completed 32 initial
+  plus eight disagreement packets, and failed semantically after `672.382 s`. Its 446 positive
+  SpendLogs had zero error rows; all three role peaks were exactly 16; spend was `$0.198205`.
+  The initial verification wave did not finish until after the 420-second boundary, before its
+  disagreement wave, prerequisite/difficulty work, or any Study Item Bank stage.
+- Route/error controls: the five operations supplied 2,024 positive SpendLogs, 4,573,471 prompt
+  tokens, 1,387,362 completion tokens, and `$0.812686` spend. `LiteLLM_ErrorLogs` had zero rows in
+  the calibration window and no operation-tag matches. SpendLogs nevertheless attribute declared
+  fallback groups: the probe used its cross-family Qwen fallback in every trial; width 8's first
+  operation used three DeepInfra claim backups, width 12 used one, and width 16 used one DeepInfra
+  plus 28 Groq claim-role backups. The groups map mechanically to the configured Qwen deployment,
+  same-model DeepInfra FP8, and same-model Groq routes, but no error row explains why those
+  fallbacks engaged; they therefore cannot satisfy the no-unexplained-fallback acceptance clause.
+  The answer timeout exists in its operation-stage `error_detail`, not in successful SpendLogs.
+- Quality/persistence: every semantically settled attempt independently rejected over-broad or
+  false Grounding Bundle claims, repeatedly including unqualified mitochondrial locations,
+  proton-only Chemiosmosis/ATP Synthase definitions, and invalid universal yields. Atomic failure
+  held: across the isolated database there are zero enrichment, enrichment-artifact, derived-node,
+  lesson, or Study Item rows. There is consequently no persisted expedition or Study Item Bank
+  eligible for the required quality inspection.
+- Verdict/decision: **`FIX_FIRST`**. None of `8 → 12 → 16` produced a semantically successful
+  attempt, every fully settled enrichment operation already exceeded 420 seconds before Study Item
+  Bank, and observed fallbacks lack an error-log cause. No width is frozen; the code default is
+  restored to the last transport-safe width four. No model, route, prompt, sample, admission,
+  supervisor, retry, or readiness policy was changed. U4's two-run soak and final consolidation are
+  gated until a future in-scope fix yields one qualifying single-run pass.
+- Cleanup/evidence boundary: the reserved learners and isolated database were retained only long
+  enough to consolidate the ignored diagnostic report; they are not canonical documentation.
+  Evidence is local API-supervisor + development Postgres + real production-model route only, not
+  deployed, browser, native, physical-device, successful latency, or persisted-artifact quality
+  evidence.
+
 ### Open findings
 
-- U3–U4 remain unimplemented and unvalidated; next calibrate equal role widths in the locked
-  `8 → 12 → 16` order and accept only a successful representative run.
-- A future passing run must supply the successful end-to-end baseline this semantic rejection could
-  not provide; do not compare `2,286.023 s` to the acceptance threshold as if it produced `ready`.
+- U3 is closed `FIX_FIRST`; U4 remains gated because no execution width is frozen. Do not run the
+  contention soak or consolidate this plan as completed without a qualifying single-run pass.
+- The repeated real-use defect is generated Grounding Bundles whose unqualified definitions are
+  broader or narrower than the named biological category. Before changing that behavior, name and
+  research the established grounding/scope-control problem class under AGENTS.md rule 21; do not
+  hide it with a weaker judge, lower quorum, model swap, lexical veto, or regenerated draft.
+- A future passing run must provide both the successful end-to-end latency baseline and direct
+  persisted-artifact inspection this calibration could not produce. Failed enrichment durations
+  are lower bounds and quality evidence, never atomic-readiness claims.
