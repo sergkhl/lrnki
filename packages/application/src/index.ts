@@ -113,6 +113,17 @@ export {
   spendStageBelongsToOperation
 } from "./operationTimelineCatalog";
 export {
+  DERIVED_GRAPH_COMPLETION_STAGE_GROUP,
+  SOURCE_LESS_GROUNDING_ADMISSION_STAGE_GROUP,
+  STUDY_ITEM_BANK_STAGE_GROUP,
+  SYNTHETIC_GENERATION_STAGE_GROUP,
+  TOPIC_EXPEDITION_PRODUCER_STAGE_GROUPS,
+  TOPIC_EXPEDITION_STAGE_PROFILE,
+  TOPIC_EXPEDITION_STAGE_TOTAL,
+  type GenerationStageDescriptor,
+  type TopicExpeditionPhase
+} from "./topicExpeditionStageProfile";
+export {
   runInstrumentedOperation,
   noopRunProgressReporter,
   passthroughStageBracket,

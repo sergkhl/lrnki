@@ -6,7 +6,7 @@ import type {
   SynthesizedConcept,
   SyntheticProbeDisposition
 } from "@lrnki/domain-core";
-import { normalizeConceptLabel, STAGE_TAGS } from "@lrnki/domain-core";
+import { normalizeConceptLabel } from "@lrnki/domain-core";
 import type {
   ConceptSetSynthesisPort,
   DeclaredDomainInferencePort,
@@ -29,6 +29,7 @@ import {
 } from "./sourceLessGroundingAdmission";
 import { noopRunProgressReporter, runInstrumentedOperation } from "./runProgressReporter";
 import { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
+import { SYNTHETIC_GENERATION_STAGE_GROUP } from "./topicExpeditionStageProfile";
 
 // The completion behavior plus the one canonical admission policy identity. The admission module
 // binds and executes this policy; the operation config retains the same value so the immutable
@@ -79,7 +80,7 @@ export async function runSyntheticGeneration(input: {
   return runInstrumentedOperation(reporter, "enrichment", operationId, async (runStage) => {
     const declaredDomain = await resolveDeclaredDomain(input, runStage);
 
-    const synthesized = await runStage(STAGE_TAGS.conceptSetSynthesis, () =>
+    const synthesized = await runStage(SYNTHETIC_GENERATION_STAGE_GROUP.conceptSetSynthesis.stage, () =>
       input.conceptSetSynthesis.synthesize({ topic: input.topic, declaredDomain })
     );
     const concepts = dedupeConcepts(synthesized);
@@ -192,7 +193,7 @@ async function resolveDeclaredDomain(
   if (!input.declaredDomainInference) {
     throw new Error("Declared Domain inference port is required when declaredDomain is missing.");
   }
-  const inferred = await runStage(STAGE_TAGS.declaredDomainInference, () =>
+  const inferred = await runStage(SYNTHETIC_GENERATION_STAGE_GROUP.declaredDomainInference.stage, () =>
     input.declaredDomainInference!.infer({ topic: input.topic })
   );
   const declaredDomain = inferred.declaredDomain.trim();

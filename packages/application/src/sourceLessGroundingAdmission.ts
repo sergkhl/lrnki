@@ -1,5 +1,4 @@
 import type { GeneratedGroundingBundle, GroundingAdmissionContext } from "@lrnki/domain-core";
-import { STAGE_TAGS } from "@lrnki/domain-core";
 import type {
   ClaimFactualityJudgmentPort,
   ClaimVerificationAnsweringPort,
@@ -22,6 +21,7 @@ import {
 } from "./knowledgeBoundaryProbe";
 import { mapWithConcurrency } from "./mapWithConcurrency";
 import type { StageBracket } from "./runProgressReporter";
+import { SOURCE_LESS_GROUNDING_ADMISSION_STAGE_GROUP } from "./topicExpeditionStageProfile";
 
 export type GroundingAdmissionCandidate = Readonly<{
   candidateKey: string;
@@ -129,7 +129,7 @@ export function createSourceLessGroundingAdmission(construction: {
           if (candidates.length === 0) return [];
           validateCandidates(candidates);
 
-          const probed = await stage(STAGE_TAGS.knowledgeBoundaryProbe, () =>
+          const probed = await stage(SOURCE_LESS_GROUNDING_ADMISSION_STAGE_GROUP.knowledgeBoundaryProbe.stage, () =>
             mapWithConcurrency(candidates, policy.candidateConcurrency, async (candidate) => ({
               candidate,
               verdict: await probeKnowledgeBoundary({
@@ -155,17 +155,19 @@ export function createSourceLessGroundingAdmission(construction: {
             }
           }
 
-          const drafts = await stage(STAGE_TAGS.groundingGeneration, () =>
-            mapWithConcurrency(core, policy.candidateConcurrency, async ({ candidate, verdict }) => {
-              const bundle = await construction.groundingGeneration.generate({
-                declaredDomain: candidate.declaredDomain,
-                canonicalLabel: candidate.canonicalLabel,
-                context: candidate.context
-              });
-              validateGeneratedBundle(candidate, bundle);
-              return { candidate, verdict, bundle };
-            }), core.length
-          );
+          const drafts = core.length === 0
+            ? []
+            : await stage(SOURCE_LESS_GROUNDING_ADMISSION_STAGE_GROUP.groundingGeneration.stage, () =>
+                mapWithConcurrency(core, policy.candidateConcurrency, async ({ candidate, verdict }) => {
+                  const bundle = await construction.groundingGeneration.generate({
+                    declaredDomain: candidate.declaredDomain,
+                    canonicalLabel: candidate.canonicalLabel,
+                    context: candidate.context
+                  });
+                  validateGeneratedBundle(candidate, bundle);
+                  return { candidate, verdict, bundle };
+                }), core.length
+              );
 
           const claimResults = await operationClaims.admitBatch(drafts.map(({ candidate, bundle }) => ({
             candidateKey: candidate.candidateKey,

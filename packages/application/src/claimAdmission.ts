@@ -1,4 +1,4 @@
-import { STAGE_TAGS, type GroundingAdmissionContext } from "@lrnki/domain-core";
+import type { GroundingAdmissionContext } from "@lrnki/domain-core";
 import type {
   ClaimFactualityJudgmentPort,
   ClaimVerificationAnsweringPort,
@@ -6,6 +6,7 @@ import type {
   StageErrorDetail
 } from "@lrnki/ports";
 import type { StageBracket } from "./runProgressReporter";
+import { SOURCE_LESS_GROUNDING_ADMISSION_STAGE_GROUP } from "./topicExpeditionStageProfile";
 
 // This is an application-internal seam. Source-less Grounding Admission and, in U3, generated
 // Support Step assurance reuse it without exposing neural planning, answer correlation, or
@@ -282,19 +283,19 @@ async function collectVerificationSampleWave(input: Readonly<{
   const stagePromises = [
     startRoleBracket(
       "question_planning",
-      STAGE_TAGS.groundingVerificationQuestionPlanning,
+      SOURCE_LESS_GROUNDING_ADMISSION_STAGE_GROUP.verificationQuestionPlanning.stage,
       questionPlanning,
       input.verificationRequests.length
     ),
     startRoleBracket(
       "answering",
-      STAGE_TAGS.groundingVerificationAnswering,
+      SOURCE_LESS_GROUNDING_ADMISSION_STAGE_GROUP.verificationAnswering.stage,
       answering,
       input.verificationRequests.length
     ),
     startRoleBracket(
       "factuality_judgment",
-      STAGE_TAGS.groundingFactualityRevision,
+      SOURCE_LESS_GROUNDING_ADMISSION_STAGE_GROUP.factualityJudgment.stage,
       factualityJudgment,
       judgmentTaskCount
     )

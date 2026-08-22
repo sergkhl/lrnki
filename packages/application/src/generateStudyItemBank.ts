@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import {
-  STAGE_TAGS,
   type ConceptLesson,
   type ConceptLessonRedundancyJudgment,
   type ConceptLessonSectionKind,
@@ -30,7 +29,12 @@ import type {
   StudyItemGenerationPort
 } from "@lrnki/ports";
 import { mapWithConcurrency } from "./mapWithConcurrency";
-import { NON_LLM_STAGES, noopRunProgressReporter, runInstrumentedOperation } from "./runProgressReporter";
+import {
+  NON_LLM_STAGES,
+  noopRunProgressReporter,
+  runInstrumentedOperation,
+  type StageBracket
+} from "./runProgressReporter";
 import { validateOptionSelectItem, type StudyItemGuardGrounding } from "./optionSelectGuard";
 import { validateImpostorItem } from "./impostorGuard";
 import { validateMatchingItem } from "./matchingGuard";
@@ -56,6 +60,7 @@ import { selectNodeGrounding } from "./selectNodeGrounding";
 import { selectLessonNeighborhood } from "./selectLessonNeighborhood";
 import { lessonGroundingShape, type LessonGroundingShape } from "./lessonGroundingShape";
 import { assembleConceptLesson, SUBSTANTIVE_KINDS } from "./assembleConceptLesson";
+import { STUDY_ITEM_BANK_STAGE_GROUP } from "./topicExpeditionStageProfile";
 
 // Lessons and blueprints are the sequential front half and can use wider per-node
 // fan-out. The three item-type stages run beside one another, so each keeps the more
@@ -140,6 +145,10 @@ export async function generateStudyItemBank(input: {
   const studyItemConcurrency = input.concurrency ?? DEFAULT_STUDY_ITEM_CONCURRENCY;
   const verificationConcurrency = input.concurrency ?? DEFAULT_ITEM_VERIFICATION_CONCURRENCY;
   return runInstrumentedOperation(reporter, "study_items", operationId, async (studyStage) => {
+    const redundancyStage = createConditionalAggregateStage(
+      studyStage,
+      STUDY_ITEM_BANK_STAGE_GROUP.lessonRedundancyJudgment.stage
+    );
     const { layer, graphVersionId, snapshot } = await studyStage(NON_LLM_STAGES.load, async () => {
       const layer = await input.enrichmentStore.getLayer(input.enrichmentId);
       if (!layer) throw new Error(`generateStudyItemBank: enrichment ${input.enrichmentId} was not found.`);
@@ -164,7 +173,7 @@ export async function generateStudyItemBank(input: {
     const purposeGeneration = input.layerPurposeGeneration;
     const purposeStore = input.layerPurposeStore;
     try {
-      await studyStage(STAGE_TAGS.layerPurposeGeneration, async () => {
+      await studyStage(STUDY_ITEM_BANK_STAGE_GROUP.layerPurposeGeneration.stage, async () => {
         const purpose = await purposeGeneration.generate({
           declaredDomain: layer.derivedNodes[0]?.declaredDomain ?? "",
           conceptLabels: layer.derivedNodes.map((node) => node.canonicalLabel)
@@ -212,7 +221,14 @@ export async function generateStudyItemBank(input: {
         draft: initialDraft
       });
       let activeRedundancy: ConceptLessonRedundancyJudgment[] = [];
-      if (assembled.kind === "lesson") activeRedundancy = await judgeLessonRedundancy(input.conceptLessonRedundancyJudge, node, assembled.lesson);
+      if (assembled.kind === "lesson") {
+        activeRedundancy = await judgeLessonRedundancy(
+          input.conceptLessonRedundancyJudge,
+          node,
+          assembled.lesson,
+          redundancyStage
+        );
+      }
       if (shouldRetryLesson(node, assembled.kind === "lesson" ? assembled.lesson : undefined) || redundantNonSubstantiveKinds(activeRedundancy).length > 0) {
         const retryDraft = await input.conceptLessonGeneration.generate({
           declaredDomain: node.declaredDomain,
@@ -235,7 +251,12 @@ export async function generateStudyItemBank(input: {
         });
         let retryRedundancy: ConceptLessonRedundancyJudgment[] = [];
         if (retryAssembled.kind === "lesson") {
-          retryRedundancy = await judgeLessonRedundancy(input.conceptLessonRedundancyJudge, node, retryAssembled.lesson);
+          retryRedundancy = await judgeLessonRedundancy(
+            input.conceptLessonRedundancyJudge,
+            node,
+            retryAssembled.lesson,
+            redundancyStage
+          );
           retryAssembled.lesson = dropRedundantNonSubstantiveSections(retryAssembled.lesson, retryRedundancy);
         }
         if (retryAssembled.kind === "lesson" && (node.groundingOrigin === "llm_grounded" || hasVerifiedSubstantiveSourceCitation(retryAssembled.lesson) || assembled.kind !== "lesson")) {
@@ -250,14 +271,19 @@ export async function generateStudyItemBank(input: {
     }
   };
   const perNodeLessons = await studyStage(
-    STAGE_TAGS.conceptLessonGeneration,
-    () =>
-      mapWithConcurrency(layer.derivedNodes, lessonConcurrency, async (node) => {
-        const result = await generateLessonForNode(node);
-        lessonDone += 1;
-        await reporter.recordProgress({ operationType: "study_items", operationId, stage: STAGE_TAGS.conceptLessonGeneration, done: lessonDone });
-        return result;
-      }),
+    STUDY_ITEM_BANK_STAGE_GROUP.conceptLessonGeneration.stage,
+    async () => {
+      try {
+        return await mapWithConcurrency(layer.derivedNodes, lessonConcurrency, async (node) => {
+          const result = await generateLessonForNode(node);
+          lessonDone += 1;
+          await reporter.recordProgress({ operationType: "study_items", operationId, stage: STUDY_ITEM_BANK_STAGE_GROUP.conceptLessonGeneration.stage, done: lessonDone });
+          return result;
+        });
+      } finally {
+        await redundancyStage.finish();
+      }
+    },
     layer.derivedNodes.length
   );
 
@@ -295,13 +321,13 @@ export async function generateStudyItemBank(input: {
   let blueprintDone = 0;
   const blueprintByNode = new Map<string, StudyItemBlueprint>();
   const blueprintResults = await studyStage(
-    STAGE_TAGS.studyItemBlueprint,
+    STUDY_ITEM_BANK_STAGE_GROUP.studyItemBlueprint.stage,
     () =>
       mapWithConcurrency(layer.derivedNodes, lessonConcurrency, async (node) => {
         const lesson = lessonByNode.get(node.derivedNodeId);
         if (!lesson) {
           blueprintDone += 1;
-          await reporter.recordProgress({ operationType: "study_items", operationId, stage: STAGE_TAGS.studyItemBlueprint, done: blueprintDone });
+          await reporter.recordProgress({ operationType: "study_items", operationId, stage: STUDY_ITEM_BANK_STAGE_GROUP.studyItemBlueprint.stage, done: blueprintDone });
           return fallbackBlueprint(node, lesson);
         }
         const preGate = structuralPreGateBlueprint(node, lesson);
@@ -320,7 +346,7 @@ export async function generateStudyItemBank(input: {
           return preGate;
         } finally {
           blueprintDone += 1;
-          await reporter.recordProgress({ operationType: "study_items", operationId, stage: STAGE_TAGS.studyItemBlueprint, done: blueprintDone });
+          await reporter.recordProgress({ operationType: "study_items", operationId, stage: STUDY_ITEM_BANK_STAGE_GROUP.studyItemBlueprint.stage, done: blueprintDone });
         }
       }),
     layer.derivedNodes.length
@@ -480,36 +506,43 @@ export async function generateStudyItemBank(input: {
     return drafted.ok ? { kind: "pending", subject: drafted.subject } : { kind: "rejected", reason: drafted.reason };
   };
   const optionSelectStage = (async () => {
-    const attempts = await studyStage(
-      STAGE_TAGS.studyItemGeneration,
-      () =>
-        mapWithConcurrency(layer.derivedNodes, studyItemConcurrency, async (node) => {
-          const result = await optionSelectForNode(node);
-          studyDone += 1;
-          await reporter.recordProgress({ operationType: "study_items", operationId, stage: STAGE_TAGS.studyItemGeneration, done: studyDone });
-          return result;
-        }),
-      layer.derivedNodes.length
+    const requested = layer.derivedNodes.some((node) =>
+      typePlanFor(blueprintByNode, node, "option_select").generate
     );
+    const attempts: NodeAttempt<AnswerKeyVerificationSubject<OptionSelectItem>>[] = requested
+      ? await studyStage(
+          STUDY_ITEM_BANK_STAGE_GROUP.optionSelectGeneration.stage,
+          () =>
+            mapWithConcurrency(layer.derivedNodes, studyItemConcurrency, async (node) => {
+              const result = await optionSelectForNode(node);
+              studyDone += 1;
+              await reporter.recordProgress({ operationType: "study_items", operationId, stage: STUDY_ITEM_BANK_STAGE_GROUP.optionSelectGeneration.stage, done: studyDone });
+              return result;
+            }),
+          layer.derivedNodes.length
+        )
+      : layer.derivedNodes.map(() => ({ kind: "skipped" as const }));
     const subjects = pendingSubjects(attempts);
-    const outcomes = await studyStage(
-      STAGE_TAGS.optionSelectKeyVerification,
-      () =>
-        verifyAnswerKeys(subjects, {
-          verifier: input.answerKeyVerification,
-          concurrency: verificationConcurrency,
-          vetoReason: (subject, verdicts) => optionSelectKeyVetoReason(subject.item, verdicts),
-          // Pass-through on unavailability is option-select's status quo and the node's only
-          // primary activity (ADR-0026) — but ONLY for an item whose citation still holds a
-          // verbatim anchor. A fallback-admitted item exists solely because a judge was
-          // expected to check it, so with no verdict it drops like an impostor (D5).
-          onUnavailable: (subject, error) =>
-            subject.citationRung === "verbatim"
-              ? { admitted: true, item: subject.item }
-              : { admitted: false, reason: `option-select key verification unavailable and the item has no verbatim grounding anchor: ${failureText(error)}` }
-        }),
-      subjects.length
-    );
+    const outcomes = subjects.length === 0
+      ? []
+      : await studyStage(
+          STUDY_ITEM_BANK_STAGE_GROUP.optionSelectKeyVerification.stage,
+          () =>
+            verifyAnswerKeys(subjects, {
+              verifier: input.answerKeyVerification,
+              concurrency: verificationConcurrency,
+              vetoReason: (subject, verdicts) => optionSelectKeyVetoReason(subject.item, verdicts),
+              // Pass-through on unavailability is option-select's status quo and the node's only
+              // primary activity (ADR-0026) — but ONLY for an item whose citation still holds a
+              // verbatim anchor. A fallback-admitted item exists solely because a judge was
+              // expected to check it, so with no verdict it drops like an impostor (D5).
+              onUnavailable: (subject, error) =>
+                subject.citationRung === "verbatim"
+                  ? { admitted: true, item: subject.item }
+                  : { admitted: false, reason: `option-select key verification unavailable and the item has no verbatim grounding anchor: ${failureText(error)}` }
+            }),
+          subjects.length
+        );
     return mergeVerified(attempts, outcomes, "option_select");
   })();
 
@@ -570,26 +603,33 @@ export async function generateStudyItemBank(input: {
     return drafted.ok ? { kind: "pending", subject: drafted.subject } : { kind: "rejected", reason: drafted.reason };
   };
   const matchingStage = (async () => {
-    const attempts = await studyStage(
-      STAGE_TAGS.matchingGeneration,
-      () =>
-        mapWithConcurrency(layer.derivedNodes, studyItemConcurrency, async (node) => {
-          const result = await generateMatchingForNode(node);
-          matchingDone += 1;
-          await reporter.recordProgress({ operationType: "study_items", operationId, stage: STAGE_TAGS.matchingGeneration, done: matchingDone });
-          return result;
-        }),
-      layer.derivedNodes.length
+    const requested = layer.derivedNodes.some((node) =>
+      typePlanFor(blueprintByNode, node, "matching").generate
     );
+    const attempts: NodeAttempt<MatchingAssignmentSubject>[] = requested
+      ? await studyStage(
+          STUDY_ITEM_BANK_STAGE_GROUP.matchingGeneration.stage,
+          () =>
+            mapWithConcurrency(layer.derivedNodes, studyItemConcurrency, async (node) => {
+              const result = await generateMatchingForNode(node);
+              matchingDone += 1;
+              await reporter.recordProgress({ operationType: "study_items", operationId, stage: STUDY_ITEM_BANK_STAGE_GROUP.matchingGeneration.stage, done: matchingDone });
+              return result;
+            }),
+          layer.derivedNodes.length
+        )
+      : layer.derivedNodes.map(() => ({ kind: "skipped" as const }));
     const subjects = pendingSubjects(attempts);
-    const outcomes = await studyStage(
-      STAGE_TAGS.matchingAssignmentVerification,
-      () => verifyMatchingAssignments(subjects, {
-        verifier: input.matchingAssignmentVerification,
-        concurrency: verificationConcurrency
-      }),
-      subjects.length
-    );
+    const outcomes = subjects.length === 0
+      ? []
+      : await studyStage(
+          STUDY_ITEM_BANK_STAGE_GROUP.matchingAssignmentVerification.stage,
+          () => verifyMatchingAssignments(subjects, {
+            verifier: input.matchingAssignmentVerification,
+            concurrency: verificationConcurrency
+          }),
+          subjects.length
+        );
     return mergeVerified(attempts, outcomes, "matching");
   })();
 
@@ -651,40 +691,48 @@ export async function generateStudyItemBank(input: {
     return drafted.ok ? { kind: "pending", subject: drafted.subject } : { kind: "rejected", reason: drafted.reason };
   };
   const impostorStage = (async () => {
-    const attempts = await studyStage(
-      STAGE_TAGS.impostorGeneration,
-      () =>
-        mapWithConcurrency(layer.derivedNodes, studyItemConcurrency, async (node) => {
-          const result = await generateImpostorForNode(node);
-          impostorDone += 1;
-          await reporter.recordProgress({ operationType: "study_items", operationId, stage: STAGE_TAGS.impostorGeneration, done: impostorDone });
-          return result;
-        }),
-      layer.derivedNodes.length
+    const requested = layer.derivedNodes.some((node) =>
+      typePlanFor(blueprintByNode, node, "impostor").generate
     );
+    const attempts: NodeAttempt<AnswerKeyVerificationSubject<ImpostorItem>>[] = requested
+      ? await studyStage(
+          STUDY_ITEM_BANK_STAGE_GROUP.impostorGeneration.stage,
+          () =>
+            mapWithConcurrency(layer.derivedNodes, studyItemConcurrency, async (node) => {
+              const result = await generateImpostorForNode(node);
+              impostorDone += 1;
+              await reporter.recordProgress({ operationType: "study_items", operationId, stage: STUDY_ITEM_BANK_STAGE_GROUP.impostorGeneration.stage, done: impostorDone });
+              return result;
+            }),
+          layer.derivedNodes.length
+        )
+      : layer.derivedNodes.map(() => ({ kind: "skipped" as const }));
     const subjects = pendingSubjects(attempts);
-    const outcomes = await studyStage(
-      STAGE_TAGS.impostorKeyVerification,
-      () =>
-        verifyAnswerKeys(subjects, {
-          verifier: input.answerKeyVerification,
-          concurrency: verificationConcurrency,
-          vetoReason: (subject, verdicts) => impostorKeyVetoReason(subject.item, verdicts),
-          // Fail closed, unchanged from the judge this replaces and for the same reason
-          // ADR-0026 gives: a true "lie" teaches a falsehood, and impostor-absent is the
-          // designed safe state.
-          onUnavailable: (_subject, error) => ({ admitted: false, reason: `impostor key verification unavailable: ${failureText(error)}` })
-        }),
-      subjects.length
-    );
+    const outcomes = subjects.length === 0
+      ? []
+      : await studyStage(
+          STUDY_ITEM_BANK_STAGE_GROUP.impostorKeyVerification.stage,
+          () =>
+            verifyAnswerKeys(subjects, {
+              verifier: input.answerKeyVerification,
+              concurrency: verificationConcurrency,
+              vetoReason: (subject, verdicts) => impostorKeyVetoReason(subject.item, verdicts),
+              // Fail closed, unchanged from the judge this replaces and for the same reason
+              // ADR-0026 gives: a true "lie" teaches a falsehood, and impostor-absent is the
+              // designed safe state.
+              onUnavailable: (_subject, error) => ({ admitted: false, reason: `impostor key verification unavailable: ${failureText(error)}` })
+            }),
+          subjects.length
+        );
     return mergeVerified(attempts, outcomes, "impostor");
   })();
 
-  // The stages launch together after blueprint, but their results merge only after the
-  // join in the canonical type order. Each mapper is itself input-ordered, so neither
-  // response timing nor stage completion timing can perturb persisted order (R4). All three
-  // chains now carry a verification bracket after their generation bracket, so up to three
-  // verification stages can overlap in wall-clock — see the concurrency knob's note.
+  // Requested family chains launch together after blueprint, but their results merge only after
+  // the join in canonical type order. A declined family opens no empty generation bracket, and a
+  // family with no pending subject opens no empty verification bracket; phase success fills those
+  // conditional conceptual stages in the Journal. Each mapper is input-ordered, so response or
+  // stage completion timing cannot perturb persistence (R4). Up to three real verification stages
+  // can overlap in wall-clock — see the concurrency knob's note.
   const stageResults = await Promise.all([
     optionSelectStage,
     matchingStage,
@@ -777,18 +825,80 @@ const REDUNDANCY_DROPPABLE_KINDS: ReadonlySet<ConceptLessonSectionKind> = new Se
 async function judgeLessonRedundancy(
   judge: ConceptLessonRedundancyJudgmentPort | undefined,
   node: DerivedGraphNode,
-  lesson: ConceptLesson
+  lesson: ConceptLesson,
+  stage: ConditionalAggregateStage
 ): Promise<ConceptLessonRedundancyJudgment[]> {
   if (!judge) return [];
   try {
-    return await judge.judge({
-      declaredDomain: node.declaredDomain,
-      node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, aliases: node.aliases },
-      sections: lesson.sections.map((section) => ({ kind: section.kind, text: section.text, ...(section.items?.length ? { items: section.items } : {}) }))
-    });
+    return await stage.run(() =>
+      judge.judge({
+        declaredDomain: node.declaredDomain,
+        node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, aliases: node.aliases },
+        sections: lesson.sections.map((section) => ({ kind: section.kind, text: section.text, ...(section.items?.length ? { items: section.items } : {}) }))
+      })
+    );
   } catch {
     return [];
   }
+}
+
+type ConditionalAggregateStage = Readonly<{
+  run<T>(task: () => Promise<T>): Promise<T>;
+  finish(): Promise<void>;
+}>;
+
+// Lesson drafts and their optional redundancy checks form a per-node pipeline. Open one aggregate
+// redundancy bracket lazily at the first real judge call, keep it open across concurrent nodes and
+// retries, and close it only after the lesson producer has stopped. This records the conditional
+// conceptual stage without creating overlapping rows for one stage name.
+function createConditionalAggregateStage(stage: StageBracket, stageTag: string): ConditionalAggregateStage {
+  let bracket: Promise<void> | undefined;
+  let active = 0;
+  let finishing = false;
+  let release!: () => void;
+  let markEntered!: () => void;
+  let rejectEntered!: (error: unknown) => void;
+  const entered = new Promise<void>((resolve, reject) => {
+    markEntered = resolve;
+    rejectEntered = reject;
+  });
+  const heldOpen = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  const settle = () => {
+    if (finishing && active === 0) release();
+  };
+  const ensureStarted = () => {
+    if (bracket) return;
+    bracket = Promise.resolve().then(() =>
+      stage(stageTag, async () => {
+        markEntered();
+        await heldOpen;
+      })
+    );
+    void bracket.catch((error) => rejectEntered(error));
+  };
+
+  return {
+    async run<T>(task: () => Promise<T>): Promise<T> {
+      if (finishing) throw new Error(`Conditional aggregate stage ${stageTag} received work after finish.`);
+      ensureStarted();
+      await entered;
+      active += 1;
+      try {
+        return await task();
+      } finally {
+        active -= 1;
+        settle();
+      }
+    },
+    async finish(): Promise<void> {
+      finishing = true;
+      settle();
+      await bracket;
+    }
+  };
 }
 
 function redundantNonSubstantiveKinds(judgments: ConceptLessonRedundancyJudgment[]): ConceptLessonSectionKind[] {

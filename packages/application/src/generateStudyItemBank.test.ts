@@ -19,6 +19,7 @@ import { installNodeOperationTagContext } from "@lrnki/domain-core/operation-tag
 import type { ConceptLessonGenerationPort, ConceptLessonRedundancyJudgmentPort, ConceptLessonStorePort, EnrichmentRunStorePort, GraphVersionStorePort, MatchingAssignmentVerificationPort, RunProgressReporterPort, StageErrorDetail, StudyItemBankStorePort, StudyItemGenerationPort, AnswerKeyVerificationPort } from "@lrnki/ports";
 import { generateStudyItemBank, OPTION_SELECT_GENERATION_ATTEMPTS } from "./generateStudyItemBank";
 import { NON_LLM_STAGES } from "./runProgressReporter";
+import { STUDY_ITEM_BANK_STAGE_GROUP } from "./topicExpeditionStageProfile";
 
 installNodeOperationTagContext();
 
@@ -417,6 +418,7 @@ test("a node whose lesson grounds an option-select that passes the guard persist
 test("structural blueprint pre-gate rejects matching and impostor when the lesson is too sparse", async () => {
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
   const { store } = capturingStore();
+  const { reporter, calls } = recordingReporter();
   const sparseLesson: ConceptLessonDraft = {
     explorableTerms: [],
     sections: [
@@ -433,34 +435,82 @@ test("structural blueprint pre-gate rejects matching and impostor when the lesso
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: capturingLessonStore().store,
     studyItemGeneration: generationReturning({ optionSelect: { "node-c1": osDraft("rules that govern memory", ["Stack", "Register", "Cache"], lessonPassageId("node-c1", 0)) } }),
-    studyItemBankStore: store
+    studyItemBankStore: store,
+    reporter
   });
 
   assert.deepEqual(typesFor(result.studyItems, "node-c1"), ["option_select"]);
   assert.deepEqual(result.rejected.map((row) => `${row.itemType}:${row.reason.startsWith("blueprint:")}`).sort(), ["impostor:true", "matching:true"]);
+  const opened = new Set(calls.flatMap((call) => call.method === "enterStage" ? [call.stage] : []));
+  assert.equal(opened.has(STUDY_ITEM_BANK_STAGE_GROUP.optionSelectGeneration.stage), true);
+  assert.equal(opened.has(STUDY_ITEM_BANK_STAGE_GROUP.optionSelectKeyVerification.stage), true);
+  assert.equal(opened.has(STUDY_ITEM_BANK_STAGE_GROUP.matchingGeneration.stage), false);
+  assert.equal(opened.has(STUDY_ITEM_BANK_STAGE_GROUP.matchingAssignmentVerification.stage), false);
+  assert.equal(opened.has(STUDY_ITEM_BANK_STAGE_GROUP.impostorGeneration.stage), false);
+  assert.equal(opened.has(STUDY_ITEM_BANK_STAGE_GROUP.impostorKeyVerification.stage), false);
 });
 
 test("redundant non-substantive lesson sections are retried once then dropped", async () => {
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
   const lessonStore = capturingLessonStore();
+  const { reporter, calls } = recordingReporter();
+  let redundancyCalls = 0;
   const result = await generateStudyItemBank({
     enrichmentId: "enr-1",
     configHash: "cfg-1",
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": goodLessonDraft("b1", ownershipDef) } }),
-    conceptLessonRedundancyJudge: redundancyJudgeReturning([{ sectionKind: "gist", verdict: "redundant", redundantWith: "definition", reason: "repeats the definition" }]),
+    conceptLessonRedundancyJudge: {
+      model: "mock-redundancy",
+      async judge() {
+        redundancyCalls += 1;
+        return [{ sectionKind: "gist", verdict: "redundant", redundantWith: "definition", reason: "repeats the definition" }];
+      }
+    },
     answerKeyVerification: keyVerifierPassing(),
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: lessonStore.store,
     studyItemGeneration: generationReturning({ optionSelect: { "node-c1": osDraft("rules that govern memory") } }),
-    studyItemBankStore: capturingStore().store
+    studyItemBankStore: capturingStore().store,
+    reporter
   });
 
   assert.equal(result.lessons.length, 1);
   assert.equal(result.lessons[0].sections.some((section) => section.kind === "gist"), false);
   assert.equal(result.lessonAbsent.length, 0);
   assert.equal(lessonStore.lessons[0].sections.some((section) => section.kind === "gist"), false);
+  assert.equal(redundancyCalls, 2, "the initial lesson and retry are judged");
+  const redundancyStage = STUDY_ITEM_BANK_STAGE_GROUP.lessonRedundancyJudgment.stage;
+  assert.equal(calls.filter((call) => call.method === "enterStage" && call.stage === redundancyStage).length, 1);
+  assert.equal(calls.filter((call) => call.method === "completeStage" && call.stage === redundancyStage).length, 1);
+  const lessonEnter = calls.findIndex((call) => call.method === "enterStage" && call.stage === STUDY_ITEM_BANK_STAGE_GROUP.conceptLessonGeneration.stage);
+  const redundancyEnter = calls.findIndex((call) => call.method === "enterStage" && call.stage === redundancyStage);
+  const redundancyComplete = calls.findIndex((call) => call.method === "completeStage" && call.stage === redundancyStage);
+  const lessonComplete = calls.findIndex((call) => call.method === "completeStage" && call.stage === STUDY_ITEM_BANK_STAGE_GROUP.conceptLessonGeneration.stage);
+  assert.ok(lessonEnter < redundancyEnter && redundancyEnter < redundancyComplete && redundancyComplete < lessonComplete);
+});
+
+test("the conditional lesson-redundancy stage is absent when no judge work occurs", async () => {
+  const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
+  const { reporter, calls } = recordingReporter();
+  await generateStudyItemBank({
+    enrichmentId: "enr-1",
+    configHash: "cfg-1",
+    graphStore: graphStoreReturning(snapshot),
+    enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
+    conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": goodLessonDraft("b1", ownershipDef) } }),
+    answerKeyVerification: keyVerifierPassing(),
+    matchingAssignmentVerification: matchingVerifierPassing(),
+    conceptLessonStore: capturingLessonStore().store,
+    studyItemGeneration: generationReturning({ optionSelect: { "node-c1": osDraft("rules that govern memory") } }),
+    studyItemBankStore: capturingStore().store,
+    reporter
+  });
+  assert.equal(
+    calls.some((call) => call.method === "enterStage" && call.stage === STUDY_ITEM_BANK_STAGE_GROUP.lessonRedundancyJudgment.stage),
+    false
+  );
 });
 
 test("the study-item operation context reaches generation calls", async () => {
@@ -639,6 +689,7 @@ test("option-select, matching, and impostor stages overlap and still persist in 
 test("an option-select guard rejection records the node as rejected", async () => {
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
   const { store, persisted, persistedRejected } = capturingStore();
+  const { reporter, calls } = recordingReporter();
   // Duplicate distractors fail the structural guard (not a grounding failure).
   await generateStudyItemBank({
     enrichmentId: "enr-1",
@@ -650,7 +701,8 @@ test("an option-select guard rejection records the node as rejected", async () =
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: capturingLessonStore().store,
     studyItemGeneration: generationReturning({ optionSelect: { "node-c1": osDraft("rules that govern memory", ["Same", "Same", "Cache"]) } }),
-    studyItemBankStore: store
+    studyItemBankStore: store,
+    reporter
   });
 
   // Option-select is rejected (its guard miss), but the matching/impostor stages still ground an item.
@@ -658,6 +710,9 @@ test("an option-select guard rejection records the node as rejected", async () =
   const optionSelectRejections = persistedRejected.filter((r) => r.itemType === "option_select");
   assert.equal(optionSelectRejections.length, 1);
   assert.deepEqual(await store.supportedItemTypes("node-c1"), ["impostor", "matching"]);
+  const opened = new Set(calls.flatMap((call) => call.method === "enterStage" ? [call.stage] : []));
+  assert.equal(opened.has(STUDY_ITEM_BANK_STAGE_GROUP.optionSelectGeneration.stage), true);
+  assert.equal(opened.has(STUDY_ITEM_BANK_STAGE_GROUP.optionSelectKeyVerification.stage), false);
 });
 
 test("Covers AE3/R3: a node with no usable grounding is recorded lesson-absent and yields no item, without calling either generator", async () => {

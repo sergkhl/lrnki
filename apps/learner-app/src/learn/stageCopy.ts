@@ -16,10 +16,14 @@ const STAGE_COPY: Record<string, string> = {
   [STAGE_TAGS.mintingDurability]: "Raising new cairns",
   [STAGE_TAGS.missingPrerequisiteProposal]: "Finding missing footholds",
   [STAGE_TAGS.groundingGeneration]: "Writing field notes",
+  [STAGE_TAGS.groundingVerificationQuestionPlanning]: "Drafting challenge questions",
+  [STAGE_TAGS.groundingVerificationAnswering]: "Consulting independent guides",
+  [STAGE_TAGS.groundingFactualityRevision]: "Testing each field note",
   [STAGE_TAGS.intrinsicDifficulty]: "Reading the terrain",
   [STAGE_TAGS.declaredDomainInference]: "Naming the country",
   [STAGE_TAGS.nodeEmbedding]: "Comparing landmarks",
   [STAGE_TAGS.nodeMergeAdjudication]: "Merging twin paths",
+  [STAGE_TAGS.layerPurposeGeneration]: "Writing the expedition charter",
   [STAGE_TAGS.conceptLessonGeneration]: "Preparing camp notes",
   [STAGE_TAGS.lessonRedundancyJudgment]: "Checking note overlap",
   [STAGE_TAGS.studyItemBlueprint]: "Planning survey stops",
@@ -38,4 +42,8 @@ const STAGE_COPY: Record<string, string> = {
 
 export function stageCopy(stage: string): string {
   return STAGE_COPY[stage] ?? "Scouting the trail";
+}
+
+export function hasExplicitStageCopy(stage: string): boolean {
+  return Object.hasOwn(STAGE_COPY, stage);
 }

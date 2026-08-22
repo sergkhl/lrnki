@@ -41,9 +41,10 @@ Historical architecture reviews were checked only to avoid proposing work that h
 - [`runSyntheticGeneration.ts`](../../packages/application/src/runSyntheticGeneration.ts)
 - [`completeDerivedGraphLayer.ts`](../../packages/application/src/completeDerivedGraphLayer.ts)
 - [`generateStudyItemBank.ts`](../../packages/application/src/generateStudyItemBank.ts)
+- [`topicExpeditionStageProfile.ts`](../../packages/application/src/topicExpeditionStageProfile.ts)
 - [`operationTimelineCatalog.ts`](../../packages/application/src/operationTimelineCatalog.ts)
 - [`expeditionJournal.ts`](../../packages/application/src/expeditionJournal.ts), especially
-  `EXPECTED_TOPIC_GENERATION_STAGE_PLAN` and `generationFacts`
+  `generationFacts`
 - [`expeditionJournal.test.ts`](../../packages/application/src/expeditionJournal.test.ts)
 - [`configHashes.ts`](../../packages/infrastructure-litellm/src/configHashes.ts) and
   [`configHashes.test.ts`](../../packages/infrastructure-litellm/src/configHashes.test.ts)

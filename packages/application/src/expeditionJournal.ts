@@ -1,4 +1,4 @@
-import { neutralResponses, STAGE_TAGS } from "@lrnki/domain-core";
+import { neutralResponses } from "@lrnki/domain-core";
 import type {
   DerivedGraphDetail,
   EnrichmentInspectionReadPort,
@@ -14,6 +14,11 @@ import type {
 } from "@lrnki/ports";
 import { deriveFlooredExpedition } from "./expeditionSections";
 import { isStaleOperation } from "./operationRunLiveness";
+import {
+  TOPIC_EXPEDITION_STAGE_PROFILE,
+  TOPIC_EXPEDITION_STAGE_TOTAL,
+  type TopicExpeditionPhase
+} from "./topicExpeditionStageProfile";
 
 // The Expedition Journal projection (plan 2026-07-12-001): one application module owns
 // candidate derivation, trail-scoped progress, generation facts, the tier partition, and
@@ -111,39 +116,11 @@ export type ExpeditionJournalDeps = ExpeditionCatalogDeps & {
 // Explore shows the top shared candidates; the catalog stays unlimited.
 const EXPLORE_CANDIDATE_LIMIT = 5;
 
-// The expected topic-generation stage plan (KTD4): the two producer phases' LLM stages,
-// locked to OPERATION_TIMELINE_CATALOG membership and LLM stage kind by a set-inclusion
-// test. Which stages the synthetic path runs is producer knowledge no mechanical
-// derivation from the catalog can express (the catalog's `enrichment` entry includes
-// source-grounded-only stages), so a new catalog stage still requires a deliberate
-// update here.
-export const EXPECTED_TOPIC_GENERATION_STAGE_PLAN = {
-  enrichment: [
-    STAGE_TAGS.declaredDomainInference,
-    STAGE_TAGS.conceptSetSynthesis,
-    STAGE_TAGS.knowledgeBoundaryProbe,
-    STAGE_TAGS.groundingGeneration,
-    STAGE_TAGS.prerequisiteOrdering,
-    STAGE_TAGS.intrinsicDifficulty
-  ],
-  study_items: [
-    STAGE_TAGS.layerPurposeGeneration,
-    STAGE_TAGS.conceptLessonGeneration,
-    STAGE_TAGS.lessonRedundancyJudgment,
-    STAGE_TAGS.studyItemBlueprint,
-    STAGE_TAGS.studyItemGeneration,
-    STAGE_TAGS.matchingGeneration,
-    STAGE_TAGS.impostorGeneration,
-    STAGE_TAGS.optionSelectKeyVerification,
-    STAGE_TAGS.impostorKeyVerification,
-    STAGE_TAGS.matchingAssignmentVerification
-  ]
-} as const;
-
-const ENRICHMENT_STAGE_SET = new Set<string>(EXPECTED_TOPIC_GENERATION_STAGE_PLAN.enrichment);
-const STUDY_ITEM_STAGE_SET = new Set<string>(EXPECTED_TOPIC_GENERATION_STAGE_PLAN.study_items);
-const STUDY_ITEM_STAGE_OFFSET = EXPECTED_TOPIC_GENERATION_STAGE_PLAN.enrichment.length;
-const TOTAL_EXPECTED_STAGES = STUDY_ITEM_STAGE_OFFSET + EXPECTED_TOPIC_GENERATION_STAGE_PLAN.study_items.length;
+const PROFILE_STAGE_SETS: Readonly<Record<TopicExpeditionPhase, ReadonlySet<string>>> = {
+  enrichment: new Set(TOPIC_EXPEDITION_STAGE_PROFILE.enrichment.map((descriptor) => descriptor.stage)),
+  study_items: new Set(TOPIC_EXPEDITION_STAGE_PROFILE.study_items.map((descriptor) => descriptor.stage))
+};
+const STUDY_ITEM_STAGE_OFFSET = TOPIC_EXPEDITION_STAGE_PROFILE.enrichment.length;
 
 export async function getExpeditionJournal(
   input: { learnerStateRef: string },
@@ -352,23 +329,31 @@ function generationFacts(expedition: LearnerExpedition, timeline: OperationTimel
   // (or transiently released for retry), so the card shows a waiting state instead of a
   // progress surface that never moves.
   const queued = expedition.status === "generating" && !expedition.currentOperationId;
-  const total = TOTAL_EXPECTED_STAGES;
+  const total = TOPIC_EXPEDITION_STAGE_TOTAL;
   if (!timeline) {
     return { queued, stalled: false, completed: 0, total, fraction: null, indeterminate: true, currentStage: null };
   }
-  const stageSet = timeline.summary.operationType === "study_items" ? STUDY_ITEM_STAGE_SET : ENRICHMENT_STAGE_SET;
-  const offset = timeline.summary.operationType === "study_items" ? STUDY_ITEM_STAGE_OFFSET : 0;
+  const phase: TopicExpeditionPhase = timeline.summary.operationType === "study_items" ? "study_items" : "enrichment";
+  const phaseProfile = TOPIC_EXPEDITION_STAGE_PROFILE[phase];
+  const stageSet = PROFILE_STAGE_SETS[phase];
+  const offset = phase === "study_items" ? STUDY_ITEM_STAGE_OFFSET : 0;
   // A succeeded phase counts as its full stage span regardless of which conditional
   // stages actually appeared (domain inference is skipped on retry; matching/impostor
   // and their judges when the blueprint admits none) — so the bar reaches its phase
   // boundary and 100% at success instead of capping below it. Mid-run skew from an
   // absent stage stays small.
   const phaseComplete = timeline.summary.status === "succeeded";
-  const completedInTimeline = phaseComplete
-    ? stageSet.size
-    : timeline.stages.filter((stage) => stageSet.has(stage.stage) && stage.endedAt && stage.ok !== false).length;
+  const successfulStages = new Set(
+    timeline.stages
+      .filter((stage) => stageSet.has(stage.stage) && stage.endedAt && stage.ok !== false)
+      .map((stage) => stage.stage)
+  );
+  const completedInTimeline = phaseComplete ? phaseProfile.length : successfulStages.size;
   const completed = Math.min(total, Math.max(0, offset + completedInTimeline));
-  const currentStage = timeline.stages.find((stage) => !stage.endedAt)?.stage ?? timeline.stages.at(-1)?.stage ?? null;
+  const openStages = timeline.stages.filter((stage) => !stage.endedAt);
+  const currentStage = phaseProfile.find((descriptor) =>
+    openStages.some((stage) => stage.stage === descriptor.stage)
+  )?.stage ?? openStages[0]?.stage ?? timeline.stages.at(-1)?.stage ?? null;
   const indeterminate = currentStage !== null && !stageSet.has(currentStage) && timeline.summary.status === "running";
   return {
     queued,

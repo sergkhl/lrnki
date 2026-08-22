@@ -16,34 +16,13 @@ import type {
 } from "@lrnki/ports";
 import type { NeutralResponseLogRow, ResponseLogRow, StudyItem } from "@lrnki/domain-core";
 import {
-  EXPECTED_TOPIC_GENERATION_STAGE_PLAN,
   getExpeditionCatalog,
   getExpeditionJournal,
   type ExpeditionJournalDeps
 } from "./expeditionJournal";
-import { OPERATION_TIMELINE_CATALOG } from "./operationTimelineCatalog";
 import { OPERATION_HEARTBEAT_STALE_AFTER_MS } from "./operationRunLiveness";
 
-const TOTAL = 16;
-
-// AE8: every expected stage is locked to its operation's catalog entry with kind `llm`;
-// a stage that leaves the catalog (or a non-LLM bookkeeping stage sneaking in) fails here.
-test("the expected stage plan is a subset of each operation's LLM catalog stages", () => {
-  for (const [operationType, stages] of Object.entries(EXPECTED_TOPIC_GENERATION_STAGE_PLAN)) {
-    const llmCatalogStages = new Set(
-      OPERATION_TIMELINE_CATALOG[operationType as keyof typeof OPERATION_TIMELINE_CATALOG]
-        .filter((descriptor) => descriptor.kind === "llm")
-        .map((descriptor) => descriptor.stage)
-    );
-    for (const stage of stages) {
-      assert.ok(llmCatalogStages.has(stage), `${stage} is not an llm stage of ${operationType}`);
-    }
-  }
-  assert.equal(
-    EXPECTED_TOPIC_GENERATION_STAGE_PLAN.enrichment.length + EXPECTED_TOPIC_GENERATION_STAGE_PLAN.study_items.length,
-    TOTAL
-  );
-});
+const TOTAL = 19;
 
 test("generation facts count completed expected stages against the fixed denominator", async () => {
   const journal = await journalWithTimeline(timeline({
@@ -62,7 +41,39 @@ test("generation facts count completed expected stages against the fixed denomin
   assert.equal(generation.currentStage, STAGE_TAGS.intrinsicDifficulty);
 });
 
-test("study-item timelines are offset after the six enrichment-phase stages", async () => {
+test("repeated successful stage occurrences advance conceptual progress only once", async () => {
+  const journal = await journalWithTimeline(timeline({
+    stages: [
+      closed(STAGE_TAGS.conceptSetSynthesis),
+      closed(STAGE_TAGS.groundingVerificationQuestionPlanning),
+      closed(STAGE_TAGS.groundingVerificationQuestionPlanning),
+      closed(STAGE_TAGS.groundingVerificationAnswering),
+      closed(STAGE_TAGS.groundingVerificationAnswering),
+      open(STAGE_TAGS.groundingFactualityRevision)
+    ]
+  }));
+  const generation = generatingFacts(journal);
+  assert.equal(generation.completed, 3);
+  assert.equal(generation.total, TOTAL);
+  assert.equal(generation.currentStage, STAGE_TAGS.groundingFactualityRevision);
+  assert.equal(generation.indeterminate, false);
+});
+
+test("concurrent verification stages report the earliest still-open profile stage", async () => {
+  const journal = await journalWithTimeline(timeline({
+    stages: [
+      open(STAGE_TAGS.groundingFactualityRevision),
+      open(STAGE_TAGS.groundingVerificationAnswering),
+      open(STAGE_TAGS.groundingVerificationQuestionPlanning)
+    ]
+  }));
+  const generation = generatingFacts(journal);
+  assert.equal(generation.currentStage, STAGE_TAGS.groundingVerificationQuestionPlanning);
+  assert.equal(generation.indeterminate, false);
+  assert.equal(generation.fraction, 0);
+});
+
+test("study-item timelines are offset after the nine enrichment-phase stages", async () => {
   const journal = await journalWithTimeline(timeline({
     operationType: "study_items",
     stages: [
@@ -73,7 +84,7 @@ test("study-item timelines are offset after the six enrichment-phase stages", as
     ]
   }));
   const generation = generatingFacts(journal);
-  assert.equal(generation.completed, 9);
+  assert.equal(generation.completed, 12);
   assert.equal(generation.total, TOTAL);
 });
 
@@ -86,7 +97,7 @@ test("a running study_items timeline whose open stage is layerPurposeGeneration 
   }));
   const generation = generatingFacts(journal);
   assert.equal(generation.indeterminate, false);
-  assert.ok(generation.completed >= 6);
+  assert.ok(generation.completed >= 9);
   assert.equal(generation.total, TOTAL);
   assert.equal(generation.currentStage, STAGE_TAGS.layerPurposeGeneration);
 });
@@ -101,7 +112,7 @@ test("a running unexpected current stage signals indeterminate", async () => {
 
 // AE2: a succeeded study_items phase clamps to its full span even when conditional
 // stages (matching/impostor and their judges) never appeared.
-test("a succeeded study_items timeline with absent conditional stages still reaches 15/15", async () => {
+test("a succeeded study_items timeline with absent conditional stages reaches full 19/19 readiness", async () => {
   const journal = await journalWithTimeline(timeline({
     operationType: "study_items",
     status: "succeeded",
@@ -117,7 +128,7 @@ test("a succeeded study_items timeline with absent conditional stages still reac
   assert.equal(generation.fraction, 1);
 });
 
-test("a succeeded enrichment timeline with domain inference skipped reaches its phase boundary (6/15)", async () => {
+test("a succeeded enrichment timeline with conditional stages absent reaches its phase boundary (9/19)", async () => {
   const journal = await journalWithTimeline(timeline({
     status: "succeeded",
     stages: [
@@ -128,7 +139,7 @@ test("a succeeded enrichment timeline with domain inference skipped reaches its 
       closed(STAGE_TAGS.intrinsicDifficulty)
     ]
   }));
-  assert.equal(generatingFacts(journal).completed, 6);
+  assert.equal(generatingFacts(journal).completed, 9);
 });
 
 // AE3: generating with no operation id is queued; the card needs no timeline knowledge.

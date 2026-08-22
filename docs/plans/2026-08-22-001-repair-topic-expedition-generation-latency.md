@@ -7,7 +7,7 @@ execution: code
 
 # Restore Topic Expedition Generation to Seven Minutes
 
-**Status:** In progress — U0–U1 complete; U2 next
+**Status:** In progress — U0–U2 complete; U3 calibration next
 
 **Decision state:** Locked. The accepted problem framing and stage-profile deletion test remain in
 [Candidate 2 of the architecture-deepening brainstorm](../brainstorms/2026-08-19-001-architecture-deepening-review.md#candidate-2--give-topic-expedition-generation-one-application-owned-stage-profile).
@@ -346,9 +346,46 @@ seven-minute threshold does not apply to this contention soak.
   provider capacity, end-to-end latency, Journal projection, or learner copy; U2 and U3 own those
   gates.
 
+### U2 — Shared stage profile and Journal projection — complete; local deterministic evidence
+
+- Profile/producer ownership: `topicExpeditionStageProfile.ts` now composes the exact nine-stage
+  Synthetic Generation phase and ten-stage Study Item Bank phase from four reusable producer
+  groups. Every descriptor records phase, conditional bracket emission, possible repeated bracket
+  emission, and overlap group. Synthetic Generation, Source-less Grounding Admission, claim
+  verification, shared Derived Graph completion, and Study Item Bank generation now use those
+  descriptors rather than their own profiled stage literals. Exactness tests prove `9 + 10 = 19`,
+  object-for-object producer composition, uniqueness, and LLM membership in the broad operation
+  catalog; the profile remains client-safe through the projection barrel.
+- Honest conditional timelines: an all-boundary admission omits empty Grounding Generation and
+  verification brackets. Study Item Bank opens its redundancy bracket lazily on the first real
+  judge call and aggregates concurrent nodes/retries into one non-overlapping row; declined
+  activity families and zero-subject verification phases emit no empty rows. Outcomes, retry
+  budgets, ordering, and persistence remain unchanged, while phase success still fills every
+  conditional conceptual stage.
+- Journal projection: the manual six-stage enrichment list is deleted. Mid-run progress counts
+  unique successful profile stages, so repeated disagreement waves advance once; multiple open
+  verification brackets resolve to question planning, answering, then factuality checking in
+  profile order. Conditional omissions remain uncounted while running, enrichment success reaches
+  `9/19`, and Study Item Bank success reaches `19/19`. Unexpected running stages remain
+  indeterminate.
+- Learner copy: question planning, independent answering, factuality checking, and layer-purpose
+  generation now have distinct expedition-fiction copy. The learner test consumes the shared
+  profile and proves every profiled stage plus every shared non-LLM stage has an explicit entry
+  rather than the generic fallback. No ETA, countdown, response-type change, or progressive
+  readiness was introduced.
+- Automated evidence: application and learner-app typechecks passed; focused profile, producer,
+  Journal, admission, Study Item Bank, and stage-copy tests passed; the full application and normal
+  learner-app suites passed. Infrastructure-LiteLLM typecheck/hash tests kept all three exact
+  operation identities unchanged. Infrastructure-Postgres typecheck and its local package suite
+  passed with DB-backed reporter/read tests explicitly skipped because `TEST_DATABASE_URL` was not
+  supplied; `pnpm test:db` remains the U4 database authority. `git diff --check` passed.
+- Evidence boundary: this is local automated projection, emission, copy, type, and regression
+  evidence only. It is not live provider, latency, persisted-artifact quality, DB-backed reporter,
+  deployed, browser, native, or physical-device evidence.
+
 ### Open findings
 
-- U2–U4 remain unimplemented and unvalidated; next add the shared stage profile and derive the
-  Journal and learner copy from it.
+- U3–U4 remain unimplemented and unvalidated; next calibrate equal role widths in the locked
+  `8 → 12 → 16` order and accept only a successful representative run.
 - A future passing run must supply the successful end-to-end baseline this semantic rejection could
   not provide; do not compare `2,286.023 s` to the acceptance threshold as if it produced `ready`.

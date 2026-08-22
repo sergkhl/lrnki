@@ -310,6 +310,19 @@ test("a measured boundary outcome never reaches Grounding Generation", async () 
   assert.equal(outcomes[1].disposition, "admitted");
 });
 
+test("an all-boundary batch omits conditional grounding and verification brackets", async () => {
+  const h = harness({ boundaryLabels: ["Boundary A", "Boundary B"] });
+  const { stage, events } = recordingStage();
+  const outcomes = await h.admission.forOperation(stage).admitBatch([
+    candidate("a", "Boundary A"),
+    candidate("b", "Boundary B")
+  ]);
+  assert.deepEqual(outcomes.map((outcome) => outcome.disposition), ["held_out", "held_out"]);
+  assert.deepEqual(events.map((event) => event.stage), [STAGE_TAGS.knowledgeBoundaryProbe]);
+  assert.deepEqual(h.groundingCalls, []);
+  assert.deepEqual(h.planningCalls, []);
+});
+
 test("embedding unavailability propagates and returns no fabricated boundary result", async () => {
   const h = harness({
     embedding: {

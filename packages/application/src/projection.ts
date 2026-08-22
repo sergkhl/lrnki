@@ -10,6 +10,12 @@ export {
   spendStageBelongsToOperation
 } from "./operationTimelineCatalog";
 export {
+  TOPIC_EXPEDITION_STAGE_PROFILE,
+  TOPIC_EXPEDITION_STAGE_TOTAL,
+  type GenerationStageDescriptor,
+  type TopicExpeditionPhase
+} from "./topicExpeditionStageProfile";
+export {
   layoutSphereGrid,
   type SphereGridEdgeInput,
   type SphereGridFlaggedLoop,

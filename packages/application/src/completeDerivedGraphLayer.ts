@@ -20,6 +20,7 @@ import type { DifficultyPort, EnrichmentRunStorePort, PrerequisiteOrderingPort }
 import { NON_LLM_STAGES, type StageBracket } from "./runProgressReporter";
 import { deriveConsensusOrdering } from "./deriveConsensusOrdering";
 import { transitiveReduction } from "./prerequisiteDag";
+import { DERIVED_GRAPH_COMPLETION_STAGE_GROUP } from "./topicExpeditionStageProfile";
 
 const PRODUCER = "@lrnki/application";
 const PRODUCER_VERSION = "0.8.0";
@@ -202,7 +203,7 @@ export function createDerivedGraphLayerCompletion(ports: {
             certainEdges,
             uncertainEdges,
             weakEdges
-          } = await request.stage(STAGE_TAGS.prerequisiteOrdering, () =>
+          } = await request.stage(DERIVED_GRAPH_COMPLETION_STAGE_GROUP.prerequisiteOrdering.stage, () =>
             deriveConsensusOrdering({
               domains: [...byDomain.entries()].map(([declaredDomain, members]) => ({ declaredDomain, nodes: members })),
               prerequisiteOrdering: ports.prerequisiteOrdering,
@@ -245,7 +246,7 @@ export function createDerivedGraphLayerCompletion(ports: {
         // Comparative banded intrinsic difficulty from node evidence contexts only
         // (ADR-0024). It scores every derived node, including evidence-excluded ones,
         // and deliberately takes no prerequisite DAG input.
-        request.stage(STAGE_TAGS.intrinsicDifficulty, () =>
+        request.stage(DERIVED_GRAPH_COMPLETION_STAGE_GROUP.intrinsicDifficulty.stage, () =>
           ports.difficulty.score({ nodes: difficultyNodes })
         )
       ]);
