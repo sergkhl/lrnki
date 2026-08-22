@@ -59,14 +59,9 @@ pnpm dev:learner:local  # web on :8881, pointed at it (--clear: Metro inlines an
 ```
 
 One-time setup: register `http://localhost:8787/auth/callback/google` as an authorized redirect URI
-on the Google client — Google exempts `localhost` from its https-only rule. `pnpm dev:api` is
-`docker compose watch` over `docker-compose.dev.yml`, whose entire content is a loopback publish of
-the port that container already serves: the base file gives `learner-api` no host port, because on
-the VPS only Caddy reaches it
-([ADR-0040](docs/adr/0040-serve-public-api-only-from-the-deployed-container.md)). Edits under
-`apps/learner-api/src` and `packages/` sync into the running container and restart it; a
-`pnpm-lock.yaml` change rebuilds the image. It runs attached — if it is not on screen it is not
-syncing.
+on the Google client — Google exempts `localhost` from its https-only rule. The first API run needs
+`pnpm dev:api:rebuild`; subsequent runs use the fast command above. See the canonical
+[API dev loop](#api-dev-loop) for rebuild and live-reload behavior.
 
 **An ambient `NODE_ENV` in your shell breaks `pnpm build`.** Next.js reads it directly, so a value
 exported by a shell profile or left over from an earlier command sends the Admin Lab build down a
@@ -181,33 +176,42 @@ supervisors and **publishes no port** — reach it from inside:
 docker exec lrnki-learner-api node -e '…fetch("http://127.0.0.1:8787"…)'
 ```
 
-**API dev loop** — the public hostname has exactly one upstream, the `learner-api` container
-([ADR-0040](docs/adr/0040-serve-public-api-only-from-the-deployed-container.md)). Edit on the host,
-run in the container:
+### API dev loop
+
+The public hostname has exactly one upstream, the `learner-api` container
+([ADR-0040](docs/adr/0040-serve-public-api-only-from-the-deployed-container.md)). Local development
+edits on the host and runs in that container through the loopback-only `docker-compose.dev.yml`
+overlay; it never starts a competing host API:
 
 ```bash
-docker compose watch learner-api      # foreground; syncs src/ and packages/ into the container
-docker compose logs -f learner-api    # the positive signal: one restart per edit
+pnpm dev:api:rebuild  # first setup or an offline lockfile/build-input change: build, start, watch
+pnpm dev:api          # normal loop: start the existing image without building, then watch
 ```
 
-A saved edit syncs and restarts the container in ~1–3s (a brief 502 during the restart is expected);
-a `pnpm-lock.yaml` change triggers a real image rebuild instead, since a dependency change cannot be
-satisfied by copying files. **Watch is foreground and attached** — if it is not on your screen it is
-not syncing, and it dies with its terminal or SSH session. Stop it before deploying;
-`scripts/deploy-learner-api.sh` refuses while one is attached, because a sync would overwrite the
-image it just deployed.
+`pnpm dev:api` deliberately fails instead of silently building when no existing image is available.
+At watcher startup, host files under `apps/learner-api/src` and `packages/` are synchronized into the
+container; a later saved edit syncs and restarts it in ~1–3s without changing the image (a brief 502
+during restart is expected). A `pnpm-lock.yaml` change made while watch is active triggers the real
+image rebuild it requires. If that file changed while watch was stopped, use
+`pnpm dev:api:rebuild` before resuming.
+
+Both commands start Compose services detached and leave only the file watcher in the foreground. If
+the watcher is not on screen, changes are not syncing; ending it leaves the detached API running.
+Stop it before deploying: `scripts/deploy-learner-api.sh` refuses while one is attached because a
+later sync would overwrite the image it just deployed.
 
 The Caddyfile is baked into the built caddy image rather than bind-mounted (reason in
 `scripts/docker/caddy/Dockerfile`), so a Caddy config change needs
 `docker compose up -d --build caddy`.
 
-**Every compose command here must be detached and must run from this checkout on the host.** A bare
-`docker compose up` is attached: it takes the whole stack down when its terminal or SSH session
-ends, which is how the shared environment went dark on 2026-08-05. Running compose from an agent
-container that binds the workspace at a different prefix is the other half of the same rule — the
-file binds set `create_host_path: false` and refuse such a caller by name, but `watch` and `down`
-are not protected ([ADR-0040](docs/adr/0040-serve-public-api-only-from-the-deployed-container.md),
-`AGENTS.md` rule 23).
+**Every compose lifecycle command for the shared environment must be detached and must run from this
+checkout on its host.** The local watcher above is only a foreground observer after its detached
+start; do not attach it on the shared host. A bare `docker compose up` is attached: it takes the
+whole stack down when its terminal or SSH session ends, which is how the shared environment went
+dark on 2026-08-05. Running compose from an agent container that binds the workspace at a different
+prefix is the other half of the same rule — the file binds set `create_host_path: false` and refuse
+such a caller by name, but `watch` and `down` are not protected
+([ADR-0040](docs/adr/0040-serve-public-api-only-from-the-deployed-container.md), `AGENTS.md` rule 23).
 
 **API deploy** — from the repo checkout on the VPS (drives the local Docker daemon):
 

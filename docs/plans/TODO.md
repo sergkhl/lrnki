@@ -67,50 +67,27 @@
 
 ## VALIDATION
 
-### DeepSeek Provider Route cutover attempt and rollback — 2026-08-22
+### Learner API fast development loop — 2026-08-22
 
-- Source identity: Model Assignment policy/refactor commit
-  `600f5ac247f244d457bf4325dd7ed95c1d085325` is retained. Tested routing commit
-  `5377ef2b0769c6f63f4ec172d006c65b9c01b0f9` reached `origin/main`, then normal revert
-  `c05e2faeac63603f7d565bc0895014bb45aa3cb4` became the verified remote tip. The failed cutover
-  replaced container `6bd6bb853e760948255cbe95531bbcda8b74546da21e315122cc402828f95a8b` with healthy
-  `95be36021184a2716f1f229d29925ba7cf9604f6ae0a37205273c39051ef5233`; rollback replaced it with
-  healthy `303fd6253ea249753278707dc1a84c5274a609c69b103d8f2aa73ff8818d6d32`.
-- Local automated evidence: the LiteLLM package typecheck and all 176 tests passed, including
-  assignment/route separation, fail-closed quantization, exact operation hashes, and the proposed
-  real config. Root `pnpm check` passed schema drift, workspace typechecks/tests, lint with no errors,
-  both production builds, and 70 intercepted-web Playwright cases. Focused restored-config tests and
-  `git diff --check` passed before the revert push.
-- Direct provider contract: the fresh OpenRouter registry reported exact `baidu/fp8` and
-  `deepinfra/fp8` endpoints with FP8, tools, forced tool choice, structured outputs, and the planned
-  limits/prices. All six exact-provider calls—Claim Verification Answering, Claim Factuality
-  Judgment, and Answer-Key Verification on each provider—returned HTTP 200 from the requested
-  provider and passed the production schema validator. Detailed artifacts remained gitignored.
-- Cutover evidence: the new container loaded only
-  `openrouter/deepseek/deepseek-v4-flash-0731` and
-  `openrouter/deepseek/deepseek-v4-flash-0731-deepinfra-backup`; LiteLLM liveliness and the public
-  learner API stayed healthy. The actual production client then passed Answer-Key Verification on
-  `kg-independent-judge`, Claim Verification Answering on `kg-claim-verification-answerer`, and a
-  direct backup Claim Factuality Judgment, but `kg-claim-factuality-judge` ended in a terminal
-  120-second timeout. An earlier one-shot harness attempt was excluded because its duplicate-call
-  and retry semantics did not match the production client.
-- SpendLogs positive control: tag prefix `deepseek-provider-cutover-1787380371361` matched three of
-  24,876 rows. Both successful production-alias rows recorded base model
-  `openrouter/deepseek/deepseek-v4-flash-0731` and provider `Baidu`; the direct backup row recorded
-  the same base model and `DeepInfra`; zero persisted tagged rows had an unexpected provider. The
-  timed-out factuality request produced no persisted row, so the required four-row gate did not pass.
-- Rollback evidence: the final container again loads the previous base, `-claim`, and
-  `-claim-deepinfra-backup` groups, with the attempted shared backup absent. LiteLLM and learner API
-  health are green. The parser confirms restored BaseTen/Parasail and Parasail→DeepInfra Provider
-  Routes and that all three consumers still resolve to one Model Assignment: DeepSeek V4 Flash 0731,
-  FP8, reasoning disabled, chat mode, and the same input limit.
-- Quality policy: prior consumer quality evidence remains qualified because the Model Assignment did
-  not change and the failed Provider Route was rolled back. Automatic Baidu→DeepInfra failover was
-  structurally validated in source but not induced, and that topology is not live after rollback.
-- Real-use quality evaluation: real model calls were contract smokes, not a curated-source semantic
-  requalification. Result: `BLOCKED` for the requested cutover because one mandatory alias smoke
-  timed out; no new usefulness claim was made. Safe to continue on the restored route: yes. Safe to
-  retry or ship the requested Baidu route without a fresh successful cutover: no.
-- Evidence boundary: deployed LiteLLM availability, provider contract, route attribution, and
-  rollback evidence only; not a browser journey, full deployed application path, new semantic
-  quality evaluation, native run, or physical-device result.
+- Source identity: the plan-less workflow change was validated from the working tree based on commit
+  `dff3b2d9bd1f21b9764e7aabe98e06c87dac8cef`; its fresh learner API image is
+  `sha256:9783fea6a8d0489cd71535a80ef8cf5cb33ab2e42d250d3a9e01a6fbdec2c6a7`.
+- Static and build evidence: the merged base/development Compose configuration parsed quietly, both
+  root command entries resolved, and `pnpm dev:api:rebuild` built the learner API and migrator before
+  starting the healthy loopback API. The build context was 127.97 kB. The fresh image contains the
+  tracked `.env.example` but no `/app/.env`; required runtime variable names were present through
+  Compose injection without printing their values, and `http://127.0.0.1:8787/health` returned
+  `{"ok":true}`.
+- Fast-start evidence: after stopping only the foreground watcher, `pnpm dev:api` ran the detached
+  `--no-build` startup and reached `Watch enabled` without a BuildKit phase. It retained the exact
+  image above and the healthy existing learner API container.
+- Live-reload evidence: a disposable source probe created while watch was off appeared in the
+  container through `initial_sync`. Changing it while watch was active produced one sync and one
+  learner API restart; removing it produced the same. The container start timestamp advanced for
+  both saves, its image ID never changed, and `/health` recovered after each restart.
+- Cleanup: the probe is absent from host and container, the validation watcher is stopped, and the
+  detached learner API remains healthy. Existing historical images and builder cache were not
+  pruned; this result proves only that the newly built image excludes the local environment file.
+- Evidence boundary: local command/configuration, exact-image contents, loopback reachability,
+  initial synchronization, and restart-on-edit only; not deployed behavior, a browser or native
+  journey, real-use quality, production credential exposure analysis, or physical-device evidence.

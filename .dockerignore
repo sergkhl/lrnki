@@ -1,5 +1,10 @@
 # Keep the learner-api build context small and force a clean in-image install.
 # node_modules is reinstalled from the frozen lockfile; the rest is never needed at runtime.
+# Runtime configuration is injected by Compose. Never bake local credentials into an image; retain
+# only the tracked setup template in the build context.
+.env
+.env.*
+!.env.example
 node_modules
 **/node_modules
 tmp

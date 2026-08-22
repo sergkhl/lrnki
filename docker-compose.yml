@@ -120,9 +120,10 @@ services:
   # lrnki network. The relocated topic-generation supervisor runs inside this long-lived process,
   # so these LiteLLM credentials are also its production generation credentials.
   #
-  # This container is the ONLY process that serves the public API (ADR-0040). The dev loop syncs
-  # into it — `docker compose watch learner-api` — rather than shadowing it with a second host
-  # runtime, so there is exactly one thing that can answer on 8787 and one source of its env.
+  # This container is the ONLY process that serves the public API (ADR-0040). The dev loop starts
+  # or reuses it detached, then attaches `docker compose watch --no-up learner-api` rather than
+  # shadowing it with a second host runtime, so there is exactly one thing that can answer on 8787
+  # and one source of its env.
   learner-api:
     build:
       context: .
@@ -157,19 +158,22 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
-    # Edit-on-host / run-in-container dev loop: `docker compose watch learner-api`. WORKDIR /app +
-    # `COPY . .` map the repo root to /app, so these targets are exact and the in-image workspace
-    # symlinks stay valid under a plain file sync. The CMD runs tsx on the TypeScript source, so a
-    # sync needs no build step — only a process restart. A lockfile change is the one case a sync
-    # cannot serve: it needs a real in-image install, hence `rebuild`.
+    # Edit-on-host / run-in-container dev loop: `pnpm dev:api` starts the existing image without a
+    # build and attaches Compose Watch with `--no-up`. WORKDIR /app + `COPY . .` map the repo root
+    # to /app, so these targets are exact and the in-image workspace symlinks stay valid under a
+    # plain file sync. Initial sync catches edits made while no watcher was attached; later source
+    # edits sync and restart without a build. A lockfile change is the one case a sync cannot serve:
+    # it needs a real in-image install, hence `rebuild` or the explicit `pnpm dev:api:rebuild`.
     develop:
       watch:
         - action: sync+restart
           path: ./apps/learner-api/src
           target: /app/apps/learner-api/src
+          initial_sync: true
         - action: sync+restart
           path: ./packages
           target: /app/packages
+          initial_sync: true
           ignore:
             - "**/node_modules/"
         - action: rebuild

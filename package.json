@@ -10,7 +10,8 @@
   },
   "scripts": {
     "dev:admin": "pnpm --filter @lrnki/admin-lab dev",
-    "dev:api": "docker compose -f docker-compose.yml -f docker-compose.dev.yml watch learner-api",
+    "dev:api": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --no-build learner-api && docker compose -f docker-compose.yml -f docker-compose.dev.yml watch --no-up learner-api",
+    "dev:api:rebuild": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build learner-api && docker compose -f docker-compose.yml -f docker-compose.dev.yml watch --no-up learner-api",
     "dev:learner": "pnpm --filter @lrnki/learner-app dev",
     "dev:learner:local": "scripts/dev-learner-app.sh web",
     "dev:android": "scripts/dev-learner-app.sh android",
