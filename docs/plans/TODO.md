@@ -10,10 +10,10 @@
   interview, one decision at a time, starting with change scope; judge ownership is required only if
   grounding generation moves.
 
-- **DeepSeek Baidu Provider Route cutover — rolled back; diagnose before retry.** The attempted
-  Baidu-primary/shared-DeepInfra route was reverted after `kg-claim-factuality-judge` timed out in
-  the production-client smoke. Keep the restored route live until a fresh bounded cutover again
-  passes every alias smoke and exact SpendLogs attribution gate.
+- **DeepSeek Baidu Provider Route cutover — rolled back; diagnose the live primary failure before
+  retry.** Exact direct-provider probes pass, but the deployed LiteLLM route attributed all three
+  production aliases to the DeepInfra backup instead of Baidu. Keep the restored route live until
+  the Baidu primary succeeds through LiteLLM and every alias passes exact SpendLogs attribution.
 
 ## COMPLETED
 
@@ -67,50 +67,57 @@
 
 ## VALIDATION
 
-### DeepSeek Provider Route cutover attempt and rollback — 2026-08-22
+### DeepSeek Provider Route restoration retry and rollback — 2026-08-23
 
-- Source identity: Model Assignment policy/refactor commit
-  `600f5ac247f244d457bf4325dd7ed95c1d085325` is retained. Tested routing commit
-  `5377ef2b0769c6f63f4ec172d006c65b9c01b0f9` reached `origin/main`, then normal revert
-  `c05e2faeac63603f7d565bc0895014bb45aa3cb4` became the verified remote tip. The failed cutover
-  replaced container `6bd6bb853e760948255cbe95531bbcda8b74546da21e315122cc402828f95a8b` with healthy
-  `95be36021184a2716f1f229d29925ba7cf9604f6ae0a37205273c39051ef5233`; rollback replaced it with
-  healthy `303fd6253ea249753278707dc1a84c5274a609c69b103d8f2aa73ff8818d6d32`.
-- Local automated evidence: the LiteLLM package typecheck and all 176 tests passed, including
-  assignment/route separation, fail-closed quantization, exact operation hashes, and the proposed
-  real config. Root `pnpm check` passed schema drift, workspace typechecks/tests, lint with no errors,
-  both production builds, and 70 intercepted-web Playwright cases. Focused restored-config tests and
-  `git diff --check` passed before the revert push.
-- Direct provider contract: the fresh OpenRouter registry reported exact `baidu/fp8` and
-  `deepinfra/fp8` endpoints with FP8, tools, forced tool choice, structured outputs, and the planned
-  limits/prices. All six exact-provider calls—Claim Verification Answering, Claim Factuality
-  Judgment, and Answer-Key Verification on each provider—returned HTTP 200 from the requested
-  provider and passed the production schema validator. Detailed artifacts remained gitignored.
-- Cutover evidence: the new container loaded only
-  `openrouter/deepseek/deepseek-v4-flash-0731` and
-  `openrouter/deepseek/deepseek-v4-flash-0731-deepinfra-backup`; LiteLLM liveliness and the public
-  learner API stayed healthy. The actual production client then passed Answer-Key Verification on
-  `kg-independent-judge`, Claim Verification Answering on `kg-claim-verification-answerer`, and a
-  direct backup Claim Factuality Judgment, but `kg-claim-factuality-judge` ended in a terminal
-  120-second timeout. An earlier one-shot harness attempt was excluded because its duplicate-call
-  and retry semantics did not match the production client.
-- SpendLogs positive control: tag prefix `deepseek-provider-cutover-1787380371361` matched three of
-  24,876 rows. Both successful production-alias rows recorded base model
-  `openrouter/deepseek/deepseek-v4-flash-0731` and provider `Baidu`; the direct backup row recorded
-  the same base model and `DeepInfra`; zero persisted tagged rows had an unexpected provider. The
-  timed-out factuality request produced no persisted row, so the required four-row gate did not pass.
-- Rollback evidence: the final container again loads the previous base, `-claim`, and
-  `-claim-deepinfra-backup` groups, with the attempted shared backup absent. LiteLLM and learner API
-  health are green. The parser confirms restored BaseTen/Parasail and Parasail→DeepInfra Provider
-  Routes and that all three consumers still resolve to one Model Assignment: DeepSeek V4 Flash 0731,
-  FP8, reasoning disabled, chat mode, and the same input limit.
-- Quality policy: prior consumer quality evidence remains qualified because the Model Assignment did
-  not change and the failed Provider Route was rolled back. Automatic Baidu→DeepInfra failover was
-  structurally validated in source but not induced, and that topology is not live after rollback.
-- Real-use quality evaluation: real model calls were contract smokes, not a curated-source semantic
-  requalification. Result: `BLOCKED` for the requested cutover because one mandatory alias smoke
-  timed out; no new usefulness claim was made. Safe to continue on the restored route: yes. Safe to
-  retry or ship the requested Baidu route without a fresh successful cutover: no.
-- Evidence boundary: deployed LiteLLM availability, provider contract, route attribution, and
-  rollback evidence only; not a browser journey, full deployed application path, new semantic
-  quality evaluation, native run, or physical-device result.
+- Source identity: bounded candidate `4f8f3838a0e034d5e8c8b84e3e03aad6153a028a` restored the
+  Baidu-primary/shared-DeepInfra route without the six unpublished local commits. Normal revert
+  `a4e20725506fc038a4604c6f19ee9a8580d4b228` is the verified `origin/main` and VPS tip.
+- Local automated evidence: the candidate LiteLLM typecheck and all 176 tests passed, including one
+  shared Model Assignment, exact route topology, fail-closed quantization, and mechanically derived
+  operation hashes. Root `pnpm check` passed schema parity, all workspace checks, lint with zero
+  errors, both production builds, and 70 intercepted-web cases. `git diff --check` passed. The
+  restored config then passed its typecheck and all 175 LiteLLM tests before the revert was pushed.
+- Direct provider preflight: at 2026-08-23 00:39 Bishkek, all six Baidu/DeepInfra × Answer-Key
+  Verification, Claim Verification Answering, and Claim Factuality Judgment calls returned HTTP 200
+  from the exact requested provider and base model, emitted one forced call, and passed the
+  production validator. The matrix completed in about 26 seconds; sanitized artifacts remain
+  gitignored.
+- Candidate deployment: healthy container
+  `a895052f1241d5ca1f8dd489c422ea6476d80dbe10e86ac9b035ba1dd9293ec5` loaded exactly the shared
+  primary and shared DeepInfra backup groups. The public learner API remained healthy.
+- Production-client smoke: over a bounded tunnel, the real deterministic client used temperature
+  0, seed 7, and the normal 600-second timeout. Tag prefix
+  `deepseek-provider-restore-1787424337621` produced four schema-valid results in 16.276 seconds:
+  all three aliases plus the direct DeepInfra backup. A local-key `/models` 401 was excluded before
+  any completion request; the repaired harness used the VPS virtual key in-process without printing
+  or persisting it.
+- SpendLogs positive control: exactly four of 78,126 rows matched the prefix; every row was
+  `success`, used base model `openrouter/deepseek/deepseek-v4-flash-0731`, and recorded zero
+  attempted retries. All three alias rows nevertheless resolved to model group
+  `openrouter/deepseek/deepseek-v4-flash-0731-deepinfra-backup` and provider `DeepInfra`; the
+  direct-backup row did the same. The required three Baidu rows were therefore absent, so the
+  acceptance gate failed without a client retry.
+- Rollback evidence: healthy container
+  `1c14e5ab8e0a0ee40629d9b416021836c735d7b60aeef3be9a4c13838ef9da30` again loads only the base,
+  `-claim`, and `-claim-deepinfra-backup` groups. The parser confirms the independent
+  BaseTen/Parasail route and both claim aliases' Parasail→DeepInfra route. LiteLLM and the public
+  learner API are healthy, and the VPS checkout is clean at the revert.
+- Quality policy: prior consumer quality evidence remains qualified because every attempted and
+  restored route kept the same DeepSeek V4 Flash 0731 FP8 Model Assignment with reasoning disabled,
+  and the failed Provider Route is no longer live.
+
+#### Real-use quality evaluation
+
+- Milestone: Baidu-primary/shared-DeepInfra Provider Route restoration retry.
+- Fixture and source type: production-contract sentinels; no curated learner source.
+- Real model calls used: yes.
+- Result: `FIX_FIRST`.
+- Useful output observed: all four contracts returned schema-valid forced-tool arguments.
+- Defects observed: every production alias used the fallback instead of the required Baidu primary.
+- Changes made after inspection: reverted the candidate and recreated only LiteLLM.
+- Remaining caveats: direct Baidu works, but its deployed LiteLLM primary path remains unexplained.
+- Safe to continue downstream: yes on the restored route; no on the candidate route.
+
+- Evidence boundary: source contracts, direct OpenRouter provider compatibility, deployed LiteLLM
+  inventory/health, production-client contract validity, SpendLogs attribution, and rollback only;
+  not a new curated-source usefulness gate, learner journey, native run, or physical-device result.
