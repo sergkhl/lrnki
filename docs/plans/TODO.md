@@ -4,13 +4,13 @@
 
 ## TODO
 
-- **Topic Expedition generation latency — in progress; U3 is `FIX_FIRST`.** Follow
+- **Topic Expedition generation latency — blocked; U3 remains `FIX_FIRST`.** Follow
   [the active plan](./2026-08-22-001-repair-topic-expedition-generation-latency.md) in U0–U4 order.
   The bounded admission pipeline and honest 19-stage Journal profile are complete, but equal widths
   8, 12, and 16 all exceeded seven minutes during enrichment and every settled attempt rejected
-  over-broad Grounding Bundles. Keep width four and U4 gated until one semantically successful
-  single run passes without changing policy, Model Assignments, Provider Routes, supervisor width,
-  or readiness semantics.
+  over-broad Grounding Bundles. Production-model prompt/schema and pre-draft trials did not clear
+  the unchanged admission contract and were discarded. Keep width four and U4 gated pending the
+  owner-gated Grounding Generation scope decision in [BLOCKERS](./BLOCKERS.md).
 
 - **Generation model evaluation — shaping; no implementation plan is ready.** The
   [brainstorm](../brainstorms/2026-08-08-002-generation-model-evaluation.md) owns the dated evidence,

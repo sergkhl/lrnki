@@ -7,7 +7,7 @@ execution: code
 
 # Restore Topic Expedition Generation to Seven Minutes
 
-**Status:** In progress — U0–U2 complete; U3 closed `FIX_FIRST`; U4 gated
+**Status:** Blocked — U0–U2 complete; U3 remains `FIX_FIRST`; U4 gated
 
 **Decision state:** Locked. The accepted problem framing and stage-profile deletion test remain in
 [Candidate 2 of the architecture-deepening brainstorm](../brainstorms/2026-08-19-001-architecture-deepening-review.md#candidate-2--give-topic-expedition-generation-one-application-owned-stage-profile).
@@ -383,7 +383,7 @@ seven-minute threshold does not apply to this contention soak.
   evidence only. It is not live provider, latency, persisted-artifact quality, DB-backed reporter,
   deployed, browser, native, or physical-device evidence.
 
-### U3 — Equal-width calibration — closed `FIX_FIRST`; no default frozen
+### U3 — Equal-width calibration and remediation investigation — closed `FIX_FIRST`; no default frozen
 
 - Topology/source: the trials used the product source at `b649d06` with only the current trial's
   execution-only default changed, through a loopback-only composition of the production learner
@@ -432,6 +432,22 @@ seven-minute threshold does not apply to this contention soak.
   restored to the last transport-safe width four. No model, route, prompt, sample, admission,
   supervisor, retry, or readiness policy was changed. U4's two-run soak and final consolidation are
   gated until a future in-scope fix yields one qualifying single-run pass.
+- Problem research: the recurring defect is coupled decontextualization and non-atomic factual-scope
+  overgeneralization. Established work makes claims independently interpretable through
+  [decontextualization](https://aclanthology.org/2021.tacl-1.27/) and evaluates long-form output as
+  [atomic facts](https://aclanthology.org/2023.emnlp-main.741/); the corresponding direction is
+  explicit material qualifiers plus atomic claims, while preserving independent verification.
+- Experimental quality gate: local production-model preflights tried explicit scope audits,
+  definition decomposition, and evidence-first analyst/answerer drafts without changing the model,
+  route, admission judges, or quorum. In the final unchanged-admission panel
+  `6bcd45fd-614d-4bf3-be1e-dd375942a864`, only Pyruvate and the Citric Acid Cycle passed; Cellular
+  Respiration and Chemiosmosis remained over-broad, Net ATP Yield was narrowed to glucose despite
+  its label, and Buffer inherited pointer/length/capacity metadata. A concept-identity preflight
+  `fcfd7d29-17e4-42fc-857c-033fcff9c834` removed presentation headings and aliases but still paired
+  independently teachable NAD+ and FAD. Automated schema/type suites cannot upgrade either result.
+- Source decision: every experimental prompt, schema, adapter, and test change was discarded. The
+  tracked implementation, exact operation identities, width-four default, one-draft rule, judges,
+  quorum, Model Assignments, and Provider Routes remain unchanged; no remediation is qualified.
 - Cleanup/evidence boundary: the reserved learners and isolated database were retained only long
   enough to consolidate the ignored diagnostic report; they are not canonical documentation.
   Evidence is local API-supervisor + development Postgres + real production-model route only, not
@@ -440,12 +456,14 @@ seven-minute threshold does not apply to this contention soak.
 
 ### Open findings
 
-- U3 is closed `FIX_FIRST`; U4 remains gated because no execution width is frozen. Do not run the
+- U3 remains `FIX_FIRST`; U4 is gated because no execution width is frozen. Do not run the
   contention soak or consolidate this plan as completed without a qualifying single-run pass.
-- The repeated real-use defect is generated Grounding Bundles whose unqualified definitions are
-  broader or narrower than the named biological category. Before changing that behavior, name and
-  research the established grounding/scope-control problem class under AGENTS.md rule 21; do not
-  hide it with a weaker judge, lower quorum, model swap, lexical veto, or regenerated draft.
+- The problem class is now researched, but the conventional repair changes Grounding Generation,
+  which this locked plan excludes, and the bounded prompt/schema and pre-draft trials did not clear
+  the current admission contract. The concrete next action is the owner-gated change-scope decision
+  recorded in [BLOCKERS.md](./BLOCKERS.md), followed by a ready plan; do not retry the rejected
+  variants or hide the defect with a weaker judge, lower quorum, model swap, lexical veto, or
+  regenerated draft.
 - A future passing run must provide both the successful end-to-end latency baseline and direct
   persisted-artifact inspection this calibration could not produce. Failed enrichment durations
   are lower bounds and quality evidence, never atomic-readiness claims.

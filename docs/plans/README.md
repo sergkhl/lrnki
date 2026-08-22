@@ -12,9 +12,10 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-22-001 — Restore Topic Expedition Generation to Seven Minutes](./2026-08-22-001-repair-topic-expedition-generation-latency.md)
-   — **In progress; U3 is `FIX_FIRST`.** The bounded pipeline and shared stage profile are complete,
-   but widths 8, 12, and 16 all missed the latency/quality contract; U4 is gated pending a
-   qualifying single-run fix.
+   — **Blocked in U3 (`FIX_FIRST`).** The bounded pipeline and shared stage profile are complete,
+   but widths 8, 12, and 16 missed the latency/quality contract and production-model remediation
+   trials failed. U4 is gated; the next move requires the owner-gated Grounding Generation scope
+   decision in [BLOCKERS](./BLOCKERS.md).
 
 Shaping, not yet a plan:
 [2026-08-08-002 — Generation model evaluation](../brainstorms/2026-08-08-002-generation-model-evaluation.md)
