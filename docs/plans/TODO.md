@@ -71,7 +71,8 @@
 
 - Source identity: bounded candidate `4f8f3838a0e034d5e8c8b84e3e03aad6153a028a` restored the
   Baidu-primary/shared-DeepInfra route without the six unpublished local commits. Normal revert
-  `a4e20725506fc038a4604c6f19ee9a8580d4b228` is the verified `origin/main` and VPS tip.
+  `a4e20725506fc038a4604c6f19ee9a8580d4b228` is the verified rollback revision in both
+  `origin/main` and the VPS checkout history.
 - Local automated evidence: the candidate LiteLLM typecheck and all 176 tests passed, including one
   shared Model Assignment, exact route topology, fail-closed quantization, and mechanically derived
   operation hashes. Root `pnpm check` passed schema parity, all workspace checks, lint with zero
