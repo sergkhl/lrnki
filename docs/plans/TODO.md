@@ -4,6 +4,12 @@
 
 ## TODO
 
+- **Topic Expedition generation latency — ready; diagnostic baseline complete.** Follow
+  [the active plan](./2026-08-22-001-repair-topic-expedition-generation-latency.md) in U0–U4 order.
+  Restore one otherwise-idle, semantically successful 15–16-concept Cellular Respiration expedition
+  to atomic readiness within seven minutes without changing semantic policy, Model Assignments,
+  Provider Routes, supervisor width, or readiness semantics.
+
 - **Generation model evaluation — shaping; no implementation plan is ready.** The
   [brainstorm](../brainstorms/2026-08-08-002-generation-model-evaluation.md) owns the dated evidence,
   candidate options, carried generation changes, and open decisions. Resume with a planning

@@ -33,7 +33,8 @@ Historical architecture reviews were checked only to avoid proposing work that h
 
 ## Candidate 2 — Give Topic Expedition generation one application-owned stage profile
 
-**Recommendation strength:** Strong
+**Recommendation strength:** Accepted — implementation tracked by the
+[Topic Expedition generation latency plan](../plans/2026-08-22-001-repair-topic-expedition-generation-latency.md)
 
 ### Files
 
