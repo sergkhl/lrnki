@@ -4,6 +4,7 @@ import { claimVerificationAnsweringDescriptor } from "./groundingGenerationAdapt
 import {
   modelAssignmentIdentity,
   modelRoutingBehaviorIdentity,
+  readLitellmProxyConfig,
   type LitellmDeployment,
   type LitellmProxyConfig
 } from "./litellmProxyConfig";
@@ -167,4 +168,62 @@ test("exact operation identity still follows provider, fallback, and router beha
   const missingDeployment = config();
   missingDeployment.modelGroupAlias[ROLE] = "missing-model";
   assert.throws(() => hash(missingDeployment), /has no declared deployment/);
+});
+
+test("the three configured DeepSeek consumers share one assignment and exact Baidu to DeepInfra route", () => {
+  const proxy = readLitellmProxyConfig();
+  const aliases = [
+    "kg-independent-judge",
+    "kg-claim-verification-answerer",
+    "kg-claim-factuality-judge"
+  ];
+  const identities = aliases.map((alias) => modelAssignmentIdentity(alias, proxy));
+  assert.deepEqual(identities[1], identities[0]);
+  assert.deepEqual(identities[2], identities[0]);
+  assert.deepEqual(identities[0]?.assignments.map((assignment) => assignment.quantization), [{ value: "fp8" }]);
+  for (const alias of aliases) {
+    const route = modelRoutingBehaviorIdentity(alias, proxy);
+    assert.equal(route.primary.modelGroup, MODEL);
+    assert.deepEqual(route.fallbacks.map((fallback) => fallback.modelGroup), [
+      "openrouter/deepseek/deepseek-v4-flash-0731-deepinfra-backup"
+    ]);
+    assert.deepEqual(
+      route.primary.deployments[0]?.behavior,
+      {
+        litellmParams: {
+          model: MODEL,
+          extra_body: {
+            reasoning: { enabled: false },
+            provider: {
+              require_parameters: true,
+              quantizations: ["fp8"],
+              only: ["baidu/fp8"],
+              order: ["baidu/fp8"],
+              allow_fallbacks: false
+            }
+          }
+        },
+        modelInfo: { mode: "chat", max_input_tokens: 1048576 }
+      }
+    );
+    assert.deepEqual(
+      route.fallbacks[0]?.deployments[0]?.behavior,
+      {
+        litellmParams: {
+          model: MODEL,
+          extra_body: {
+            reasoning: { enabled: false },
+            provider: {
+              require_parameters: true,
+              quantizations: ["fp8"],
+              only: ["deepinfra/fp8"],
+              order: ["deepinfra/fp8"],
+              allow_fallbacks: false
+            }
+          }
+        },
+        modelInfo: { mode: "chat", max_input_tokens: 1048576 }
+      }
+    );
+  }
 });
