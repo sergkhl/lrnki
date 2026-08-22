@@ -181,81 +181,19 @@ model_list:
             - "google-vertex"
             - "google-ai-studio"
 
-  # THE production independent judge (kg-independent-judge, ADR-0007/0005). Replaced gpt-oss-120b on
-  # 2026-08-07: that deployment is Groq-pinned for forced tool_choice, and Groq's shared-account
-  # request rate is the busiest constraint in the pipeline — a sustained 429 stalls EVERY judge stage
-  # at once, including both neutral Answer-Key Verification brackets, and it failed 3 of 3
-  # topic-generation attempts. Cross-family independent of the MiMo synthesizer, so ADR-0007/0005's
-  # "the judge is never the extractor grading its own output" holds.
+  # Shared production DeepSeek V4 Flash 0731 primary for the independent judge and both claim roles.
+  # Cross-family independence from the MiMo synthesizer preserves ADR-0007/0005's rule that the
+  # judge is never the extractor grading its own output. Provider failover is deliberately outside
+  # OpenRouter: this group is DeepInfra-only, and every public request alias has an explicit LiteLLM
+  # fallback to the Parasail-only group below. Single-provider `only`/`order` pins plus
+  # `allow_fallbacks: false` keep each served provider attributable in LiteLLM SpendLogs.
+  # DeepInfra passed the complete production-client contract: temperature 0, seed 7, reasoning
+  # disabled, and a strict forced named tool. `require_parameters: true` therefore cannot silently
+  # discard a sampling or schema field. The sampling policy itself remains owned by neuralClients.ts.
   # `reasoning.enabled: false` is REQUIRED: with reasoning on, DeepSeek double-encodes nested
   # array-of-object tool arguments (the quirk cited in the MiMo comment below), and every judge
   # verdict schema is exactly that shape — an array of per-candidate verdict objects.
-  # Do NOT read the 2026-06-24 "deepseek-flash is disproven for whole-set ordering" note on
-  # kg-prerequisite-ordering as applying here: that measured a PREVIOUS flash generation, months
-  # before this model. It constrains the ordering alias, which still runs gpt-oss-120b, and says
-  # nothing about v4-flash-0731. Judge competence on THIS model is measured, not assumed — see the
-  # plan's U4 discrimination probes.
   - model_name: "openrouter/deepseek/deepseek-v4-flash-0731"
-    litellm_params:
-      model: "openrouter/deepseek/deepseek-v4-flash-0731"
-      api_key: os.environ/OPENROUTER_API_KEY
-      input_cost_per_token: 0.00000009
-      output_cost_per_token: 0.00000018
-      cache_read_input_token_cost: 0.000000018
-      extra_body:
-        reasoning:
-          enabled: false
-        provider:
-          # OpenRouter removed the previously qualified `deepseek/fp8` endpoint tag. On
-          # 2026-08-19 that stale lock failed every request with 404, after which LiteLLM's
-          # deployment cooldown surfaced retries as 429. Exact forced-named-tool probes over
-          # the nested verdict shape qualified BaseTen and Parasail at 200; Novita advertised
-          # tool_choice but returned 404 and remains excluded. `only` keeps fallback inside the
-          # same model and FP8 quantization, so model identity and verdict attribution do not drift.
-          require_parameters: true
-          only:
-            - "baseten/fp8"
-            - "parasail/fp8"
-          order:
-            - "baseten/fp8"
-            - "parasail/fp8"
-          allow_fallbacks: true
-    model_info:
-      mode: "chat"
-      max_input_tokens: 1048576
-
-  # Claim-admission answerer and primary factuality judge, deliberately separate from
-  # kg-independent-judge so this reassignment does not alter unrelated consumers. The pinned
-  # 0731 revision passed both exact forced-tool schemas and a 22-target, two-sample panel gate:
-  # all 12 unsafe claims were rejected and all 10 safe controls were accepted. Parasail FP8
-  # supplied all 58 answer/judge calls in the complete gate; reasoning stays disabled for the
-  # nested object-array contracts.
-  - model_name: "openrouter/deepseek/deepseek-v4-flash-0731-claim"
-    litellm_params:
-      model: "openrouter/deepseek/deepseek-v4-flash-0731"
-      api_key: os.environ/OPENROUTER_API_KEY
-      input_cost_per_token: 0.00000014
-      output_cost_per_token: 0.00000028
-      cache_read_input_token_cost: 0.00000007
-      extra_body:
-        reasoning:
-          enabled: false
-        provider:
-          require_parameters: true
-          only:
-            - "parasail/fp8"
-          order:
-            - "parasail/fp8"
-          allow_fallbacks: false
-    model_info:
-      mode: "chat"
-      max_input_tokens: 1048576
-
-  # Same pinned claim model and forced-tool contract, isolated on DeepInfra FP8. The
-  # Parasail route returned one repeated 429 after 27 successful calls in an earlier matrix;
-  # this group is reached only through the two explicit claim-role fallbacks below. Direct
-  # production-schema probes rejected both known unsafe claims and accepted the control.
-  - model_name: "openrouter/deepseek/deepseek-v4-flash-0731-claim-deepinfra-backup"
     litellm_params:
       model: "openrouter/deepseek/deepseek-v4-flash-0731"
       api_key: os.environ/OPENROUTER_API_KEY
@@ -267,10 +205,38 @@ model_list:
           enabled: false
         provider:
           require_parameters: true
+          quantizations:
+            - "fp8"
           only:
             - "deepinfra/fp8"
           order:
             - "deepinfra/fp8"
+          allow_fallbacks: false
+    model_info:
+      mode: "chat"
+      max_input_tokens: 1048576
+
+  # Same Model Assignment and complete forced-tool contract, pinned to Parasail FP8 only. This
+  # group is reached directly for operational proof or through explicit LiteLLM alias fallbacks;
+  # OpenRouter never chooses it as an internal fallback for the DeepInfra primary.
+  - model_name: "openrouter/deepseek/deepseek-v4-flash-0731-parasail-backup"
+    litellm_params:
+      model: "openrouter/deepseek/deepseek-v4-flash-0731"
+      api_key: os.environ/OPENROUTER_API_KEY
+      input_cost_per_token: 0.00000014
+      output_cost_per_token: 0.00000028
+      cache_read_input_token_cost: 0.00000007
+      extra_body:
+        reasoning:
+          enabled: false
+        provider:
+          require_parameters: true
+          quantizations:
+            - "fp8"
+          only:
+            - "parasail/fp8"
+          order:
+            - "parasail/fp8"
           allow_fallbacks: false
     model_info:
       mode: "chat"
@@ -466,17 +432,16 @@ router_settings:
   cooldown_time: 15
   # Explicit cross-deployment fallbacks, keyed on the request aliases. The knowledge-boundary
   # probe retains its small cross-family Qwen backup. GPT-OSS roles move from DigitalOcean to
-  # same-model Groq only after an error; the two DeepSeek claim roles move from Parasail to
-  # same-model DeepInfra. Separate groups keep every provider route attributable.
+  # same-model Groq only after an error. All three DeepSeek roles move from DeepInfra to the
+  # shared same-assignment Parasail group. Separate groups keep every provider route attributable.
   fallbacks:
     - kg-knowledge-boundary-probe: ["openrouter/qwen/qwen3-30b-a3b-instruct-2507"]
     - kg-claim-verification-planner: ["openrouter/openai/gpt-oss-120b-groq-backup"]
-    - kg-claim-verification-answerer: ["openrouter/deepseek/deepseek-v4-flash-0731-claim-deepinfra-backup"]
-    - kg-claim-factuality-judge: ["openrouter/deepseek/deepseek-v4-flash-0731-claim-deepinfra-backup"]
+    - kg-independent-judge: ["openrouter/deepseek/deepseek-v4-flash-0731-parasail-backup"]
+    - kg-claim-verification-answerer: ["openrouter/deepseek/deepseek-v4-flash-0731-parasail-backup"]
+    - kg-claim-factuality-judge: ["openrouter/deepseek/deepseek-v4-flash-0731-parasail-backup"]
     - kg-claim-factuality-challenger: ["openrouter/openai/gpt-oss-120b-groq-backup"]
     - kg-prerequisite-ordering: ["openrouter/openai/gpt-oss-120b-groq-backup"]
-  # NOTE: kg-independent-judge has NO fallback on purpose — it is a single model now, so its verdicts
-  # stay attributable from the alias alone. See its model_group_alias comment below.
   # disable_cooldowns: true
   # default_litellm_params:
   #   temperature: 0.5
@@ -515,14 +480,14 @@ router_settings:
     # target text. Neither settles learner text. Two independently sampled evidence packets reach
     # the panel below, with a third complete packet only for an unreplicated objection.
     kg-claim-verification-planner: openrouter/openai/gpt-oss-120b
-    kg-claim-verification-answerer: openrouter/deepseek/deepseek-v4-flash-0731-claim
+    kg-claim-verification-answerer: openrouter/deepseek/deepseek-v4-flash-0731
     # Final Grounding Admission factuality panel. Separate aliases make both model assignments part
     # of the operation config identity without changing any other kg-independent-judge consumer.
-    # DeepSeek 0731 and its Parasail→DeepInfra provider qualification are owned above; the
+    # DeepSeek 0731 and its DeepInfra→Parasail Provider Route are owned above; the
     # challenger is provider-pinned GPT-OSS-120B. The families showed complementary blind spots,
     # so neither settles alone: a model vetoes only after independently repeating the same rejection
     # across separately planned and answered packets.
-    kg-claim-factuality-judge: openrouter/deepseek/deepseek-v4-flash-0731-claim
+    kg-claim-factuality-judge: openrouter/deepseek/deepseek-v4-flash-0731
     kg-claim-factuality-challenger: openrouter/openai/gpt-oss-120b
     # Learner generation helper: infer a Declared Domain from the learner's
     # topic inside source-less concept generation. Stays on the production
@@ -546,13 +511,12 @@ router_settings:
     # Verification. Grounding factuality is deliberately owned by the claim-specific alias above
     # after its separate U1 qualification. DeepSeek v4 flash is cross-family independent of
     # the MiMo extractor, so the judge is never the extractor grading its own output, and it is
-    # cheaper than the gpt-oss-120b it replaced ($0.09/$0.18 vs $0.15/$0.60 per Mtok).
-    # ONE judge model, deliberately, with NO deployment fallback: our operation_run_stages rows record
-    # only the alias, so a two-model judge mix cannot be attributed from our own records and every
-    # quality gate that ranges over judge verdicts (ADR-0013, ADR-0028) becomes unreadable. Moving off
-    # the Groq-pinned gpt-oss-120b also removes the shared-account request-rate ceiling that took out
-    # every judge stage at once on 2026-08-07. Provider qualification and the FP8-only lock are owned
-    # by the deployment above; never widen this alias to an unmeasured provider or quantization.
+    # cheaper than the gpt-oss-120b it replaced ($0.08/$0.18 vs $0.15/$0.60 per Mtok).
+    # ONE Model Assignment, deliberately: the provider-only fallback is attributable through
+    # LiteLLM SpendLogs and does not mix model revision, quantization, or inference behavior. Moving
+    # off the Groq-pinned gpt-oss-120b also removes the shared-account request-rate ceiling that took
+    # out every judge stage at once on 2026-08-07. Provider qualification and the FP8-only lock are
+    # owned by the deployments above; never widen this alias to an unmeasured provider or quantization.
     # (The off-core oracle triangle and label aligner were retired after the admission-precision fix;
     # see ADR-0013.)
     kg-independent-judge: openrouter/deepseek/deepseek-v4-flash-0731

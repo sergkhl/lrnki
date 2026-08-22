@@ -21,11 +21,13 @@ export type NeuralClients = {
   // across processes even at temperature 0 (MoE non-determinism), and the replayable
   // unit is the graph-version build, not the extraction run (ADR-0017).
   discoveryClient: LiteLlmForcedToolClient;
-  // Determinism lever applied where it is both effective and beneficial:
-  // admission is the precision gate and, GIVEN a fixed candidate set, greedy decoding
-  // collapses its core-set drift (probe: spread 3→1/4→0/1→0 across the three
-  // fixtures); claims are per-subject and benefit from stable text. Not bit-exact on
-  // DeepSeek's MoE, so a small residual remains.
+  // Low-temperature policy applied where the measured bundle was beneficial: admission
+  // is the precision gate and, GIVEN a fixed candidate set, temperature 0 plus seed 7
+  // collapsed its core-set drift (probe: spread 3→1/4→0/1→0 across the three fixtures);
+  // claims are per-subject and benefit from stable text. The experiment did not isolate
+  // seed's contribution from greedy decoding, and seed is only a best-effort sampling
+  // input—not a reproducibility guarantee. The Provider Route repair deliberately keeps
+  // this policy unchanged rather than reassign every deterministic-client consumer.
   deterministicClient: LiteLlmForcedToolClient;
   // Knowledge-boundary probe client (plan 2026-06-30-001, KTD4). MODERATE temperature —
   // NOT the deterministic 0 — so the K draws carry the sampling diversity that exposes a
