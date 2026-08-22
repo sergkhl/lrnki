@@ -248,13 +248,13 @@ function sourceLessGroundingAdmissionBehavior(
 ) {
   const {
     candidateConcurrency: _candidateConcurrency,
-    verificationConcurrency: _verificationConcurrency,
+    verificationExecution: _verificationExecution,
     probe,
     ...admissionBehavior
   } = sourceLessGroundingAdmission;
   const { probeConcurrency: _probeConcurrency, ...probeBehavior } = probe;
   void _candidateConcurrency;
-  void _verificationConcurrency;
+  void _verificationExecution;
   void _probeConcurrency;
   return {
     ...admissionBehavior,

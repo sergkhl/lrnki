@@ -7,7 +7,7 @@ execution: code
 
 # Restore Topic Expedition Generation to Seven Minutes
 
-**Status:** Ready — U0 baseline complete; U1 begins after the baseline/plan commit
+**Status:** In progress — U0–U1 complete; U2 next
 
 **Decision state:** Locked. The accepted problem framing and stage-profile deletion test remain in
 [Candidate 2 of the architecture-deepening brainstorm](../brainstorms/2026-08-19-001-architecture-deepening-review.md#candidate-2--give-topic-expedition-generation-one-application-owned-stage-profile).
@@ -312,8 +312,43 @@ seven-minute threshold does not apply to this contention soak.
   deployed, browser, native, physical-device, successful end-to-end latency, or implementation
   evidence. Generated diagnostics remain in gitignored `tmp/`.
 
+### U1 — Bounded verification pipeline — complete; local deterministic evidence
+
+- Interface/policy: `SourceLessGroundingAdmission.admitBatch` remains the sole caller interface.
+  The former shared `verificationConcurrency` is now the execution-only `verificationExecution`
+  object with independent planning, answering, and shared factuality-judgment widths. Defaults stay
+  equal at four in this unit; no model, prompt, sample, quorum, K value, HTTP type, persistence
+  shape, or retry behavior changed.
+- Scheduling/failure semantics: each packet now enters answering when its own plan resolves and
+  judgment when its own answer resolves. One limiter per role bounds queued starts; both judge
+  families share the factuality limiter. Each sample wave opens its three aggregate brackets before
+  releasing work, never overlaps the same stage across waves, and merges by candidate, sample,
+  original target, and judge index. The first failure aborts queued starts across all roles, drains
+  running calls, closes remaining brackets with the origin or an explicit upstream-abort carrier,
+  and rethrows the original error object without returning a partial result.
+- Deterministic contracts: interface-level tests force an answer to start while later plans remain
+  blocked and a judgment to start while later answers remain blocked; mechanically saturate the
+  independent `2/3/4` role caps; prove the combined judge peak is four; reverse planning, answering,
+  and judge completion order; and preserve candidate, target, sample, judge, passage-settlement,
+  initial/disagreement-sampling, replicated-rejection, target-isolation, and no-regeneration
+  behavior. Planner, answerer, and judge origin failures each stop with only two calls started under
+  a cap of two, remain pending until the second in-flight call drains, close all three brackets, and
+  escape by object identity with no result.
+- Hash/regression evidence: changing each execution width independently leaves Synthetic
+  Generation, Graph Enrichment, and Scaffold Generation identities unchanged; semantic admission
+  variants still perturb them. Exact defaults remain `synthetic-topic-generation-0b1ab66013e0`,
+  `graph-enrichment-dfb9ae848b85`, and `learner-scaffold-generation-7ab16c2fc80e`.
+  `@lrnki/application` typecheck and its full local suite passed; the focused admission plus scaffold
+  set passed; `@lrnki/infrastructure-litellm` typecheck, focused hash tests, and full local suite
+  passed; `git diff --check` passed.
+- Evidence boundary: this is local automated evidence for scheduling, failure, ordering, semantic
+  regression, types, and config identity only. It does not establish production-model quality,
+  provider capacity, end-to-end latency, Journal projection, or learner copy; U2 and U3 own those
+  gates.
+
 ### Open findings
 
-- U1–U4 remain unimplemented and unvalidated; begin U1 at the preserved deep interface.
+- U2–U4 remain unimplemented and unvalidated; next add the shared stage profile and derive the
+  Journal and learner copy from it.
 - A future passing run must supply the successful end-to-end baseline this semantic rejection could
   not provide; do not compare `2,286.023 s` to the acceptance threshold as if it produced `ready`.

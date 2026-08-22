@@ -25,7 +25,11 @@ const policy: SourceLessGroundingAdmissionPolicy = {
   groundingClaimProjection: "sentence_and_semicolon",
   judgmentTargetBatchSize: 1,
   candidateConcurrency: 2,
-  verificationConcurrency: 2
+  verificationExecution: {
+    questionPlanningConcurrency: 2,
+    answeringConcurrency: 2,
+    factualityJudgmentConcurrency: 2
+  }
 };
 
 function judgmentPanel(
@@ -170,11 +174,57 @@ function harness(options: HarnessOptions = {}) {
 
 function recordingStage() {
   const events: Array<{ stage: string; total: number | undefined }> = [];
+  const active = new Set<string>();
+  const overlappedStages = new Set<string>();
   const stage: StageBracket = async (name, fn, total) => {
     events.push({ stage: name, total });
-    return fn();
+    if (active.has(name)) overlappedStages.add(name);
+    active.add(name);
+    try {
+      return await fn();
+    } finally {
+      active.delete(name);
+    }
   };
-  return { stage, events };
+  return { stage, events, overlappedStages };
+}
+
+function testDeferred<T = void>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function lifecycleStage() {
+  type Event =
+    | { kind: "opened"; stage: string; total: number | undefined }
+    | { kind: "closed"; stage: string; ok: true }
+    | { kind: "closed"; stage: string; ok: false; error: unknown };
+  const events: Event[] = [];
+  const open = new Set<string>();
+  const stage: StageBracket = async (name, fn, total) => {
+    events.push({ kind: "opened", stage: name, total });
+    open.add(name);
+    try {
+      const result = await fn();
+      events.push({ kind: "closed", stage: name, ok: true });
+      return result;
+    } catch (error) {
+      events.push({ kind: "closed", stage: name, ok: false, error });
+      throw error;
+    } finally {
+      open.delete(name);
+    }
+  };
+  return { stage, events, open };
 }
 
 test("invalid policy is rejected during construction before any neural work", () => {
@@ -199,6 +249,18 @@ test("invalid policy is rejected during construction before any neural work", ()
   assert.throws(() => harness({
     policy: { ...policy, groundingClaimProjection: "unknown" as "sentence_and_semicolon" }
   }), /groundingClaimProjection must be sentence_and_semicolon/);
+  for (const field of [
+    "questionPlanningConcurrency",
+    "answeringConcurrency",
+    "factualityJudgmentConcurrency"
+  ] as const) {
+    assert.throws(() => harness({
+      policy: {
+        ...policy,
+        verificationExecution: { ...policy.verificationExecution, [field]: 0 }
+      }
+    }), new RegExp(`verificationExecution\\.${field} must be a positive integer`));
+  }
   assert.throws(() => harness({
     factualityJudgments: [{ model: "only-judge", async judge() { return []; } }] as never
   }), /exactly two initial factuality judgment models/);
@@ -292,6 +354,232 @@ test("every generated passage becomes a known target and answering receives no t
     ["definition:0:claim:0", "definition:1:claim:0", "mention:0:claim:0"],
     "every original passage is judged alone with only its own correlated answers"
   );
+});
+
+test("verification packets flow from planning through answering and judgment without whole-batch barriers", async () => {
+  const plannerRelease = testDeferred();
+  const answerRelease = testDeferred();
+  let planningStarted = 0;
+  let planningCompleted = 0;
+  let answeringStarted = 0;
+  let answeringCompleted = 0;
+  let judgmentStarted = 0;
+  let answerOverlappedPlanning = false;
+  let judgmentOverlappedAnswering = false;
+  let everyRoleBracketWasOpen = false;
+  const timeline = lifecycleStage();
+  const verificationStages: ReadonlySet<string> = new Set([
+    STAGE_TAGS.groundingVerificationQuestionPlanning,
+    STAGE_TAGS.groundingVerificationAnswering,
+    STAGE_TAGS.groundingFactualityRevision
+  ]);
+
+  const h = harness({
+    questionPlanning: {
+      model: "gated-planner",
+      async plan(input) {
+        const callIndex = planningStarted++;
+        try {
+          if (callIndex > 0) await plannerRelease.promise;
+          return input.targets.map((target) => ({
+            targetKey: target.targetKey,
+            question: `Independent question for ${target.targetKey}`
+          }));
+        } finally {
+          planningCompleted += 1;
+        }
+      }
+    },
+    answering: {
+      model: "gated-answerer",
+      async answer(input) {
+        const callIndex = answeringStarted++;
+        if (callIndex === 0) {
+          answerOverlappedPlanning = planningCompleted < 4;
+          everyRoleBracketWasOpen = [...verificationStages].every((stage) => timeline.open.has(stage));
+          plannerRelease.resolve();
+        }
+        try {
+          if (callIndex > 0) await answerRelease.promise;
+          return input.questions.map((question) => ({
+            questionKey: question.questionKey,
+            answer: `Independent answer for ${question.questionKey}`
+          }));
+        } finally {
+          answeringCompleted += 1;
+        }
+      }
+    },
+    factualityJudgments: judgmentPanel(async (input) => {
+      judgmentStarted += 1;
+      if (judgmentStarted === 1) {
+        judgmentOverlappedAnswering = answeringCompleted < 4;
+        answerRelease.resolve();
+      }
+      return input.targets.map((target) => ({
+        targetKey: target.targetKey,
+        disposition: "accepted" as const,
+        rationale: "established"
+      }));
+    })
+  });
+
+  const outcomes = await h.admission.forOperation(timeline.stage).admitBatch([
+    candidate("a", "Concept A"),
+    candidate("b", "Concept B")
+  ]);
+  assert.deepEqual(outcomes.map((outcome) => outcome.disposition), ["admitted", "admitted"]);
+  assert.equal(answerOverlappedPlanning, true, "an answered packet starts before the final plan resolves");
+  assert.equal(judgmentOverlappedAnswering, true, "a judgment starts before the final answer resolves");
+  assert.equal(everyRoleBracketWasOpen, true, "all three role brackets open before the first packet is released");
+});
+
+test("each verification role honors its own cap and both judge families share one judgment cap", async () => {
+  const saturationTracker = (cap: number) => {
+    const firstWave = testDeferred();
+    let entered = 0;
+    let active = 0;
+    let peak = 0;
+    return {
+      async run<T>(work: () => T | Promise<T>): Promise<T> {
+        entered += 1;
+        active += 1;
+        peak = Math.max(peak, active);
+        if (entered === cap) firstWave.resolve();
+        await firstWave.promise;
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        try {
+          return await work();
+        } finally {
+          active -= 1;
+        }
+      },
+      peak: () => peak
+    };
+  };
+  const planner = saturationTracker(2);
+  const answerer = saturationTracker(3);
+  const judges = saturationTracker(4);
+  const capPolicy: SourceLessGroundingAdmissionPolicy = {
+    ...policy,
+    verificationExecution: {
+      questionPlanningConcurrency: 2,
+      answeringConcurrency: 3,
+      factualityJudgmentConcurrency: 4
+    }
+  };
+  const h = harness({
+    policy: capPolicy,
+    questionPlanning: {
+      model: "tracked-planner",
+      plan: (input) => planner.run(() => input.targets.map((target) => ({
+        targetKey: target.targetKey,
+        question: `Question for ${target.targetKey}`
+      })))
+    },
+    answering: {
+      model: "tracked-answerer",
+      answer: (input) => answerer.run(() => input.questions.map((question) => ({
+        questionKey: question.questionKey,
+        answer: `Answer for ${question.questionKey}`
+      })))
+    },
+    factualityJudgments: [
+      {
+        model: "tracked-judge-a",
+        judge: (input) => judges.run(() => input.targets.map((target) => ({
+          targetKey: target.targetKey,
+          disposition: "accepted" as const,
+          rationale: "judge A acceptance"
+        })))
+      },
+      {
+        model: "tracked-judge-b",
+        judge: (input) => judges.run(() => input.targets.map((target) => ({
+          targetKey: target.targetKey,
+          disposition: "accepted" as const,
+          rationale: "judge B acceptance"
+        })))
+      }
+    ]
+  });
+
+  await h.admission.forOperation(async (_name, fn) => fn()).admitBatch([
+    candidate("a"),
+    candidate("b"),
+    candidate("c")
+  ]);
+  assert.equal(planner.peak(), 2);
+  assert.equal(answerer.peak(), 3);
+  assert.equal(judges.peak(), 4, "judge A and judge B use one combined limiter");
+});
+
+test("out-of-order packet completion cannot change candidate, target, sample, or judge ordering", async () => {
+  const judge = (family: "A" | "B"): ClaimFactualityJudgmentPort => ({
+    model: `ordering-judge-${family}`,
+    async judge(input) {
+      const questionKey = input.verificationAnswers[0]!.questionKey;
+      const sample = Number(/:verification:(\d+):/.exec(questionKey)![1]);
+      await delay(family === "A" ? (sample === 0 ? 12 : 1) : (sample === 0 ? 1 : 12));
+      return input.targets.map((target) => ({
+        targetKey: target.targetKey,
+        disposition: target.targetKey.startsWith("definition:") ? "rejected" as const : "accepted" as const,
+        rationale: `${family}${sample}:${target.targetKey}`
+      }));
+    }
+  });
+  const h = harness({
+    policy: {
+      ...policy,
+      verificationExecution: {
+        questionPlanningConcurrency: 4,
+        answeringConcurrency: 4,
+        factualityJudgmentConcurrency: 8
+      }
+    },
+    questionPlanning: {
+      model: "ordering-planner",
+      async plan(input) {
+        if (input.canonicalLabel === "Slow") await delay(8);
+        return [...input.targets].reverse().map((target) => ({
+          targetKey: target.targetKey,
+          question: `Question for ${target.targetKey}`
+        }));
+      }
+    },
+    answering: {
+      model: "ordering-answerer",
+      async answer(input) {
+        const sample = Number(/:verification:(\d+):/.exec(input.questions[0]!.questionKey)![1]);
+        await delay(sample === 0 ? 6 : 1);
+        return [...input.questions].reverse().map((question) => ({
+          questionKey: question.questionKey,
+          answer: `Answer for ${question.questionKey}`
+        }));
+      }
+    },
+    factualityJudgments: [judge("A"), judge("B")]
+  });
+
+  const outcomes = await h.admission.forOperation(async (_name, fn) => fn()).admitBatch([
+    candidate("slow", "Slow"),
+    candidate("fast", "Fast")
+  ]);
+  assert.deepEqual(outcomes.map((outcome) => outcome.candidateKey), ["slow", "fast"]);
+  assert.deepEqual(outcomes.map((outcome) => outcome.disposition), ["rejected", "rejected"]);
+  for (const outcome of outcomes) {
+    if (outcome.disposition !== "rejected") continue;
+    const orderedMarkers = [
+      "A0:definition:0:claim:0",
+      "A1:definition:0:claim:0",
+      "B0:definition:0:claim:0",
+      "B1:definition:0:claim:0",
+      "A0:definition:1:claim:0"
+    ];
+    const positions = orderedMarkers.map((marker) => outcome.rationale.indexOf(marker));
+    assert.ok(positions.every((position) => position >= 0));
+    assert.deepEqual([...positions].sort((left, right) => left - right), positions);
+  }
 });
 
 test("sentence and semicolon claims are judged alone while settlement keeps the original passage atomic", async () => {
@@ -437,7 +725,7 @@ test("bundle settlement can only drop rejected original passages in original ord
 
 test("a single rejection outlier receives one bounded disagreement sample but cannot veto without replication", async () => {
   let primaryMentionVerdict = 0;
-  const { stage, events } = recordingStage();
+  const { stage, events, overlappedStages } = recordingStage();
   const h = harness({
     factualityJudgments: [
       {
@@ -483,6 +771,7 @@ test("a single rejection outlier receives one bounded disagreement sample but ca
     { stage: STAGE_TAGS.groundingFactualityRevision, total: 12 },
     { stage: STAGE_TAGS.groundingFactualityRevision, total: 2 }
   ]);
+  assert.deepEqual([...overlappedStages], [], "a disagreement wave never overlaps an earlier bracket with the same stage name");
 });
 
 test("one judgment model repeating its rejection across independent samples vetoes the target", async () => {
@@ -627,6 +916,158 @@ test("judgment dependency failure rejects the whole batch without returning part
     returned = true;
   }, /judge unavailable/);
   assert.equal(returned, false);
+});
+
+test("planner, answerer, and judge failures stop queued work, drain in-flight calls, and preserve the origin", async (t) => {
+  const cases = [
+    {
+      role: "question_planning" as const,
+      stage: STAGE_TAGS.groundingVerificationQuestionPlanning,
+      maximumCalls: 6
+    },
+    {
+      role: "answering" as const,
+      stage: STAGE_TAGS.groundingVerificationAnswering,
+      maximumCalls: 6
+    },
+    {
+      role: "factuality_judgment" as const,
+      stage: STAGE_TAGS.groundingFactualityRevision,
+      maximumCalls: 36
+    }
+  ];
+
+  for (const scenario of cases) {
+    await t.test(scenario.role, async () => {
+      const origin = new Error(`${scenario.role} origin`);
+      const secondStarted = testDeferred();
+      const originObserved = testDeferred();
+      const releaseInFlight = testDeferred();
+      let targetCalls = 0;
+      let activeTargetCalls = 0;
+      let drained = false;
+      const failAndDrain = async <T>(produce: () => T | Promise<T>): Promise<T> => {
+        const callIndex = targetCalls++;
+        activeTargetCalls += 1;
+        try {
+          if (callIndex === 0) {
+            await secondStarted.promise;
+            originObserved.resolve();
+            throw origin;
+          }
+          if (callIndex === 1) {
+            secondStarted.resolve();
+            await releaseInFlight.promise;
+            return await produce();
+          }
+          throw new Error(`${scenario.role} queued work started after the origin failed`);
+        } finally {
+          activeTargetCalls -= 1;
+          if (activeTargetCalls === 0) drained = true;
+        }
+      };
+      const plan = async (input: Parameters<ClaimVerificationQuestionPlanningPort["plan"]>[0]) => {
+        const produce = () => input.targets.map((target) => ({
+          targetKey: target.targetKey,
+          question: `Question for ${target.targetKey}`
+        }));
+        return scenario.role === "question_planning" ? failAndDrain(produce) : produce();
+      };
+      const answer = async (input: Parameters<ClaimVerificationAnsweringPort["answer"]>[0]) => {
+        const produce = () => input.questions.map((question) => ({
+          questionKey: question.questionKey,
+          answer: `Answer for ${question.questionKey}`
+        }));
+        return scenario.role === "answering" ? failAndDrain(produce) : produce();
+      };
+      const judge = async (input: Parameters<ClaimFactualityJudgmentPort["judge"]>[0]) => {
+        const produce = () => input.targets.map((target) => ({
+          targetKey: target.targetKey,
+          disposition: "accepted" as const,
+          rationale: "established"
+        }));
+        return scenario.role === "factuality_judgment" ? failAndDrain(produce) : produce();
+      };
+      const timeline = lifecycleStage();
+      const h = harness({
+        policy: {
+          ...policy,
+          verificationExecution: {
+            questionPlanningConcurrency: 2,
+            answeringConcurrency: 2,
+            factualityJudgmentConcurrency: 2
+          }
+        },
+        questionPlanning: { model: "failure-planner", plan },
+        answering: { model: "failure-answerer", answer },
+        factualityJudgments: [
+          { model: "failure-judge-a", judge },
+          { model: "failure-judge-b", judge }
+        ]
+      });
+
+      let resultWasReturned = false;
+      let settled = false;
+      const admissionPromise = h.admission.forOperation(timeline.stage).admitBatch([
+        candidate("a"),
+        candidate("b"),
+        candidate("c")
+      ]).then((result) => {
+        resultWasReturned = true;
+        return result;
+      });
+      void admissionPromise.then(
+        () => { settled = true; },
+        () => { settled = true; }
+      );
+
+      await originObserved.promise;
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      assert.equal(settled, false, "the batch waits for already-running work to drain");
+      assert.equal(targetCalls, 2, "the role cap is full when the first call fails");
+      releaseInFlight.resolve();
+
+      let caught: unknown;
+      try {
+        await admissionPromise;
+      } catch (error) {
+        caught = error;
+      }
+      assert.equal(caught, origin, "the first dependency error escapes by identity");
+      assert.equal(resultWasReturned, false, "no partial admission result escapes");
+      assert.equal(drained, true);
+      assert.equal(activeTargetCalls, 0);
+      assert.equal(targetCalls, 2);
+      assert.ok(targetCalls < scenario.maximumCalls, "queued calls never start after abort");
+
+      const verificationStages: ReadonlySet<string> = new Set([
+        STAGE_TAGS.groundingVerificationQuestionPlanning,
+        STAGE_TAGS.groundingVerificationAnswering,
+        STAGE_TAGS.groundingFactualityRevision
+      ]);
+      const opened = timeline.events.filter((event) => event.kind === "opened" && verificationStages.has(event.stage));
+      const closed = timeline.events.filter((event) => event.kind === "closed" && verificationStages.has(event.stage));
+      assert.equal(opened.length, 3);
+      assert.equal(closed.length, 3, "every opened verification bracket closes");
+      const originClose = closed.find((event) => event.stage === scenario.stage);
+      assert.ok(originClose?.kind === "closed" && !originClose.ok);
+      assert.equal(originClose.error, origin);
+      for (const event of closed) {
+        if (event.kind !== "closed" || event.ok || event.stage === scenario.stage) continue;
+        assert.equal(
+          typeof event.error === "object"
+            && event.error !== null
+            && "stageErrorDetail" in event.error
+            && typeof event.error.stageErrorDetail === "object"
+            && event.error.stageErrorDetail !== null
+            && "message" in event.error.stageErrorDetail
+            && String(event.error.stageErrorDetail.message).includes(`upstream ${scenario.role} failure`),
+          true,
+          `${event.stage} closes with an explicit upstream-abort detail`
+        );
+      }
+    });
+  }
 });
 
 test("each core candidate gets one grounding draft and a rejected draft is not regenerated", async () => {

@@ -152,7 +152,7 @@ export function createScaffoldGeneration(construction: ScaffoldGenerationConstru
     verificationDecision: admissionPolicy.verificationDecision,
     verificationRejectionSampleQuorum: admissionPolicy.verificationRejectionSampleQuorum,
     judgmentTargetBatchSize: admissionPolicy.judgmentTargetBatchSize,
-    verificationConcurrency: admissionPolicy.verificationConcurrency
+    verificationExecution: admissionPolicy.verificationExecution
   });
   return async (request) => {
     await runInstrumentedOperation(construction.reporter, "scaffold", request.operationId, async (runStage) => {

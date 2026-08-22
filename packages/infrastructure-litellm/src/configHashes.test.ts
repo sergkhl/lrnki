@@ -147,7 +147,27 @@ test("scaffold identity includes every admission behavior and descriptor but exc
     scaffoldGenerationConfigHash({ ...DEFAULT_SCAFFOLD_GENERATION_CONFIG, sourceLessGroundingAdmission });
   for (const [name, variant] of [
     ["candidate fan-out", { ...policy, candidateConcurrency: policy.candidateConcurrency + 1 }],
-    ["verification fan-out", { ...policy, verificationConcurrency: policy.verificationConcurrency + 1 }],
+    ["question-planning fan-out", {
+      ...policy,
+      verificationExecution: {
+        ...policy.verificationExecution,
+        questionPlanningConcurrency: policy.verificationExecution.questionPlanningConcurrency + 1
+      }
+    }],
+    ["answering fan-out", {
+      ...policy,
+      verificationExecution: {
+        ...policy.verificationExecution,
+        answeringConcurrency: policy.verificationExecution.answeringConcurrency + 1
+      }
+    }],
+    ["factuality-judgment fan-out", {
+      ...policy,
+      verificationExecution: {
+        ...policy.verificationExecution,
+        factualityJudgmentConcurrency: policy.verificationExecution.factualityJudgmentConcurrency + 1
+      }
+    }],
     ["probe fan-out", { ...policy, probe: { ...policy.probe, probeConcurrency: policy.probe.probeConcurrency + 1 } }]
   ] as const) {
     assert.equal(hashWithPolicy(variant), base, `${name} is execution policy`);
@@ -227,7 +247,27 @@ test("Graph Enrichment hashes every admission behavior knob but not execution fa
 
   for (const [name, sourceLessGroundingAdmission] of [
     ["candidate fan-out", { ...policy, candidateConcurrency: policy.candidateConcurrency + 1 }],
-    ["verification fan-out", { ...policy, verificationConcurrency: policy.verificationConcurrency + 1 }],
+    ["question-planning fan-out", {
+      ...policy,
+      verificationExecution: {
+        ...policy.verificationExecution,
+        questionPlanningConcurrency: policy.verificationExecution.questionPlanningConcurrency + 1
+      }
+    }],
+    ["answering fan-out", {
+      ...policy,
+      verificationExecution: {
+        ...policy.verificationExecution,
+        answeringConcurrency: policy.verificationExecution.answeringConcurrency + 1
+      }
+    }],
+    ["factuality-judgment fan-out", {
+      ...policy,
+      verificationExecution: {
+        ...policy.verificationExecution,
+        factualityJudgmentConcurrency: policy.verificationExecution.factualityJudgmentConcurrency + 1
+      }
+    }],
     ["probe fan-out", { ...policy, probe: { ...policy.probe, probeConcurrency: policy.probe.probeConcurrency + 1 } }]
   ] as const) {
     assert.equal(hashWith(sourceLessGroundingAdmission), base, `${name} is execution policy`);
@@ -304,17 +344,26 @@ test("synthetic execution widths do not change identity while probe behavior sti
     base,
     "concept fan-out is execution policy"
   );
-  assert.equal(
-    syntheticGenerationConfigHash({
-      ...DEFAULT_SYNTHETIC_GENERATION_CONFIG,
-      sourceLessGroundingAdmission: {
-        ...DEFAULT_SYNTHETIC_GENERATION_CONFIG.sourceLessGroundingAdmission,
-        verificationConcurrency: 1
-      }
-    }),
-    base,
-    "verification fan-out is execution policy"
-  );
+  for (const field of [
+    "questionPlanningConcurrency",
+    "answeringConcurrency",
+    "factualityJudgmentConcurrency"
+  ] as const) {
+    assert.equal(
+      syntheticGenerationConfigHash({
+        ...DEFAULT_SYNTHETIC_GENERATION_CONFIG,
+        sourceLessGroundingAdmission: {
+          ...DEFAULT_SYNTHETIC_GENERATION_CONFIG.sourceLessGroundingAdmission,
+          verificationExecution: {
+            ...DEFAULT_SYNTHETIC_GENERATION_CONFIG.sourceLessGroundingAdmission.verificationExecution,
+            [field]: 1
+          }
+        }
+      }),
+      base,
+      `${field} is execution policy`
+    );
+  }
   assert.equal(
     syntheticGenerationConfigHash({
       ...DEFAULT_SYNTHETIC_GENERATION_CONFIG,

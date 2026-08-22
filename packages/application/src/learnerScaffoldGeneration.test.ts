@@ -43,7 +43,11 @@ const TEST_CONFIG: ScaffoldGenerationConfig = {
     verificationSampleCount: 2,
     verificationRejectionSampleQuorum: 2,
     candidateConcurrency: 1,
-    verificationConcurrency: 1
+    verificationExecution: {
+      questionPlanningConcurrency: 1,
+      answeringConcurrency: 1,
+      factualityJudgmentConcurrency: 1
+    }
   }
 };
 

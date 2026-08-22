@@ -2,9 +2,9 @@ import { STAGE_TAGS, type GroundingAdmissionContext } from "@lrnki/domain-core";
 import type {
   ClaimFactualityJudgmentPort,
   ClaimVerificationAnsweringPort,
-  ClaimVerificationQuestionPlanningPort
+  ClaimVerificationQuestionPlanningPort,
+  StageErrorDetail
 } from "@lrnki/ports";
-import { mapWithConcurrency } from "./mapWithConcurrency";
 import type { StageBracket } from "./runProgressReporter";
 
 // This is an application-internal seam. Source-less Grounding Admission and, in U3, generated
@@ -39,7 +39,7 @@ export type ClaimAdmission = {
   };
 };
 
-export function createClaimAdmission(construction: {
+type ClaimAdmissionConstruction = Readonly<{
   questionPlanning: ClaimVerificationQuestionPlanningPort;
   answering: ClaimVerificationAnsweringPort;
   factualityJudgments: readonly [ClaimFactualityJudgmentPort, ClaimFactualityJudgmentPort];
@@ -47,13 +47,38 @@ export function createClaimAdmission(construction: {
   verificationDecision: "same_model_replicated_rejection";
   verificationRejectionSampleQuorum: number;
   judgmentTargetBatchSize: 1;
-  verificationConcurrency: number;
-}): ClaimAdmission {
+  verificationExecution: Readonly<{
+    questionPlanningConcurrency: number;
+    answeringConcurrency: number;
+    factualityJudgmentConcurrency: number;
+  }>;
+}>;
+
+type VerificationRequest = Readonly<{
+  claimSet: PositiveClaimSet;
+  sampleIndex: number;
+  targetIndexes: readonly number[];
+}>;
+
+type SampledJudgment = Readonly<{
+  candidateKey: string;
+  targetIndex: number;
+  verdictIndex: number;
+  judgment: ClaimJudgment;
+}>;
+
+export function createClaimAdmission(construction: ClaimAdmissionConstruction): ClaimAdmission {
   if (!Number.isInteger(construction.verificationSampleCount) || construction.verificationSampleCount < 2) {
     throw new Error("Claim admission verificationSampleCount must be an integer of at least 2.");
   }
-  if (!Number.isInteger(construction.verificationConcurrency) || construction.verificationConcurrency < 1) {
-    throw new Error("Claim admission verificationConcurrency must be a positive integer.");
+  for (const [name, value] of [
+    ["questionPlanningConcurrency", construction.verificationExecution.questionPlanningConcurrency],
+    ["answeringConcurrency", construction.verificationExecution.answeringConcurrency],
+    ["factualityJudgmentConcurrency", construction.verificationExecution.factualityJudgmentConcurrency]
+  ] as const) {
+    if (!Number.isInteger(value) || value < 1) {
+      throw new Error(`Claim admission verificationExecution.${name} must be a positive integer.`);
+    }
   }
   if (construction.judgmentTargetBatchSize !== 1) {
     throw new Error("Claim admission judgmentTargetBatchSize must be exactly 1.");
@@ -82,94 +107,15 @@ export function createClaimAdmission(construction: {
           validateClaimSets(claimSets);
 
           const samplesByCandidate = new Map<string, ClaimJudgment[][]>();
-          type VerificationRequest = Readonly<{
-            claimSet: PositiveClaimSet;
-            sampleIndex: number;
-            targetIndexes: readonly number[];
-          }>;
+          const candidateOrder = new Map(claimSets.map((claimSet, index) => [claimSet.candidateKey, index] as const));
 
-          const collectSampleWave = async (verificationRequests: readonly VerificationRequest[]) => {
-            const planned = await stage(STAGE_TAGS.groundingVerificationQuestionPlanning, () =>
-              mapWithConcurrency(verificationRequests, construction.verificationConcurrency, async ({ claimSet, sampleIndex, targetIndexes }) => {
-                const questions = await construction.questionPlanning.plan({
-                  declaredDomain: claimSet.declaredDomain,
-                  canonicalLabel: claimSet.canonicalLabel,
-                  context: claimSet.context,
-                  targets: claimSet.targets
-                });
-                validateQuestionPlan(claimSet, questions);
-                return {
-                  claimSet,
-                  sampleIndex,
-                  targetIndexes,
-                  questions: questions.map((question, index) => ({
-                    ...question,
-                    questionKey: `${claimSet.candidateKey}:verification:${sampleIndex}:question:${index}`
-                  }))
-                };
-              }), verificationRequests.length
-            );
-
-            const answered = await stage(STAGE_TAGS.groundingVerificationAnswering, () =>
-              mapWithConcurrency(planned, construction.verificationConcurrency, async ({ claimSet, sampleIndex, targetIndexes, questions }) => {
-                const answers = await construction.answering.answer({
-                  declaredDomain: claimSet.declaredDomain,
-                  canonicalLabel: claimSet.canonicalLabel,
-                  context: claimSet.context,
-                  questions: questions.map(({ questionKey, question }) => ({ questionKey, question }))
-                });
-                const answerByKey = validateAnswers(claimSet.candidateKey, questions, answers);
-                return {
-                  claimSet,
-                  sampleIndex,
-                  targetIndexes,
-                  verificationAnswers: questions.map((question) => ({
-                    targetKey: question.targetKey,
-                    questionKey: question.questionKey,
-                    question: question.question,
-                    answer: answerByKey.get(question.questionKey)!
-                  }))
-                };
-              }), planned.length
-            );
-
-            // A judgment call owns exactly one positive target. Returning one verdict per target from
-            // a multi-target call is not independent verification: a true neighboring passage can
-            // distract the model into repairing or overlooking a false clause. Planning and answering
-            // remain candidate-wide so the answer model stays draft-blind, but terminal judgment sees
-            // only the target being settled and only that target's independently produced checks.
-            const judgmentRequests = answered.flatMap(({ claimSet, verificationAnswers, sampleIndex, targetIndexes }) =>
-              claimSet.targets.flatMap((target, localTargetIndex) =>
-                construction.factualityJudgments.map((judgment, judgeIndex) => ({
-                  claimSet,
-                  target,
-                  targetIndex: targetIndexes[localTargetIndex]!,
-                  verificationAnswers: verificationAnswers.filter((answer) => answer.targetKey === target.targetKey),
-                  sampleIndex,
-                  judgeIndex,
-                  judgment
-                }))
-              )
-            );
-            return stage(STAGE_TAGS.groundingFactualityRevision, () =>
-              mapWithConcurrency(judgmentRequests, construction.verificationConcurrency, async ({ claimSet, target, targetIndex, verificationAnswers, sampleIndex, judgeIndex, judgment }) => {
-                const targetClaimSet: PositiveClaimSet = { ...claimSet, targets: [target] };
-                const judgments = await judgment.judge({
-                  declaredDomain: claimSet.declaredDomain,
-                  canonicalLabel: claimSet.canonicalLabel,
-                  context: claimSet.context,
-                  targets: targetClaimSet.targets,
-                  verificationAnswers
-                });
-                return {
-                  candidateKey: claimSet.candidateKey,
-                  targetIndex,
-                  verdictIndex: sampleIndex * construction.factualityJudgments.length + judgeIndex,
-                  judgment: validateJudgments(targetClaimSet, judgments)[0]!
-                };
-              }), judgmentRequests.length
-            );
-          };
+          const collectSampleWave = (verificationRequests: readonly VerificationRequest[]) =>
+            collectVerificationSampleWave({
+              construction,
+              stage,
+              verificationRequests,
+              candidateOrder
+            });
 
           const recordSamples = (sampledJudgments: Awaited<ReturnType<typeof collectSampleWave>>) => {
             for (const sample of sampledJudgments) {
@@ -235,6 +181,326 @@ export function createClaimAdmission(construction: {
       };
     }
   };
+}
+
+type VerificationPipelineRole = "question_planning" | "answering" | "factuality_judgment";
+
+type VerificationPipelineFailure = Readonly<{
+  role: VerificationPipelineRole;
+  error: unknown;
+}>;
+
+type RoleLimiter = Readonly<{
+  run<T>(task: () => Promise<T>): Promise<T>;
+  abort(failure: VerificationPipelineFailure): void;
+  whenSettled(): Promise<void>;
+}>;
+
+type Deferred<T> = Readonly<{
+  promise: Promise<T>;
+  resolve(value: T | PromiseLike<T>): void;
+  reject(reason?: unknown): void;
+}>;
+
+type PipelineJob = Readonly<{
+  task: () => Promise<unknown>;
+  resolve(value: unknown): void;
+  reject(reason?: unknown): void;
+}>;
+
+async function collectVerificationSampleWave(input: Readonly<{
+  construction: ClaimAdmissionConstruction;
+  stage: StageBracket;
+  verificationRequests: readonly VerificationRequest[];
+  candidateOrder: ReadonlyMap<string, number>;
+}>): Promise<readonly SampledJudgment[]> {
+  if (input.verificationRequests.length === 0) return [];
+
+  let firstFailure: VerificationPipelineFailure | undefined;
+  const limiters: RoleLimiter[] = [];
+  const fail = (role: VerificationPipelineRole, error: unknown) => {
+    if (firstFailure) return;
+    firstFailure = { role, error };
+    for (const limiter of limiters) limiter.abort(firstFailure);
+  };
+  const getFailure = () => firstFailure;
+
+  const questionPlanning = createRoleLimiter({
+    role: "question_planning",
+    concurrency: input.construction.verificationExecution.questionPlanningConcurrency,
+    expectedTaskCount: input.verificationRequests.length,
+    fail,
+    getFailure
+  });
+  const answering = createRoleLimiter({
+    role: "answering",
+    concurrency: input.construction.verificationExecution.answeringConcurrency,
+    expectedTaskCount: input.verificationRequests.length,
+    fail,
+    getFailure
+  });
+  const judgmentTaskCount = input.verificationRequests.reduce(
+    (total, request) => total + request.claimSet.targets.length * input.construction.factualityJudgments.length,
+    0
+  );
+  const factualityJudgment = createRoleLimiter({
+    role: "factuality_judgment",
+    concurrency: input.construction.verificationExecution.factualityJudgmentConcurrency,
+    expectedTaskCount: judgmentTaskCount,
+    fail,
+    getFailure
+  });
+  limiters.push(questionPlanning, answering, factualityJudgment);
+
+  // Open one aggregate bracket for every pipeline role before releasing the first request. The
+  // brackets deliberately overlap, but a later disagreement wave cannot open the same stage until
+  // all three brackets from this wave have drained and closed.
+  const opened = deferred<void>();
+  let openedCount = 0;
+  const markOpened = () => {
+    openedCount += 1;
+    if (openedCount === 3) opened.resolve(undefined);
+  };
+  const startRoleBracket = (
+    role: VerificationPipelineRole,
+    stageTag: string,
+    limiter: RoleLimiter,
+    total: number
+  ): Promise<void> => {
+    let entered = false;
+    const bracket = Promise.resolve().then(() => input.stage(stageTag, async () => {
+      entered = true;
+      markOpened();
+      await limiter.whenSettled();
+    }, total));
+    return bracket.catch((error) => {
+      if (!entered) markOpened();
+      fail(role, error);
+      throw error;
+    });
+  };
+  const stagePromises = [
+    startRoleBracket(
+      "question_planning",
+      STAGE_TAGS.groundingVerificationQuestionPlanning,
+      questionPlanning,
+      input.verificationRequests.length
+    ),
+    startRoleBracket(
+      "answering",
+      STAGE_TAGS.groundingVerificationAnswering,
+      answering,
+      input.verificationRequests.length
+    ),
+    startRoleBracket(
+      "factuality_judgment",
+      STAGE_TAGS.groundingFactualityRevision,
+      factualityJudgment,
+      judgmentTaskCount
+    )
+  ];
+
+  await opened.promise;
+  const packetPromises = firstFailure
+    ? []
+    : input.verificationRequests.map((request) =>
+        questionPlanning.run(async () => {
+          const questions = await input.construction.questionPlanning.plan({
+            declaredDomain: request.claimSet.declaredDomain,
+            canonicalLabel: request.claimSet.canonicalLabel,
+            context: request.claimSet.context,
+            targets: request.claimSet.targets
+          });
+          validateQuestionPlan(request.claimSet, questions);
+          return questions.map((question, index) => ({
+            ...question,
+            questionKey: `${request.claimSet.candidateKey}:verification:${request.sampleIndex}:question:${index}`
+          }));
+        }).then((questions) => answering.run(async () => {
+          // Answering is intentionally draft-blind: it receives independently planned questions,
+          // never the positive targets or generated passages that those questions challenge.
+          const answers = await input.construction.answering.answer({
+            declaredDomain: request.claimSet.declaredDomain,
+            canonicalLabel: request.claimSet.canonicalLabel,
+            context: request.claimSet.context,
+            questions: questions.map(({ questionKey, question }) => ({ questionKey, question }))
+          });
+          const answerByKey = validateAnswers(request.claimSet.candidateKey, questions, answers);
+          return questions.map((question) => ({
+            targetKey: question.targetKey,
+            questionKey: question.questionKey,
+            question: question.question,
+            answer: answerByKey.get(question.questionKey)!
+          }));
+        })).then((verificationAnswers) =>
+          // A judgment call owns exactly one positive target. Both judge families share this one
+          // limiter, so their combined physical request fan-out can never exceed the configured cap.
+          Promise.all(request.claimSet.targets.flatMap((target, localTargetIndex) =>
+            input.construction.factualityJudgments.map((judgment, judgeIndex) =>
+              factualityJudgment.run(async () => {
+                const targetClaimSet: PositiveClaimSet = { ...request.claimSet, targets: [target] };
+                const judgments = await judgment.judge({
+                  declaredDomain: request.claimSet.declaredDomain,
+                  canonicalLabel: request.claimSet.canonicalLabel,
+                  context: request.claimSet.context,
+                  targets: targetClaimSet.targets,
+                  verificationAnswers: verificationAnswers.filter((answer) => answer.targetKey === target.targetKey)
+                });
+                return {
+                  candidateIndex: input.candidateOrder.get(request.claimSet.candidateKey)!,
+                  candidateKey: request.claimSet.candidateKey,
+                  sampleIndex: request.sampleIndex,
+                  targetIndex: request.targetIndexes[localTargetIndex]!,
+                  judgeIndex,
+                  verdictIndex: request.sampleIndex * input.construction.factualityJudgments.length + judgeIndex,
+                  judgment: validateJudgments(targetClaimSet, judgments)[0]!
+                };
+              })
+            )
+          ))
+        )
+      );
+
+  const [packetSettlements] = await Promise.all([
+    Promise.allSettled(packetPromises),
+    Promise.allSettled(stagePromises)
+  ]);
+  if (firstFailure) throw firstFailure.error;
+
+  const unexpectedPacketFailure = packetSettlements.find((result) => result.status === "rejected");
+  if (unexpectedPacketFailure?.status === "rejected") throw unexpectedPacketFailure.reason;
+  return packetSettlements
+    .flatMap((result) => result.status === "fulfilled" ? result.value : [])
+    .sort((left, right) =>
+      left.candidateIndex - right.candidateIndex
+      || left.sampleIndex - right.sampleIndex
+      || left.targetIndex - right.targetIndex
+      || left.judgeIndex - right.judgeIndex
+    )
+    .map(({ candidateKey, targetIndex, verdictIndex, judgment }) => ({
+      candidateKey,
+      targetIndex,
+      verdictIndex,
+      judgment
+    }));
+}
+
+function createRoleLimiter(input: Readonly<{
+  role: VerificationPipelineRole;
+  concurrency: number;
+  expectedTaskCount: number;
+  fail(role: VerificationPipelineRole, error: unknown): void;
+  getFailure(): VerificationPipelineFailure | undefined;
+}>): RoleLimiter {
+  const queue: PipelineJob[] = [];
+  const settled = deferred<void>();
+  // A reporter can fail before invoking its bracket body; keep this internal promise handled even
+  // when no stage awaits it. Callers of whenSettled still observe the original rejection.
+  void settled.promise.catch(() => {});
+  let scheduled = 0;
+  let completed = 0;
+  let active = 0;
+  let terminal = false;
+
+  const abortError = (failure: VerificationPipelineFailure) =>
+    failure.role === input.role
+      ? failure.error
+      : new VerificationPipelineUpstreamAbortError(input.role, failure.role);
+
+  const settleIfReady = () => {
+    if (terminal) return;
+    const failure = input.getFailure();
+    if (failure) {
+      if (active !== 0) return;
+      terminal = true;
+      settled.reject(abortError(failure));
+      return;
+    }
+    if (completed === input.expectedTaskCount) {
+      terminal = true;
+      settled.resolve(undefined);
+    }
+  };
+
+  const abort = (failure: VerificationPipelineFailure) => {
+    const error = abortError(failure);
+    for (const job of queue.splice(0)) job.reject(error);
+    settleIfReady();
+  };
+
+  const pump = () => {
+    const failure = input.getFailure();
+    if (failure) {
+      abort(failure);
+      return;
+    }
+    while (active < input.concurrency && queue.length > 0 && !input.getFailure()) {
+      const job = queue.shift()!;
+      active += 1;
+      void Promise.resolve()
+        .then(job.task)
+        .then(job.resolve, (error) => {
+          job.reject(error);
+          input.fail(input.role, error);
+        })
+        .finally(() => {
+          active -= 1;
+          completed += 1;
+          pump();
+          settleIfReady();
+        });
+    }
+    settleIfReady();
+  };
+
+  return {
+    run<T>(task: () => Promise<T>): Promise<T> {
+      const failure = input.getFailure();
+      if (failure) return Promise.reject(abortError(failure));
+      scheduled += 1;
+      if (scheduled > input.expectedTaskCount) {
+        const error = new Error(`Claim admission scheduled too many ${input.role} tasks.`);
+        input.fail(input.role, error);
+        return Promise.reject(error);
+      }
+      return new Promise<T>((resolve, reject) => {
+        queue.push({
+          task,
+          resolve: (value) => resolve(value as T),
+          reject
+        });
+        pump();
+      });
+    },
+    abort,
+    whenSettled() {
+      settleIfReady();
+      return settled.promise;
+    }
+  };
+}
+
+class VerificationPipelineUpstreamAbortError extends Error {
+  readonly stageErrorDetail: StageErrorDetail;
+
+  constructor(role: VerificationPipelineRole, origin: VerificationPipelineRole) {
+    super(`Claim admission ${role} aborted after upstream ${origin} failure.`);
+    this.name = "VerificationPipelineUpstreamAbortError";
+    this.stageErrorDetail = {
+      kind: "other",
+      message: `Claim admission ${role} aborted after upstream ${origin} failure.`
+    };
+  }
+}
+
+function deferred<T>(): Deferred<T> {
+  let resolve!: Deferred<T>["resolve"];
+  let reject!: Deferred<T>["reject"];
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
 }
 
 function validateClaimSets(claimSets: readonly PositiveClaimSet[]): void {

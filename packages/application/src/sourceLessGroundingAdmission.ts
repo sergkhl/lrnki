@@ -77,7 +77,11 @@ export type SourceLessGroundingAdmissionPolicy = Readonly<{
   groundingClaimProjection: "sentence_and_semicolon";
   judgmentTargetBatchSize: 1;
   candidateConcurrency: number;
-  verificationConcurrency: number;
+  verificationExecution: Readonly<{
+    questionPlanningConcurrency: number;
+    answeringConcurrency: number;
+    factualityJudgmentConcurrency: number;
+  }>;
 }>;
 
 export const DEFAULT_SOURCE_LESS_GROUNDING_ADMISSION_POLICY: SourceLessGroundingAdmissionPolicy = {
@@ -88,7 +92,11 @@ export const DEFAULT_SOURCE_LESS_GROUNDING_ADMISSION_POLICY: SourceLessGrounding
   groundingClaimProjection: "sentence_and_semicolon",
   judgmentTargetBatchSize: 1,
   candidateConcurrency: 8,
-  verificationConcurrency: 4
+  verificationExecution: {
+    questionPlanningConcurrency: 4,
+    answeringConcurrency: 4,
+    factualityJudgmentConcurrency: 4
+  }
 };
 
 export function createSourceLessGroundingAdmission(construction: {
@@ -110,7 +118,7 @@ export function createSourceLessGroundingAdmission(construction: {
     verificationDecision: policy.verificationDecision,
     verificationRejectionSampleQuorum: policy.verificationRejectionSampleQuorum,
     judgmentTargetBatchSize: policy.judgmentTargetBatchSize,
-    verificationConcurrency: policy.verificationConcurrency
+    verificationExecution: policy.verificationExecution
   });
 
   return {
@@ -304,13 +312,20 @@ function rejectionRationale(judgments: readonly ClaimJudgment[]): string {
 }
 
 function validatePolicy(policy: SourceLessGroundingAdmissionPolicy): void {
-  requireExactKeys(policy, ["probe", "verificationSampleCount", "verificationDecision", "verificationRejectionSampleQuorum", "groundingClaimProjection", "judgmentTargetBatchSize", "candidateConcurrency", "verificationConcurrency"], "policy");
+  requireExactKeys(policy, ["probe", "verificationSampleCount", "verificationDecision", "verificationRejectionSampleQuorum", "groundingClaimProjection", "judgmentTargetBatchSize", "candidateConcurrency", "verificationExecution"], "policy");
+  requireExactKeys(
+    policy.verificationExecution,
+    ["questionPlanningConcurrency", "answeringConcurrency", "factualityJudgmentConcurrency"],
+    "verificationExecution"
+  );
   validateKnowledgeBoundaryProbeConfig(policy.probe);
   for (const [name, value] of [
     ["verificationSampleCount", policy.verificationSampleCount],
     ["verificationRejectionSampleQuorum", policy.verificationRejectionSampleQuorum],
     ["candidateConcurrency", policy.candidateConcurrency],
-    ["verificationConcurrency", policy.verificationConcurrency]
+    ["verificationExecution.questionPlanningConcurrency", policy.verificationExecution.questionPlanningConcurrency],
+    ["verificationExecution.answeringConcurrency", policy.verificationExecution.answeringConcurrency],
+    ["verificationExecution.factualityJudgmentConcurrency", policy.verificationExecution.factualityJudgmentConcurrency]
   ] as const) {
     if (!Number.isInteger(value) || value < 1) {
       throw new Error(`Source-less Grounding Admission ${name} must be a positive integer.`);
