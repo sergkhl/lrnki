@@ -18,12 +18,13 @@
   interview, one decision at a time, starting with change scope; judge ownership is required only if
   grounding generation moves.
 
-- **DeepSeek Baidu Provider Route cutover — rolled back; diagnose the live primary failure before
-  retry.** Exact direct-provider probes pass, but the deployed LiteLLM route attributed all three
-  production aliases to the DeepInfra backup instead of Baidu. Keep the restored route live until
-  the Baidu primary succeeds through LiteLLM and every alias passes exact SpendLogs attribution.
-
 ## COMPLETED
+
+- **The DeepSeek Provider Route is repaired and attributable (2026-08-23).** The three production
+  aliases now share one FP8, reasoning-disabled Model Assignment with provider failover owned only by
+  LiteLLM. The canonical topology and sampling-policy boundary live in
+  [`litellm/config.yaml`](../../litellm/config.yaml) and the client source; reusable cutover mechanics
+  live in the root [README](../../README.md#deployment). Deployed candidate: `eadf16d`.
 
 - **Source-less Grounding Admission is shared and one-pass (2026-08-19–20).** Synthetic Topic
   Generation, model-grounded prerequisite minting, and generated Support Steps now cross one deep
@@ -63,70 +64,45 @@
   full study-item fixture. The reload and deployment-verification procedure lives in the root
   [README](../../README.md#deployment).
 
-- **Matching item assignment quality shipped (2026-08-08).** The prompt contract, provable
-  containment veto, shared learner-vocabulary rule, and cross-family assignment verification are
-  deployed. One borderline residual remains an accepted neural-quality tail rather than a lexical
-  gate under [ADR-0026](../adr/0026-typed-study-item-bank.md). Detailed record: commit 4ea7e64.
-
-- **Study Item grounding and key verification shipped (2026-08-07).** Citation resolution and
-  cross-family answer-key verification now share one grounding contract; production real-use
-  inspection confirmed the repaired bank. Durable policy:
-  [ADR-0026](../adr/0026-typed-study-item-bank.md). Detailed record: commit 7fb9a2d.
+- **Study Item grounding, key verification, and matching assignment quality shipped
+  (2026-08-07–08).** Citation resolution and cross-family answer-key verification share one grounding
+  contract; matching adds a provable containment veto, shared learner vocabulary, and cross-family
+  assignment verification. Production real-use inspection confirmed the repaired bank; one
+  borderline matching residual remains an accepted neural-quality tail rather than a lexical gate.
+  Durable policy: [ADR-0026](../adr/0026-typed-study-item-bank.md). Detailed records: commits 7fb9a2d
+  and 4ea7e64.
 
 ## VALIDATION
 
-### DeepSeek Provider Route restoration retry and rollback — 2026-08-23
+### DeepInfra-primary Provider Route repair — 2026-08-23
 
-- Source identity: bounded candidate `4f8f3838a0e034d5e8c8b84e3e03aad6153a028a` restored the
-  Baidu-primary/shared-DeepInfra route without the six unpublished local commits. Normal revert
-  `a4e20725506fc038a4604c6f19ee9a8580d4b228` is the verified rollback revision in both
-  `origin/main` and the VPS checkout history.
-- Local automated evidence: the candidate LiteLLM typecheck and all 176 tests passed, including one
-  shared Model Assignment, exact route topology, fail-closed quantization, and mechanically derived
-  operation hashes. Root `pnpm check` passed schema parity, all workspace checks, lint with zero
-  errors, both production builds, and 70 intercepted-web cases. `git diff --check` passed. The
-  restored config then passed its typecheck and all 175 LiteLLM tests before the revert was pushed.
-- Direct provider preflight: at 2026-08-23 00:39 Bishkek, all six Baidu/DeepInfra × Answer-Key
-  Verification, Claim Verification Answering, and Claim Factuality Judgment calls returned HTTP 200
-  from the exact requested provider and base model, emitted one forced call, and passed the
-  production validator. The matrix completed in about 26 seconds; sanitized artifacts remain
-  gitignored.
-- Candidate deployment: healthy container
-  `a895052f1241d5ca1f8dd489c422ea6476d80dbe10e86ac9b035ba1dd9293ec5` loaded exactly the shared
-  primary and shared DeepInfra backup groups. The public learner API remained healthy.
-- Production-client smoke: over a bounded tunnel, the real deterministic client used temperature
-  0, seed 7, and the normal 600-second timeout. Tag prefix
-  `deepseek-provider-restore-1787424337621` produced four schema-valid results in 16.276 seconds:
-  all three aliases plus the direct DeepInfra backup. A local-key `/models` 401 was excluded before
-  any completion request; the repaired harness used the VPS virtual key in-process without printing
-  or persisting it.
-- SpendLogs positive control: exactly four of 78,126 rows matched the prefix; every row was
-  `success`, used base model `openrouter/deepseek/deepseek-v4-flash-0731`, and recorded zero
-  attempted retries. All three alias rows nevertheless resolved to model group
-  `openrouter/deepseek/deepseek-v4-flash-0731-deepinfra-backup` and provider `DeepInfra`; the
-  direct-backup row did the same. The required three Baidu rows were therefore absent, so the
-  acceptance gate failed without a client retry.
-- Rollback evidence: healthy container
-  `1c14e5ab8e0a0ee40629d9b416021836c735d7b60aeef3be9a4c13838ef9da30` again loads only the base,
-  `-claim`, and `-claim-deepinfra-backup` groups. The parser confirms the independent
-  BaseTen/Parasail route and both claim aliases' Parasail→DeepInfra route. LiteLLM and the public
-  learner API are healthy, and the VPS checkout is clean at the revert.
-- Quality policy: prior consumer quality evidence remains qualified because every attempted and
-  restored route kept the same DeepSeek V4 Flash 0731 FP8 Model Assignment with reasoning disabled,
-  and the failed Provider Route is no longer live.
-
-#### Real-use quality evaluation
-
-- Milestone: Baidu-primary/shared-DeepInfra Provider Route restoration retry.
-- Fixture and source type: production-contract sentinels; no curated learner source.
-- Real model calls used: yes.
-- Result: `FIX_FIRST`.
-- Useful output observed: all four contracts returned schema-valid forced-tool arguments.
-- Defects observed: every production alias used the fallback instead of the required Baidu primary.
-- Changes made after inspection: reverted the candidate and recreated only LiteLLM.
-- Remaining caveats: direct Baidu works, but its deployed LiteLLM primary path remains unexplained.
-- Safe to continue downstream: yes on the restored route; no on the candidate route.
-
-- Evidence boundary: source contracts, direct OpenRouter provider compatibility, deployed LiteLLM
-  inventory/health, production-client contract validity, SpendLogs attribution, and rollback only;
-  not a new curated-source usefulness gate, learner journey, native run, or physical-device result.
+- Diagnosis: the earlier Baidu preflight omitted production `seed: 7`. The real client sent it with
+  `temperature: 0`; Baidu rejected seed, so `require_parameters: true` excluded Baidu before
+  inference and LiteLLM served DeepInfra. That successful fallback response had not proved primary
+  use. Candidate `eadf16d4e05841ed00a5b080c87a1f8235860c26` leaves the sampling body unchanged and
+  replaces the superseded route definitions with one shared primary and explicit same-assignment
+  backup. Seed's independent benefit remains unisolated and it is not a reproducibility guarantee.
+- Provider contract and router evidence: immediately before cutover, the endpoint registry still
+  advertised the full FP8/seed/reasoning/forced-tool/structured-output contract for both routes. All
+  six direct provider × Answer-Key Verification, Claim Verification Answering, and Claim Factuality
+  Judgment probes returned the requested provider/model, one schema-valid forced call, and HTTP 200.
+  In the exact-image fault harness, tag `deepseek-provider-fallback-1787428988213` produced exactly
+  three Parasail-attributed backup rows, all successful with zero retries and one client request.
+- Automated evidence: the deployable candidate passed the LiteLLM typecheck and 176/176 package
+  tests. Root `pnpm check` passed schema parity, every workspace check, lint with zero errors, both
+  production builds, and 70/70 intercepted-web cases; `git diff --check` passed. Intercepted web is
+  qualified only at that layer.
+- Deployed evidence: VPS checkout `eadf16d4` recreated only LiteLLM as healthy container
+  `5b819236816539ba4fe3dec53f919b2af76741d433dace3377ddeb0b1980c56f` on image digest
+  `sha256:c98c9395c56a35b7abacff8269d43ff99aabacb62bbf42a04cc1514fcb9bde4a`; `/model/info`
+  exposed exactly the two pinned FP8, reasoning-disabled groups and the public learner API stayed
+  healthy. Tag `deepseek-provider-deepinfra-primary-1787429578731` had a four-row positive control:
+  all three alias rows shared primary deployment id `b33145a5…`, provider `DeepInfra`, and one direct
+  backup row used deployment id `ac3f244a…`, provider `Parasail`. Every row used the exact base model,
+  succeeded with zero retries, and its schema-valid client call made one HTTP request.
+- Rollback identity remains prior revision `d069cba1dcd393b8377857e4f8c71aff17e96c74` and container
+  `1c14e5ab8e0a0ee40629d9b416021836c735d7b60aeef3be9a4c13838ef9da30`. No rollback was required.
+  Prior semantic quality evidence remains qualified because revision, FP8 quantization, reasoning
+  behavior, temperature, and seed did not change. This result proves provider contract, explicit
+  fallback mechanics, deployed reachability, attribution, and service health only—not new
+  broad-source usefulness, learner-flow, native, simulator/emulator, or physical-device quality.
