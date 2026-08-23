@@ -7,7 +7,7 @@ execution: code
 
 # Apply the ADR Audit Without Changing ADR-0006 or Cross-Family Rules
 
-**Status:** Ready — U0 complete; U1 next
+**Status:** In progress — U0–U1 complete; U2 next
 
 **Decision state:** Locked. The accepted audit findings and fixed assumptions are implementation
 inputs, not an invitation to reopen Concept Canonicalization, Operation Timeline ownership,
@@ -326,7 +326,42 @@ without implementing that follow-up.
   preservation boundary. It proves no source behavior, schema compatibility, semantic quality,
   deployment, browser, native, or physical-device behavior.
 
+### U1 — Concept Canonicalization interface and deterministic build — complete; local automated evidence
+
+- Interface and persistence: `canonicalizeConcepts` is the one caller use-case. It owns ordered
+  Extraction Run/base loading, candidate reduction, semantic or exact-label-only execution, bounded
+  unavailable results, artifact validation, stable summary, timeline lifecycle, and append-only
+  persistence through the narrow `ConceptCanonicalizationStorePort`. The unused generic artifact
+  repository and worker-owned mapping were deleted; internal resolver tests were replaced with
+  interface tests.
+- Semantic behavior: semantic mode alone invokes the embedding proposer and independent adjudicator.
+  Embedding failures create a bounded domain unavailable record; adjudicator failures create a
+  bounded pair unavailable record and no false semantic `distinct`. Exact-label-only mode invokes
+  neither port. Artifact read validation enforces envelope/type, ordered unique runs, captured
+  registry uniqueness, merge survivor, two-member distinct, two-published quarantine, cosine, and
+  unavailable-versus-distinct invariants.
+- Deterministic publication: Graph-Version Build now requires the selected artifact and store, has
+  no neural dependency, reuses only captured published identities, and derives new UUIDv5 Concept
+  IDs from final IRIs. It accepts unchanged captured state or the exact full deterministic output of
+  a prior replay and rejects missing, changed, unrelated, conflicting, or partial registry state.
+  The selected artifact and copied decisions persist with the artifact/config identity; quarantine
+  still blocks publication.
+- Worker/config surface: parsing covers the three locked commands, ordered selection, explicit base,
+  required artifact, exact-label mode, and JSON inspection. The canonicalization hash includes mode,
+  similarity threshold, pair/evidence bounds, embedding assignment, and adjudicator descriptor/
+  assignment while excluding adjudication concurrency.
+- Automated evidence: the focused canonicalization/build interface set passed 30/30 and worker
+  parsing passed 8/8. Full affected local suites passed: application 801/801, infrastructure-LiteLLM
+  177/177, and worker 8/8. The PostgreSQL package's local-only portion passed 14/14 while 90 DB cases
+  correctly remained skipped outside `pnpm test:db`. Domain, ports, application,
+  infrastructure-LiteLLM, infrastructure-PostgreSQL, and worker typechecks passed; `git diff --check`
+  passed.
+- Evidence boundary: this proves source interfaces, deterministic identity/replay behavior,
+  validation, config derivation, worker parsing, and local buildability. It does not yet prove the
+  generated schema, PostgreSQL append/read behavior, ambient wrong-stage rejection, Processing
+  Journey lineage, real-model usefulness, or local database publication; U2 and U4 own those gates.
+
 ### Open findings
 
-- None at U0. Any source, database, or real-use finding discovered in later units remains open here
-  until resolved or given an explicit terminal verdict.
+- U2 must finish the application-owned ambient stage check, lineage, generated operation constraint,
+  and database-backed canonicalization requirements before any DB or real-use claim is qualified.

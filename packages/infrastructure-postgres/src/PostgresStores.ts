@@ -22,7 +22,7 @@ import type {
   SourceRegistrationStorePort
 } from "@lrnki/ports";
 import type { Sql } from "postgres";
-import { writeArtifactEnvelope } from "./PostgresArtifactRepository";
+import { writeArtifactEnvelope } from "./PostgresArtifacts";
 
 // Postgres-backed implementations of the kernel store ports. Authoritative state
 // is relational; immutable artifacts live in artifact_versions as JSONB (ADR-0003).

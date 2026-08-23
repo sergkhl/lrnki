@@ -35,6 +35,13 @@ export const OPERATION_TIMELINE_CATALOG: Record<OperationType, readonly Operatio
     llm(STAGE_TAGS.discoveryCoverageAudit),
     nonLlm(NON_LLM_STAGES.persist)
   ],
+  canonicalization: [
+    nonLlm(NON_LLM_STAGES.load),
+    llm(STAGE_TAGS.nodeEmbedding),
+    llm(STAGE_TAGS.nodeMergeAdjudication),
+    nonLlm(NON_LLM_STAGES.refine),
+    nonLlm(NON_LLM_STAGES.persist)
+  ],
   minting: [
     nonLlm(NON_LLM_STAGES.load),
     nonLlm(NON_LLM_STAGES.refine),

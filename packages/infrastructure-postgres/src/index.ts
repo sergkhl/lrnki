@@ -6,7 +6,7 @@ export {
   PostgresExtractionRunStore,
   PostgresGraphVersionStore
 } from "./PostgresStores";
-export { PostgresArtifactRepository } from "./PostgresArtifactRepository";
+export { PostgresConceptCanonicalizationStore } from "./PostgresArtifacts";
 export { PostgresInspectionRead } from "./PostgresInspectionRead";
 export { PostgresEnrichmentInspectionRead } from "./PostgresEnrichmentInspectionRead";
 export { PostgresLearnerLoopRead } from "./PostgresLearnerLoopRead";

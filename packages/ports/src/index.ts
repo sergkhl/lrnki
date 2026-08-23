@@ -8,6 +8,7 @@ import type {
   AssertionEntailmentJudgment,
   BlockEvidence,
   CalibrationVerdict,
+  ConceptCanonicalizationArtifact,
   ConceptIdentityResolutionOutcome,
   ConceptLesson,
   ConceptLessonDraft,
@@ -365,8 +366,9 @@ export interface NodeMergeAdjudicationPort {
   }): Promise<NodeMergeAdjudication>;
 }
 
-export interface ArtifactRepositoryPort {
-  append<TPayload>(artifact: ArtifactEnvelope<TPayload>): Promise<void>;
+export interface ConceptCanonicalizationStorePort {
+  persist(artifact: ArtifactEnvelope<ConceptCanonicalizationArtifact>): Promise<void>;
+  getById(artifactId: string): Promise<ArtifactEnvelope<ConceptCanonicalizationArtifact> | undefined>;
 }
 
 // Source registration and normalization persistence (ADR-0004, ADR-0015).
@@ -1495,7 +1497,7 @@ export interface LearnerLoopReadPort {
 // The four triggered operations whose timeline these tables describe.
 // `study_items` is its own operation_type keyed by enrichmentId (ADR-0017 split
 // is preserved — these describe operations, they do not unify them).
-export type OperationType = "extraction" | "minting" | "enrichment" | "study_items" | "scaffold";
+export type OperationType = "extraction" | "canonicalization" | "minting" | "enrichment" | "study_items" | "scaffold";
 
 // ---------------------------------------------------------------------------
 // Forced-tool failure detail (ADR-0006 fail-closed, made INSPECTABLE). When a

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   DEFAULT_ENRICHMENT_CONFIG,
+  DEFAULT_CONCEPT_CANONICALIZATION_CONFIG,
   DEFAULT_SCAFFOLD_GENERATION_CONFIG,
   DEFAULT_SYNTHETIC_GENERATION_CONFIG,
   OPERATION_TIMELINE_CATALOG
@@ -10,6 +11,7 @@ import { STAGE_TAGS } from "@lrnki/domain-core";
 import type { OperationType } from "@lrnki/ports";
 import {
   allNeuralOperationDescriptors,
+  conceptCanonicalizationConfigHash,
   graphEnrichmentConfigHash,
   measurementNeuralStageDescriptors,
   neuralOperationRegistry,
@@ -44,6 +46,51 @@ test("registered operation stages union-equal the catalog's LLM stage set per ti
     const registered = [...(registeredByTimeline.get(operationType as OperationType) ?? new Set<string>())].sort();
     assert.deepEqual(registered, catalogLlm, `timeline type ${operationType}`);
   }
+});
+
+test("Concept Canonicalization identity is complete and excludes execution-only concurrency", () => {
+  const config = DEFAULT_CONCEPT_CANONICALIZATION_CONFIG;
+  const semantic = conceptCanonicalizationConfigHash({ mode: "semantic", config });
+  assert.equal(
+    semantic,
+    conceptCanonicalizationConfigHash({ mode: "semantic", config: { ...config } }),
+    "hash is deterministic"
+  );
+  assert.notEqual(
+    conceptCanonicalizationConfigHash({ mode: "exact_label_only", config }),
+    semantic,
+    "the explicit mode is attributable"
+  );
+  for (const variant of [
+    { ...config, similarityThreshold: config.similarityThreshold - 0.01 },
+    { ...config, maxPairsPerNode: config.maxPairsPerNode + 1 },
+    { ...config, maxEvidencePerNode: config.maxEvidencePerNode + 1 }
+  ]) {
+    assert.notEqual(conceptCanonicalizationConfigHash({ mode: "semantic", config: variant }), semantic);
+  }
+  assert.equal(
+    conceptCanonicalizationConfigHash({
+      mode: "semantic",
+      config: { ...config, adjudicationConcurrency: config.adjudicationConcurrency + 1 }
+    }),
+    semantic,
+    "adjudication concurrency is execution-only"
+  );
+
+  const entry = neuralOperationRegistry.conceptCanonicalization;
+  const { adjudicationConcurrency: _execution, ...behavior } = config;
+  void _execution;
+  const appIdentity = { mode: "semantic", ...behavior, nodeEmbeddingModel: "kg-node-embedding" };
+  assert.notEqual(
+    operationConfigHash(entry.configSeed, entry.descriptors, appIdentity),
+    semantic,
+    "the embedding Model Assignment is part of identity"
+  );
+  assert.notEqual(
+    operationConfigHash(entry.configSeed, [], appIdentity, { additionalModels: ["kg-node-embedding"] }),
+    semantic,
+    "the adjudicator descriptor and Model Assignment are part of identity"
+  );
 });
 
 // Stage sharing is derived from the two authorities themselves. There is no hand-maintained

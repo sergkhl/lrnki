@@ -1107,8 +1107,33 @@ export type ConceptIdentityDecision = {
   proposingScore: number;
   rationale: string;
   decidingModel: string;
-  configHash: string;
 };
+
+// One bounded neural-unavailability result from Concept Canonicalization. An unavailable
+// adjudication is deliberately separate from a semantic `distinct` decision: exact-label
+// publication still keeps the identities apart, but no model judgment is invented.
+export type ConceptCanonicalizationUnavailable =
+  | { kind: "embedding"; declaredDomain: string; reason: string }
+  | {
+      kind: "adjudication";
+      declaredDomain: string;
+      aKey: string;
+      bKey: string;
+      proposingScore: number;
+      reason: string;
+    };
+
+export type ConceptCanonicalizationArtifact = {
+  mode: "semantic" | "exact_label_only";
+  baseGraphVersionId: string | null;
+  runIds: readonly string[];
+  publishedConceptIdentities: readonly PublishedConceptIdentity[];
+  decisions: readonly ConceptIdentityDecision[];
+  unavailable: readonly ConceptCanonicalizationUnavailable[];
+};
+
+export const CONCEPT_CANONICALIZATION_ARTIFACT_TYPE = "concept_canonicalization";
+export const CONCEPT_CANONICALIZATION_SELECTION_DECISION_TYPE = "concept_canonicalization_selection";
 
 // The single `refinement_decisions.decision_type` an identity decision persists under
 // (KTD3). The build writes it; the inspection read model filters on it (plan U4), so it

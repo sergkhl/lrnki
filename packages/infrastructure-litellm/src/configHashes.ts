@@ -1,4 +1,10 @@
-import type { GraphEnrichmentConfig, ScaffoldGenerationConfig, SyntheticGenerationConfig } from "@lrnki/application";
+import type {
+  ConceptCanonicalizationMode,
+  ConceptCanonicalizationConfig,
+  GraphEnrichmentConfig,
+  ScaffoldGenerationConfig,
+  SyntheticGenerationConfig
+} from "@lrnki/application";
 import { STAGE_TAGS, type StageTag } from "@lrnki/domain-core";
 import type { OperationType } from "@lrnki/ports";
 import { admissionDecisionsDescriptor, admissionLabelJudgmentDescriptor, conceptDiscoveryDescriptor, coreSelectionDescriptor, definitionEntailmentDescriptor, definitionPassageQualityDescriptor, evidenceProfileExtractionDescriptor } from "./extractionAdapters";
@@ -59,6 +65,12 @@ export const neuralOperationRegistry = {
       admissionLabelJudgmentDescriptor
     ],
     embeddingStages: []
+  },
+  conceptCanonicalization: {
+    configSeed: "concept-canonicalization",
+    timelineType: "canonicalization",
+    descriptors: [nodeMergeAdjudicationDescriptor],
+    embeddingStages: [STAGE_TAGS.nodeEmbedding]
   },
   graphEnrichment: {
     configSeed: "graph-enrichment",
@@ -162,6 +174,25 @@ export const allNeuralOperationDescriptors: readonly AnyNeuralStageDescriptor[] 
 export function extractionConfigHash(): string {
   const entry = neuralOperationRegistry.extraction;
   return operationConfigHash(entry.configSeed, entry.descriptors);
+}
+
+export function conceptCanonicalizationConfigHash(input: {
+  mode: ConceptCanonicalizationMode;
+  config: ConceptCanonicalizationConfig;
+}): string {
+  const entry = neuralOperationRegistry.conceptCanonicalization;
+  const { adjudicationConcurrency: _adjudicationConcurrency, ...behavior } = input.config;
+  void _adjudicationConcurrency;
+  return operationConfigHash(
+    entry.configSeed,
+    entry.descriptors,
+    {
+      mode: input.mode,
+      ...behavior,
+      nodeEmbeddingModel: NODE_EMBEDDING_MODEL
+    },
+    { additionalModels: [NODE_EMBEDDING_MODEL] }
+  );
 }
 
 export function graphEnrichmentConfigHash(config: GraphEnrichmentConfig): string {

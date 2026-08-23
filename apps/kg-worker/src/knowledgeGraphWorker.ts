@@ -1,14 +1,17 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { STAGE_TAGS, type ConceptIdentityDecision } from "@lrnki/domain-core";
+import { STAGE_TAGS } from "@lrnki/domain-core";
 import {
   buildGraphVersion,
+  canonicalizeConcepts,
+  loadConceptCanonicalizationArtifact,
+  summarizeConceptCanonicalization,
+  DEFAULT_CONCEPT_CANONICALIZATION_CONFIG,
   createSourceLessGroundingAdmission,
   createIntrinsicDifficultyPort,
   DEFAULT_ENRICHMENT_CONFIG,
   DEFAULT_SYNTHETIC_GENERATION_CONFIG,
-  resolveConceptIdentity,
   runExtractionOverSources,
   type ExtractionSourceUnit,
   generateStudyItemBank,
@@ -26,8 +29,12 @@ import {
   auditScaffoldContent,
   type ScaffoldContentAuditReport
 } from "@lrnki/application";
-import { identityCandidatesFromBuildInputs } from "./identityCandidateMapping";
-import { parseGenerateStudyItemsArgs } from "./workerArgs";
+import {
+  parseBuildGraphVersionArgs,
+  parseCanonicalizeConceptsArgs,
+  parseGenerateStudyItemsArgs,
+  parseInspectConceptCanonicalizationArgs
+} from "./workerArgs";
 import {
   DoclingStructuredDocumentParser,
   HtmlStructuredDocumentParser,
@@ -71,12 +78,13 @@ import {
   createNeuralClients,
   resolveNeuralClientBaseOptions,
   extractionConfigHash,
+  conceptCanonicalizationConfigHash,
   studyItemBankConfigHash,
   withGraphEnrichmentConfigHash,
   withSyntheticGenerationConfigHash
 } from "@lrnki/infrastructure-litellm";
 import {
-  PostgresArtifactRepository,
+  PostgresConceptCanonicalizationStore,
   PostgresEnrichmentRunStore,
   PostgresExtractionRunStore,
   PostgresStudyItemBankStore,
@@ -120,7 +128,7 @@ function buildContext() {
   // timeline that the live progress view and cost & timings report read.
   const runProgressReporter = new PostgresRunProgressReporter(sql);
   const graphStore = new PostgresGraphVersionStore(sql);
-  const artifacts = new PostgresArtifactRepository(sql);
+  const canonicalizationStore = new PostgresConceptCanonicalizationStore(sql);
   const parsers = new StructuredDocumentParserRegistry([
     new MarkdownStructuredDocumentParser(),
     new HtmlStructuredDocumentParser(),
@@ -174,7 +182,7 @@ function buildContext() {
     },
     spendLogsRead,
     graphStore,
-    artifacts,
+    canonicalizationStore,
     parsers,
     // Inspection read model (ADR-0027): the discovery-coverage audit reads the run's
     // admitted set and the source's teachable blocks through the same read ports the
@@ -353,60 +361,99 @@ async function runExtraction(ctx: Context, sourceResourceId?: string) {
   });
 }
 
-async function buildVersion(ctx: Context, args: string[]) {
-  // Publication selects Extraction Runs explicitly by id. A run passing the
-  // mechanical/evidence gates ('succeeded') is not automatically publishable —
-  // the operator must name the runs they inspected and judged sound, so a
-  // semantically-bad-but-valid run never silently mutates the graph (AGENTS
-  // rule 11; ADR-0017 builds are a pure function of the base version + runs).
-  // `--base <graphVersionId>` extends a published version, unioning its CEP
-  // evidence with the newly selected runs (ADR-0007 reset R3); omit it for the
-  // initial build.
-  let baseGraphVersionId: string | null = null;
-  const runIds: string[] = [];
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === "--base") { baseGraphVersionId = args[++i] ?? null; continue; }
-    runIds.push(args[i]);
+async function canonicalizeConceptsCommand(ctx: Context, args: string[]) {
+  let parsed;
+  try {
+    parsed = parseCanonicalizeConceptsArgs(args);
+  } catch (error) {
+    console.error(`! ${error instanceof Error ? error.message : String(error)}`);
+    process.exitCode = 1;
+    return;
   }
-  if (runIds.length === 0) {
-    console.error("! build-graph-version requires one or more explicit run IDs (no automatic 'latest succeeded' selection).");
-    console.error("  Inspect runs first, then: worker:kg build-graph-version [--base <graphVersionId>] <runId> [<runId> ...]");
+  const artifactId = randomUUID();
+  const configHash = conceptCanonicalizationConfigHash({
+    mode: parsed.mode,
+    config: DEFAULT_CONCEPT_CANONICALIZATION_CONFIG
+  });
+  const artifact = await canonicalizeConcepts({
+    artifactId,
+    baseGraphVersionId: parsed.baseGraphVersionId,
+    runIds: parsed.runIds,
+    mode: parsed.mode,
+    configHash,
+    config: DEFAULT_CONCEPT_CANONICALIZATION_CONFIG,
+    runStore: ctx.runStore,
+    graphStore: ctx.graphStore,
+    canonicalizationStore: ctx.canonicalizationStore,
+    embedding: ctx.nodeEmbedding,
+    adjudicator: ctx.nodeMergeAdjudicator,
+    reporter: ctx.runProgressReporter
+  });
+  printCanonicalizationSummary(summarizeConceptCanonicalization(artifact));
+}
+
+async function inspectConceptCanonicalizationCommand(ctx: Context, args: string[]) {
+  let parsed;
+  try {
+    parsed = parseInspectConceptCanonicalizationArgs(args);
+  } catch (error) {
+    console.error(`! ${error instanceof Error ? error.message : String(error)}`);
+    process.exitCode = 1;
+    return;
+  }
+  const artifact = await loadConceptCanonicalizationArtifact(
+    ctx.canonicalizationStore,
+    parsed.artifactId
+  );
+  if (parsed.json) {
+    console.log(JSON.stringify(artifact, null, 2));
+    return;
+  }
+  printCanonicalizationSummary(summarizeConceptCanonicalization(artifact));
+  for (const decision of artifact.payload.decisions) {
+    const members = decision.members.map((member) => member.canonicalLabel).join(" | ");
+    console.log(
+      `   ${decision.outcome} [${decision.declaredDomain}] score=${decision.proposingScore.toFixed(6)} survivor=${decision.survivorNormalizedLabel ?? "-"} members=${members}`
+    );
+    console.log(`     ${decision.rationale}`);
+  }
+  for (const unavailable of artifact.payload.unavailable) {
+    const subject = unavailable.kind === "embedding"
+      ? unavailable.declaredDomain
+      : `${unavailable.aKey} | ${unavailable.bKey}`;
+    console.log(`   unavailable/${unavailable.kind} ${subject}: ${unavailable.reason}`);
+  }
+}
+
+function printCanonicalizationSummary(summary: ReturnType<typeof summarizeConceptCanonicalization>) {
+  console.log(
+    `>> Concept Canonicalization artifact ${summary.artifactId}: mode=${summary.mode} runs=${summary.runCount} merges=${summary.mergeCount} distinct=${summary.distinctCount} quarantine=${summary.quarantineCount} unavailable=${summary.unavailableCount}`
+  );
+}
+
+async function buildVersion(ctx: Context, args: string[]) {
+  let parsed;
+  try {
+    parsed = parseBuildGraphVersionArgs(args);
+  } catch (error) {
+    console.error(`! ${error instanceof Error ? error.message : String(error)}`);
     process.exitCode = 1;
     return;
   }
   const graphVersionId = randomUUID();
-
-  // Semantic identity resolution before the build (plan 2026-06-26-002). The model calls
-  // live here; the build consumes the decisions and stays LLM-free (KTD1, R8). Opt out
-  // with BUILD_DISABLE_IDENTITY_RESOLUTION to reproduce the exact-label baseline for the
-  // U5 calibration comparison (KTD7), mirroring ENRICH_DISABLE_DEDUP. The base snapshot
-  // and runs are read again here; the build re-reads them internally — both are
-  // deterministic reads that keep the build a self-contained pure function (KTD1).
-  let identityDecisions: ConceptIdentityDecision[] = [];
-  if (!process.env.BUILD_DISABLE_IDENTITY_RESOLUTION) {
-    const runs = await ctx.runStore.runsForBuildByIds(runIds);
-    const base = baseGraphVersionId ? await ctx.graphStore.getPublishedSnapshot(baseGraphVersionId) : undefined;
-    const existingIdentities = await ctx.graphStore.existingConceptIdentities();
-    const candidates = identityCandidatesFromBuildInputs({ runs, base, existingIdentities });
-    let unavailable = 0;
-    const result = await resolveConceptIdentity({
-      candidates,
-      embedding: ctx.nodeEmbedding,
-      adjudicator: ctx.nodeMergeAdjudicator,
-      onUnavailable: () => { unavailable++; }
-    });
-    identityDecisions = result.decisions;
-    const count = (outcome: ConceptIdentityDecision["outcome"]) => identityDecisions.filter((decision) => decision.outcome === outcome).length;
-    // One-line resolution summary mirroring the dedup/ordering lines. A case-B
-    // quarantine surfaces here as quarantine>0 and the build below then refuses with a
-    // named-collision error (R7).
-    console.log(`   identity: merges=${count("merge")} distinct=${count("distinct")} quarantine=${count("quarantine")} unavailable=${unavailable}`);
-  }
-
-  const snapshot = await buildGraphVersion({ graphVersionId, baseGraphVersionId, runIds, runStore: ctx.runStore, graphStore: ctx.graphStore, reporter: ctx.runProgressReporter, identityDecisions });
+  const snapshot = await buildGraphVersion({
+    graphVersionId,
+    baseGraphVersionId: parsed.baseGraphVersionId,
+    runIds: parsed.runIds,
+    runStore: ctx.runStore,
+    graphStore: ctx.graphStore,
+    canonicalizationArtifactId: parsed.canonicalizationArtifactId,
+    canonicalizationStore: ctx.canonicalizationStore,
+    reporter: ctx.runProgressReporter
+  });
   const passages = snapshot.evidenceProfiles.reduce((sum, profile) => sum + profile.definitions.length + profile.mentions.length, 0);
   const assertions = snapshot.evidenceProfiles.reduce((sum, profile) => sum + profile.assertions.length, 0);
-  console.log(`\n>> published graph version ${graphVersionId}${baseGraphVersionId ? ` (base ${baseGraphVersionId})` : ""} from ${runIds.length} run(s): concepts=${snapshot.concepts.length} CEP-passages=${passages} assertions=${assertions} edges=0`);
+  console.log(`\n>> published graph version ${graphVersionId}${parsed.baseGraphVersionId ? ` (base ${parsed.baseGraphVersionId})` : ""} from ${parsed.runIds.length} run(s), canonicalization=${parsed.canonicalizationArtifactId}: concepts=${snapshot.concepts.length} CEP-passages=${passages} assertions=${assertions} edges=0`);
 }
 
 async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
@@ -959,8 +1006,14 @@ async function dispatch(ctx: Context, command: string | undefined, arg: string |
     case "run-extraction":
       await runExtraction(ctx, arg === "--all" || arg === undefined ? undefined : arg);
       break;
+    case "canonicalize-concepts":
+      await canonicalizeConceptsCommand(ctx, [arg, ...rest].filter((value): value is string => Boolean(value)));
+      break;
+    case "inspect-concept-canonicalization":
+      await inspectConceptCanonicalizationCommand(ctx, [arg, ...rest].filter((value): value is string => Boolean(value)));
+      break;
     case "build-graph-version":
-      // All positional args after the command are run IDs to publish.
+      // The selected artifact and ordered run IDs are all explicit command inputs.
       await buildVersion(ctx, [arg, ...rest].filter((value): value is string => Boolean(value)));
       break;
     case "enrich-graph-version":
@@ -994,7 +1047,7 @@ async function dispatch(ctx: Context, command: string | undefined, arg: string |
       await journeyCostReportCommand(ctx, arg, rest);
       break;
     default:
-      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | generate-synthetic-layer <topic> <declaredDomain> | calibrate-boundary-probe <ladder-file> [--out <dir>] [--deployments <csv>] [--temperatures <csv>] [--k <csv>] [--thresholds <csv>] [--sample-count <n>] [--draw-concurrency <n>] [--concept-concurrency <n>] | audit-discovery-coverage <runId> [--k <n>] [--out <dir>] | audit-scaffold-content <enrichmentId> [--k <n>] [--out <dir>] | generate-study-items <enrichmentId> [--concurrency <positiveInteger>] | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources | cost-timing-report <operationId> [--json] [--ranked] | journey-cost-report <enrichmentId> [--json] [--ranked]>");
+      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | canonicalize-concepts [--exact-label-only] [--base <graphVersionId>] <runId>... | inspect-concept-canonicalization <artifactId> [--json] | build-graph-version --canonicalization <artifactId> [--base <graphVersionId>] <runId>... | enrich-graph-version [<graphVersionId>] | generate-synthetic-layer <topic> <declaredDomain> | calibrate-boundary-probe <ladder-file> [--out <dir>] [--deployments <csv>] [--temperatures <csv>] [--k <csv>] [--thresholds <csv>] [--sample-count <n>] [--draw-concurrency <n>] [--concept-concurrency <n>] | audit-discovery-coverage <runId> [--k <n>] [--out <dir>] | audit-scaffold-content <enrichmentId> [--k <n>] [--out <dir>] | generate-study-items <enrichmentId> [--concurrency <positiveInteger>] | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources | cost-timing-report <operationId> [--json] [--ranked] | journey-cost-report <enrichmentId> [--json] [--ranked]>");
   }
 }
 

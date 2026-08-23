@@ -4,12 +4,13 @@
 
 ## TODO
 
-- **ADR audit — ready; U1 next.** Follow
-  [the first active plan](./2026-08-23-001-apply-adr-audit.md) in U0–U5 order. The ready-plan commit
-  precedes all source work. Next, create the immutable Concept Canonicalization operation and make
-  Graph-Version Build consume its explicitly selected artifact without model or embedding calls.
-  Preserve ADR-0006, every cross-family rule, current one-pass admission behavior, all Model
-  Assignments, the ten local commits, and unrelated skill worktree changes.
+- **ADR audit — in progress; U2 next.** Follow
+  [the first active plan](./2026-08-23-001-apply-adr-audit.md) in U0–U5 order. U1 now owns immutable
+  semantic/exact Concept Canonicalization artifacts and LLM-free deterministic build replay. Next,
+  finish application-owned Operation Timeline stage enforcement, Processing Journey lineage, the
+  code-first operation constraint/hash rule, and their database tests. Preserve ADR-0006, every
+  cross-family rule, current one-pass admission behavior, all Model Assignments, the ten original
+  local commits, and unrelated skill worktree changes.
 
 - **Topic Expedition generation latency — blocked; U3 remains `FIX_FIRST`.** Follow
   [the active plan](./2026-08-22-001-repair-topic-expedition-generation-latency.md) in U0–U4 order.

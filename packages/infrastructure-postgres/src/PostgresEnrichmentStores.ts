@@ -15,7 +15,7 @@ import type {
 } from "@lrnki/domain-core";
 import type { EnrichmentRunStorePort } from "@lrnki/ports";
 import type { Sql } from "postgres";
-import { writeArtifactEnvelope } from "./PostgresArtifactRepository";
+import { writeArtifactEnvelope } from "./PostgresArtifacts";
 
 // Each Enrichment Run is appended once. Normalized rows are the query surface;
 // the JSONB artifact is the complete judgment/disposition trace.

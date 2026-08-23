@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { ArtifactEnvelope, BuildEvidenceProfile, ConceptIdentityDecision, ConceptIdentityRef, GraphSnapshot, PublishedConceptIdentity, RefinementDecisionRecord, RunForBuild } from "@lrnki/domain-core";
-import { CONCEPT_IDENTITY_DECISION_TYPE } from "@lrnki/domain-core";
+import type { ArtifactEnvelope, BuildEvidenceProfile, ConceptCanonicalizationArtifact, ConceptIdentityDecision, ConceptIdentityRef, GraphSnapshot, PublishedConceptIdentity, RefinementDecisionRecord, RunForBuild } from "@lrnki/domain-core";
+import { CONCEPT_CANONICALIZATION_ARTIFACT_TYPE, CONCEPT_CANONICALIZATION_SELECTION_DECISION_TYPE, CONCEPT_IDENTITY_DECISION_TYPE } from "@lrnki/domain-core";
 import { currentOperationTag } from "@lrnki/domain-core/operation-tag-context";
 import { installNodeOperationTagContext } from "@lrnki/domain-core/operation-tag-context-node";
 import type { ExtractionRunStorePort, GraphVersionStorePort, RunProgressReporterPort } from "@lrnki/ports";
@@ -72,6 +72,39 @@ function fakes(runs: RunForBuild[], existing: PublishedConceptIdentity[] = []) {
   return { runStore, graphStore, artifacts, getPublished: () => last, getDecisions: () => lastDecisions, published };
 }
 
+type BuildInput = Parameters<typeof buildGraphVersion>[0];
+
+function withCanonicalization(
+  input: Omit<BuildInput, "canonicalizationArtifactId" | "canonicalizationStore">,
+  decisions: ConceptIdentityDecision[] = [],
+  captured: PublishedConceptIdentity[] = []
+): BuildInput {
+  const artifact: ArtifactEnvelope<ConceptCanonicalizationArtifact> = {
+    artifactId: "canon-1",
+    artifactType: CONCEPT_CANONICALIZATION_ARTIFACT_TYPE,
+    producer: "test",
+    producerVersion: "1",
+    configHash: "canonicalization-test-v1",
+    createdAt: "2026-08-23T00:00:00.000Z",
+    payload: {
+      mode: decisions.length > 0 ? "semantic" : "exact_label_only",
+      baseGraphVersionId: input.baseGraphVersionId,
+      runIds: input.runIds,
+      publishedConceptIdentities: captured,
+      decisions,
+      unavailable: []
+    }
+  };
+  return {
+    ...input,
+    canonicalizationArtifactId: artifact.artifactId,
+    canonicalizationStore: {
+      persist: async () => {},
+      getById: async (artifactId) => artifactId === artifact.artifactId ? artifact : undefined
+    }
+  };
+}
+
 // A merge/quarantine identity decision builder for the build-consumption tests.
 function identityRef(declaredDomain: string, normalizedLabel: string, canonicalLabel: string, published: boolean, definitions: string[] = []): ConceptIdentityRef {
   return { declaredDomain, normalizedLabel, canonicalLabel, aliases: [], definitions, published };
@@ -86,8 +119,7 @@ function mergeDecision(declaredDomain: string, survivor: ConceptIdentityRef, abs
     proposingSignal: "embedding_cosine",
     proposingScore: 0.9,
     rationale: "near-duplicate same-domain identity",
-    decidingModel: "fake-judge",
-    configHash: "identity-res-v1"
+    decidingModel: "fake-judge"
   };
 }
 
@@ -96,7 +128,7 @@ test("buildGraphVersion refuses to publish when a selected run carries a quarant
   const { runStore, graphStore, getPublished } = fakes(runs);
 
   await assert.rejects(
-    () => buildGraphVersion({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore, graphStore }),
+    () => buildGraphVersion(withCanonicalization({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore, graphStore })),
     /unresolved quarantine decisions: run-1:Mercury/
   );
   assert.equal(getPublished(), undefined, "nothing should be published when a run is quarantined");
@@ -105,7 +137,7 @@ test("buildGraphVersion refuses to publish when a selected run carries a quarant
 test("buildGraphVersion publishes Concepts with CEPs and zero asserted edges (R5)", async () => {
   const { runStore, graphStore, getPublished } = fakes([runForBuild()]);
 
-  const snapshot = await buildGraphVersion({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore, graphStore });
+  const snapshot = await buildGraphVersion(withCanonicalization({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore, graphStore }));
 
   assert.equal(snapshot.graphVersionId, "gv-1");
   assert.equal(snapshot.baseGraphVersionId, null);
@@ -122,7 +154,7 @@ test("buildGraphVersion fails closed when a selected run has a core Concept with
   const { runStore, graphStore, getPublished } = fakes([run]);
 
   await assert.rejects(
-    () => buildGraphVersion({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore, graphStore }),
+    () => buildGraphVersion(withCanonicalization({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore, graphStore })),
     /no complete Concept Evidence Profile/
   );
   assert.equal(getPublished(), undefined);
@@ -144,7 +176,7 @@ test("buildGraphVersion publishes cross-domain homographs separately (curated tr
   });
   const { runStore, graphStore } = fakes([rustRun, economicsRun]);
 
-  const snapshot = await buildGraphVersion({ graphVersionId: "gv-homographs", baseGraphVersionId: null, runIds: ["run-rust", "run-econ"], runStore, graphStore });
+  const snapshot = await buildGraphVersion(withCanonicalization({ graphVersionId: "gv-homographs", baseGraphVersionId: null, runIds: ["run-rust", "run-econ"], runStore, graphStore }));
 
   assert.equal(snapshot.concepts.length, 2);
   assert.ok(snapshot.concepts.every((concept) => concept.homograph));
@@ -163,7 +195,7 @@ test("an incremental build unions base + new source evidence on one Concept (AE2
     })]
   });
   const a = fakes([runA]);
-  const versionA = await buildGraphVersion({ graphVersionId: "gv-a", baseGraphVersionId: null, runIds: ["run-a"], runStore: a.runStore, graphStore: a.graphStore });
+  const versionA = await buildGraphVersion(withCanonicalization({ graphVersionId: "gv-a", baseGraphVersionId: null, runIds: ["run-a"], runStore: a.runStore, graphStore: a.graphStore }));
   const conceptId = versionA.concepts[0].conceptId;
 
   // Version B bases on A and selects source B, which adds new evidence to Ownership.
@@ -183,7 +215,7 @@ test("an incremental build unions base + new source evidence on one Concept (AE2
   b.published.set("gv-a", versionA);
   const graphStoreB: GraphVersionStorePort = { ...b.graphStore, getPublishedSnapshot: async (id) => (id === "gv-a" ? versionA : b.published.get(id)) };
 
-  const versionB = await buildGraphVersion({ graphVersionId: "gv-b", baseGraphVersionId: "gv-a", runIds: ["run-b"], runStore: b.runStore, graphStore: graphStoreB });
+  const versionB = await buildGraphVersion(withCanonicalization({ graphVersionId: "gv-b", baseGraphVersionId: "gv-a", runIds: ["run-b"], runStore: b.runStore, graphStore: graphStoreB }, [], existing));
 
   assert.equal(versionB.concepts.length, 1, "the Concept identity is reused, not duplicated");
   assert.equal(versionB.concepts[0].conceptId, conceptId, "ADR-0015 stable identity reused across versions (U4.5)");
@@ -209,7 +241,7 @@ test("identical evidence from one source is deduplicated; distinct quotes are ke
   });
   const { runStore, graphStore } = fakes([run]);
 
-  const snapshot = await buildGraphVersion({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore, graphStore });
+  const snapshot = await buildGraphVersion(withCanonicalization({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore, graphStore }));
   const cep = snapshot.evidenceProfiles[0];
   assert.equal(cep.definitions.length, 1, "exact-duplicate definition collapsed");
   assert.equal(cep.mentions.length, 2, "distinct mentions retained");
@@ -218,7 +250,7 @@ test("identical evidence from one source is deduplicated; distinct quotes are ke
 test("buildGraphVersion fails when the named base version is not published", async () => {
   const { runStore, graphStore } = fakes([runForBuild()]);
   await assert.rejects(
-    () => buildGraphVersion({ graphVersionId: "gv-1", baseGraphVersionId: "missing", runIds: ["run-1"], runStore, graphStore }),
+    () => buildGraphVersion(withCanonicalization({ graphVersionId: "gv-1", baseGraphVersionId: "missing", runIds: ["run-1"], runStore, graphStore })),
     /Base graph version missing is not published/
   );
 });
@@ -231,7 +263,7 @@ test("a thrown build gate closes the open stage ok:false and reports completeOpe
   const { reporter, calls } = recordingReporter();
 
   await assert.rejects(
-    () => buildGraphVersion({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore, graphStore, reporter }),
+    () => buildGraphVersion(withCanonicalization({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore, graphStore, reporter })),
     /unresolved quarantine decisions/
   );
 
@@ -245,7 +277,7 @@ test("a clean build reports the three non-LLM stages and completeOperation succe
   const { runStore, graphStore } = fakes([runForBuild()]);
   const { reporter, calls } = recordingReporter();
 
-  await buildGraphVersion({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore, graphStore, reporter });
+  await buildGraphVersion(withCanonicalization({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore, graphStore, reporter }));
 
   const stages = calls.filter((c) => c.method === "completeStage") as { stage: string; ok: boolean }[];
   assert.deepEqual(stages.map((c) => c.stage), [
@@ -266,18 +298,18 @@ test("the minting operation establishes its ambient operation tag", async () => 
       return runStore.runsForBuildByIds(runIds);
     }
   };
-  await buildGraphVersion({
+  await buildGraphVersion(withCanonicalization({
     graphVersionId: "gv-context",
     baseGraphVersionId: null,
     runIds: ["run-1"],
     runStore: checkingRunStore,
     graphStore
-  });
+  }));
 });
 
 test("the published snapshot is written with its immutable artifact envelope", async () => {
   const { runStore, graphStore, artifacts } = fakes([runForBuild()]);
-  await buildGraphVersion({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore, graphStore });
+  await buildGraphVersion(withCanonicalization({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore, graphStore }));
   assert.equal(artifacts.length, 1);
   assert.equal(artifacts[0].artifactType, "graph_snapshot");
   assert.equal(artifacts[0].graphVersionId, "gv-1");
@@ -293,7 +325,7 @@ test("AE1: a merge decision folds a new candidate into a published Concept, keep
     evidenceProfiles: [profile("ownership", { definitions: [{ sourceBlockId: "a-def", evidenceQuote: "Ownership governs memory.", headingPath: ["A"], locator: { page: 1 } }] })]
   });
   const a = fakes([runA]);
-  const versionA = await buildGraphVersion({ graphVersionId: "gv-a", baseGraphVersionId: null, runIds: ["run-a"], runStore: a.runStore, graphStore: a.graphStore });
+  const versionA = await buildGraphVersion(withCanonicalization({ graphVersionId: "gv-a", baseGraphVersionId: null, runIds: ["run-a"], runStore: a.runStore, graphStore: a.graphStore }));
   const baseConceptId = versionA.concepts[0].conceptId;
   const baseIri = versionA.concepts[0].iri;
 
@@ -311,10 +343,10 @@ test("AE1: a merge decision folds a new candidate into a published Concept, keep
     identityRef("rust programming", "ownership", "Ownership", true),
     [identityRef("rust programming", "owner", "Owner", false)]);
 
-  const versionB = await buildGraphVersion({
+  const versionB = await buildGraphVersion(withCanonicalization({
     graphVersionId: "gv-b", baseGraphVersionId: "gv-a", runIds: ["run-b"],
-    runStore: b.runStore, graphStore: graphStoreB, identityDecisions: [decision]
-  });
+    runStore: b.runStore, graphStore: graphStoreB
+  }, [decision], existing));
 
   assert.equal(versionB.concepts.length, 1, "the new candidate folded into the published Concept");
   assert.equal(versionB.concepts[0].conceptId, baseConceptId, "stable identity reused (case A)");
@@ -338,10 +370,10 @@ test("AE2: a merge decision over two new candidates mints one Concept carrying b
     identityRef("economics", "barter", "Barter", false),
     [identityRef("economics", "bartering", "Bartering", false)]);
 
-  const snapshot = await buildGraphVersion({
+  const snapshot = await buildGraphVersion(withCanonicalization({
     graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"],
-    runStore, graphStore, identityDecisions: [decision]
-  });
+    runStore, graphStore
+  }, [decision]));
 
   assert.equal(snapshot.concepts.length, 1, "two candidates collapse to one minted Concept");
   assert.equal(snapshot.concepts[0].canonicalLabel, "Barter", "survivor presentation wins");
@@ -350,7 +382,6 @@ test("AE2: a merge decision over two new candidates mints one Concept carrying b
 });
 
 test("AE3: a case-B quarantine decision refuses the build and publishes nothing", async () => {
-  const { runStore, graphStore, getPublished } = fakes([runForBuild()]);
   const quarantine: ConceptIdentityDecision = {
     outcome: "quarantine",
     declaredDomain: "economics",
@@ -360,21 +391,28 @@ test("AE3: a case-B quarantine decision refuses the build and publishes nothing"
     ],
     survivorNormalizedLabel: null,
     proposingSignal: "embedding_cosine", proposingScore: 0.95, rationale: "collision",
-    decidingModel: "fake-judge", configHash: "identity-res-v1"
+    decidingModel: "fake-judge"
   };
+  const captured = quarantine.members.map((member, index) => ({
+    conceptId: `00000000-0000-5000-8000-00000000000${index}`,
+    iri: `https://lrnki.local/concept/trade-${index}`,
+    normalizedLabel: member.normalizedLabel,
+    declaredDomain: member.declaredDomain
+  }));
+  const quarantinedFakes = fakes([runForBuild()], captured);
 
   await assert.rejects(
-    () => buildGraphVersion({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore, graphStore, identityDecisions: [quarantine] }),
+    () => buildGraphVersion(withCanonicalization({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore: quarantinedFakes.runStore, graphStore: quarantinedFakes.graphStore }, [quarantine], captured)),
     /two-already-published collision.*Trade One ⇄ Trade Two/s
   );
-  assert.equal(getPublished(), undefined, "nothing is published; no IRI minted or retired");
+  assert.equal(quarantinedFakes.getPublished(), undefined, "nothing is published; no IRI minted or retired");
 });
 
-test("an empty identityDecisions array builds exactly as exact-label-only", async () => {
+test("an artifact with no semantic decisions builds exactly as exact-label-only", async () => {
   const withEmpty = fakes([runForBuild()]);
   const baseline = fakes([runForBuild()]);
-  const a = await buildGraphVersion({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore: withEmpty.runStore, graphStore: withEmpty.graphStore, identityDecisions: [] });
-  const b = await buildGraphVersion({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore: baseline.runStore, graphStore: baseline.graphStore });
+  const a = await buildGraphVersion(withCanonicalization({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore: withEmpty.runStore, graphStore: withEmpty.graphStore }));
+  const b = await buildGraphVersion(withCanonicalization({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore: baseline.runStore, graphStore: baseline.graphStore }));
   assert.deepEqual(a.concepts.map((c) => c.canonicalLabel), b.concepts.map((c) => c.canonicalLabel));
   assert.equal(a.concepts.length, 1);
 });
@@ -392,7 +430,7 @@ test("the build consumes a merge decision with no ports supplied (no model call,
   });
   const { runStore, graphStore } = fakes([run]);
   const decision = mergeDecision("economics", identityRef("economics", "barter", "Barter", false), [identityRef("economics", "bartering", "Bartering", false)]);
-  const snapshot = await buildGraphVersion({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore, graphStore, identityDecisions: [decision] });
+  const snapshot = await buildGraphVersion(withCanonicalization({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore, graphStore }, [decision]));
   assert.equal(snapshot.concepts.length, 1);
 });
 
@@ -407,8 +445,193 @@ test("applied identity decisions are written to refinement_decisions (KTD3)", as
   });
   const { runStore, graphStore, getDecisions } = fakes([run]);
   const decision = mergeDecision("economics", identityRef("economics", "barter", "Barter", false), [identityRef("economics", "bartering", "Bartering", false)]);
-  await buildGraphVersion({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore, graphStore, identityDecisions: [decision] });
+  await buildGraphVersion(withCanonicalization({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore, graphStore }, [decision]));
   const identityRows = getDecisions().filter((d) => d.decisionType === CONCEPT_IDENTITY_DECISION_TYPE);
   assert.equal(identityRows.length, 1, "the merge decision is persisted");
   assert.equal(identityRows[0].outcome, "merge");
+  assert.deepEqual(identityRows[0].provenance, {
+    proposingSignal: "embedding_cosine",
+    proposingScore: 0.9,
+    decidingModel: "fake-judge",
+    artifactId: "canon-1",
+    configHash: "canonicalization-test-v1"
+  });
+  const selection = getDecisions().find(
+    (row) => row.decisionType === CONCEPT_CANONICALIZATION_SELECTION_DECISION_TYPE
+  );
+  assert.deepEqual(selection?.subject, { artifactId: "canon-1" });
+  assert.equal(
+    (selection?.provenance as { configHash?: string } | undefined)?.configHash,
+    "canonicalization-test-v1"
+  );
+});
+
+test("unknown, wrong-type, malformed, base-mismatched, and run-mismatched artifacts fail closed", async () => {
+  const env = fakes([runForBuild()]);
+  const base = withCanonicalization({
+    graphVersionId: "gv-1",
+    baseGraphVersionId: null,
+    runIds: ["run-1"],
+    runStore: env.runStore,
+    graphStore: env.graphStore
+  });
+
+  await assert.rejects(
+    () => buildGraphVersion({
+      ...base,
+      canonicalizationArtifactId: "missing",
+      canonicalizationStore: { persist: async () => {}, getById: async () => undefined }
+    }),
+    /Unknown Concept Canonicalization artifact/
+  );
+
+  const valid = await base.canonicalizationStore.getById("canon-1");
+  assert.ok(valid);
+  const returning = (artifact: unknown) => ({
+    persist: async () => {},
+    getById: async () => artifact as ArtifactEnvelope<ConceptCanonicalizationArtifact>
+  });
+  await assert.rejects(
+    () => buildGraphVersion({
+      ...base,
+      canonicalizationStore: returning({ ...valid, artifactType: "graph_snapshot" })
+    }),
+    /Wrong artifact type/
+  );
+  await assert.rejects(
+    () => buildGraphVersion({
+      ...base,
+      canonicalizationStore: returning({ ...valid, payload: { ...valid.payload, decisions: "not-an-array" } })
+    }),
+    /decisions must be an array/
+  );
+  await assert.rejects(
+    () => buildGraphVersion({
+      ...base,
+      canonicalizationStore: returning({
+        ...valid,
+        payload: { ...valid.payload, baseGraphVersionId: "gv-other" }
+      })
+    }),
+    /created for base gv-other, not <none>/
+  );
+  await assert.rejects(
+    () => buildGraphVersion({
+      ...base,
+      canonicalizationStore: returning({
+        ...valid,
+        payload: { ...valid.payload, runIds: ["run-other"] }
+      })
+    }),
+    /different ordered Extraction Run selection/
+  );
+});
+
+test("replaying one artifact preserves Concept identity, IRI, CEP, and refinement content", async () => {
+  const selectedRun = runForBuild({
+    coreCandidates: [
+      { candidateKey: "barter", canonicalLabel: "Barter", normalizedLabel: "barter", aliases: [] },
+      { candidateKey: "bartering", canonicalLabel: "Bartering", normalizedLabel: "bartering", aliases: [] }
+    ],
+    evidenceProfiles: [profile("barter"), profile("bartering")]
+  });
+  const decision = mergeDecision(
+    "rust programming",
+    identityRef("rust programming", "barter", "Barter", false),
+    [identityRef("rust programming", "bartering", "Bartering", false)]
+  );
+  const first = fakes([selectedRun]);
+  const snapshotA = await buildGraphVersion(withCanonicalization({
+    graphVersionId: "gv-replay-a",
+    baseGraphVersionId: null,
+    runIds: ["run-1"],
+    runStore: first.runStore,
+    graphStore: first.graphStore
+  }, [decision]));
+
+  const replayIdentities: PublishedConceptIdentity[] = snapshotA.concepts.map((concept) => ({
+    conceptId: concept.conceptId,
+    iri: concept.iri,
+    normalizedLabel: concept.normalizedLabel,
+    declaredDomain: concept.declaredDomain
+  }));
+  const replay = fakes([selectedRun], replayIdentities);
+  const snapshotB = await buildGraphVersion(withCanonicalization({
+    graphVersionId: "gv-replay-b",
+    baseGraphVersionId: null,
+    runIds: ["run-1"],
+    runStore: replay.runStore,
+    graphStore: replay.graphStore
+  }, [decision]));
+
+  assert.deepEqual(snapshotB.concepts, snapshotA.concepts);
+  assert.deepEqual(snapshotB.evidenceProfiles, snapshotA.evidenceProfiles);
+  assert.deepEqual(replay.getDecisions(), first.getDecisions());
+  assert.match(snapshotA.concepts[0].conceptId, /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+});
+
+test("missing, changed, unrelated, conflicting, and partial registry state is rejected", async () => {
+  const captured: PublishedConceptIdentity = {
+    conceptId: "00000000-0000-5000-8000-000000000001",
+    iri: "https://lrnki.local/concept/published",
+    normalizedLabel: "published",
+    declaredDomain: "rust programming"
+  };
+  const selectedRun = runForBuild();
+
+  const attempt = async (
+    current: PublishedConceptIdentity[],
+    capturedIdentities: PublishedConceptIdentity[],
+    runValue: RunForBuild = selectedRun
+  ) => {
+    const env = fakes([runValue], current);
+    return buildGraphVersion(withCanonicalization({
+      graphVersionId: "gv-registry",
+      baseGraphVersionId: null,
+      runIds: [runValue.runId],
+      runStore: env.runStore,
+      graphStore: env.graphStore
+    }, [], capturedIdentities));
+  };
+
+  await assert.rejects(() => attempt([], [captured]), /captured identity .* is missing/);
+  await assert.rejects(
+    () => attempt([{ ...captured, conceptId: "00000000-0000-5000-8000-000000000009" }], [captured]),
+    /captured identity .* conflicts/
+  );
+  await assert.rejects(
+    () => attempt([{
+      conceptId: "00000000-0000-5000-8000-000000000099",
+      iri: "https://lrnki.local/concept/unrelated",
+      normalizedLabel: "unrelated",
+      declaredDomain: "other"
+    }], []),
+    /unrelated or conflicting identity/
+  );
+
+  const twoConceptRun = runForBuild({
+    coreCandidates: [
+      { candidateKey: "one", canonicalLabel: "One", normalizedLabel: "one", aliases: [] },
+      { candidateKey: "two", canonicalLabel: "Two", normalizedLabel: "two", aliases: [] }
+    ],
+    evidenceProfiles: [profile("one"), profile("two")]
+  });
+  const seed = fakes([twoConceptRun]);
+  const output = await buildGraphVersion(withCanonicalization({
+    graphVersionId: "gv-seed",
+    baseGraphVersionId: null,
+    runIds: ["run-1"],
+    runStore: seed.runStore,
+    graphStore: seed.graphStore
+  }));
+  const partial = output.concepts.slice(0, 1).map((concept) => ({
+    conceptId: concept.conceptId,
+    iri: concept.iri,
+    normalizedLabel: concept.normalizedLabel,
+    declaredDomain: concept.declaredDomain
+  }));
+  await assert.rejects(
+    () => attempt(partial, [], twoConceptRun),
+    /unrelated or partial replay identities/
+  );
 });

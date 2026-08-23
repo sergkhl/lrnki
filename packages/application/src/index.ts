@@ -1,5 +1,14 @@
 export { runExtractionOverSources, type ExtractionSourceUnit } from "./runExtractionOverSources";
 export { buildGraphVersion } from "./buildGraphVersion";
+export {
+  canonicalizeConcepts,
+  loadConceptCanonicalizationArtifact,
+  summarizeConceptCanonicalization,
+  DEFAULT_CONCEPT_CANONICALIZATION_CONFIG,
+  type ConceptCanonicalizationConfig,
+  type ConceptCanonicalizationMode,
+  type ConceptCanonicalizationSummary
+} from "./canonicalizeConcepts";
 export { runGraphEnrichment, DEFAULT_ENRICHMENT_CONFIG } from "./runGraphEnrichment";
 export type { GraphEnrichmentConfig } from "./runGraphEnrichment";
 export { runSyntheticGeneration, DEFAULT_SYNTHETIC_GENERATION_CONFIG } from "./runSyntheticGeneration";
@@ -83,7 +92,6 @@ export {
 export { getWeeklyLeaderboard, lifetimeMasteredCrystalCount, type WeeklyLeaderboard } from "./getWeeklyLeaderboard";
 
 export { createIntrinsicDifficultyPort } from "./intrinsicDifficulty";
-export { resolveConceptIdentity, type ConceptIdentityCandidate } from "./resolveConceptIdentity";
 export { synthesizeResponses } from "./syntheticResponses";
 
 export {

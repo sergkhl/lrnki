@@ -1,10 +1,11 @@
+import { createHash } from "node:crypto";
 import {
+  CONCEPT_CANONICALIZATION_SELECTION_DECISION_TYPE,
   CONCEPT_IDENTITY_DECISION_TYPE,
   slugifyConceptLabel,
   type ArtifactEnvelope,
   type BuildEvidencePassage,
   type Concept,
-  type ConceptIdentityDecision,
   type GraphSnapshot,
   type PublishedConceptEvidenceProfile,
   type PublishedEvidencePassage,
@@ -12,7 +13,13 @@ import {
   type RefinementDecisionRecord,
   type TrustTier
 } from "@lrnki/domain-core";
-import type { GraphVersionStorePort, ExtractionRunStorePort, RunProgressReporterPort } from "@lrnki/ports";
+import type {
+  ConceptCanonicalizationStorePort,
+  GraphVersionStorePort,
+  ExtractionRunStorePort,
+  RunProgressReporterPort
+} from "@lrnki/ports";
+import { loadConceptCanonicalizationArtifact } from "./canonicalizeConcepts";
 import { NON_LLM_STAGES, noopRunProgressReporter, runInstrumentedOperation } from "./runProgressReporter";
 
 const PRODUCER = "@lrnki/application";
@@ -38,11 +45,8 @@ export async function buildGraphVersion(input: {
   runIds: string[];
   runStore: ExtractionRunStorePort;
   graphStore: GraphVersionStorePort;
-  // Recorded semantic identity-resolution decisions (plan 2026-06-26-002, KTD1/KTD3).
-  // The build CONSUMES these — it makes no model call (R8). `merge` decisions remap an
-  // absorbed identity key onto its survivor; a `quarantine` decision (case B) refuses
-  // the build (R7). Absent/empty → exact-label-only identity, exactly as before.
-  identityDecisions?: ConceptIdentityDecision[];
+  canonicalizationArtifactId: string;
+  canonicalizationStore: ConceptCanonicalizationStorePort;
   // Run-progress reporter seam (ADR-0029). Minting is LLM-free, so all three stages are
   // non-LLM (wall-clock only, never in the cost half). Absent → no-op.
   reporter?: RunProgressReporterPort;
@@ -53,9 +57,32 @@ export async function buildGraphVersion(input: {
   return runInstrumentedOperation(reporter, "minting", operationId, async (buildStage) => {
     // Load — resolve the selected runs and the base version, failing closed on a
     // quarantine decision or an incomplete core CEP before any assembly.
-    const { runs, base, existingIdentities } = await buildStage(NON_LLM_STAGES.load, async () => {
+    const {
+      runs,
+      base,
+      capturedIdentities,
+      currentIdentities,
+      identityDecisions,
+      canonicalizationArtifact
+    } = await buildStage(NON_LLM_STAGES.load, async () => {
+      const canonicalizationArtifact = await loadConceptCanonicalizationArtifact(
+        input.canonicalizationStore,
+        input.canonicalizationArtifactId
+      );
+      if (canonicalizationArtifact.payload.baseGraphVersionId !== input.baseGraphVersionId) {
+        throw new Error(
+          `Concept Canonicalization artifact ${input.canonicalizationArtifactId} was created for base ${canonicalizationArtifact.payload.baseGraphVersionId ?? "<none>"}, not ${input.baseGraphVersionId ?? "<none>"}.`
+        );
+      }
+      if (!sameOrderedStrings(canonicalizationArtifact.payload.runIds, input.runIds)) {
+        throw new Error(
+          `Concept Canonicalization artifact ${input.canonicalizationArtifactId} was created for a different ordered Extraction Run selection.`
+        );
+      }
       const runs = await input.runStore.runsForBuildByIds(input.runIds);
-      if (runs.length === 0) throw new Error("No extraction runs resolved for the requested run IDs.");
+      if (!sameOrderedStrings(runs.map((run) => run.runId), input.runIds)) {
+        throw new Error("Extraction Run store returned a different ordered selection during Graph-Version Build.");
+      }
 
       // Quarantine gate (CONTEXT.md Graph-Version Build): a quarantine decision in any
       // selected run blocks publication until its identity or meaning conflict is
@@ -72,7 +99,8 @@ export async function buildGraphVersion(input: {
       // than re-key — resolving it would retire a minted IRI (ADR-0010/ADR-0015). Fail
       // closed before any assembly and name the colliding published Concepts; quarantine
       // plus re-run is the v1 escape hatch (R10).
-      const identityQuarantines = (input.identityDecisions ?? []).filter((decision) => decision.outcome === "quarantine");
+      const identityDecisions = canonicalizationArtifact.payload.decisions;
+      const identityQuarantines = identityDecisions.filter((decision) => decision.outcome === "quarantine");
       if (identityQuarantines.length) {
         const collisions = identityQuarantines.map((decision) => {
           const published = decision.members.filter((member) => member.published).map((member) => member.canonicalLabel);
@@ -105,8 +133,15 @@ export async function buildGraphVersion(input: {
         throw new Error(`Base graph version ${input.baseGraphVersionId} is not published; cannot extend it.`);
       }
 
-      const existingIdentities = await input.graphStore.existingConceptIdentities();
-      return { runs, base, existingIdentities };
+      const currentIdentities = await input.graphStore.existingConceptIdentities();
+      return {
+        runs,
+        base,
+        capturedIdentities: canonicalizationArtifact.payload.publishedConceptIdentities,
+        currentIdentities,
+        identityDecisions,
+        canonicalizationArtifact
+      };
   });
 
   // Refine — deterministic identity resolution, IRI minting, and CEP evidence union.
@@ -119,7 +154,7 @@ export async function buildGraphVersion(input: {
     // its CEP evidence unions onto the survivor (KTD3, KTD8). `quarantine` decisions
     // already failed the build in the load stage; `distinct` decisions change no identity
     // and are persisted for audit only (R4). No model call happens here (R8).
-    const identityMerges = (input.identityDecisions ?? []).filter((decision) => decision.outcome === "merge");
+    const identityMerges = identityDecisions.filter((decision) => decision.outcome === "merge");
     const keyRemap = new Map<IdentityKey, IdentityKey>(); // absorbed key -> survivor key
     const survivorIdentity = new Map<IdentityKey, { normalizedLabel: string; canonicalLabel: string }>();
     for (const decision of identityMerges) {
@@ -227,8 +262,8 @@ export async function buildGraphVersion(input: {
     const homographLabels = new Set([...domainsByLabel.entries()].filter(([, domains]) => domains.size > 1).map(([label]) => label));
 
     // --- IRI minting (ADR-0015): reuse existing IRI, else mint a fresh slug ---
-    const existingByIdentity = new Map(existingIdentities.map((identity) => [identityKey(identity.declaredDomain, identity.normalizedLabel), identity] as const));
-    const usedSlugs = new Set(existingIdentities.map((identity) => iriSlug(identity.iri)));
+    const existingByIdentity = new Map(capturedIdentities.map((identity) => [identityKey(identity.declaredDomain, identity.normalizedLabel), identity] as const));
+    const usedSlugs = new Set(capturedIdentities.map((identity) => iriSlug(identity.iri)));
     const conceptByIdentity = new Map<IdentityKey, Concept>();
     const concepts: Concept[] = [];
 
@@ -245,7 +280,7 @@ export async function buildGraphVersion(input: {
       }
       const existing = existingByIdentity.get(key);
       const iri = cluster.baseIri ?? existing?.iri ?? mintIri(cluster.normalizedLabel, usedSlugs);
-      const conceptId = cluster.baseConceptId ?? existing?.conceptId ?? crypto.randomUUID();
+      const conceptId = cluster.baseConceptId ?? existing?.conceptId ?? deterministicConceptId(iri);
       const concept: Concept = {
         conceptId,
         iri,
@@ -370,10 +405,29 @@ export async function buildGraphVersion(input: {
       }
     }
 
+    // The mutable registry may be unchanged since canonicalization, or it may contain exactly
+    // the deterministic identities produced by an earlier replay of this same artifact. Anything
+    // missing, changed, unrelated, or only partially replayed fails closed before publication.
+    assertCompatibleConceptRegistry(currentIdentities, capturedIdentities, concepts);
+
+    refinementDecisions.push({
+      decisionType: CONCEPT_CANONICALIZATION_SELECTION_DECISION_TYPE,
+      subject: { artifactId: canonicalizationArtifact.artifactId },
+      outcome: "selected",
+      rationale: "Graph-Version Build consumed the explicitly selected immutable Concept Canonicalization artifact.",
+      provenance: {
+        artifactId: canonicalizationArtifact.artifactId,
+        configHash: canonicalizationArtifact.configHash,
+        mode: canonicalizationArtifact.payload.mode,
+        baseGraphVersionId: canonicalizationArtifact.payload.baseGraphVersionId,
+        runIds: canonicalizationArtifact.payload.runIds
+      }
+    });
+
     // Persist the applied identity decisions alongside the exact-label decisions (KTD3,
     // R5). Quarantine decisions already failed the build, so only `merge`/`distinct`
     // reach publication; the absorbed surface labels they carry are inspectable (R10).
-    for (const decision of (input.identityDecisions ?? []).filter((d) => d.outcome !== "quarantine")) {
+    for (const decision of identityDecisions.filter((d) => d.outcome !== "quarantine")) {
       refinementDecisions.push({
         decisionType: CONCEPT_IDENTITY_DECISION_TYPE,
         subject: { declaredDomain: decision.declaredDomain, survivorNormalizedLabel: decision.survivorNormalizedLabel, members: decision.members },
@@ -383,7 +437,8 @@ export async function buildGraphVersion(input: {
           proposingSignal: decision.proposingSignal,
           proposingScore: decision.proposingScore,
           decidingModel: decision.decidingModel,
-          configHash: decision.configHash
+          artifactId: canonicalizationArtifact.artifactId,
+          configHash: canonicalizationArtifact.configHash
         }
       });
     }
@@ -421,6 +476,68 @@ export async function buildGraphVersion(input: {
   );
   return snapshot;
   });
+}
+
+function sameOrderedStrings(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+function assertCompatibleConceptRegistry(
+  current: readonly { conceptId: string; iri: string; normalizedLabel: string; declaredDomain: string }[],
+  captured: readonly { conceptId: string; iri: string; normalizedLabel: string; declaredDomain: string }[],
+  output: readonly Concept[]
+): void {
+  const byKey = <T extends { normalizedLabel: string; declaredDomain: string }>(items: readonly T[]) => {
+    const result = new Map<string, T>();
+    for (const item of items) {
+      const key = identityKey(item.declaredDomain, item.normalizedLabel);
+      if (result.has(key)) throw new Error(`Conflicting Concept registry identity: ${key}.`);
+      result.set(key, item);
+    }
+    return result;
+  };
+  const currentByKey = byKey(current);
+  const capturedByKey = byKey(captured);
+  const outputByKey = byKey(output);
+
+  for (const [key, identity] of capturedByKey) {
+    const observed = currentByKey.get(key);
+    if (!observed) {
+      throw new Error(`Concept registry changed after canonicalization: captured identity ${key} is missing.`);
+    }
+    if (observed.conceptId !== identity.conceptId || observed.iri !== identity.iri) {
+      throw new Error(`Concept registry changed after canonicalization: captured identity ${key} conflicts.`);
+    }
+  }
+
+  const currentExtras = [...currentByKey.entries()].filter(([key]) => !capturedByKey.has(key));
+  if (currentExtras.length === 0) return;
+  const expectedReplay = [...outputByKey.entries()].filter(([key]) => !capturedByKey.has(key));
+  if (currentExtras.length !== expectedReplay.length) {
+    throw new Error(
+      "Concept registry changed after canonicalization: unrelated or partial replay identities appeared."
+    );
+  }
+  const expectedByKey = new Map(expectedReplay);
+  for (const [key, observed] of currentExtras) {
+    const expected = expectedByKey.get(key);
+    if (!expected || observed.conceptId !== expected.conceptId || observed.iri !== expected.iri) {
+      throw new Error(
+        `Concept registry changed after canonicalization: unrelated or conflicting identity ${key} appeared.`
+      );
+    }
+  }
+}
+
+// UUIDv5 over the final Concept IRI. The standard URL namespace makes the UUID stable across
+// processes and replay while the IRI remains the human-readable first-publication identity.
+function deterministicConceptId(iri: string): string {
+  const namespace = Buffer.from("6ba7b8119dad11d180b400c04fd430c8", "hex");
+  const digest = createHash("sha1").update(namespace).update(iri, "utf8").digest().subarray(0, 16);
+  digest[6] = (digest[6] & 0x0f) | 0x50;
+  digest[8] = (digest[8] & 0x3f) | 0x80;
+  const hex = digest.toString("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 function iriSlug(iri: string): string {

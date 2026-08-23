@@ -169,6 +169,7 @@ export {
 } from "./domainInferenceAdapters";
 export {
   extractionConfigHash,
+  conceptCanonicalizationConfigHash,
   graphEnrichmentConfigHash,
   syntheticGenerationConfigHash,
   studyItemBankConfigHash,

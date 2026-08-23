@@ -12,7 +12,8 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-23-001 — Apply the ADR Audit Without Changing ADR-0006 or Cross-Family Rules](./2026-08-23-001-apply-adr-audit.md)
-   — **Ready; U1 next.** Extract Concept Canonicalization into an immutable replay input, make the
+   — **In progress; U2 next.** Concept Canonicalization and deterministic artifact replay are locally
+   verified. Next, make the
    application catalog the sole Operation Timeline membership owner, and correct the audited durable
    documentation boundaries without changing Model Assignments, ADR-0006, or cross-family rules.
 

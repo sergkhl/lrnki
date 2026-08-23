@@ -1,4 +1,5 @@
 import type {
+  ConceptCanonicalizationUnavailable,
   ConceptIdentityDecision,
   ConceptIdentityRef,
   ConceptIdentityResolutionOutcome
@@ -6,6 +7,8 @@ import type {
 import type { NodeEmbeddingPort, NodeMergeAdjudicationPort } from "@lrnki/ports";
 import { cosineSimilarity, DEFAULT_DEDUP_CONFIG } from "./deduplicateDerivedNodes";
 import { mapWithConcurrency } from "./mapWithConcurrency";
+import { passthroughStageBracket, type StageBracket } from "./runProgressReporter";
+import { STAGE_TAGS } from "@lrnki/domain-core";
 
 // Published-Concept Semantic Identity Resolution (plan 2026-06-26-002, ADR-0015,
 // ADR-0012, AGENTS rule 20). Runs BEFORE the deterministic Graph-Version Build over the
@@ -24,9 +27,9 @@ import { mapWithConcurrency } from "./mapWithConcurrency";
 //       2 or more published → `quarantine` (case B — the build refuses, R7).
 //
 // Fail closed everywhere (R9/KTD6): a per-domain embedding failure yields no merge for
-// that domain and is surfaced; an adjudicator throw degrades that pair to `distinct`; no
-// failure path silently changes authoritative identity. The pass runs only when BOTH
-// ports are supplied (opt-in, KTD7); omitting either returns no decisions.
+// that domain and is surfaced; an adjudicator throw yields an explicit unavailable record,
+// never a fabricated semantic `distinct` decision. No failure path silently changes
+// authoritative identity. The pass runs only when BOTH ports are supplied.
 
 // One identity representative the worker feeds in — a base published Concept OR a
 // selected run's core candidate. The operation first collapses these to ONE
@@ -70,14 +73,9 @@ export const DEFAULT_IDENTITY_RESOLUTION_CONFIG: ConceptIdentityResolutionConfig
 
 const PROPOSING_SIGNAL = "embedding_cosine" as const;
 
-// Surfaced (never swallowed) fail-closed events for the worker/operator (R9).
-export type ConceptIdentityUnavailable =
-  | { kind: "embedding"; declaredDomain: string; reason: string }
-  | { kind: "adjudication"; aKey: string; bKey: string; reason: string };
-
 export type ConceptIdentityResolutionResult = {
   decisions: ConceptIdentityDecision[];
-  configHash: string;
+  unavailable: ConceptCanonicalizationUnavailable[];
 };
 
 const identityKey = (declaredDomain: string, normalizedLabel: string): string => `${declaredDomain}::${normalizedLabel}`;
@@ -87,15 +85,14 @@ export async function resolveConceptIdentity(input: {
   embedding?: NodeEmbeddingPort;
   adjudicator?: NodeMergeAdjudicationPort;
   config?: ConceptIdentityResolutionConfig;
-  onUnavailable?: (event: ConceptIdentityUnavailable) => void;
+  runStage?: StageBracket;
 }): Promise<ConceptIdentityResolutionResult> {
   const config = input.config ?? DEFAULT_IDENTITY_RESOLUTION_CONFIG;
-  const configHash = hashConfig(config);
   const { embedding, adjudicator } = input;
+  const runStage = input.runStage ?? passthroughStageBracket;
+  const unavailable: ConceptCanonicalizationUnavailable[] = [];
 
-  // Opt-in: without BOTH ports the pass is a no-op (KTD7) — no decisions, the build
-  // falls back to exact-label-only identity (the calibration baseline).
-  if (!embedding || !adjudicator) return { decisions: [], configHash };
+  if (!embedding || !adjudicator) return { decisions: [], unavailable };
 
   // Collapse to one identity representative per (declaredDomain, normalizedLabel) (KTD5).
   const representativesByKey = collapseToRepresentatives(input.candidates);
@@ -105,16 +102,20 @@ export async function resolveConceptIdentity(input: {
   // that domain (R9). Cross-domain pairs are never proposed (R1).
   const vectorByKey = new Map<string, number[]>();
   const byDomain = groupByDomain(representatives);
-  for (const [domain, members] of byDomain) {
-    const texts = members.map((member) => embedText(member));
-    try {
-      const vectors = await embedding.embed(texts);
-      members.forEach((member, index) => {
-        if (vectors[index]) vectorByKey.set(member.key, vectors[index]);
-      });
-    } catch (error) {
-      input.onUnavailable?.({ kind: "embedding", declaredDomain: domain, reason: reasonOf(error) });
-    }
+  if (byDomain.size > 0) {
+    await runStage(STAGE_TAGS.nodeEmbedding, async () => {
+      for (const [domain, members] of byDomain) {
+        const texts = members.map((member) => embedText(member));
+        try {
+          const vectors = await embedding.embed(texts);
+          members.forEach((member, index) => {
+            if (vectors[index]) vectorByKey.set(member.key, vectors[index]);
+          });
+        } catch (error) {
+          unavailable.push({ kind: "embedding", declaredDomain: domain, reason: boundedReason(error) });
+        }
+      }
+    }, byDomain.size);
   }
 
   const pairs = candidatePairsByDomain(representatives, vectorByKey, config.similarityThreshold, config.maxPairsPerNode);
@@ -122,25 +123,37 @@ export async function resolveConceptIdentity(input: {
   // DECIDE — adjudicate each proposed pair with bounded concurrency. A throw degrades
   // the pair to keep_distinct (fail-closed), surfaced via onUnavailable.
   const refByKey = new Map(representatives.map((member) => [member.key, member] as const));
-  const decided = await mapWithConcurrency(pairs, config.adjudicationConcurrency, async (pair) => {
-    const a = refByKey.get(pair.aKey)!;
-    const b = refByKey.get(pair.bKey)!;
-    try {
-      const decision = await adjudicator.adjudicate({
-        declaredDomain: pair.declaredDomain,
-        a: { label: a.canonicalLabel, aliases: a.aliases, evidence: a.definitions.slice(0, config.maxEvidencePerNode) },
-        b: { label: b.canonicalLabel, aliases: b.aliases, evidence: b.definitions.slice(0, config.maxEvidencePerNode) }
-      });
-      return { pair, merge: decision.decision === "merge", rationale: decision.rationale };
-    } catch (error) {
-      input.onUnavailable?.({ kind: "adjudication", aKey: pair.aKey, bKey: pair.bKey, reason: reasonOf(error) });
-      return { pair, merge: false, rationale: "" };
-    }
-  });
+  const decided = pairs.length === 0
+    ? []
+    : await runStage(STAGE_TAGS.nodeMergeAdjudication, async () => {
+        const outcomes = await mapWithConcurrency(pairs, config.adjudicationConcurrency, async (pair) => {
+          const a = refByKey.get(pair.aKey)!;
+          const b = refByKey.get(pair.bKey)!;
+          try {
+            const decision = await adjudicator.adjudicate({
+              declaredDomain: pair.declaredDomain,
+              a: { label: a.canonicalLabel, aliases: a.aliases, evidence: a.definitions.slice(0, config.maxEvidencePerNode) },
+              b: { label: b.canonicalLabel, aliases: b.aliases, evidence: b.definitions.slice(0, config.maxEvidencePerNode) }
+            });
+            return { pair, merge: decision.decision === "merge", rationale: decision.rationale } satisfies DecidedPair;
+          } catch (error) {
+            unavailable.push({
+              kind: "adjudication",
+              declaredDomain: pair.declaredDomain,
+              aKey: pair.aKey,
+              bKey: pair.bKey,
+              proposingScore: pair.score,
+              reason: boundedReason(error)
+            });
+            return undefined;
+          }
+        });
+        return outcomes.filter((outcome): outcome is DecidedPair => outcome !== undefined);
+      }, pairs.length);
 
   // APPLY — union the merged pairs, classify each cluster, and record decisions.
-  const decisions = classifyDecisions(decided, refByKey, adjudicator.model, configHash);
-  return { decisions, configHash };
+  const decisions = classifyDecisions(decided, refByKey, adjudicator.model);
+  return { decisions, unavailable };
 }
 
 // --- Pure, model-free helpers (exported for deterministic-envelope tests) -----------
@@ -226,8 +239,7 @@ type DecidedPair = {
 export function classifyDecisions(
   decided: DecidedPair[],
   refByKey: Map<string, Representative>,
-  decidingModel: string,
-  configHash: string
+  decidingModel: string
 ): ConceptIdentityDecision[] {
   const mergedEdges = decided.filter((decision) => decision.merge);
 
@@ -285,7 +297,7 @@ export function classifyDecisions(
     if (publishedMembers.length >= 2) {
       // Case B: two-or-more already-published members — a published-identity collision the
       // build must refuse rather than re-key (R7, KTD4). No survivor; quarantine the cluster.
-      decisions.push(decision("quarantine", declaredDomain, members.map(toRef), null, score, rationale, decidingModel, configHash));
+      decisions.push(decision("quarantine", declaredDomain, members.map(toRef), null, score, rationale, decidingModel));
       continue;
     }
     // Case A (1 published) / Case C (0 published): canonicalize automatically.
@@ -299,8 +311,7 @@ export function classifyDecisions(
         survivor.normalizedLabel,
         score,
         rationale,
-        decidingModel,
-        configHash
+        decidingModel
       )
     );
   }
@@ -310,7 +321,7 @@ export function classifyDecisions(
     const a = refByKey.get(distinct.pair.aKey)!;
     const b = refByKey.get(distinct.pair.bKey)!;
     decisions.push(
-      decision("distinct", distinct.pair.declaredDomain, [toRef(a), toRef(b)], null, distinct.pair.score, distinct.rationale, decidingModel, configHash)
+      decision("distinct", distinct.pair.declaredDomain, [toRef(a), toRef(b)], null, distinct.pair.score, distinct.rationale, decidingModel)
     );
   }
   return decisions;
@@ -333,8 +344,7 @@ function decision(
   survivorNormalizedLabel: string | null,
   proposingScore: number,
   rationale: string,
-  decidingModel: string,
-  configHash: string
+  decidingModel: string
 ): ConceptIdentityDecision {
   return {
     outcome,
@@ -344,8 +354,7 @@ function decision(
     proposingSignal: PROPOSING_SIGNAL,
     proposingScore,
     rationale,
-    decidingModel,
-    configHash
+    decidingModel
   };
 }
 
@@ -379,10 +388,13 @@ function embedText(member: Representative): string {
   return definition ? `${head}: ${definition}` : head;
 }
 
-function hashConfig(config: ConceptIdentityResolutionConfig): string {
-  return `identity-res-v1:thr=${config.similarityThreshold},topN=${config.maxPairsPerNode}`;
-}
+const UNAVAILABLE_REASON_CAP = 500;
 
-function reasonOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+function boundedReason(error: unknown): string {
+  const reason = (error instanceof Error ? error.message : String(error))
+    .replace(/[\x00-\x1f\x7f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, UNAVAILABLE_REASON_CAP);
+  return reason || "Unavailable without a reported reason.";
 }

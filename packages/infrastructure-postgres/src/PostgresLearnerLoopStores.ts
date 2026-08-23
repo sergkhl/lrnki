@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { ArtifactEnvelope, CalibrationVerdict, ConceptLesson, ConceptLessonSection, ImpostorItem, ImpostorStatement, LessonAbsentNode, MatchingItem, MatchingPair, NewResponseLogRow, RejectedStudyItem, ResponseLogRow, StudyItem, StudyItemCitation, StudyItemOption, StudyItemType } from "@lrnki/domain-core";
 import type { CalibrationVerdictStorePort, ConceptLessonStorePort, EnrichmentLayerPurposeStorePort, LessonReadStorePort, ResponseLogStorePort, StudyItemBankStorePort } from "@lrnki/ports";
 import type { Sql, TransactionSql } from "postgres";
-import { writeArtifactEnvelope } from "./PostgresArtifactRepository";
+import { writeArtifactEnvelope } from "./PostgresArtifacts";
 
 const STUDY_ITEM_BANK_PRODUCER = "@lrnki/infrastructure-postgres";
 const STUDY_ITEM_BANK_PRODUCER_VERSION = "0.1.0";
