@@ -4,11 +4,11 @@
 
 ## TODO
 
-- **Operation-neutral DeepSeek Grounding — in progress; U0–U3 complete, U4 next.** Follow
-  [the execution-order plan](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md). The exact
-  local candidate is active and healthy; all seven public aliases passed on their intended primary
-  deployments with matched SpendLogs, zero matched errors, and no retired aliases loaded. Run and
-  inspect the complete affected-consumer quality matrix next.
+- **Operation-neutral DeepSeek Grounding — in progress; U0–U3 complete, U4 closed `FIX_FIRST`, U5
+  next.** Follow [the execution-order plan](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md).
+  Exact routes pass, but the first required Topic consumer exposed context-narrowed Grounding that
+  independent verification correctly rejected. Run the repository handback gate next; do not spend
+  on the remaining matrix before an owner-approved producer-contract repair.
 
 - **Source-less Grounding context and answer correlation — on hold; U0–U1 complete.** The
   [predecessor plan](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md) retains

@@ -7,7 +7,7 @@ execution: code
 
 # Unify Source-less Node Generation and Grounding on DeepSeek
 
-**Status:** In progress — U0–U3 complete; U4 next
+**Status:** In progress — U0–U3 complete; U4 closed `FIX_FIRST`; U5 next
 
 **Decision state:** Locked by owner decision on 2026-08-23. DeepSeek V4 Flash 0731 owns Grounding
 Generation for every Source-less Grounding Admission consumer. Preserving ADR-0023 makes the paired
@@ -475,81 +475,27 @@ direct preflight, successful retry, or HTTP 200 does not substitute for real-use
 
 ## Validation Log
 
-### Planning and owner decision — 2026-08-23 — complete
-
-- Current source inspection confirmed that Topic Grounding already uses DeepSeek while Graph
-  Enrichment and generated Support Steps use MiMo through `kg-claim-extraction`. Their answering and
-  primary-judgment roles are inverted, so repointing Grounding alone would violate ADR-0023.
-- The accepted design moves the complete five-role admission topology to operation-neutral prompt
-  aliases. Because either factuality family can veto after replicated evidence, the design also
-  moves Concept Set Synthesis and missing-prerequisite proposal to an operation-neutral DeepSeek
-  alias. Topic-only routing then retains Declared Domain/learner-asset generation, learner-asset
-  judgment, and prerequisite ordering without changing the application admission interface.
-- A second coupling audit found that the worker's DeepSeek merge adjudicator and intrinsic-difficulty
-  port consume generated Grounding, while the same merge port also serves Concept Canonicalization.
-  The plan therefore splits only the production composition and effective descriptors: MiMo owns
-  generated-layer judgment, while Canonicalization and source-mentioned judgments keep their
-  existing DeepSeek assignment.
-- The current DeepSeek, MiMo, and GPT deployment groups can be reused; the proposed DeepSeek Parasail
-  fallbacks remain unreachable until both node-producer descriptors and the changed Grounding
-  descriptor pass there. Config and operation-hash tests already expose the required route and
-  assignment identities.
-- Revision `61da45e` supplied one valid Xiaomi route observation with malformed tool JSON. It failed
-  that candidate's old gate but did not establish a persistent MiMo incapability. The owner-approved
-  DeepSeek assignment supersedes that route for Grounding rather than claiming to repair it.
-- This is repository planning and local source/config inspection only. No implementation, served
-  contract, loaded composition, real-use, deployed, browser, native, physical-device, latency, or
-  release evidence exists for this plan.
-
 ### U0 — freeze the pre-cutover source and loaded-environment snapshot — 2026-08-23 — complete
 
-- The pre-cutover snapshot was clean at `fddf171`; `git worktree list --porcelain` reported only the
-  main checkout, so no second worktree had claimed the exclusive model-topology unit. Direct source
-  inspection confirmed the shared and Topic-specific claim-role aliases, `kg-concept-synthesis`,
-  and caller-owned Topic admission overrides were still present before U1.
-- The focused configuration baseline passed all 13 tests:
-  `pnpm --filter @lrnki/infrastructure-litellm exec tsx --test
-  src/topicExpeditionRouting.test.ts src/configHashes.test.ts`. It froze default Graph Enrichment
-  `3cd73a12f2f2`, Scaffold `be49ba010024`, default Synthetic `901788bb7bd4`, Topic Synthetic
-  `9a8f4f1cb34b`, default Study Item Bank `d574e02753f9`, Topic Study Item Bank `02d755d9fae1`, and
-  the nineteen-stage Topic profile under the old topology.
-- The host-local LiteLLM `/models` inventory, authenticated from the root environment, still exposed
-  the eight old shared/Topic claim-role aliases plus `kg-concept-synthesis` and exposed none of the
-  seven neutral aliases. The existing application and router containers were healthy, but no
-  candidate source/config was loaded or exercised. No provider draw, Compose lifecycle action,
-  process reload, database write, deployment, or release action occurred.
-- This is repository/source and loaded-router inventory evidence only. It proves the reviewable U1
-  baseline and absence of an already-active candidate; it is not a served-contract, Model
-  Assignment, real-use, deployed, browser, native, physical-device, latency, or release result.
+- Clean revision `fddf171` and a single-worktree inventory froze the exclusive baseline. Thirteen
+  focused route/hash tests passed: Graph `3cd73a12f2f2`, Scaffold `be49ba010024`, Synthetic
+  `901788bb7bd4` / `9a8f4f1cb34b`, Study Banks `d574e02753f9` / `02d755d9fae1`, and nineteen stages.
+- Authenticated loaded-router inventory exposed the nine retired aliases and none of the seven
+  candidate aliases. No candidate process, provider draw, database write, deployment, or release
+  action occurred; this was repository plus loaded-inventory evidence only.
 
 ### U1 — implement the primary-only operation-neutral topology — 2026-08-23 — complete
 
-- The five Grounding Admission prompts now request operation-neutral aliases. Concept Set Synthesis
-  and missing-prerequisite proposal share `kg-source-less-node-generation`; minting durability and
-  both intrinsic-difficulty descriptors use `kg-generated-node-judge`. Graph Enrichment overrides
-  only its generated-layer merge descriptor to that judge, while Concept Canonicalization keeps the
-  base source-family judge. The worker constructs those two merge adapters separately.
-- `TopicExpeditionModelRouting` now owns only learner-asset generation, learner-asset judgment, and
-  prerequisite ordering. Topic and worker Source-less Grounding compositions use prompt defaults,
-  so Graph Enrichment, default/Topic Synthetic, and Scaffold resolve the same five admission roles.
-  The nine superseded public aliases/fallback entries and four caller routing fields have no active
-  source/config references; the regression test retains their names only to prove absence.
-- Route tests resolve the seven candidate aliases to DeepInfra DeepSeek FP8 with reasoning off,
-  Xiaomi MiMo FP8 with reasoning off, or Novita GPT-OSS FP4 with medium reasoning as approved. Each
-  alias is primary-only for U1, every generator/judge family pairing is distinct by resolved Model
-  Assignment, and no deployment group was duplicated.
-- Exact candidate hashes are Graph Enrichment `b9e03231cc3a`, Scaffold `3d2fd6f627c7`, default
-  Synthetic `baaa3b539272`, and Topic Synthetic `6184e63adc3e`. Default/Topic Study Item Bank remain
-  `d574e02753f9` / `02d755d9fae1`; Extraction remains `114ec9e8ddf5`; semantic Concept
-  Canonicalization remains `ce3969a22bea`; Topic remains nineteen conceptual stages.
-- Local automated checks passed: all 194 `@lrnki/infrastructure-litellm` tests, all eight worker
-  tests, the focused learner composition test, all eleven workspace typechecks, targeted ESLint,
-  retired runtime-reference searches, and `git diff --check`. The falsification runs exposed only
-  intentionally stale operation baselines and renamed model expectations; those were re-frozen and
-  the complete package suite then passed.
-- No provider request, database write, Compose lifecycle action, LiteLLM reload, API rebuild,
-  deployment, browser, native, physical-device, or release action occurred. The currently loaded
-  router still serves the pre-U1 topology; source and loaded-process evidence remain distinct.
+- The five admission prompts, DeepSeek producer alias, and MiMo generated-node judge now resolve
+  operation-neutrally; Topic retains only learner-asset generation/judgment and prerequisite
+  ordering. Worker wiring splits generated-layer merge judgment from unchanged Canonicalization;
+  nine superseded aliases and four caller overrides have no active source/config references.
+- Primary-only routes resolved to approved DeepInfra DeepSeek FP8, Xiaomi MiMo FP8, and Novita
+  GPT-OSS FP4 with pairwise-independent families. Candidate hashes were Graph `b9e03231cc3a`,
+  Scaffold `3d2fd6f627c7`, Synthetic `baaa3b539272` / `6184e63adc3e`; unaffected identities stayed exact.
+- All 194 infrastructure tests, eight worker tests, focused learner composition, eleven workspace
+  typechecks, targeted lint, non-leakage, and diff checks passed. No provider, activation, deployed,
+  browser/native/device, or release evidence was claimed.
 
 #### Real-use quality evaluation
 
@@ -561,30 +507,15 @@ direct preflight, successful retry, or HTTP 200 does not substitute for real-use
 
 ### U2 — qualify exact direct routes and freeze fallbacks — 2026-08-23 — complete
 
-- The live catalog exposed DeepInfra/Parasail DeepSeek FP8, Xiaomi MiMo FP8, and Novita/Parasail
-  GPT-OSS FP4 with the required provider tags and forced-tool parameters. This was metadata only;
-  served calls carried the exact pin, reasoning, sampling, strict tool, tag, and disabled fallback.
-- Attempt 1 retained all 24 HTTP attempts: 19 cases passed; MiMo's three-key answer consumed both
-  corrective attempts after two wrong-key objects; then Novita's challenger exhausted on three
-  attributable shared-pool HTTP 429s and the matrix stopped. A separately retained recovery draw
-  later passed that challenger and both previously unrun GPT-OSS Parasail cases on one attempt each.
-- DeepInfra passed both producer contracts and all three Grounding cases in one attempt each. Its
-  definitions avoided the established mitochondrial-only, hidden-until-commit, and time-only scope
-  defects. Parasail passed the same strict schemas, but manual inspection found exactly those three
-  defects in its Grounding text, so both DeepSeek aliases remain DeepInfra-only.
-- Xiaomi passed exact answer coverage, primary factuality, minting durability, generated-layer
-  merge, and both difficulty contracts. Its judgments rejected the false definition, kept MVCC as
-  durable, merged its spelling variants, and used supplied evidence. Both GPT routes planned checks
-  and rejected the false universal definition. No successful call mismatched model/provider or
-  leaked reasoning on a reasoning-disabled assignment.
-- Only `kg-grounding-verification-planner` and `kg-grounding-factuality-challenger` now fall back to
-  the qualified GPT Parasail group. Final hashes are Graph `2af0ada6d7e6`, Scaffold `7930b34c0fdb`,
-  default Synthetic `9f81ce84488e`, and Topic Synthetic `d78aba900512`; both Study hashes,
-  Canonicalization `ce3969a22bea`, Extraction `114ec9e8ddf5`, and nineteen stages remain unchanged.
-- The two retained runs total 33,409 prompt, 9,187 completion, and 3,044 reasoning tokens; response
-  cost was USD 0.00398383 and the catalog estimate USD 0.0058543252. All 194 infrastructure tests,
-  all eleven workspace typechecks, targeted ESLint, route/hash/non-leakage checks, and diff check
-  passed. No process reload, database write, deployment, device, or release action occurred.
+- Exact direct calls qualified DeepInfra DeepSeek, Xiaomi MiMo, and Novita/Parasail GPT-OSS. A
+  transient Novita 429 exhaustion recovered. Parasail DeepSeek passed schemas but repeated all three
+  scope defects, so DeepSeek remains primary-only; only planner and challenger gained GPT fallback.
+- Final hashes are Graph `2af0ada6d7e6`, Scaffold `7930b34c0fdb`, default/Topic Synthetic
+  `9f81ce84488e` / `d78aba900512`; unaffected hashes and nineteen stages are unchanged. Retained runs
+  used 33,409 prompt, 9,187 completion, and 3,044 reasoning tokens; recorded/estimated costs were
+  USD 0.00398383 / 0.0058543252.
+- All 194 infrastructure tests, eleven typechecks, targeted lint, route/hash/non-leakage, and diff
+  checks passed; this was direct-contract—not consumer-usefulness or deployed—evidence.
 
 #### Real-use quality evaluation
 
@@ -597,20 +528,12 @@ direct preflight, successful retry, or HTTP 200 does not substitute for real-use
 
 ### U3 — activate the committed local composition and prove aliases — 2026-08-23 — complete
 
-- Candidate `16ee119` was rebuilt and recreated through the detached root Compose runbook. The
-  running API image matched `lrnki-learner-api:latest`, was healthy, and contained byte-identical
-  copies of every U1/U2 source/config file; the loaded router config matched tracked SHA-256
-  `d0c04b90d8adcbd9982b21fb97b5eb0ae355e59a0aa4f4b60f05590d0546ac47`.
-- Authenticated `/models` exposed all seven neutral aliases and none of the eight retired claim-role
-  aliases or `kg-concept-synthesis`. `/model/info` exposed the four expected primary/fallback
-  deployment identities; the one router and one API process both served the candidate mapping.
-- One uniquely tagged production forced-tool call through each public alias passed on its first
-  upstream attempt. SpendLogs retained each requested alias and resolved by `model_id` to two
-  DeepInfra DeepSeek primary calls, two Novita GPT-OSS primary calls, and three Xiaomi MiMo primary
-  calls. No fallback was forced; U2 retains its direct GPT fallback proof.
-- The seven matched rows contained 11,332 prompt and 3,692 completion tokens and USD 0.000732492
-  recorded spend. A joined error-table query used those same seven rows as its positive control and
-  found zero matched errors; every response status and stored error field was clean.
+- Candidate `16ee119` was rebuilt/recreated detached. The healthy API contained byte-identical U1/U2
+  sources; router SHA-256 was `d0c04b90d8adcbd9982b21fb97b5eb0ae355e59a0aa4f4b60f05590d0546ac47`.
+  Authenticated inventory exposed all seven neutral and none of the nine retired aliases.
+- Seven uniquely tagged public-alias forced-tool calls passed first-attempt on two DeepInfra, two
+  Novita, and three Xiaomi primaries. Their joined positive control found seven SpendLogs, 11,332
+  prompt plus 3,692 completion tokens, USD 0.000732492 recorded spend, and zero matched errors.
 
 #### Real-use quality evaluation
 
@@ -621,11 +544,59 @@ direct preflight, successful retry, or HTTP 200 does not substitute for real-use
   loaded-identity, retired-alias, SpendLog, or matched-error defect remained.
 - **Safe to continue downstream:** yes to U4 affected-consumer qualification only.
 
+### U4 — affected-consumer real-use qualification — 2026-08-23 — `FIX_FIRST`
+
+- After an authorized development-app reset and exact API recreation, the first mandatory Topic
+  fixture, Cellular Respiration, failed atomically in enrichment. Expedition
+  `da12672b-9109-4237-ad23-81a75ccd128b`, operation
+  `cf71e497-5a28-466e-b89b-33da72a5e9d3`, and operation run
+  `eb394b75-30a7-4d7a-9a8c-bfe1d2bb82f8` settled after 765,982 / 766,000 ms. The generic enrichment
+  timeline correctly has optional `config_hash = null`; committed Topic Synthetic identity is
+  `d78aba900512`, and failure occurred before an enrichment artifact existed.
+- DeepSeek made mitochondrial location and aerobic context part of Pyruvate Oxidation's identity,
+  excluding valid bacterial cytoplasmic and anaerobic variants. Draft-blind MiMo answers surfaced
+  both counterexamples; three retained MiMo primary judgments and three GPT challenger judgments
+  rejected the definition (with one separate challenger acceptance). The replicated primary veto
+  correctly failed Source-less Grounding Admission. No node, edge, lesson, Study Item, or rejected
+  Study Item persisted, and no enrichment or learner assets leaked.
+- Settled attribution contains 367 successful calls, 896,144 prompt plus 312,263 completion tokens,
+  USD 0.06135924 raw recorded spend, and USD 0.15405394 usage-derived reported cost including BYOK
+  estimates. Same-query controls found all 367 SpendLogs and zero non-success/error-information or
+  joined ErrorLog rows. One qualified GPT fallback and three existing probe fallbacks were used.
+  Eleven malformed retained tool-argument attempts—six planner, four answerer, one challenger—were
+  corrected inside the retry envelope before semantic settlement.
+- The run proves the admission module's verification architecture caught a producer scope defect.
+  It does not qualify the producer or Topic usefulness: the existing domain-neutral prompt already
+  forbids turning a common case into a universal identity, while the U2 direct pyruvate draw passed.
+  This is context-sensitive neural nondeterminism, not a route/schema/transport failure. Repeating
+  until a lucky draw passes would violate the gate.
+- The remaining three Topic fixtures, worker-default Synthetic run, Graph generated-prerequisite /
+  merge case, and generated Support Step were not run after the first required consumer failed.
+  Their usefulness remains `INCONCLUSIVE`. Exact reserved-identity cleanup removed the one created
+  learner and left zero reserved users or expeditions.
+
+#### Real-use quality evaluation
+
+- **Milestone / fixture:** exact local production composition; Cellular Respiration Topic fixture.
+- **Real model calls / result:** one required operation `FIX_FIRST`; transport and attribution
+  passed, but DeepSeek produced a context-narrowed identity that independent verification rejected.
+- **Useful output / defects / changes:** atomic failure was useful; no learner-ready output exists.
+  [Chain-of-Verification](https://arxiv.org/abs/2309.11495) matches the successful draft-blind
+  detection path. [Self-Refine](https://arxiv.org/abs/2303.17651) would add a feedback/regeneration
+  loop and conflicts with this plan's frozen one-draft, cross-family admission contract.
+- **Safe to continue downstream:** yes to U5 repository handback only; no to more U4 spending,
+  consolidation, latency work, deployment, browser/native/device claims, or release.
+
 ### Open findings
 
-- **NEXT:** execute U4 only: reset the development app database, run the four fixed Topic
-  Expeditions plus one worker-default Synthetic operation, the smallest real Graph Enrichment that
-  exercises generated prerequisite minting and merge adjudication, and one generated Support Step;
-  inspect every output, artifact, retry, error, fallback, spend row, and same-query positive control.
-- The latency plan remains blocked until U4 produces one successful, fully inspected quality
-  baseline. This plan does not claim or tune the 420-second target.
+- **NEXT:** execute U5 only: run the focused dependency-graph repository gate and production builds,
+  preserve this exact failed handback, and leave both active plans live. Do not rerun the remaining
+  U4 matrix until the producer defect is repaired.
+- **Blocker:** DeepSeek Source-less Grounding can still narrow a broad concept identity to the
+  originating Topic's common case despite the existing prompt prohibition. Prompt/schema changes,
+  regenerated Grounding, and policy/retry changes are outside this locked plan. The concrete next
+  action is an owner-approved successor plan for a domain-neutral, enforced identity-scope and
+  counterexample audit before the single initial draft, followed by direct route and complete U4
+  requalification. Do not weaken the independent answer/judge veto that caught the defect.
+- The latency plan remains blocked until a repaired candidate produces one successful, fully
+  inspected quality baseline. This plan does not claim or tune the 420-second target.
