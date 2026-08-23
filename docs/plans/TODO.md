@@ -4,11 +4,11 @@
 
 ## TODO
 
-- **Source-less Grounding and answer correlation — in progress; U0–U1 complete, U2 next.** Follow
-  the [active plan](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md).
-  Batch-owned identity context reaches Grounding Generation and answer correlation is now an exact
-  key-indexed provider object behind unchanged ports. Qualify every exact served route next, then
-  run all three affected consumers before unblocking latency work.
+- **Source-less Grounding and answer correlation — blocked in U2 (`FIX_FIRST`).** Follow the
+  [active plan](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md). U0–U1 are
+  complete, but the first exact served-contract case returned invalid forced-tool JSON from the
+  expected shared MiMo FP8 route. Establish and commit a same-assignment contract correction before
+  restarting KTD3; do not activate or re-draw the unchanged candidate.
 
 - **Topic Expedition generation latency — blocked; U3 remains `FIX_FIRST`.** Follow
   [the active plan](./2026-08-22-001-repair-topic-expedition-generation-latency.md) in U0–U4 order.

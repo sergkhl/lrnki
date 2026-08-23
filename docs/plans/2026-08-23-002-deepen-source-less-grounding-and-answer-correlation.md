@@ -7,7 +7,7 @@ execution: code
 
 # Deepen Source-less Grounding Context and Answer Correlation
 
-**Status:** In progress — U0–U1 complete; U2 served-contract qualification next
+**Status:** Blocked in U2 (`FIX_FIRST`) — shared MiMo Grounding returned invalid forced-tool JSON
 
 **Decision state:** Locked. Grounding Generation and Verification Answering are the only stages to
 `DEEPEN`; the other seventeen Topic Expedition stages remain `KEEP`. This plan fixes those two
@@ -413,11 +413,37 @@ plan's 420-second baseline and two-run soak.
   the new contracts, nor any real-use, deployed, browser, native, physical-device, latency, or
   release claim.
 
+### U2 — Served-contract qualification — 2026-08-23 — blocked (`FIX_FIRST`)
+
+- Candidate revision `61da45e532cf5c5db746da319f58745d15ae27b6` entered the bounded direct-route
+  matrix before any loaded process changed. The current OpenRouter endpoint registry attributed the
+  reachable routes to Xiaomi, DeepInfra, and Parasail respectively and reported FP8 for
+  `xiaomi/fp8`, `deepinfra/fp8`, and `parasail/fp8`. A correctly authenticated local LiteLLM
+  `/models` read also listed all four public aliases in KTD3. An earlier unauthenticated read caused
+  only by an env-unloaded shell was excluded and made no credential or route claim.
+- The first required case reconstructed the complete effective Grounding prompt for Pyruvate
+  Oxidation with both aliases, all five same-context peer identities, the Declared Domain, and the
+  originating topic. The exact shared deployment request used Xiaomi MiMo v2.5, reasoning disabled,
+  temperature 0, seed 7, the strict named tool, Xiaomi-only provider routing, and no provider
+  fallback.
+- OpenRouter returned HTTP 200 from the expected `xiaomi/mimo-v2.5` model and Xiaomi provider in
+  7.404 seconds with exactly one `submit_generated_grounding_bundle` call. Its tool arguments were
+  invalid JSON at position 687, after 1,514 prompt and 235 completion tokens. This is a schema
+  contract miss, not an excluded transport failure, so KTD3 forbids a retry or any later matrix
+  case. The disposable report carries run tag `source-less-u2-direct-1787499208132`; this durable
+  entry retains the qualifying facts without depending on a gitignored artifact.
+- No public-alias proof, API rebuild/activation, development-database reset, affected-consumer run,
+  deployment, browser, native, physical-device, latency, or release action occurred. U0–U1 remain
+  committed local evidence, but neither U2 nor plan completion passed.
+
 ### Open findings
 
-- **NEXT:** execute U2 only: run the bounded exact-route Grounding and Verification Answering
-  matrices, stop on any semantic/schema miss, activate only the exact committed local production
-  composition through the root runbook if the preflight passes, verify unique tagged public-alias
-  calls and source/config health, persist all three status altitudes, and commit status separately.
+- **FIX_FIRST — shared MiMo Grounding cannot currently pass the new exact served contract.** The
+  first U2 direct-route call produced one expected forced tool from the expected model/provider but
+  invalid JSON arguments. Before resuming U2, establish a conventional root-cause correction that
+  stays within the locked assignment, FP8 route, retry budget, and unchanged Grounding Bundle
+  schema; commit that correction as a new candidate, then restart KTD3 at the failed shared MiMo
+  Grounding route. Do not treat another draw from revision `61da45e` as evidence, widen routing,
+  increase retries, or activate the local production composition first.
 - The latency plan remains blocked until U3 produces one successful, fully inspected quality
   baseline. Do not restart width calibration from the current all-failed operations.
