@@ -7,7 +7,7 @@ execution: code
 
 # Cut Over Topic Expedition Generation to DeepSeek Flash and Measure Stage Value
 
-**Status:** In progress — U4 complete; successor ready; consolidation next
+**Status:** Completed — durable state consolidated; deletion next
 
 **Decision state:** Locked. The accepted direction, dated comparison, and known quality defects
 remain in the
@@ -537,5 +537,5 @@ to the existing latency plan. No simplification code or extra model run was adde
 
 ### Open findings
 
-- **NEXT:** consolidate current outcome and durable references, then delete this completed plan in a
-  separate commit. The successor owns implementation and the actual prompt/cost observation paths.
+- **NEXT:** delete this consolidated completed plan in its own commit. No implementation remains
+  here; the successor owns the two accepted deepening seams and final quality evidence.

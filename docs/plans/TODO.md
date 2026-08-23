@@ -4,12 +4,6 @@
 
 ## TODO
 
-- **DeepSeek Flash Topic Expedition cutover — U4 complete; consolidate next.** Follow the
-  [active plan](./2026-08-23-001-cut-over-topic-expedition-generation-to-deepseek-flash.md). It
-  assigns `DEEPEN` only to Grounding Generation and Verification Answering, keeps the other 17
-  stages, and has created the ready successor. Consolidate and delete the cutover plan next. The
-  candidate remains unqualified for release.
-
 - **Source-less Grounding and answer correlation — ready; U0 next.** Follow the
   [active plan](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md). Preserve
   the deep admission interface while supplying batch-owned identity context and replacing answer
@@ -25,6 +19,14 @@
   deepening plan supplies a successful, fully inspected quality baseline.
 
 ## COMPLETED
+
+- **Topic Expedition generation is scoped to DeepSeek and its stage decisions are frozen
+  (2026-08-23).** One composition-owned routing value moves the nine direct generators without
+  repointing shared consumers; exact aliases, assignments, fallbacks, and operation identities are
+  source/config owned. Local provider recovery passed under natural load. Mixed-domain inspection
+  kept seventeen stages and handed only Grounding Generation plus Verification Answering to the
+  [ready successor](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md).
+  Detailed record: commits `54329cf`, `8efc7e7`, `3938f19`, `8adfa00`, `f3e2a79`, and `8bf3e3a`.
 
 - **Concept Canonicalization is explicit and replayable (2026-08-23).** An immutable inspected
   artifact now separates neural identity judgment from LLM-free Graph-Version Build, and the
@@ -74,14 +76,6 @@
   real-backend journeys cover persistence and refusal paths. Durable policy:
   [ADR-0041](../adr/0041-own-learner-identity-with-self-hosted-better-auth.md); gate commits 03cdc32,
   d949177, and 3361bfc.
-
-- **Study Item grounding, key verification, and matching assignment quality shipped
-  (2026-08-07–08).** Citation resolution and cross-family answer-key verification share one grounding
-  contract; matching adds a provable containment veto, shared learner vocabulary, and cross-family
-  assignment verification. Production real-use inspection confirmed the repaired bank; one
-  borderline matching residual remains an accepted neural-quality tail rather than a lexical gate.
-  Durable policy: [ADR-0026](../adr/0026-typed-study-item-bank.md). Detailed records: commits 7fb9a2d
-  and 4ea7e64.
 
 ## VALIDATION
 

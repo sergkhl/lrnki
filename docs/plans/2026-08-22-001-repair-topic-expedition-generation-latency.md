@@ -461,7 +461,7 @@ seven-minute threshold does not apply to this contention soak.
 - The problem class is now researched, but the conventional repair changes Grounding Generation,
   which this locked plan excludes, and the bounded prompt/schema and pre-draft trials did not clear
   the current admission contract. The concrete next action is the ready
-  [DeepSeek Flash cutover and stage-value plan](./2026-08-23-001-cut-over-topic-expedition-generation-to-deepseek-flash.md);
+  [Source-less Grounding and answer-correlation plan](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md);
   do not retry the rejected variants or hide
   the defect with a weaker judge, lower quorum, unqualified model swap, lexical veto, or regenerated
   draft.

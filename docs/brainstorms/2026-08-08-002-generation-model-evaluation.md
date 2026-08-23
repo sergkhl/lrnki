@@ -6,9 +6,9 @@ date: 2026-08-08
 
 # DeepSeek Flash Generation Cutover and Pipeline Simplification
 
-**Status:** Interview resolved. The
-[ready implementation plan](../plans/2026-08-23-001-cut-over-topic-expedition-generation-to-deepseek-flash.md)
-owns the scoped cutover, independent-judge topology, and stage-value evidence gate.
+**Status:** Interview resolved. The scoped cutover and stage-value decision are complete. The
+[ready deepening plan](../plans/2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md)
+owns the two accepted quality seams and affected-consumer qualification.
 
 ## Decided direction
 
@@ -22,8 +22,8 @@ model card states that it supersedes the preview release, and the repository alr
 revision for judge roles. `litellm/config.yaml` remains the source of truth for the current
 alias-to-deployment mapping; this brainstorm does not change it or any Model Assignment.
 
-The ready plan rechecked the official Flash catalog and owns the exact pinned
-[Model Assignment](../../CONTEXT.md#model-operations). It does not use a moving `latest` alias.
+The implemented cutover uses the exact pinned [Model Assignment](../../CONTEXT.md#model-operations),
+not a moving `latest` alias. Current alias-to-deployment truth remains in `litellm/config.yaml`.
 
 ## Dated evidence and known defects
 
@@ -47,9 +47,9 @@ lexical veto, weaker admission, or a generator judging its own output.
 
 ## Resolved handoff
 
-The planning interview is complete. The ready plan owns the frozen initial pipeline shape and
-judge topology, then requires output evidence before a later plan may simplify stages. The handoff
-retains these constraints:
+The planning interview and initial stage decision are complete. Seventeen stages remain `KEEP`; the
+ready deepening plan owns Grounding Generation and Verification Answering without reopening the
+judge topology. The handoff retains these constraints:
 
 - Re-derive the affected consumer set from prompt frontmatter and the current LiteLLM mapping.
 - **Grounding generation and its judge must stay cross-family.**
@@ -62,10 +62,10 @@ retains these constraints:
 
 ## Release qualification
 
-Validation does not compare models to decide whether to proceed. The ready plan first gathers
-bounded stage-decision evidence; final-topology validation must then qualify the pinned Model
-Assignment and Provider Route, every affected consumer, latency, cost, and learner-facing quality
-for release under
+Validation does not compare models to decide whether to proceed. The ready deepening plan must
+qualify the pinned Model Assignment and Provider Route, every affected consumer, cost, and
+learner-facing quality; the active latency plan separately owns the successful 420-second baseline
+and soak required before release under
 [ADR-0013](../adr/0013-verify-quality-by-real-source-inspection.md) and
 [ADR-0028](../adr/0028-measure-non-deterministic-quality-with-non-deterministic-methods.md).
 Affected prior quality evidence is re-run or explicitly marked unqualified.

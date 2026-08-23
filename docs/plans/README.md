@@ -12,8 +12,8 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-23-001 — Cut Over Topic Expedition Generation to DeepSeek Flash and Measure Stage Value](./2026-08-23-001-cut-over-topic-expedition-generation-to-deepseek-flash.md)
-   — **In progress; U4 complete.** The focused successor is ready. Consolidate and delete this plan;
-   do not begin successor implementation in the same batch.
+   — **Completed and consolidated; delete next.** Detailed evidence is committed and durable status
+   is re-homed. Delete this plan in its own commit before entering the successor.
 
 2. [2026-08-23-002 — Deepen Source-less Grounding Context and Answer Correlation](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md)
    — **Ready; U0 next.** Supply batch-owned identity context, make answer correlation structural,
