@@ -6,9 +6,9 @@
 
 - **DeepSeek Flash Topic Expedition cutover — in progress in U2.** Follow the
   [active plan](./2026-08-23-001-cut-over-topic-expedition-generation-to-deepseek-flash.md). It
-  has a validated inactive seam, passing single-provider DeepInfra/Novita routes, and authorization
-  to qualify one MiMo provider without the catalog prefilter. Run the bounded eight-descriptor
-  served-call selection and commit its exact route verdict before configuration. No route is active;
+  has a validated inactive seam and a complete direct-provider matrix: DeepInfra DeepSeek, Xiaomi
+  MiMo, and Novita GPT-OSS. Implement the seven scoped aliases and exact single-provider deployment
+  groups, validate locally, then follow the LiteLLM reload/attribution runbook. No route is active;
   the candidate remains unqualified for release.
 
 - **Topic Expedition generation latency — blocked; U3 remains `FIX_FIRST`.** Follow

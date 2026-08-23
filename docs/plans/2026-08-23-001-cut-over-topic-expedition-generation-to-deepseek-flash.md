@@ -7,7 +7,7 @@ execution: code
 
 # Cut Over Topic Expedition Generation to DeepSeek Flash and Measure Stage Value
 
-**Status:** In progress — U2 empirical MiMo qualification authorized
+**Status:** In progress — U2 provider preflight complete; activation next
 
 **Decision state:** Locked. The accepted direction, dated comparison, and known quality defects
 remain in the
@@ -171,9 +171,9 @@ the corresponding global alias:
 | Scoped alias | Consumers | Exact Model Assignment | Provider Route |
 | --- | --- | --- | --- |
 | `kg-topic-expedition-generation` | all nine direct generators | DeepSeek V4 Flash 0731, FP8, reasoning off, temperature 0, seed 7 | `deepinfra/fp8` only |
-| `kg-topic-expedition-independent-judge` | difficulty banding/comparison, lesson redundancy, both key verifiers, matching assignment | Xiaomi MiMo v2.5, FP8, reasoning off, temperature 0, best-effort seed 7 | first full-pass route from `xiaomi/fp8`, `parasail/fp8`, `novita/fp8`; one provider only |
-| `kg-topic-expedition-claim-verification-answerer` | draft-blind answers | same MiMo assignment | same selected MiMo provider |
-| `kg-topic-expedition-claim-factuality-judge` | primary factuality judgments | same MiMo assignment | same selected MiMo provider |
+| `kg-topic-expedition-independent-judge` | difficulty banding/comparison, lesson redundancy, both key verifiers, matching assignment | Xiaomi MiMo v2.5, FP8, reasoning off, temperature 0, best-effort seed 7 | `xiaomi/fp8` only |
+| `kg-topic-expedition-claim-verification-answerer` | draft-blind answers | same MiMo assignment | `xiaomi/fp8` only |
+| `kg-topic-expedition-claim-factuality-judge` | primary factuality judgments | same MiMo assignment | `xiaomi/fp8` only |
 | `kg-topic-expedition-claim-verification-planner` | verification questions | OpenAI `gpt-oss-120b`, FP4, reasoning effort `medium`, temperature 0, seed 7 | `novita/fp4` only |
 | `kg-topic-expedition-claim-factuality-challenger` | second-family factuality judgments | same GPT-OSS assignment | `novita/fp4` only |
 | `kg-topic-expedition-prerequisite-ordering` | whole-set ordering | same GPT-OSS assignment | `novita/fp4` only |
@@ -192,13 +192,11 @@ seed 7, reasoning disabled, the exact strict forced named tool and schema, `quan
 one exact `only`/`order` provider pin, and `allow_fallbacks: false`. Seed remains the owning client's
 documented best-effort input, not a reproducibility guarantee.
 
-Qualify MiMo in `xiaomi/fp8`, `parasail/fp8`, then `novita/fp8` order. Probe the answerer contract on
-all three, then run the other seven descriptors on each still-eligible provider until the first
-provider passes all eight; stop there, with 24 calls as the hard maximum. A schema, forced-tool,
-reasoning, provider, or quantization failure disqualifies that provider; only an excluded transport
-or rate-limit attempt may receive one cooldown retry. Freeze the first full-pass provider in the
-Validation Log before editing configuration. The candidate prices are respectively $0.14/$0.28,
-$0.14/$0.28, and $0.168/$0.336 per million input/output tokens.
+The bounded MiMo selection froze `xiaomi/fp8`, the first provider in the approved order, after all
+eight descriptors passed. Parasail passed only the answerer screen and was not expanded after Xiaomi
+qualified; Novita's answerer returned schema-valid arguments but leaked reasoning and is
+disqualified. No retry was needed. The selected endpoint price at qualification time was
+$0.14/$0.28 per million input/output tokens.
 
 Those route claims are a dated snapshot of OpenRouter's endpoint catalogs for
 [DeepSeek](https://openrouter.ai/api/v1/models/deepseek/deepseek-v4-flash-0731/endpoints),
@@ -503,7 +501,7 @@ hidden by prompt tuning, regeneration, lower quorum, lexical rejection, or an un
   source seam and deterministic identities—not provider compatibility, activation, real use,
   deployed behavior, browser, native, or physical-device behavior.
 
-### U2 — exact direct-provider preflight — 2026-08-23 — `FIX_FIRST`
+### U2 — provider preflight complete; activation pending — 2026-08-23 — in progress
 
 - A disposable probe built the complete temperature-0/seed-7 request and exact strict named-tool
   schema from all 20 effective descriptors, then pinned the frozen quantization and one physical
@@ -537,12 +535,20 @@ hidden by prompt tuning, regeneration, lower quorum, lexical rejection, or an un
   complete request retains seed 7 as best-effort, reasoning disabled, exact FP8/provider pins, no
   fallback, and every strict forced-tool/schema check. DeepInfra-only DeepSeek and Novita-only
   GPT-OSS retain their complete passing matrices; failed backups are no longer candidates.
+- Empirical MiMo verdict: the three-provider answerer screen passed on Xiaomi and Parasail; Novita
+  was disqualified for reasoning leakage despite schema-valid forced-tool arguments. Xiaomi then
+  passed the other seven descriptors, freezing an 8/8 `xiaomi/fp8` route. All Xiaomi responses
+  reported the expected provider and model, one matching schema-valid tool call, and no reasoning;
+  no retry was needed, and the stop-on-first-full-pass rule avoided unneeded Parasail calls.
+- Evidence authority remains direct OpenRouter served-call contract and physical-provider
+  attribution only. The empirical calls did not exercise LiteLLM aliases, loaded configuration,
+  Topic Expedition persistence, learner usefulness, browser, native, or physical-device behavior.
 
 ### Open findings
 
-- **NEXT:** run the bounded MiMo served-call selection in KTD3 and freeze the first provider that
-  passes all eight descriptors. Do not edit configuration or activate U2 before that evidence is
-  committed.
+- **NEXT:** implement the exact single-provider KTD3 topology in `litellm/config.yaml` and Topic
+  production composition, add the focused config/routing tests, and validate locally before the
+  README-governed LiteLLM reload and served-alias attribution checks.
 - U3 and U4 remain gated by U2. No scoped alias, deployment group, config file, or running route has
   changed, so prior evidence has not yet been invalidated by this plan.
 - All prior usefulness evidence for the nine generators and eleven reassigned/re-routed supporting
