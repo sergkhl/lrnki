@@ -6,9 +6,8 @@
 
 - **DeepSeek Flash Topic Expedition cutover — in progress; U2 is `FIX_FIRST`.** Follow the
   [active plan](./2026-08-23-001-cut-over-topic-expedition-generation-to-deepseek-flash.md). It
-  has a validated inactive seam, but the frozen Xiaomi and GPT judge routes failed exact
-  forced-tool preflight and one Parasail DeepSeek descriptor remained throttled. Amend KTD3 to a
-  bounded same-Model-Assignment candidate matrix before any more provider calls or config changes.
+  has a validated inactive seam and a frozen 31-call replacement-provider matrix that preserves
+  every Model Assignment and deterministic field. Run that exact matrix before any config change.
   No route is active; the candidate remains unqualified for release.
 
 - **Topic Expedition generation latency — blocked; U3 remains `FIX_FIRST`.** Follow
