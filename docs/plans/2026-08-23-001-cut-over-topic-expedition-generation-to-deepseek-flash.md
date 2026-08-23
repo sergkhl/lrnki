@@ -7,7 +7,7 @@ execution: code
 
 # Cut Over Topic Expedition Generation to DeepSeek Flash and Measure Stage Value
 
-**Status:** In progress — U2 locally validated candidate; live activation next
+**Status:** In progress — U2 complete; U3 bounded real-use sample next
 
 **Decision state:** Locked. The accepted direction, dated comparison, and known quality defects
 remain in the
@@ -501,7 +501,7 @@ hidden by prompt tuning, regeneration, lower quorum, lexical rejection, or an un
   source seam and deterministic identities—not provider compatibility, activation, real use,
   deployed behavior, browser, native, or physical-device behavior.
 
-### U2 — provider preflight complete; activation pending — 2026-08-23 — in progress
+### U2 — exact scoped routes active and attributable — 2026-08-23 — complete
 
 - A disposable probe built the complete temperature-0/seed-7 request and exact strict named-tool
   schema from all 20 effective descriptors, then pinned the frozen quantization and one physical
@@ -555,15 +555,29 @@ hidden by prompt tuning, regeneration, lower quorum, lexical rejection, or an un
   eval context cannot resolve workspace aliases; the package-scoped rerun produced the hashes above.
   This proves the committed source/config candidate only, not a loaded LiteLLM process or served
   alias.
+- Local shared-runtime activation: the sole host worktree was clean at committed candidate
+  `3d418a3`, Docker used that checkout, and LiteLLM's read-only bind resolved to its canonical config.
+  The old process was the negative control—37 loaded models and no Topic group. A detached recreate
+  produced a new container; its initial bounded health wait was excluded while Prisma migration was
+  still running, then the same container became healthy with 45 models and all three exact groups.
+- Served-alias attribution: proof tag `topic-u2-3d418a3-proof-a1` had zero rows before seven
+  zero-retry production-client calls. All seven returned validator-accepted forced tools. SpendLogs
+  then contained exactly seven successful rows and seven aliases: one DeepInfra DeepSeek, three
+  Xiaomi MiMo, and three Novita GPT-OSS. `/model/info` resolved their three deployment ids to the
+  expected base models; no fallback row appeared. Two malformed read-only `jq` projections were
+  excluded and corrected without another model call.
+- Production-composition freshness: host and learner-API container hashes for
+  `learnerGeneration.ts` matched, the watcher-started process was healthy, and its internal `/health`
+  returned 200. This is local shared-runtime source, loaded-route, provider-attribution, and forced-
+  tool evidence—not a complete Topic Expedition, persistence, learner usefulness, browser, native,
+  physical-device, deployed, or final-release evidence.
 
 ### Open findings
 
-- **NEXT:** from the verified host/deploy checkout, reload the committed LiteLLM config detached,
-  verify the three deployment groups through `/models`, send uniquely tagged calls through all
-  seven scoped aliases, and match each to its loaded deployment, base model, and physical provider
-  in SpendLogs before closing U2.
-- U3 and U4 remain gated by U2. No scoped alias, deployment group, config file, or running route has
-  changed, so prior evidence has not yet been invalidated by this plan.
-- All prior usefulness evidence for the nine generators and eleven reassigned/re-routed supporting
-  consumers becomes unqualified when U2 activates. U3 is the first current DeepSeek candidate
-  evidence; final release evidence remains intentionally deferred until the pipeline shape settles.
+- **NEXT:** apply the validation skill's real-use route, hard-reset only the local development
+  application database, verify an empty Topic queue, and run the three KTD5 topics plus the Cellular
+  Respiration repeat through the fresh production composition. Build and inspect the joined report
+  before assigning any learner-quality verdict.
+- U4 remains gated by U3. The active route invalidates prior usefulness evidence for all affected
+  consumers; U3 is the first current candidate evidence, and final release qualification remains
+  intentionally deferred until the pipeline shape settles.

@@ -4,12 +4,12 @@
 
 ## TODO
 
-- **DeepSeek Flash Topic Expedition cutover — in progress in U2.** Follow the
+- **DeepSeek Flash Topic Expedition cutover — U2 complete; U3 next.** Follow the
   [active plan](./2026-08-23-001-cut-over-topic-expedition-generation-to-deepseek-flash.md). It
-  has a complete provider matrix and locally validated source/config candidate for the seven scoped
-  aliases. Reload the committed LiteLLM config from the verified host checkout, prove all three
-  groups in `/models`, and attribute uniquely tagged calls for every alias in SpendLogs. No route is
-  active yet; the candidate remains unqualified for release.
+  has completed U2: all seven aliases serve the exact DeepInfra/Xiaomi/Novita topology with loaded
+  deployment and SpendLogs attribution. Next hard-reset only the local application database, run
+  the three KTD5 topics plus the Cellular Respiration repeat, and inspect the joined real-use report.
+  The active candidate remains unqualified for release.
 
 - **Topic Expedition generation latency — blocked; U3 remains `FIX_FIRST`.** Follow
   [the active plan](./2026-08-22-001-repair-topic-expedition-generation-latency.md) in U0–U4 order.

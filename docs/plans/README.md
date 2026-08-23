@@ -12,9 +12,9 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-23-001 — Cut Over Topic Expedition Generation to DeepSeek Flash and Measure Stage Value](./2026-08-23-001-cut-over-topic-expedition-generation-to-deepseek-flash.md)
-   — **In progress; U2 candidate locally validated, live activation next.** The seven scoped aliases
-   and exact DeepInfra/Xiaomi/Novita groups are implemented with new operation identities. Reload
-   the committed config and prove every served alias in SpendLogs; no runtime route has changed.
+   — **In progress; U2 complete, U3 real-use sample next.** All seven scoped aliases are loaded and
+   attributed to the exact DeepInfra/Xiaomi/Novita topology. Reset only the local application data,
+   run the four bounded KTD5 expeditions, and inspect every descriptor output and learner asset.
 
 2. [2026-08-22-001 — Restore Topic Expedition Generation to Seven Minutes](./2026-08-22-001-repair-topic-expedition-generation-latency.md)
    — **Blocked in U3 (`FIX_FIRST`).** The bounded pipeline and shared stage profile are complete,
