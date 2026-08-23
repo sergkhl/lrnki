@@ -7,7 +7,7 @@ execution: code
 
 # Cut Over Topic Expedition Generation to DeepSeek Flash and Measure Stage Value
 
-**Status:** In progress — U1 complete; U2 next
+**Status:** In progress — U2 `FIX_FIRST`; route amendment next
 
 **Decision state:** Locked. The accepted direction, dated comparison, and known quality defects
 remain in the
@@ -485,16 +485,36 @@ hidden by prompt tuning, regeneration, lower quorum, lexical rejection, or an un
   source seam and deterministic identities—not provider compatibility, activation, real use,
   deployed behavior, browser, native, or physical-device behavior.
 
+### U2 — exact direct-provider preflight — 2026-08-23 — `FIX_FIRST`
+
+- A disposable probe built the complete temperature-0/seed-7 request and exact strict named-tool
+  schema from all 20 effective descriptors, then pinned the frozen quantization and one physical
+  provider per call. The initial matrix ran 32 cases; only throttled Parasail DeepSeek cases were
+  rerun. No alias, deployment group, config file, or running service changed.
+- DeepSeek: DeepInfra FP8 passed all nine generator descriptors. Parasail FP8 passed eight; Study
+  Item Blueprint passed after an initial `429`, while Matching Generation returned `429` twice and
+  remains operationally unqualified. Every valid DeepSeek response had matching provider/model
+  attribution, one schema-valid forced tool call, and no reasoning output.
+- MiMo: Xiaomi FP8 served none of the eight judge/answer descriptors; OpenRouter returned `404` for
+  the complete required-parameter body. GPT-OSS: CoreWeave FP4 passed Prerequisite Ordering, but the
+  planner returned schema-invalid string entries and the challenger emitted no tool call. Parasail
+  FP4 served none of the three descriptors under the complete body (`404`). These are route-contract
+  failures, so U2 correctly stopped before activation.
+- Evidence authority: direct OpenRouter/provider contract and physical-provider attribution only.
+  The calls did not exercise the LiteLLM aliases, a deployed config, a Topic Expedition, persisted
+  artifacts, learner usefulness, browser, native, or physical-device behavior.
+
 ### Open findings
 
-- **NEXT:** U2 must preflight the complete deterministic request and exact forced-tool schema for
-  every newly routed descriptor against every candidate physical provider before editing or
-  reloading `litellm/config.yaml`. Only a wholly passing matrix may activate the one routing value;
-  U3–U4 remain open.
-- CoreWeave/Parasail GPT FP4 and the Topic-only Xiaomi FP8 group remain candidate routes until their
-  complete forced-tool preflights and served-call attribution pass.
-- Xiaomi's current endpoint catalog omits `seed`; U2 must prove the complete deterministic request
-  body is honored or stop as `FIX_FIRST`. Do not drop the field or substitute a provider ad hoc.
+- **NEXT:** amend KTD3 before testing a replacement Provider Route. Preserve all three frozen Model
+  Assignments and the complete deterministic body; use only declared FP8 MiMo and FP4 GPT endpoints
+  that advertise forced tools, seed, and the required reasoning control. Current catalog candidates
+  include Parasail/Novita for MiMo and Novita/Nebius for GPT; DeepSeek also needs a stable exact-FP8
+  fallback. Freeze the smallest candidate matrix, then preflight it completely before any config
+  edit or reload.
+- The frozen Xiaomi, CoreWeave, and Parasail GPT routes failed; Parasail DeepSeek is not fully
+  reachable. Do not drop `seed`, weaken schemas, enable OpenRouter fallback, split one role across
+  different Model Assignments, or activate a partial matrix to make U2 pass.
 - All prior usefulness evidence for the nine generators and eleven reassigned/re-routed supporting
   consumers becomes unqualified when U2 activates. U3 is the first current DeepSeek candidate
   evidence; final release evidence remains intentionally deferred until the pipeline shape settles.

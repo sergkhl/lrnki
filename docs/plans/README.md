@@ -12,9 +12,10 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-23-001 — Cut Over Topic Expedition Generation to DeepSeek Flash and Measure Stage Value](./2026-08-23-001-cut-over-topic-expedition-generation-to-deepseek-flash.md)
-   — **In progress; U1 complete, U2 next.** The inactive descriptor override seam and effective
-   Topic hash builders pass focused package checks while every default identity remains stable.
-   Preflight every exact physical-provider route before activation; no route is active yet.
+   — **In progress; U2 is `FIX_FIRST`, route amendment next.** DeepSeek/DeepInfra passed its complete
+   generator matrix, but the frozen Xiaomi and GPT judge routes failed exact forced-tool preflight
+   and Parasail DeepSeek remained throttled for one descriptor. Amend the route before more calls;
+   no config or runtime route changed.
 
 2. [2026-08-22-001 — Restore Topic Expedition Generation to Seven Minutes](./2026-08-22-001-repair-topic-expedition-generation-latency.md)
    — **Blocked in U3 (`FIX_FIRST`).** The bounded pipeline and shared stage profile are complete,
