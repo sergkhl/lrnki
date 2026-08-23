@@ -4,18 +4,6 @@
 
 ## TODO
 
-- **ADR audit — in progress; U5 next.** Follow
-  [the first active plan](./2026-08-23-001-apply-adr-audit.md) in U0–U5 order. U1–U2 now own immutable
-  Concept Canonicalization artifacts, LLM-free deterministic replay, application-owned stage
-  membership, full Processing Journey lineage, and the regenerated operation constraint. U3
-  corrected the audited ADR/workflow/glossary/runbook boundaries and recorded the decided DeepSeek
-  follow-up without implementing it. U4 passed production-model semantic inspection, exact local
-  replay, SpendLog attribution, and isolated database gates after fixing PostgreSQL timestamp
-  hydration at the artifact-store boundary. Next, run the full repository/protected-diff gate and
-  consolidate the completed plan. Preserve ADR-0006, every
-  cross-family rule, current one-pass admission behavior, all Model Assignments, the ten original
-  local commits, and unrelated skill worktree changes.
-
 - **Topic Expedition generation latency — blocked; U3 remains `FIX_FIRST`.** Follow
   [the active plan](./2026-08-22-001-repair-topic-expedition-generation-latency.md) in U0–U4 order.
   The bounded admission pipeline and honest 19-stage Journal profile are complete, but equal widths
@@ -33,6 +21,16 @@
   the model choice.
 
 ## COMPLETED
+
+- **Concept Canonicalization is explicit and replayable (2026-08-23).** An immutable inspected
+  artifact now separates neural identity judgment from LLM-free Graph-Version Build, and the
+  application catalog alone owns operation-stage membership. A local production-model gate across
+  PDF, Markdown, and HTML sources passed; two publications from one artifact replayed exactly.
+  Durable policy lives in [ADR-0017](../adr/0017-split-extraction-runs-from-graph-version-builds.md),
+  [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md), and
+  [ADR-0034](../adr/0034-neural-stage-descriptors-dotprompt-config-hashes.md); operator commands live
+  in the root [README](../../README.md#concept-canonicalization-and-graph-publication). Detailed
+  record: commits `a84edcc`, `935fe13`, `546b9db`, and `617e058`.
 
 - **The DeepSeek Provider Route is repaired and attributable (2026-08-23).** The three production
   aliases now share one FP8, reasoning-disabled Model Assignment with provider failover owned only by
@@ -73,11 +71,6 @@
   [ADR-0041](../adr/0041-own-learner-identity-with-self-hosted-better-auth.md); gate commits 03cdc32,
   d949177, and 3361bfc.
 
-- **The shared judge deployment is live and exercised (2026-08-08).** Recreating LiteLLM made the
-  configured independent judge effective, and the production real-use gate exercised it over the
-  full study-item fixture. The reload and deployment-verification procedure lives in the root
-  [README](../../README.md#deployment).
-
 - **Study Item grounding, key verification, and matching assignment quality shipped
   (2026-08-07–08).** Citation resolution and cross-family answer-key verification share one grounding
   contract; matching adds a provable containment veto, shared learner vocabulary, and cross-family
@@ -88,35 +81,22 @@
 
 ## VALIDATION
 
-### DeepInfra-primary Provider Route repair — 2026-08-23
+### Concept Canonicalization and ADR audit — 2026-08-23
 
-- Diagnosis: the earlier Baidu preflight omitted production `seed: 7`. The real client sent it with
-  `temperature: 0`; Baidu rejected seed, so `require_parameters: true` excluded Baidu before
-  inference and LiteLLM served DeepInfra. That successful fallback response had not proved primary
-  use. Candidate `eadf16d4e05841ed00a5b080c87a1f8235860c26` leaves the sampling body unchanged and
-  replaces the superseded route definitions with one shared primary and explicit same-assignment
-  backup. Seed's independent benefit remains unisolated and it is not a reproducibility guarantee.
-- Provider contract and router evidence: immediately before cutover, the endpoint registry still
-  advertised the full FP8/seed/reasoning/forced-tool/structured-output contract for both routes. All
-  six direct provider × Answer-Key Verification, Claim Verification Answering, and Claim Factuality
-  Judgment probes returned the requested provider/model, one schema-valid forced call, and HTTP 200.
-  In the exact-image fault harness, tag `deepseek-provider-fallback-1787428988213` produced exactly
-  three Parasail-attributed backup rows, all successful with zero retries and one client request.
-- Automated evidence: the deployable candidate passed the LiteLLM typecheck and 176/176 package
-  tests. Root `pnpm check` passed schema parity, every workspace check, lint with zero errors, both
-  production builds, and 70/70 intercepted-web cases; `git diff --check` passed. Intercepted web is
-  qualified only at that layer.
-- Deployed evidence: VPS checkout `eadf16d4` recreated only LiteLLM as healthy container
-  `5b819236816539ba4fe3dec53f919b2af76741d433dace3377ddeb0b1980c56f` on image digest
-  `sha256:c98c9395c56a35b7abacff8269d43ff99aabacb62bbf42a04cc1514fcb9bde4a`; `/model/info`
-  exposed exactly the two pinned FP8, reasoning-disabled groups and the public learner API stayed
-  healthy. Tag `deepseek-provider-deepinfra-primary-1787429578731` had a four-row positive control:
-  all three alias rows shared primary deployment id `b33145a5…`, provider `DeepInfra`, and one direct
-  backup row used deployment id `ac3f244a…`, provider `Parasail`. Every row used the exact base model,
-  succeeded with zero retries, and its schema-valid client call made one HTTP request.
-- Rollback identity remains prior revision `d069cba1dcd393b8377857e4f8c71aff17e96c74` and container
-  `1c14e5ab8e0a0ee40629d9b416021836c735d7b60aeef3be9a4c13838ef9da30`. No rollback was required.
-  Prior semantic quality evidence remains qualified because revision, FP8 quantization, reasoning
-  behavior, temperature, and seed did not change. This result proves provider contract, explicit
-  fallback mechanics, deployed reachability, attribution, and service health only—not new
-  broad-source usefulness, learner-flow, native, simulator/emulator, or physical-device quality.
+- Local real-use: semantic artifact `bc33525e-77ce-455a-8e6f-72022192daaa` preserved the selected
+  PDF → Markdown → HTML Extraction Run order and inspected 15 core Concepts across machine learning
+  systems and molecular biology. Its two proposals were correctly `distinct`; no unsupported merge,
+  cross-domain merge, quarantine, or unavailable result appeared.
+- Replay and attribution: graph versions `227f8bab-7697-44f7-8321-5789335b5f28` and
+  `9efc7a9e-89c2-40b9-9d73-294e534907d1` matched after excluding version identity/timestamps. The
+  canonicalization operation joined four production-assignment SpendLogs and 2,663 tokens; each
+  Graph-Version Build had a same-query positive control and zero model calls.
+- Database and automation: a timestamp-hydration defect found by artifact inspection was fixed at the
+  PostgreSQL boundary. `pnpm test:db` passed against reset-only `lrnki_test`; `pnpm db:check`, full
+  workspace typechecks/tests, lint with zero errors, both production builds, link checks, and
+  `git diff --check` passed. Root `pnpm check` was decomposed because its Playwright browser step was
+  explicitly out of scope; no browser was launched.
+- Protected diff: ADR-0006, Model Assignments, cross-family policy/enforcement, and one-pass Source-less
+  Grounding Admission behavior are unchanged from `ab15107`. This is local automated, local database,
+  local production-model, and documentation evidence—not deployed, production-data, browser, native,
+  simulator/emulator, or physical-device evidence.
