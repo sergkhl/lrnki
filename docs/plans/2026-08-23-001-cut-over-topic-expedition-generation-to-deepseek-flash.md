@@ -7,7 +7,7 @@ execution: code
 
 # Cut Over Topic Expedition Generation to DeepSeek Flash and Measure Stage Value
 
-**Status:** In progress — U2 provider preflight complete; activation next
+**Status:** In progress — U2 locally validated candidate; live activation next
 
 **Decision state:** Locked. The accepted direction, dated comparison, and known quality defects
 remain in the
@@ -543,12 +543,25 @@ hidden by prompt tuning, regeneration, lower quorum, lexical rejection, or an un
 - Evidence authority remains direct OpenRouter served-call contract and physical-provider
   attribution only. The empirical calls did not exercise LiteLLM aliases, loaded configuration,
   Topic Expedition persistence, learner usefulness, browser, native, or physical-device behavior.
+- Local activation candidate: Topic production composition now owns one seven-alias routing value
+  and passes it to every affected port plus both operation hashes. The canonical LiteLLM config
+  resolves those aliases to one DeepInfra DeepSeek deployment, one exact Xiaomi FP8 MiMo deployment,
+  and one Novita FP4 GPT-OSS deployment with medium reasoning; none has a fallback. Shared aliases
+  and non-Topic composition remain unchanged. Candidate hashes are
+  `synthetic-topic-generation-299166f6ba7c` and `study-item-bank-02d755d9fae1`.
+- Local automated evidence: focused production-constant and resolved-route tests passed; the full
+  infrastructure-LiteLLM and learner-API suites passed, both package typechecks passed, targeted
+  lint passed, and `git diff --check` passed. One root `tsx -e` hash print was excluded because that
+  eval context cannot resolve workspace aliases; the package-scoped rerun produced the hashes above.
+  This proves the committed source/config candidate only, not a loaded LiteLLM process or served
+  alias.
 
 ### Open findings
 
-- **NEXT:** implement the exact single-provider KTD3 topology in `litellm/config.yaml` and Topic
-  production composition, add the focused config/routing tests, and validate locally before the
-  README-governed LiteLLM reload and served-alias attribution checks.
+- **NEXT:** from the verified host/deploy checkout, reload the committed LiteLLM config detached,
+  verify the three deployment groups through `/models`, send uniquely tagged calls through all
+  seven scoped aliases, and match each to its loaded deployment, base model, and physical provider
+  in SpendLogs before closing U2.
 - U3 and U4 remain gated by U2. No scoped alias, deployment group, config file, or running route has
   changed, so prior evidence has not yet been invalidated by this plan.
 - All prior usefulness evidence for the nine generators and eleven reassigned/re-routed supporting

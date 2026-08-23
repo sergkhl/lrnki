@@ -12,9 +12,9 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-23-001 — Cut Over Topic Expedition Generation to DeepSeek Flash and Measure Stage Value](./2026-08-23-001-cut-over-topic-expedition-generation-to-deepseek-flash.md)
-   — **In progress; U2 provider preflight complete, activation next.** Xiaomi passed all eight MiMo
-   descriptors, completing the DeepInfra/Xiaomi/Novita single-provider topology. Implement and
-   validate the scoped aliases before reloading LiteLLM; no runtime route has changed.
+   — **In progress; U2 candidate locally validated, live activation next.** The seven scoped aliases
+   and exact DeepInfra/Xiaomi/Novita groups are implemented with new operation identities. Reload
+   the committed config and prove every served alias in SpendLogs; no runtime route has changed.
 
 2. [2026-08-22-001 — Restore Topic Expedition Generation to Seven Minutes](./2026-08-22-001-repair-topic-expedition-generation-latency.md)
    — **Blocked in U3 (`FIX_FIRST`).** The bounded pipeline and shared stage profile are complete,

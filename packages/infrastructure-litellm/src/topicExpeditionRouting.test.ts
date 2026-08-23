@@ -31,6 +31,11 @@ import { createIntrinsicDifficultyJudgmentPort } from "./intrinsicDifficultyAdap
 import { createLayerPurposeGenerationPort } from "./layerPurposeGenerationAdapters";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import {
+  modelAssignmentIdentity,
+  modelRoutingBehaviorIdentity,
+  readLitellmProxyConfig
+} from "./litellmProxyConfig";
+import {
   createAnswerKeyVerificationPort,
   createMatchingAssignmentVerificationPort,
   createStudyItemBlueprintPort,
@@ -47,6 +52,10 @@ const routing: TopicExpeditionModelRouting = {
   claimFactualityChallenger: "kg-topic-expedition-claim-factuality-challenger",
   prerequisiteOrdering: "kg-topic-expedition-prerequisite-ordering"
 };
+
+const DEEPSEEK_GROUP = "openrouter/deepseek/deepseek-v4-flash-0731";
+const MIMO_GROUP = "openrouter/xiaomi/mimo-v2.5-topic-expedition";
+const GPT_GROUP = "openrouter/openai/gpt-oss-120b-topic-expedition-novita";
 
 test("every Topic adapter factory exposes its effective scoped model without changing composition", () => {
   const client = {} as LiteLlmForcedToolClient;
@@ -145,4 +154,97 @@ test("Topic overrides change only Topic hashes while default identities and the 
   assert.equal(TOPIC_EXPEDITION_STAGE_TOTAL, 19);
   assert.equal(TOPIC_EXPEDITION_STAGE_PROFILE.enrichment.length, 9);
   assert.equal(TOPIC_EXPEDITION_STAGE_PROFILE.study_items.length, 10);
+});
+
+test("configured Topic aliases resolve one exact DeepInfra, Xiaomi, or Novita deployment with no fallback", () => {
+  const proxy = readLitellmProxyConfig();
+  const expected = new Map<string, { group: string; behavior: Record<string, unknown> }>([
+    [routing.generation, {
+      group: DEEPSEEK_GROUP,
+      behavior: {
+        litellmParams: {
+          model: DEEPSEEK_GROUP,
+          extra_body: {
+            reasoning: { enabled: false },
+            provider: {
+              require_parameters: true,
+              quantizations: ["fp8"],
+              only: ["deepinfra/fp8"],
+              order: ["deepinfra/fp8"],
+              allow_fallbacks: false
+            }
+          }
+        },
+        modelInfo: { mode: "chat", max_input_tokens: 1048576 }
+      }
+    }],
+    ...[
+      routing.independentJudge,
+      routing.claimVerificationAnswerer,
+      routing.claimFactualityJudge
+    ].map((alias) => [alias, {
+      group: MIMO_GROUP,
+      behavior: {
+        litellmParams: {
+          model: "openrouter/xiaomi/mimo-v2.5",
+          extra_body: {
+            reasoning: { enabled: false },
+            provider: {
+              quantizations: ["fp8"],
+              only: ["xiaomi/fp8"],
+              order: ["xiaomi/fp8"],
+              allow_fallbacks: false
+            }
+          }
+        },
+        modelInfo: { mode: "chat", max_input_tokens: 1048576, max_output_tokens: 131072 }
+      }
+    }] as const),
+    ...[
+      routing.claimVerificationPlanner,
+      routing.claimFactualityChallenger,
+      routing.prerequisiteOrdering
+    ].map((alias) => [alias, {
+      group: GPT_GROUP,
+      behavior: {
+        litellmParams: {
+          model: "openrouter/openai/gpt-oss-120b",
+          extra_body: {
+            reasoning: { effort: "medium" },
+            provider: {
+              require_parameters: true,
+              quantizations: ["fp4"],
+              only: ["novita/fp4"],
+              order: ["novita/fp4"],
+              allow_fallbacks: false
+            }
+          }
+        },
+        modelInfo: { mode: "chat", max_input_tokens: 131072 }
+      }
+    }] as const)
+  ]);
+
+  for (const [alias, routeExpectation] of expected) {
+    const route = modelRoutingBehaviorIdentity(alias, proxy);
+    assert.equal(route.primary.modelGroup, routeExpectation.group, alias);
+    assert.equal(route.primary.deployments.length, 1, alias);
+    assert.deepEqual(route.primary.deployments[0]?.behavior, routeExpectation.behavior, alias);
+    assert.deepEqual(route.fallbacks, [], alias);
+  }
+
+  const assignmentModels = [
+    routing.generation,
+    routing.independentJudge,
+    routing.claimVerificationPlanner
+  ].map((alias) => {
+    const identity = modelAssignmentIdentity(alias, proxy);
+    assert.equal(identity.assignments.length, 1, alias);
+    return identity.assignments[0]?.model;
+  });
+  assert.deepEqual(assignmentModels, [
+    "openrouter/deepseek/deepseek-v4-flash-0731",
+    "openrouter/xiaomi/mimo-v2.5",
+    "openrouter/openai/gpt-oss-120b"
+  ]);
 });

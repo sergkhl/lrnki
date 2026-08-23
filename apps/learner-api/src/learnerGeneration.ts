@@ -29,7 +29,8 @@ import {
   createStudyItemGenerationPort,
   createNeuralClients,
   studyItemBankConfigHash,
-  withSyntheticGenerationConfigHash
+  withSyntheticGenerationConfigHash,
+  type TopicExpeditionModelRouting
 } from "@lrnki/infrastructure-litellm";
 import {
   PostgresConceptLessonStore,
@@ -41,6 +42,16 @@ import {
   PostgresStudyItemBankStore
 } from "@lrnki/infrastructure-postgres";
 import type { DatabaseClient } from "./db";
+
+export const TOPIC_EXPEDITION_MODEL_ROUTING = {
+  generation: "kg-topic-expedition-generation",
+  independentJudge: "kg-topic-expedition-independent-judge",
+  claimVerificationAnswerer: "kg-topic-expedition-claim-verification-answerer",
+  claimFactualityJudge: "kg-topic-expedition-claim-factuality-judge",
+  claimVerificationPlanner: "kg-topic-expedition-claim-verification-planner",
+  claimFactualityChallenger: "kg-topic-expedition-claim-factuality-challenger",
+  prerequisiteOrdering: "kg-topic-expedition-prerequisite-ordering"
+} as const satisfies TopicExpeditionModelRouting;
 
 // Production composition for Topic Expedition generation (plan 2026-07-13-001 U2): the
 // full neural, store, reporter, and config-hash construction happens ONCE here, adapted
@@ -54,20 +65,27 @@ export function createLearnerTopicExpeditionGeneration(sql: DatabaseClient): Top
   const graphStore = new PostgresGraphVersionStore(sql);
   const enrichmentStore = new PostgresEnrichmentRunStore(sql);
   const reporter = new PostgresRunProgressReporter(sql);
-  const syntheticConfig = withSyntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG);
+  const routing = TOPIC_EXPEDITION_MODEL_ROUTING;
+  const syntheticConfig = withSyntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG, routing);
   const sourceLessGroundingAdmission = createSourceLessGroundingAdmission({
     knowledgeBoundaryProbe: createKnowledgeBoundaryProbePort(probeClient),
     embedding: new LiteLlmNodeEmbeddingAdapter(embeddingClient),
-    groundingGeneration: createGroundingGenerationPort(deterministicClient),
-    claimVerificationQuestionPlanning: createClaimVerificationQuestionPlanningPort(deterministicClient),
-    claimVerificationAnswering: createClaimVerificationAnsweringPort(deterministicClient),
+    groundingGeneration: createGroundingGenerationPort(deterministicClient, routing.generation),
+    claimVerificationQuestionPlanning: createClaimVerificationQuestionPlanningPort(
+      deterministicClient,
+      routing.claimVerificationPlanner
+    ),
+    claimVerificationAnswering: createClaimVerificationAnsweringPort(
+      deterministicClient,
+      routing.claimVerificationAnswerer
+    ),
     claimFactualityJudgments: [
-      createClaimFactualityJudgmentPort(deterministicClient),
-      createClaimFactualityChallengePort(deterministicClient)
+      createClaimFactualityJudgmentPort(deterministicClient, routing.claimFactualityJudge),
+      createClaimFactualityChallengePort(deterministicClient, routing.claimFactualityChallenger)
     ],
     policy: syntheticConfig.sourceLessGroundingAdmission
   });
-  const bankConfigHash = studyItemBankConfigHash();
+  const bankConfigHash = studyItemBankConfigHash(routing);
   return createTopicExpeditionGeneration({
     expeditionProgress: new PostgresLearnerExpeditionStore(sql),
     syntheticGeneration: async (activity) => {
@@ -76,12 +94,12 @@ export function createLearnerTopicExpeditionGeneration(sql: DatabaseClient): Top
         topic: activity.topic,
         declaredDomain: activity.declaredDomain,
         onDeclaredDomain: activity.onDeclaredDomain,
-        declaredDomainInference: createDeclaredDomainInferencePort(deterministicClient),
-        conceptSetSynthesis: createConceptSetSynthesisPort(deterministicClient),
+        declaredDomainInference: createDeclaredDomainInferencePort(deterministicClient, routing.generation),
+        conceptSetSynthesis: createConceptSetSynthesisPort(deterministicClient, routing.generation),
         sourceLessGroundingAdmission,
-        prerequisiteOrdering: createPrerequisiteOrderingPort(deterministicClient),
+        prerequisiteOrdering: createPrerequisiteOrderingPort(deterministicClient, routing.prerequisiteOrdering),
         difficulty: createIntrinsicDifficultyPort(
-          createIntrinsicDifficultyJudgmentPort(deterministicClient),
+          createIntrinsicDifficultyJudgmentPort(deterministicClient, routing.independentJudge),
           DEFAULT_ENRICHMENT_CONFIG.difficultySampleCount
         ),
         enrichmentStore,
@@ -96,15 +114,21 @@ export function createLearnerTopicExpeditionGeneration(sql: DatabaseClient): Top
         configHash: bankConfigHash,
         graphStore,
         enrichmentStore,
-        conceptLessonGeneration: createConceptLessonGenerationPort(deterministicClient),
-        conceptLessonRedundancyJudge: createConceptLessonRedundancyJudgmentPort(deterministicClient),
-        layerPurposeGeneration: createLayerPurposeGenerationPort(deterministicClient),
+        conceptLessonGeneration: createConceptLessonGenerationPort(deterministicClient, routing.generation),
+        conceptLessonRedundancyJudge: createConceptLessonRedundancyJudgmentPort(
+          deterministicClient,
+          routing.independentJudge
+        ),
+        layerPurposeGeneration: createLayerPurposeGenerationPort(deterministicClient, routing.generation),
         layerPurposeStore: new PostgresEnrichmentLayerPurposeStore(sql),
-        studyItemBlueprint: createStudyItemBlueprintPort(deterministicClient),
-        answerKeyVerification: createAnswerKeyVerificationPort(deterministicClient),
-        matchingAssignmentVerification: createMatchingAssignmentVerificationPort(deterministicClient),
+        studyItemBlueprint: createStudyItemBlueprintPort(deterministicClient, routing.generation),
+        answerKeyVerification: createAnswerKeyVerificationPort(deterministicClient, routing.independentJudge),
+        matchingAssignmentVerification: createMatchingAssignmentVerificationPort(
+          deterministicClient,
+          routing.independentJudge
+        ),
         conceptLessonStore: new PostgresConceptLessonStore(sql),
-        studyItemGeneration: createStudyItemGenerationPort(deterministicClient),
+        studyItemGeneration: createStudyItemGenerationPort(deterministicClient, routing.generation),
         studyItemBankStore: new PostgresStudyItemBankStore(sql),
         reporter
       });

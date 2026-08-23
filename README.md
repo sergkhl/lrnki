@@ -290,6 +290,13 @@ prove the primary ran. After reloading a route, send uniquely tagged calls and r
 SpendLogs `model_group`, `model_id`, and `response->>'provider'` attribution before accepting the
 cutover.
 
+An owning plan may omit `require_parameters` only when the catalog filter rejects a candidate and a
+provider-pinned served-call matrix qualifies every effective production descriptor without it.
+Keep the complete request body, exact quantization and `only`/`order` pin, internal fallback off,
+strict forced tool/schema checks, and reasoning check. Record unsupported sampling controls as
+best-effort rather than claiming the provider enforces them; the exception qualifies only the exact
+provider, model assignment, and descriptor matrix that was exercised.
+
 **Shared schema cutover** — the only response to a reset-required deploy, and deliberately manual.
 It **discards the application data** in database `lrnki` (greenfield: no backup or data migration is
 an acceptance dependency) and preserves everything else. From the repo checkout on the VPS:

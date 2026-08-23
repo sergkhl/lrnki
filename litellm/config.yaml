@@ -181,6 +181,32 @@ model_list:
             - "google-vertex"
             - "google-ai-studio"
 
+  # Topic Expedition planner/challenger/ordering assignment. Novita FP4 passed all three exact
+  # strict forced-tool descriptors with temperature 0, seed 7, and medium reasoning. This group is
+  # intentionally single-provider: the scoped aliases have no router fallback, so attribution and
+  # Model Assignment identity stay exact during the development-candidate campaign.
+  - model_name: "openrouter/openai/gpt-oss-120b-topic-expedition-novita"
+    litellm_params:
+      model: "openrouter/openai/gpt-oss-120b"
+      api_key: os.environ/OPENROUTER_API_KEY
+      input_cost_per_token: 0.00000005
+      output_cost_per_token: 0.00000025
+      extra_body:
+        reasoning:
+          effort: "medium"
+        provider:
+          require_parameters: true
+          quantizations:
+            - "fp4"
+          only:
+            - "novita/fp4"
+          order:
+            - "novita/fp4"
+          allow_fallbacks: false
+    model_info:
+      mode: "chat"
+      max_input_tokens: 131072
+
   # Shared production DeepSeek V4 Flash 0731 primary for the independent judge and both claim roles.
   # Cross-family independence from the MiMo synthesizer preserves ADR-0007/0005's rule that the
   # judge is never the extractor grading its own output. Provider failover is deliberately outside
@@ -268,6 +294,34 @@ model_list:
             - "xiaomi"
           order:
             - "xiaomi"
+          allow_fallbacks: false
+    model_info:
+      mode: "chat"
+      max_input_tokens: 1048576
+      max_output_tokens: 131072
+
+  # Topic Expedition primary independent-judge/answerer assignment. Xiaomi FP8 passed all eight
+  # effective strict forced-tool descriptors with reasoning disabled. OpenRouter's catalog omits
+  # seed support for this endpoint even though the served requests accepted the client's seed 7;
+  # `require_parameters` is intentionally omitted so that prefilter cannot reject the empirically
+  # qualified route. Seed remains best-effort under neuralClients.ts, never a reproducibility claim.
+  - model_name: "openrouter/xiaomi/mimo-v2.5-topic-expedition"
+    litellm_params:
+      model: "openrouter/xiaomi/mimo-v2.5"
+      api_key: os.environ/OPENROUTER_API_KEY
+      input_cost_per_token: 0.00000014
+      output_cost_per_token: 0.00000028
+      cache_read_input_token_cost: 0.0000000028
+      extra_body:
+        reasoning:
+          enabled: false
+        provider:
+          quantizations:
+            - "fp8"
+          only:
+            - "xiaomi/fp8"
+          order:
+            - "xiaomi/fp8"
           allow_fallbacks: false
     model_info:
       mode: "chat"
@@ -434,6 +488,7 @@ router_settings:
   # probe retains its small cross-family Qwen backup. GPT-OSS roles move from DigitalOcean to
   # same-model Groq only after an error. All three DeepSeek roles move from DeepInfra to the
   # shared same-assignment Parasail group. Separate groups keep every provider route attributable.
+  # Topic Expedition aliases are intentionally absent: each owns one preflighted provider only.
   fallbacks:
     - kg-knowledge-boundary-probe: ["openrouter/qwen/qwen3-30b-a3b-instruct-2507"]
     - kg-claim-verification-planner: ["openrouter/openai/gpt-oss-120b-groq-backup"]
@@ -520,6 +575,16 @@ router_settings:
     # (The off-core oracle triangle and label aligner were retired after the admission-precision fix;
     # see ADR-0013.)
     kg-independent-judge: openrouter/deepseek/deepseek-v4-flash-0731
+    # Topic Expedition cutover: seven public aliases preserve the global routes above while the
+    # source-less generation composition selects one exact DeepInfra/Xiaomi/Novita topology. None
+    # has a router_settings fallback; all OpenRouter deployments also disable internal fallback.
+    kg-topic-expedition-generation: openrouter/deepseek/deepseek-v4-flash-0731
+    kg-topic-expedition-independent-judge: openrouter/xiaomi/mimo-v2.5-topic-expedition
+    kg-topic-expedition-claim-verification-answerer: openrouter/xiaomi/mimo-v2.5-topic-expedition
+    kg-topic-expedition-claim-factuality-judge: openrouter/xiaomi/mimo-v2.5-topic-expedition
+    kg-topic-expedition-claim-verification-planner: openrouter/openai/gpt-oss-120b-topic-expedition-novita
+    kg-topic-expedition-claim-factuality-challenger: openrouter/openai/gpt-oss-120b-topic-expedition-novita
+    kg-topic-expedition-prerequisite-ordering: openrouter/openai/gpt-oss-120b-topic-expedition-novita
     # Derived-node semantic-dedup PROPOSE signal (plan U1, ADR-0012, AGENTS rule 20).
     # Embeddings only propose near-duplicate candidate pairs within a Declared Domain;
     # a separate cross-family adjudicator (kg-independent-judge) DECIDES each merge.
