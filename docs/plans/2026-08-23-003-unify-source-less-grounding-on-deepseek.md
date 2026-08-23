@@ -7,7 +7,7 @@ execution: code
 
 # Unify Source-less Node Generation and Grounding on DeepSeek
 
-**Status:** In progress — U0–U3 complete; U4 closed `FIX_FIRST`; U5 next
+**Status:** Blocked — U0–U3 and U5 complete; U4 remains `FIX_FIRST`
 
 **Decision state:** Locked by owner decision on 2026-08-23. DeepSeek V4 Flash 0731 owns Grounding
 Generation for every Source-less Grounding Admission consumer. Preserving ADR-0023 makes the paired
@@ -546,57 +546,58 @@ direct preflight, successful retry, or HTTP 200 does not substitute for real-use
 
 ### U4 — affected-consumer real-use qualification — 2026-08-23 — `FIX_FIRST`
 
-- After an authorized development-app reset and exact API recreation, the first mandatory Topic
-  fixture, Cellular Respiration, failed atomically in enrichment. Expedition
-  `da12672b-9109-4237-ad23-81a75ccd128b`, operation
-  `cf71e497-5a28-466e-b89b-33da72a5e9d3`, and operation run
-  `eb394b75-30a7-4d7a-9a8c-bfe1d2bb82f8` settled after 765,982 / 766,000 ms. The generic enrichment
-  timeline correctly has optional `config_hash = null`; committed Topic Synthetic identity is
-  `d78aba900512`, and failure occurred before an enrichment artifact existed.
+- After an authorized development-app reset and exact API recreation, Cellular Respiration failed
+  atomically in enrichment. Expedition `da12672b-9109-4237-ad23-81a75ccd128b`, operation
+  `cf71e497-5a28-466e-b89b-33da72a5e9d3`, and run `eb394b75-30a7-4d7a-9a8c-bfe1d2bb82f8`
+  settled after 765,982 / 766,000 ms. Enrichment timelines permit `config_hash = null`; committed
+  Topic Synthetic identity is `d78aba900512`, and no enrichment artifact existed before failure.
 - DeepSeek made mitochondrial location and aerobic context part of Pyruvate Oxidation's identity,
   excluding valid bacterial cytoplasmic and anaerobic variants. Draft-blind MiMo answers surfaced
   both counterexamples; three retained MiMo primary judgments and three GPT challenger judgments
   rejected the definition (with one separate challenger acceptance). The replicated primary veto
-  correctly failed Source-less Grounding Admission. No node, edge, lesson, Study Item, or rejected
-  Study Item persisted, and no enrichment or learner assets leaked.
+  correctly failed admission; no node, edge, lesson, Study Item, rejection, or enrichment leaked.
 - Settled attribution contains 367 successful calls, 896,144 prompt plus 312,263 completion tokens,
   USD 0.06135924 raw recorded spend, and USD 0.15405394 usage-derived reported cost including BYOK
   estimates. Same-query controls found all 367 SpendLogs and zero non-success/error-information or
-  joined ErrorLog rows. One qualified GPT fallback and three existing probe fallbacks were used.
-  Eleven malformed retained tool-argument attempts—six planner, four answerer, one challenger—were
-  corrected inside the retry envelope before semantic settlement.
+  joined ErrorLog rows. One GPT and three probe fallbacks were used; eleven malformed retained tool
+  attempts—six planner, four answerer, one challenger—corrected inside the retry envelope.
 - The run proves the admission module's verification architecture caught a producer scope defect.
   It does not qualify the producer or Topic usefulness: the existing domain-neutral prompt already
-  forbids turning a common case into a universal identity, while the U2 direct pyruvate draw passed.
-  This is context-sensitive neural nondeterminism, not a route/schema/transport failure. Repeating
-  until a lucky draw passes would violate the gate.
+  forbids turning a common case into a universal identity, while the U2 direct draw passed. This is
+  context-sensitive neural nondeterminism, not route/schema/transport failure; retrying for luck
+  would violate the gate.
 - The remaining three Topic fixtures, worker-default Synthetic run, Graph generated-prerequisite /
-  merge case, and generated Support Step were not run after the first required consumer failed.
-  Their usefulness remains `INCONCLUSIVE`. Exact reserved-identity cleanup removed the one created
-  learner and left zero reserved users or expeditions.
+  merge case, and generated Support Step were not run; their usefulness remains `INCONCLUSIVE`.
+  Exact cleanup removed the one created learner and left zero reserved users or expeditions.
 
 #### Real-use quality evaluation
 
 - **Milestone / fixture:** exact local production composition; Cellular Respiration Topic fixture.
-- **Real model calls / result:** one required operation `FIX_FIRST`; transport and attribution
-  passed, but DeepSeek produced a context-narrowed identity that independent verification rejected.
+- **Real model calls / result:** one operation `FIX_FIRST`; transport/attribution passed, but
+  independent verification rejected DeepSeek's context-narrowed identity.
 - **Useful output / defects / changes:** atomic failure was useful; no learner-ready output exists.
-  [Chain-of-Verification](https://arxiv.org/abs/2309.11495) matches the successful draft-blind
-  detection path. [Self-Refine](https://arxiv.org/abs/2303.17651) would add a feedback/regeneration
-  loop and conflicts with this plan's frozen one-draft, cross-family admission contract.
+  [Chain-of-Verification](https://arxiv.org/abs/2309.11495) matches the draft-blind detection path;
+  [Self-Refine](https://arxiv.org/abs/2303.17651) conflicts with the frozen one-draft contract.
 - **Safe to continue downstream:** yes to U5 repository handback only; no to more U4 spending,
   consolidation, latency work, deployment, browser/native/device claims, or release.
 
+### U5 — repository gate and failed handback — 2026-08-23 — complete
+
+- Focused automation passed: 194 infrastructure, eight worker, and 21/24 learner-API tests; three
+  database-opt-in cases skipped as designed. Eleven workspace typechecks, 58-table Drizzle parity,
+  ESLint with zero errors / eleven warnings, and the unchanged API health endpoint passed.
+- Both production builds passed: Next.js Admin Lab and Expo learner-web export. `git diff --check`
+  passed. Root `pnpm check` was decomposed because Playwright, native/device, deployment,
+  production-data, and release execution were outside this plan's authority.
+- U4 did not pass, so no predecessor validation upgrade, consolidation, plan deletion, or latency
+  unblock occurred. This repository health evidence does not supersede the real-use `FIX_FIRST`.
+
 ### Open findings
 
-- **NEXT:** execute U5 only: run the focused dependency-graph repository gate and production builds,
-  preserve this exact failed handback, and leave both active plans live. Do not rerun the remaining
-  U4 matrix until the producer defect is repaired.
-- **Blocker:** DeepSeek Source-less Grounding can still narrow a broad concept identity to the
-  originating Topic's common case despite the existing prompt prohibition. Prompt/schema changes,
-  regenerated Grounding, and policy/retry changes are outside this locked plan. The concrete next
-  action is an owner-approved successor plan for a domain-neutral, enforced identity-scope and
-  counterexample audit before the single initial draft, followed by direct route and complete U4
-  requalification. Do not weaken the independent answer/judge veto that caught the defect.
-- The latency plan remains blocked until a repaired candidate produces one successful, fully
-  inspected quality baseline. This plan does not claim or tune the 420-second target.
+- **NEXT:** no implementation unit is actionable. [BLOCKERS](./BLOCKERS.md#source-less-grounding-identity-scope-repair)
+  owns the owner-only authorization and drain criterion; do not rerun U4 before the repair exists.
+- The technical finding remains the U4 context-narrowed identity documented above. Any repair must
+  preserve the independent answer/judge veto that caught it, then repeat direct qualification and
+  the complete affected-consumer matrix.
+- Latency remains blocked until a repaired candidate has one fully inspected successful baseline;
+  this plan does not claim or tune 420 seconds.

@@ -12,10 +12,10 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-23-003 — Unify Source-less Grounding on DeepSeek](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md)
-   — **In progress; U0–U3 complete, U4 closed `FIX_FIRST`, U5 next.** The exact committed local
-   routes are healthy, but the first required Topic consumer exposed context-narrowed Grounding that
-   independent verification correctly rejected. Run the repository handback gate next; do not spend
-   on the remaining consumer matrix before an owner-approved producer-contract repair.
+   — **Blocked; U0–U3 and U5 complete, U4 remains `FIX_FIRST`.** Exact routes and the repository gate
+   pass, but the first required Topic consumer exposed context-narrowed Grounding that independent
+   verification correctly rejected. The owner-gated repair is in [BLOCKERS](./BLOCKERS.md); do not
+   spend on the remaining matrix before it is resolved.
 
 2. [2026-08-23-002 — Deepen Source-less Grounding Context and Answer Correlation](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md)
    — **On hold; U0–U1 complete.** Identity context and exact-key answer correlation are committed.

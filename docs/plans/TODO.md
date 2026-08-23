@@ -4,11 +4,11 @@
 
 ## TODO
 
-- **Operation-neutral DeepSeek Grounding — in progress; U0–U3 complete, U4 closed `FIX_FIRST`, U5
-  next.** Follow [the execution-order plan](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md).
-  Exact routes pass, but the first required Topic consumer exposed context-narrowed Grounding that
-  independent verification correctly rejected. Run the repository handback gate next; do not spend
-  on the remaining matrix before an owner-approved producer-contract repair.
+- **Operation-neutral DeepSeek Grounding — blocked; U0–U3 and U5 complete, U4 remains `FIX_FIRST`.**
+  Follow [the execution-order plan](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md).
+  Exact routes and the repository gate pass, but the first required Topic consumer exposed
+  context-narrowed Grounding that independent verification correctly rejected. The owner-gated
+  repair is in [BLOCKERS](./BLOCKERS.md); do not spend on the remaining matrix before it is resolved.
 
 - **Source-less Grounding context and answer correlation — on hold; U0–U1 complete.** The
   [predecessor plan](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md) retains
