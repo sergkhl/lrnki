@@ -7,7 +7,7 @@ execution: code
 
 # Cut Over Topic Expedition Generation to DeepSeek Flash and Measure Stage Value
 
-**Status:** Ready — U0 next
+**Status:** In progress — U0 complete; U1 next
 
 **Decision state:** Locked. The accepted direction, dated comparison, and known quality defects
 remain in the
@@ -293,8 +293,8 @@ appear redundant.
 ### U0 — Freeze identities and the pre-change baseline
 
 1. Commit this ready plan before source or `litellm/config.yaml` changes.
-2. Record the current Synthetic Topic Generation and Study Item Bank config hashes, the seven global
-   aliases that the scoped routes replace inside Topic composition, and the unchanged 19-stage
+2. Record the current Synthetic Topic Generation and Study Item Bank config hashes, the nine global
+   aliases mapped to the seven scoped routes inside Topic composition, and the unchanged 19-stage
    profile.
 3. Recheck the official Flash catalog and the OpenRouter endpoint records for DeepSeek, MiMo, and
    GPT-OSS. Record timestamped model id, quantization, supported forced-tool parameters, provider
@@ -443,11 +443,40 @@ hidden by prompt tuning, regeneration, lower quorum, lexical rejection, or an un
   decision. This is planning and provider-catalog evidence only—not implemented, local real-use,
   release, deployed, browser, native, or physical-device evidence.
 
+### U0 — frozen identities and pre-change baseline — 2026-08-23 — complete
+
+- Source baseline at `7360475`: Synthetic Topic Generation config hash
+  `synthetic-topic-generation-7b8549a3e0cc`, Study Item Bank config hash
+  `study-item-bank-d574e02753f9`, and 19 conceptual stages (nine enrichment plus ten Study Item
+  Bank). The exact ordered profile remains source-owned by `TOPIC_EXPEDITION_STAGE_PROFILE`.
+- Current-to-scoped alias map: `kg-domain-inference`, `kg-concept-synthesis`, and
+  `kg-claim-extraction` map to `kg-topic-expedition-generation`; `kg-independent-judge`,
+  `kg-claim-verification-answerer`, `kg-claim-factuality-judge`,
+  `kg-claim-verification-planner`, `kg-claim-factuality-challenger`, and
+  `kg-prerequisite-ordering` each map to their corresponding Topic-scoped alias in KTD3. The
+  Knowledge-Boundary Probe remains outside the override.
+- Catalog refresh at `2026-08-23T10:40:00Z`: the official Flash release and immutable snapshot remain
+  `deepseek-ai/DeepSeek-V4-Flash-0731@7872f01b1d1fe23eabc4c98b48bffcef5a386062`. OpenRouter still
+  reports `deepinfra/fp8` at $0.08/$0.18 and `parasail/fp8` at $0.14/$0.28 per million input/output
+  tokens for DeepSeek; both advertise forced tools, temperature, and seed. Xiaomi MiMo remains
+  `xiaomi/fp8` at $0.14/$0.28 and advertises forced tools and temperature, but not seed. GPT-OSS
+  remains `coreweave/fp4` at $0.03/$0.17 and `parasail/fp4` at $0.10/$0.75; both advertise forced
+  tools, temperature, seed, and reasoning effort. Prices exclude cache-read charges.
+- Development queue query against `lrnki`: six historical operation rows were the same-query
+  positive control; zero operations were running and zero running rows belonged to enrichment or
+  Study Item Bank. `learner_expeditions` was empty. No provider call, config reload, source change,
+  or learner-quality claim occurred in U0; catalog fields remain candidates for U2 served-call
+  qualification.
+
 ### Open findings
 
-- U0–U4 remain open. No source or `litellm/config.yaml` cutover has occurred under this plan.
+- **NEXT:** U1 adds the inactive descriptor-override seam, effective Topic descriptor builders, and
+  focused hash/model/stage-count tests. U2–U4 remain open; no source or `litellm/config.yaml` cutover
+  has occurred under this plan.
 - CoreWeave/Parasail GPT FP4 and the Topic-only Xiaomi FP8 group remain candidate routes until their
   complete forced-tool preflights and served-call attribution pass.
+- Xiaomi's current endpoint catalog omits `seed`; U2 must prove the complete deterministic request
+  body is honored or stop as `FIX_FIRST`. Do not drop the field or substitute a provider ad hoc.
 - All prior usefulness evidence for the nine generators and eleven reassigned/re-routed supporting
   consumers becomes unqualified when U2 activates. U3 is the first current DeepSeek candidate
   evidence; final release evidence remains intentionally deferred until the pipeline shape settles.

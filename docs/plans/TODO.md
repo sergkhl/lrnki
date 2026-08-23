@@ -4,12 +4,12 @@
 
 ## TODO
 
-- **DeepSeek Flash Topic Expedition cutover — ready; execute first.** Follow the
+- **DeepSeek Flash Topic Expedition cutover — in progress; U0 complete, U1 next.** Follow the
   [active plan](./2026-08-23-001-cut-over-topic-expedition-generation-to-deepseek-flash.md). It
-  preserves the current 19-stage topology, scopes the exact DeepSeek and independent-judge routes
-  to Topic Expedition, and collects a bounded per-stage quality/latency/cost dataset before any
-  simplification. The candidate remains unqualified for release until the final pipeline shape and
-  its follow-up gate are complete.
+  has frozen the current hashes, 19-stage topology, idle development queue, and catalog candidates.
+  Add and validate the inactive Topic-scoped descriptor override seam next; no route is activated.
+  The candidate remains unqualified for release until the final pipeline shape and its follow-up
+  gate are complete.
 
 - **Topic Expedition generation latency — blocked; U3 remains `FIX_FIRST`.** Follow
   [the active plan](./2026-08-22-001-repair-topic-expedition-generation-latency.md) in U0–U4 order.

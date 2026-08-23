@@ -12,9 +12,9 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-23-001 — Cut Over Topic Expedition Generation to DeepSeek Flash and Measure Stage Value](./2026-08-23-001-cut-over-topic-expedition-generation-to-deepseek-flash.md)
-   — **Ready; execute first.** Preserve the current 19-stage pipeline, move only Topic Expedition
-   generators to the exact Flash assignment with scoped independent judges, and collect a bounded
-   stage-by-stage dataset before deciding what to deepen, combine, or remove.
+   — **In progress; U0 complete, U1 next.** The pre-change hashes, 19-stage profile, idle queue, and
+   current provider catalogs are frozen. Add the inactive Topic-scoped descriptor override seam
+   next; no route is activated yet.
 
 2. [2026-08-22-001 — Restore Topic Expedition Generation to Seven Minutes](./2026-08-22-001-repair-topic-expedition-generation-latency.md)
    — **Blocked in U3 (`FIX_FIRST`).** The bounded pipeline and shared stage profile are complete,
