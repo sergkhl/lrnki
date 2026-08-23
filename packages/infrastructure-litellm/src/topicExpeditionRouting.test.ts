@@ -121,6 +121,21 @@ const GPT_BEHAVIOR = {
   },
   modelInfo: { mode: "chat", max_input_tokens: 131072 }
 };
+const GPT_FALLBACK_BEHAVIOR = {
+  litellmParams: {
+    model: "openrouter/openai/gpt-oss-120b",
+    extra_body: {
+      reasoning: { effort: "medium" },
+      provider: {
+        quantizations: ["fp4"],
+        only: ["parasail/fp4"],
+        order: ["parasail/fp4"],
+        allow_fallbacks: false
+      }
+    }
+  },
+  modelInfo: { mode: "chat", max_input_tokens: 131072 }
+};
 
 type DescriptorRef = Readonly<{ promptPath: string; modelOverride?: string }>;
 
@@ -283,7 +298,7 @@ test("only affected operation hashes change and Topic remains nineteen stages", 
   assert.notEqual(studyItemBankConfigHash(resolvableRouting), studyItemBankConfigHash());
   assert.equal(
     syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG, routing),
-    "synthetic-topic-generation-6184e63adc3e"
+    "synthetic-topic-generation-d78aba900512"
   );
   assert.notEqual(
     syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG, routing),
@@ -293,7 +308,7 @@ test("only affected operation hashes change and Topic remains nineteen stages", 
   assert.equal(studyItemBankConfigHash(routing), "study-item-bank-02d755d9fae1");
   assert.equal(
     syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG),
-    "synthetic-topic-generation-baaa3b539272"
+    "synthetic-topic-generation-9f81ce84488e"
   );
   assert.notEqual(
     syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG),
@@ -301,7 +316,7 @@ test("only affected operation hashes change and Topic remains nineteen stages", 
     "default Synthetic changes from the U0 topology"
   );
   assert.equal(studyItemBankConfigHash(), "study-item-bank-d574e02753f9");
-  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-b9e03231cc3a");
+  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-2af0ada6d7e6");
   assert.notEqual(
     graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG),
     "graph-enrichment-3cd73a12f2f2",
@@ -309,7 +324,7 @@ test("only affected operation hashes change and Topic remains nineteen stages", 
   );
   assert.equal(
     scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG),
-    "learner-scaffold-generation-3d2fd6f627c7"
+    "learner-scaffold-generation-7930b34c0fdb"
   );
   assert.notEqual(
     scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG),
@@ -329,15 +344,27 @@ test("only affected operation hashes change and Topic remains nineteen stages", 
   assert.equal(TOPIC_EXPEDITION_STAGE_PROFILE.study_items.length, 10);
 });
 
-test("the seven neutral aliases resolve the approved primary-only cross-family assignments", () => {
+test("the seven neutral aliases resolve the approved cross-family assignments and qualified fallbacks", () => {
   const proxy = readLitellmProxyConfig();
-  const expectedRoutes = new Map<string, { group: string; behavior: Record<string, unknown> }>([
+  const expectedRoutes = new Map<string, {
+    group: string;
+    behavior: Record<string, unknown>;
+    fallback?: { group: string; behavior: Record<string, unknown> };
+  }>([
     [SOURCE_LESS_NODE_GENERATION, { group: DEEPSEEK_GROUP, behavior: DEEPSEEK_BEHAVIOR }],
     [GROUNDING_GENERATION, { group: DEEPSEEK_GROUP, behavior: DEEPSEEK_BEHAVIOR }],
-    [VERIFICATION_PLANNER, { group: GPT_GROUP, behavior: GPT_BEHAVIOR }],
+    [VERIFICATION_PLANNER, {
+      group: GPT_GROUP,
+      behavior: GPT_BEHAVIOR,
+      fallback: { group: GPT_FALLBACK_GROUP, behavior: GPT_FALLBACK_BEHAVIOR }
+    }],
     [VERIFICATION_ANSWERER, { group: MIMO_GROUP, behavior: MIMO_BEHAVIOR }],
     [FACTUALITY_JUDGE, { group: MIMO_GROUP, behavior: MIMO_BEHAVIOR }],
-    [FACTUALITY_CHALLENGER, { group: GPT_GROUP, behavior: GPT_BEHAVIOR }],
+    [FACTUALITY_CHALLENGER, {
+      group: GPT_GROUP,
+      behavior: GPT_BEHAVIOR,
+      fallback: { group: GPT_FALLBACK_GROUP, behavior: GPT_FALLBACK_BEHAVIOR }
+    }],
     [GENERATED_NODE_JUDGE_MODEL, { group: MIMO_GROUP, behavior: MIMO_BEHAVIOR }]
   ]);
   for (const [alias, expected] of expectedRoutes) {
@@ -345,7 +372,14 @@ test("the seven neutral aliases resolve the approved primary-only cross-family a
     assert.equal(route.primary.modelGroup, expected.group, alias);
     assert.equal(route.primary.deployments.length, 1, alias);
     assert.deepEqual(route.primary.deployments[0]?.behavior, expected.behavior, alias);
-    assert.deepEqual(route.fallbacks, [], `${alias} stays primary-only through U1`);
+    assert.deepEqual(
+      route.fallbacks.map((fallback) => ({
+        group: fallback.modelGroup,
+        behavior: fallback.deployments[0]?.behavior
+      })),
+      expected.fallback ? [expected.fallback] : [],
+      `${alias} fallback route`
+    );
     assert.equal(modelAssignmentIdentity(alias, proxy).assignments.length, 1, alias);
   }
 

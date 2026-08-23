@@ -7,7 +7,7 @@ execution: code
 
 # Unify Source-less Node Generation and Grounding on DeepSeek
 
-**Status:** In progress — U0–U1 complete; U2 `FIX_FIRST` after direct-matrix attempt 1
+**Status:** In progress — U0–U2 complete; U3 next
 
 **Decision state:** Locked by owner decision on 2026-08-23. DeepSeek V4 Flash 0731 owns Grounding
 Generation for every Source-less Grounding Admission consumer. Preserving ADR-0023 makes the paired
@@ -553,48 +553,52 @@ direct preflight, successful retry, or HTTP 200 does not substitute for real-use
 
 #### Real-use quality evaluation
 
-- **Milestone:** primary-only operation-neutral source/config candidate.
-- **Fixture and source type:** not run; U2 must qualify exact provider contracts before U3 may load
-  the candidate and U4 may exercise consumers.
-- **Real model calls used:** no.
-- **Result:** `BLOCKED` at this implementation unit by the ordered direct-route and activation gates.
-- **Useful output observed / defects observed / changes after inspection:** none evaluated.
-- **Remaining caveats:** structural reliability, served assignment, provider reachability, and all
-  affected-consumer usefulness remain unqualified.
-- **Safe to continue downstream:** yes to U2 direct-route qualification only; no to activation or
-  consumer-quality claims.
+- **Milestone / fixture:** primary-only source/config candidate; no fixture before U2 route proof.
+- **Real model calls / result:** none; `BLOCKED` here by the ordered direct-route and activation gates.
+- **Useful output / defects / changes:** none evaluated; structural, served-route, and consumer-
+  usefulness authority remained unqualified.
+- **Safe to continue downstream:** yes to U2 qualification only; no to activation or usefulness.
 
-### U2 — exact direct-route matrix attempt 1 — 2026-08-23 — `FIX_FIRST`
+### U2 — qualify exact direct routes and freeze fallbacks — 2026-08-23 — complete
 
 - The live catalog exposed DeepInfra/Parasail DeepSeek FP8, Xiaomi MiMo FP8, and Novita/Parasail
   GPT-OSS FP4 with the required provider tags and forced-tool parameters. This was metadata only;
   served calls carried the exact pin, reasoning, sampling, strict tool, tag, and disabled fallback.
-- The unchanged production client made 24 HTTP attempts across 20 reached cases: 19 contracts
-  passed, MiMo's three-key answer needed both corrective attempts after two wrong-key objects, and
-  the Novita challenger exhausted all three attempts on attributable upstream shared-pool HTTP 429s.
-  The stop rule left both GPT-OSS Parasail cases unrun. All 19 successes returned the requested
-  model/provider with no reasoning leakage on reasoning-disabled assignments.
+- Attempt 1 retained all 24 HTTP attempts: 19 cases passed; MiMo's three-key answer consumed both
+  corrective attempts after two wrong-key objects; then Novita's challenger exhausted on three
+  attributable shared-pool HTTP 429s and the matrix stopped. A separately retained recovery draw
+  later passed that challenger and both previously unrun GPT-OSS Parasail cases on one attempt each.
 - DeepInfra passed both producer contracts and all three Grounding cases in one attempt each. Its
   definitions avoided the established mitochondrial-only, hidden-until-commit, and time-only scope
   defects. Parasail passed the same strict schemas, but manual inspection found exactly those three
-  defects in its Grounding text, so neither DeepSeek alias gains that proposed fallback.
+  defects in its Grounding text, so both DeepSeek aliases remain DeepInfra-only.
 - Xiaomi passed exact answer coverage, primary factuality, minting durability, generated-layer
   merge, and both difficulty contracts. Its judgments rejected the false definition, kept MVCC as
-  durable, merged its spelling variants, and used the supplied evidence. Novita planning passed.
-- Run `source-less-u2-production-envelope-1787504368170` recorded 26,807 prompt, 6,834 completion,
-  and 889 reasoning tokens; response cost was USD 0.00207254 and the catalog estimate USD
-  0.0039430352. This is direct-contract evidence, not alias, usefulness, deployed, or device proof.
-  No fallback, hash, loaded process, database, or release state changed from the primary-only U1.
+  durable, merged its spelling variants, and used supplied evidence. Both GPT routes planned checks
+  and rejected the false universal definition. No successful call mismatched model/provider or
+  leaked reasoning on a reasoning-disabled assignment.
+- Only `kg-grounding-verification-planner` and `kg-grounding-factuality-challenger` now fall back to
+  the qualified GPT Parasail group. Final hashes are Graph `2af0ada6d7e6`, Scaffold `7930b34c0fdb`,
+  default Synthetic `9f81ce84488e`, and Topic Synthetic `d78aba900512`; both Study hashes,
+  Canonicalization `ce3969a22bea`, Extraction `114ec9e8ddf5`, and nineteen stages remain unchanged.
+- The two retained runs total 33,409 prompt, 9,187 completion, and 3,044 reasoning tokens; response
+  cost was USD 0.00398383 and the catalog estimate USD 0.0058543252. All 194 infrastructure tests,
+  all eleven workspace typechecks, targeted ESLint, route/hash/non-leakage checks, and diff check
+  passed. No process reload, database write, deployment, device, or release action occurred.
+
+#### Real-use quality evaluation
+
+- **Milestone / fixture:** final route candidate; production-shaped direct inputs, not a curated run.
+- **Real model calls / result:** exact DeepSeek, MiMo, and GPT routes passed with the semantically
+  failed DeepSeek fallback excluded; consumer usefulness remains `INCONCLUSIVE` until U4.
+- **Useful output / defects / changes:** primary outputs fit their roles; three Parasail Grounding
+  defects excluded that fallback, and the qualified GPT fallback was added.
+- **Safe to continue downstream:** yes to U3 alias proof only; not yet to usefulness.
 
 ### Open findings
 
-- **NEXT:** retain attempt 1 and, after Novita's temporary shared-pool limit clears, separately rerun
-  only its blocked challenger. If it passes, continue the two unrun GPT-OSS Parasail cases; do not
-  overwrite the 19 passes, activate the candidate, or add a fallback before committing recovery.
-- Parasail FP8 is semantically disqualified for both new DeepSeek aliases by all three Grounding
-  defects. Keep source-less node production and Grounding DeepInfra-only; do not substitute another
-  provider or rewrite the prompts to rescue this fallback.
-- Novita's challenger returned three upstream shared-pool HTTP 429s after its planner passed. This
-  external capacity finding is not an owner action; U3 waits for fresh attributable evidence.
+- **NEXT:** execute U3 only: rebuild/recreate the exact committed local candidate through the root
+  detached host runbook, verify image/source/config identity and health, call all seven public aliases
+  with unique tags, reconcile SpendLogs, and prove retired aliases absent before any consumer run.
 - The latency plan remains blocked until U4 produces one successful, fully inspected quality
   baseline. This plan does not claim or tune the 420-second target.

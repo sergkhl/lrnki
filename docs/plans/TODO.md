@@ -4,11 +4,10 @@
 
 ## TODO
 
-- **Operation-neutral DeepSeek Grounding — in progress; U0–U1 complete, U2 `FIX_FIRST`.** Follow
-  [the execution-order plan](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md). DeepInfra
-  and Xiaomi passed their complete direct sets; DeepSeek Parasail failed all three Grounding
-  semantics and stays unreachable. Retry the Novita challenger only after its temporary upstream
-  429 clears, then run the two never-reached GPT-OSS Parasail cases before activation.
+- **Operation-neutral DeepSeek Grounding — in progress; U0–U2 complete, U3 next.** Follow
+  [the execution-order plan](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md). All primary
+  routes and both GPT fallback contracts passed; DeepSeek Parasail stays unreachable after failing
+  all three Grounding semantics. Activate and prove the exact committed local aliases before U4.
 
 - **Source-less Grounding context and answer correlation — on hold; U0–U1 complete.** The
   [predecessor plan](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md) retains

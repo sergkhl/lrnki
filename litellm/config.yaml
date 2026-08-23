@@ -512,13 +512,15 @@ router_settings:
   cooldown_time: 15
   # Explicit cross-deployment fallbacks, keyed on request aliases. The knowledge-boundary probe,
   # source-family independent judge, and general/Topic prerequisite ordering retain their qualified
-  # routes. The seven operation-neutral Source-less Grounding aliases deliberately have no fallback
-  # in the U1 candidate; U2 adds one only after its complete exact descriptor matrix passes.
+  # routes. U2 qualified the planner/challenger Parasail FP4 fallback, while all three changed
+  # Grounding semantics failed on DeepSeek Parasail FP8; the two DeepSeek aliases remain primary-only.
   fallbacks:
     - kg-knowledge-boundary-probe: ["openrouter/qwen/qwen3-30b-a3b-instruct-2507"]
     - kg-independent-judge: ["openrouter/deepseek/deepseek-v4-flash-0731-parasail-backup"]
     - kg-prerequisite-ordering: ["openrouter/openai/gpt-oss-120b-groq-backup"]
     - kg-topic-expedition-prerequisite-ordering: ["openrouter/openai/gpt-oss-120b-topic-expedition-parasail-backup"]
+    - kg-grounding-verification-planner: ["openrouter/openai/gpt-oss-120b-topic-expedition-parasail-backup"]
+    - kg-grounding-factuality-challenger: ["openrouter/openai/gpt-oss-120b-topic-expedition-parasail-backup"]
   # disable_cooldowns: true
   # default_litellm_params:
   #   temperature: 0.5
@@ -539,9 +541,9 @@ router_settings:
     kg-claim-extraction: openrouter/xiaomi/mimo-v2.5
     # Source-less graph-node identity and Grounding use one operation-neutral DeepSeek assignment.
     # Verification answering and primary/generated-node judgment use MiMo; planning and factuality
-    # challenge use GPT-OSS. These U1 aliases are primary-only until U2 qualifies each proposed
-    # provider fallback through its complete strict forced-tool descriptor set. The deployment
-    # groups are reused exactly; alias names own roles, not duplicate deployments.
+    # challenge use GPT-OSS. U2 qualified the GPT Parasail fallback for planning/challenge but
+    # disqualified DeepSeek Parasail for the changed Grounding semantics, so node/Grounding stay
+    # DeepInfra-only. Deployment groups are reused; aliases own roles, not duplicate deployments.
     kg-source-less-node-generation: openrouter/deepseek/deepseek-v4-flash-0731
     kg-grounding-generation: openrouter/deepseek/deepseek-v4-flash-0731
     kg-grounding-verification-planner: openrouter/openai/gpt-oss-120b-topic-expedition-novita
