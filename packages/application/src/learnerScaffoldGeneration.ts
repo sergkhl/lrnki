@@ -344,6 +344,7 @@ async function generateSteps(input: {
     const candidate: GroundingAdmissionCandidate = {
       candidateKey: `scaffold-candidate:${planIndex}`,
       canonicalLabel: item.label,
+      aliases: [],
       declaredDomain: parent.declaredDomain,
       context
     };

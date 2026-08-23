@@ -324,6 +324,7 @@ function toAdmissionCandidate(proposal: ReservedMintingProposal): GroundingAdmis
   return {
     candidateKey: proposal.derivedNodeId,
     canonicalLabel: proposal.proposedLabel,
+    aliases: [],
     declaredDomain: proposal.declaredDomain,
     context: {
       kind: "scaffolded_anchor",

@@ -1,9 +1,10 @@
-import type { GeneratedGroundingBundle, GroundingAdmissionContext } from "@lrnki/domain-core";
+import { normalizeConceptLabel, type GeneratedGroundingBundle, type GroundingAdmissionContext } from "@lrnki/domain-core";
 import type {
   ClaimFactualityJudgmentPort,
   ClaimVerificationAnsweringPort,
   ClaimVerificationQuestionPlanningPort,
   GroundingGenerationPort,
+  GroundingIdentityContext,
   KnowledgeBoundaryProbePort,
   NodeEmbeddingPort
 } from "@lrnki/ports";
@@ -26,6 +27,7 @@ import { SOURCE_LESS_GROUNDING_ADMISSION_STAGE_GROUP } from "./topicExpeditionSt
 export type GroundingAdmissionCandidate = Readonly<{
   candidateKey: string;
   canonicalLabel: string;
+  aliases: readonly string[];
   declaredDomain: string;
   context: GroundingAdmissionContext;
 }>;
@@ -162,7 +164,8 @@ export function createSourceLessGroundingAdmission(construction: {
                   const bundle = await construction.groundingGeneration.generate({
                     declaredDomain: candidate.declaredDomain,
                     canonicalLabel: candidate.canonicalLabel,
-                    context: candidate.context
+                    context: candidate.context,
+                    identityContext: groundingIdentityContext(candidate, candidates)
                   });
                   validateGeneratedBundle(candidate, bundle);
                   return { candidate, verdict, bundle };
@@ -354,16 +357,77 @@ function validatePolicy(policy: SourceLessGroundingAdmissionPolicy): void {
 function validateCandidates(candidates: readonly GroundingAdmissionCandidate[]): void {
   const keys = new Set<string>();
   for (const candidate of candidates) {
-    requireExactKeys(candidate, ["candidateKey", "canonicalLabel", "declaredDomain", "context"], "candidate");
+    requireExactKeys(candidate, ["candidateKey", "canonicalLabel", "aliases", "declaredDomain", "context"], "candidate");
     requireNonEmptyString(candidate.candidateKey, "candidateKey");
     requireNonEmptyString(candidate.canonicalLabel, `canonicalLabel for ${candidate.candidateKey}`);
     requireNonEmptyString(candidate.declaredDomain, `declaredDomain for ${candidate.candidateKey}`);
+    if (!Array.isArray(candidate.aliases)) {
+      throw new Error(`Source-less Grounding Admission received malformed aliases for ${candidate.candidateKey}.`);
+    }
+    for (const alias of candidate.aliases) {
+      requireNonEmptyString(alias, `alias for ${candidate.candidateKey}`);
+    }
     if (keys.has(candidate.candidateKey)) {
       throw new Error(`Source-less Grounding Admission received duplicate candidateKey ${JSON.stringify(candidate.candidateKey)}.`);
     }
     keys.add(candidate.candidateKey);
     validateContext(candidate.candidateKey, candidate.context);
   }
+}
+
+function groundingIdentityContext(
+  candidate: GroundingAdmissionCandidate,
+  candidates: readonly GroundingAdmissionCandidate[]
+): GroundingIdentityContext {
+  const aliases = uniqueIdentityAliases(candidate.canonicalLabel, candidate.aliases);
+  const peerConcepts: Array<{ canonicalLabel: string; aliases: readonly string[] }> = [];
+  const seenPeers = new Set<string>();
+  for (const peer of candidates) {
+    if (peer === candidate
+      || peer.declaredDomain !== candidate.declaredDomain
+      || !sameGroundingAdmissionContext(peer.context, candidate.context)) continue;
+    const peerAliases = uniqueIdentityAliases(peer.canonicalLabel, peer.aliases);
+    const peerKey = normalizedIdentityLabel(peer.canonicalLabel);
+    if (seenPeers.has(peerKey)) continue;
+    seenPeers.add(peerKey);
+    peerConcepts.push(Object.freeze({
+      canonicalLabel: peer.canonicalLabel,
+      aliases: Object.freeze(peerAliases)
+    }));
+  }
+  return Object.freeze({
+    aliases: Object.freeze(aliases),
+    peerConcepts: Object.freeze(peerConcepts)
+  });
+}
+
+function uniqueIdentityAliases(canonicalLabel: string, aliases: readonly string[]): string[] {
+  const seen = new Set([normalizedIdentityLabel(canonicalLabel)]);
+  const unique: string[] = [];
+  for (const alias of aliases) {
+    const normalized = normalizedIdentityLabel(alias);
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    unique.push(alias);
+  }
+  return unique;
+}
+
+function normalizedIdentityLabel(label: string): string {
+  return normalizeConceptLabel(label)
+    || label.normalize("NFKC").toLowerCase().trim().replace(/\s+/gu, " ");
+}
+
+function sameGroundingAdmissionContext(a: GroundingAdmissionContext, b: GroundingAdmissionContext): boolean {
+  if (a.kind !== b.kind) return false;
+  if (a.kind === "originating_topic" && b.kind === "originating_topic") return a.topic === b.topic;
+  if (a.kind === "scaffolded_anchor" && b.kind === "scaffolded_anchor") {
+    return a.anchor.reference === b.anchor.reference
+      && a.anchor.canonicalLabel === b.anchor.canonicalLabel
+      && a.anchor.definitionPassages.length === b.anchor.definitionPassages.length
+      && a.anchor.definitionPassages.every((passage, index) => passage === b.anchor.definitionPassages[index]);
+  }
+  return false;
 }
 
 function validateContext(candidateKey: string, context: GroundingAdmissionContext): void {

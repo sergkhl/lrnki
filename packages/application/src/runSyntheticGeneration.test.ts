@@ -175,8 +175,8 @@ test("Synthetic Topic Generation crosses one batch admission interface and assem
 
   assert.equal(seen.length, 1, "the caller delegates one finished batch instead of orchestrating neural ports");
   assert.deepEqual(seen[0], [
-    { candidateKey: "a", canonicalLabel: "Concept A", declaredDomain: "some domain", context: { kind: "originating_topic", topic: "Some Topic" } },
-    { candidateKey: "b", canonicalLabel: "Concept B", declaredDomain: "some domain", context: { kind: "originating_topic", topic: "Some Topic" } }
+    { candidateKey: "a", canonicalLabel: "Concept A", aliases: [], declaredDomain: "some domain", context: { kind: "originating_topic", topic: "Some Topic" } },
+    { candidateKey: "b", canonicalLabel: "Concept B", aliases: ["B-prime"], declaredDomain: "some domain", context: { kind: "originating_topic", topic: "Some Topic" } }
   ]);
   assert.equal(layer.graphVersionId, null);
   assert.deepEqual(layer.derivedNodes.map((node) => node.canonicalLabel), ["Concept A", "Concept B"]);

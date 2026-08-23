@@ -45,6 +45,7 @@ function candidate(candidateKey: string, canonicalLabel = candidateKey): Groundi
   return {
     candidateKey,
     canonicalLabel,
+    aliases: [],
     declaredDomain: "systems science",
     context: { kind: "originating_topic", topic: "Feedback systems" }
   };
@@ -287,6 +288,12 @@ test("invalid and duplicate candidates fail before opening a stage or calling a 
     context: { kind: "originating_topic", topic: "   " }
   }]), /non-empty originating topic/);
   assert.deepEqual(events, []);
+
+  await assert.rejects(() => h.admission.forOperation(stage).admitBatch([{
+    ...candidate("bad-alias"),
+    aliases: ["   "]
+  }]), /non-empty alias/);
+  assert.deepEqual(events, []);
 });
 
 test("an empty batch is inert and opens no stage", async () => {
@@ -308,6 +315,45 @@ test("a measured boundary outcome never reaches Grounding Generation", async () 
   assert.equal(outcomes[0].probe.agreementScore, 0);
   assert.deepEqual(h.groundingCalls.map((call) => call.canonicalLabel), ["Core concept"]);
   assert.equal(outcomes[1].disposition, "admitted");
+});
+
+test("the admission interface derives immutable aliases and same-context peers without scope leakage", async () => {
+  const h = harness();
+  const candidates: GroundingAdmissionCandidate[] = [
+    {
+      ...candidate("a", "Concept A"),
+      aliases: ["Concept Alpha", "concept-alpha", "Concept A"]
+    },
+    {
+      ...candidate("b", "Concept B"),
+      aliases: ["B alternate"]
+    },
+    {
+      ...candidate("b-duplicate", "concept b"),
+      aliases: ["b-alternate"]
+    },
+    {
+      ...candidate("other-topic", "Other topic concept"),
+      context: { kind: "originating_topic", topic: "Different topic" }
+    },
+    {
+      ...candidate("other-domain", "Other domain concept"),
+      declaredDomain: "control engineering"
+    }
+  ];
+
+  const outcomes = await h.admission.forOperation(async (_name, fn) => fn()).admitBatch(candidates);
+
+  assert.deepEqual(outcomes.map((outcome) => outcome.candidateKey), candidates.map((entry) => entry.candidateKey));
+  assert.equal(h.groundingCalls.length, candidates.length, "each core candidate receives exactly one initial draft");
+  const input = h.groundingCalls.find((call) => call.canonicalLabel === "Concept A");
+  assert.deepEqual(input?.identityContext, {
+    aliases: ["Concept Alpha"],
+    peerConcepts: [{ canonicalLabel: "Concept B", aliases: ["B alternate"] }]
+  });
+  assert.equal(Object.isFrozen(input?.identityContext), true);
+  assert.equal(Object.isFrozen(input?.identityContext.aliases), true);
+  assert.equal(Object.isFrozen(input?.identityContext.peerConcepts), true);
 });
 
 test("an all-boundary batch omits conditional grounding and verification brackets", async () => {
@@ -1208,6 +1254,7 @@ test("the closed scaffolded-anchor context is preserved and mechanically attribu
   const anchored: GroundingAdmissionCandidate = {
     candidateKey: "anchored",
     canonicalLabel: "State transition",
+    aliases: [],
     declaredDomain: "computer science",
     context: {
       kind: "scaffolded_anchor",

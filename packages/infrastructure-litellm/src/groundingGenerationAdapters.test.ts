@@ -37,6 +37,10 @@ test("generates an owner-neutral bundle conditioned on one closed scaffolded anc
   const bundle = await adapter.generate({
     declaredDomain: "software engineering",
     canonicalLabel: "Stack allocation",
+    identityContext: {
+      aliases: ["Automatic storage duration"],
+      peerConcepts: [{ canonicalLabel: "Region allocation", aliases: ["Region-managed allocation"] }]
+    },
     context: {
       kind: "scaffolded_anchor",
       anchor: {
@@ -58,6 +62,9 @@ test("generates an owner-neutral bundle conditioned on one closed scaffolded anc
   assert.equal(call.model, "kg-claim-extraction");
   assert.equal(call.toolName, "submit_generated_grounding_bundle");
   assert.ok(call.messages.some((message) => message.content.includes("Candidate concept: \"Stack allocation\"")));
+  assert.ok(call.messages.some((message) => message.content.includes("same identity: \"Automatic storage duration\"")));
+  assert.ok(call.messages.some((message) => message.content.includes("nearby but distinct identities")));
+  assert.ok(call.messages.some((message) => message.content.includes('"Region allocation" (alternate names "Region-managed allocation")')));
   assert.ok(call.messages.some((message) => message.content.includes("Copy Trait")));
   assert.ok(call.messages.some((message) => message.content.includes("Types with a known size")));
   assert.ok(call.messages.some((message) => message.content.includes("hard limit on every generated claim")));
@@ -90,11 +97,14 @@ test("originating-topic grounding produces no anchor references", async () => {
   const bundle = await adapter.generate({
     declaredDomain: "systems science",
     canonicalLabel: "Feedback loop",
+    identityContext: { aliases: [], peerConcepts: [] },
     context: { kind: "originating_topic", topic: "Feedback systems" }
   });
   assert.deepEqual(bundle.groundingAnchorReferences, []);
   const call = calls[0] as { messages: { content: string }[] };
   assert.ok(call.messages.some((message) => message.content.includes("Originating topic: \"Feedback systems\"")));
+  assert.ok(call.messages.some((message) => message.content.includes("Candidate alternate names: none supplied.")));
+  assert.ok(call.messages.some((message) => message.content.includes("Same-context peer concepts: none.")));
 });
 
 test("a scoped generation override drives both the provider call and Grounding Bundle provenance", async () => {
@@ -108,6 +118,7 @@ test("a scoped generation override drives both the provider call and Grounding B
   const bundle = await adapter.generate({
     declaredDomain: "systems science",
     canonicalLabel: "Feedback loop",
+    identityContext: { aliases: [], peerConcepts: [] },
     context: { kind: "originating_topic", topic: "Feedback systems" }
   });
 
@@ -123,6 +134,7 @@ test("malformed Grounding Generation arguments fail closed through the forced-to
   await assert.rejects(() => createGroundingGenerationPort(client).generate({
     declaredDomain: "software engineering",
     canonicalLabel: "Stack allocation",
+    identityContext: { aliases: [], peerConcepts: [] },
     context: { kind: "originating_topic", topic: "Memory management" }
   }), /definition/);
 });

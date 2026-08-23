@@ -7,7 +7,7 @@ execution: code
 
 # Deepen Source-less Grounding Context and Answer Correlation
 
-**Status:** Ready — U0 context-bearing Grounding input next
+**Status:** In progress — U0 complete; U1 exact-key answer object next
 
 **Decision state:** Locked. Grounding Generation and Verification Answering are the only stages to
 `DEEPEN`; the other seventeen Topic Expedition stages remain `KEEP`. This plan fixes those two
@@ -360,10 +360,36 @@ plan's 420-second baseline and two-run soak.
   successful learner assets, deployed, browser, native, physical-device, latency, or release
   evidence.
 
+### U0 — Context-bearing Grounding input — 2026-08-23 — complete
+
+- `GroundingAdmissionCandidate` now requires caller-owned aliases. Synthetic Topic Generation passes
+  synthesized aliases; Graph Enrichment and generated Support Steps pass explicit empty lists. The
+  unchanged `admitBatch` interface derives one frozen identity context per candidate, preserves the
+  validated batch order and learner-visible spelling, deduplicates identities by normalized label,
+  and includes only peers with the exact same Declared Domain and Grounding Admission Context.
+- Grounding Generation alone receives candidate aliases and same-context peers. Its domain-neutral
+  prompt identifies aliases as the same identity and peers as nearby distinct identities; the
+  generated tool schema, Grounding Bundle, claim projection, one-draft settlement, ordering, and
+  persisted shapes are unchanged.
+- Focused local automation passed for the admission interface, Synthetic Topic Generation, Graph
+  Enrichment minting and operation composition, generated Support Steps, Grounding Generation
+  rendering, config-hash registry, and Topic routing. `@lrnki/ports`, `@lrnki/application`, and
+  `@lrnki/infrastructure-litellm` typechecks plus targeted ESLint passed. The first hash and Topic
+  routing runs failed only on the prior exact expected identities and passed after intentional
+  re-baselining.
+- Current default identities are `graph-enrichment-7f3f772bb21e`,
+  `learner-scaffold-generation-0a71975fa183`, and
+  `synthetic-topic-generation-4fc21bcd9522`; the Topic-scoped Synthetic identity is
+  `synthetic-topic-generation-f8258c9c9332`. Study Item Bank and the nineteen-stage Topic profile
+  stayed unchanged.
+- This is local source, type, lint, deterministic interface, prompt-rendering, and composition
+  evidence. No production-model call, activated local composition, real-use artifact, deployed,
+  browser, native, physical-device, latency, or release claim is made.
+
 ### Open findings
 
-- **NEXT:** implement U0 only: preserve the `admitBatch` interface, add candidate aliases, derive
-  same-context peers internally, update the Grounding input/rendering, validate, persist all three
-  status altitudes, and commit before U1.
+- **NEXT:** implement U1 only: replace the provider answer array with the request-specific exact-key
+  object, map it back to the unchanged ordered port result, replace the sentinel and focused tests,
+  re-baseline only affected identities, validate, persist all three status altitudes, and commit.
 - The latency plan remains blocked until U3 produces one successful, fully inspected quality
   baseline. Do not restart width calibration from the current all-failed operations.

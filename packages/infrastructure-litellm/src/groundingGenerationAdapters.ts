@@ -57,6 +57,10 @@ export const groundingGenerationDescriptor: NeuralStageDescriptor<
   sentinelInput: {
     declaredDomain: "sentinel domain",
     canonicalLabel: "Sentinel concept",
+    identityContext: {
+      aliases: ["Sentinel alternate name"],
+      peerConcepts: [{ canonicalLabel: "Nearby sentinel concept", aliases: ["Nearby sentinel alias"] }]
+    },
     context: {
       kind: "scaffolded_anchor",
       anchor: {
@@ -69,6 +73,7 @@ export const groundingGenerationDescriptor: NeuralStageDescriptor<
   templateData: (input) => ({
     declaredDomain: input.declaredDomain,
     canonicalLabel: input.canonicalLabel,
+    identityLines: formatGroundingIdentityContext(input.identityContext),
     contextLines: formatGroundingAdmissionContext(input.context)
   }),
   mapResult: (result, input, model) => generatedBundleFromResult(
@@ -265,6 +270,26 @@ export function formatGroundingAdmissionContext(context: GroundingAdmissionConte
     `Scaffolded anchor: "${context.anchor.canonicalLabel}" (${context.anchor.reference}).`,
     "The anchor's named or structurally identified scope is a hard limit on every generated claim.",
     ...context.anchor.definitionPassages.map((passage) => `Anchor Definition Passage: "${passage}"`)
+  ].join("\n");
+}
+
+function formatGroundingIdentityContext(identity: GroundingGenerationInput["identityContext"]): string {
+  const aliases = identity.aliases.length === 0
+    ? "Candidate alternate names: none supplied."
+    : `Candidate alternate names for the same identity: ${identity.aliases.map((alias) => JSON.stringify(alias)).join(", ")}.`;
+  if (identity.peerConcepts.length === 0) {
+    return `${aliases}\nSame-context peer concepts: none.`;
+  }
+  const peers = identity.peerConcepts.map((peer) => {
+    const peerAliases = peer.aliases.length === 0
+      ? "no alternate names supplied"
+      : `alternate names ${peer.aliases.map((alias) => JSON.stringify(alias)).join(", ")}`;
+    return `- ${JSON.stringify(peer.canonicalLabel)} (${peerAliases})`;
+  });
+  return [
+    aliases,
+    "Same-context peer concepts are nearby but distinct identities; do not absorb or substitute them:",
+    ...peers
   ].join("\n");
 }
 

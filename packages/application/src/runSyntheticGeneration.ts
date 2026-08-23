@@ -88,6 +88,7 @@ export async function runSyntheticGeneration(input: {
       concepts.map((concept) => ({
         candidateKey: concept.conceptKey,
         canonicalLabel: concept.canonicalLabel,
+        aliases: concept.aliases,
         declaredDomain,
         context: { kind: "originating_topic", topic: input.topic }
       }))

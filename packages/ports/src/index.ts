@@ -466,10 +466,19 @@ export type ClaimVerificationAnswer = {
   answer: string;
 };
 
+export type GroundingIdentityContext = Readonly<{
+  aliases: readonly string[];
+  peerConcepts: readonly Readonly<{
+    canonicalLabel: string;
+    aliases: readonly string[];
+  }>[];
+}>;
+
 export type GroundingGenerationInput = {
   declaredDomain: string;
   canonicalLabel: string;
   context: GroundingAdmissionContext;
+  identityContext: GroundingIdentityContext;
 };
 
 export interface GroundingGenerationPort {
