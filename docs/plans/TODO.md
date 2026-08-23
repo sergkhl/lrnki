@@ -4,11 +4,17 @@
 
 ## TODO
 
-- **Source-less Grounding and answer correlation — blocked in U2 (`FIX_FIRST`).** Follow the
-  [active plan](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md). U0–U1 are
-  complete, but the first exact served-contract case returned invalid forced-tool JSON from the
-  expected shared MiMo FP8 route. Establish and commit a same-assignment contract correction before
-  restarting KTD3; do not activate or re-draw the unchanged candidate.
+- **Operation-neutral DeepSeek Grounding — ready; implementation not started.** Follow
+  [the execution-order plan](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md). Move the
+  complete Source-less topology together: DeepSeek produces graph nodes and Grounding; MiMo answers
+  and judges them; GPT-OSS plans, challenges, and orders. Preserve Concept Canonicalization, Topic's
+  learner-asset routing, the application interface, context/correlation changes, admission policy,
+  and consumer contracts.
+
+- **Source-less Grounding context and answer correlation — on hold; U0–U1 complete.** The
+  [predecessor plan](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md) retains
+  its committed interface evidence. Plan 003 supersedes its old assignment matrix and owns route,
+  activation, affected-consumer, and consolidation work; do not resume the shared-MiMo preflight.
 
 - **Topic Expedition generation latency — blocked; U3 remains `FIX_FIRST`.** Follow
   [the active plan](./2026-08-22-001-repair-topic-expedition-generation-latency.md) in U0–U4 order.
@@ -25,7 +31,7 @@
   repointing shared consumers; exact aliases, assignments, fallbacks, and operation identities are
   source/config owned. Local provider recovery passed under natural load. Mixed-domain inspection
   kept seventeen stages and handed only Grounding Generation plus Verification Answering to the
-  [ready successor](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md).
+  [implemented predecessor](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md).
   Detailed record: commits `54329cf`, `8efc7e7`, `3938f19`, `8adfa00`, `f3e2a79`, and `8bf3e3a`.
 
 - **Concept Canonicalization is explicit and replayable (2026-08-23).** An immutable inspected

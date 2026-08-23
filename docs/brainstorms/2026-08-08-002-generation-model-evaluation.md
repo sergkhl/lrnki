@@ -6,9 +6,11 @@ date: 2026-08-08
 
 # DeepSeek Flash Generation Cutover and Pipeline Simplification
 
-**Status:** Interview resolved. The scoped cutover and stage-value decision are complete. The
-[ready deepening plan](../plans/2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md)
-owns the two accepted quality seams and affected-consumer qualification.
+**Status:** Interview resolved. The initial Topic-scoped cutover and stage-value decision are
+complete. The owner-approved
+[operation-neutral Grounding plan](../plans/2026-08-23-003-unify-source-less-grounding-on-deepseek.md)
+now owns the expanded all-consumer assignment and qualification; the predecessor retains only its
+implemented context and answer-correlation record.
 
 ## Decided direction
 
@@ -22,8 +24,13 @@ model card states that it supersedes the preview release, and the repository alr
 revision for judge roles. `litellm/config.yaml` remains the source of truth for the current
 alias-to-deployment mapping; this brainstorm does not change it or any Model Assignment.
 
-The implemented cutover uses the exact pinned [Model Assignment](../../CONTEXT.md#model-operations),
-not a moving `latest` alias. Current alias-to-deployment truth remains in `litellm/config.yaml`.
+The implemented Topic cutover uses the exact pinned
+[Model Assignment](../../CONTEXT.md#model-operations), not a moving `latest` alias. The subsequent
+owner decision assigns Grounding Generation to that DeepSeek release for Topic Expedition, Graph
+Enrichment, and generated Support Steps. ADR-0023 makes the graph-node pair atomic: Concept Set
+Synthesis and missing-prerequisite proposal use the same DeepSeek assignment, while independent
+admission/node judgments move as one cross-family bundle. Current alias-to-deployment truth remains
+in `litellm/config.yaml`.
 
 ## Dated evidence and known defects
 
@@ -47,22 +54,26 @@ lexical veto, weaker admission, or a generator judging its own output.
 
 ## Resolved handoff
 
-The planning interview and initial stage decision are complete. Seventeen stages remain `KEEP`; the
-ready deepening plan owns Grounding Generation and Verification Answering without reopening the
-judge topology. The handoff retains these constraints:
+The initial stage decision remains complete and seventeen stages remain `KEEP`. The predecessor
+implemented only the two accepted interface changes. The new execution owner retains these
+constraints:
 
 - Re-derive the affected consumer set from prompt frontmatter and the current LiteLLM mapping.
-- **Grounding generation and its judge must stay cross-family.**
+- **Grounding generation and its judges stay cross-family.**
   [ADR-0023](../adr/0023-grounding-origin-model-and-cross-family-generated-node-judge.md) requires the
-  generating and judging roles to move as an independent pair. The judge has no independently
-  qualified destination if the whole alias moves today.
+  generating and judging roles to move as an independent pair. The qualified Topic topology now
+  supplies the operation-neutral destination: DeepSeek source-less node production/Grounding, MiMo
+  answering and node/primary judgment, and GPT-OSS planning/challenge/ordering. Graph's merge seam
+  splits from Concept Canonicalization so generated nodes move to MiMo judgment without reassigning
+  source canonicalization.
 - Treat earlier blueprint changes, extra attempts, and pipeline stages as scope candidates rather
   than inherited implementation requirements.
-- Keep the DeepSeek choice separate from Provider Route selection and qualification.
+- Keep the DeepSeek Model Assignment decision separate from Provider Route selection and
+  qualification.
 
 ## Release qualification
 
-Validation does not compare models to decide whether to proceed. The ready deepening plan must
+Validation does not compare models to decide whether to proceed. The operation-neutral plan must
 qualify the pinned Model Assignment and Provider Route, every affected consumer, cost, and
 learner-facing quality; the active latency plan separately owns the successful 420-second baseline
 and soak required before release under

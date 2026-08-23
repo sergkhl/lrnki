@@ -7,12 +7,12 @@ execution: code
 
 # Deepen Source-less Grounding Context and Answer Correlation
 
-**Status:** Blocked in U2 (`FIX_FIRST`) — shared MiMo Grounding returned invalid forced-tool JSON
+**Status:** On hold — U0–U1 complete; remaining qualification delegated to execution-order plan 003
 
-**Decision state:** Locked. Grounding Generation and Verification Answering are the only stages to
-`DEEPEN`; the other seventeen Topic Expedition stages remain `KEEP`. This plan fixes those two
-interfaces, qualifies every affected source-less consumer, and hands a quality-qualified pipeline
-to the separate latency plan. It does not reopen the DeepSeek cutover or stage topology.
+**Decision state:** U0–U1 are locked and implemented. The owner-approved
+[operation-neutral DeepSeek Grounding plan](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md)
+supersedes this plan's preserved-assignment design and owns all remaining route, activation,
+affected-consumer, and handback work. This plan has no executable unit while that successor is live.
 
 ## Goal capsule
 
@@ -28,10 +28,10 @@ to the separate latency plan. It does not reopen the DeepSeek cutover or stage t
   two independently planned verification packets, draft-blind answers, two cross-family judge
   families, replicated-rejection quorum, one-target judgments, atomic failure/persistence, and all
   nineteen conceptual stages.
-- **Model topology:** Keep the committed Model Assignments and Provider Routes. Topic generation is
-  DeepSeek V4 Flash 0731 FP8; Topic primary answering/judgment is Xiaomi MiMo v2.5 FP8; Topic
-  planning/challenge/ordering is GPT-OSS 120B FP4 on Novita with the qualified Parasail fallback.
-  Shared source-less consumers retain their existing aliases.
+- **Model topology:** The
+  [execution-order successor](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md#approved-model-role-topology)
+  is the sole owner of the approved assignment and Provider Routes. The identity-context and
+  exact-correlation interfaces implemented here remain unchanged inputs to that topology.
 - **Authority:** Follow [AGENTS.md](../../AGENTS.md), [CONTEXT.md](../../CONTEXT.md),
   [ADR-0001](../adr/0001-adopt-greenfield-deep-module-architecture.md),
   [ADR-0006](../adr/0006-use-forced-named-tool-schemas.md),
@@ -46,10 +46,9 @@ to the separate latency plan. It does not reopen the DeepSeek cutover or stage t
   interface, correlation, hashing, and invariant claims; exact served calls own provider contract;
   local production-model runs plus direct artifact inspection own usefulness. None substitutes for
   deployed, browser, native, physical-device, or release evidence.
-- **Completion:** Close U0–U4 in order. A passing U3 qualifies the changed source-less quality
-  topology and unblocks the
-  [seven-minute latency plan](./2026-08-22-001-repair-topic-expedition-generation-latency.md); only
-  that plan's successful latency baseline and soak may remove the remaining release block.
+- **Completion:** Preserve the U0–U1 Validation Log until the successor supplies fresh route and
+  real-use evidence. Then consolidate this implemented interface outcome without duplicating the
+  successor's evidence and delete this plan in its own later commit.
 
 ## Problem classes and recognized practice
 
@@ -172,66 +171,14 @@ colon-delimited form that failed. Focused tests cover one, three, and six keys; 
 property order; missing, extra, empty, and duplicate input keys; malformed JSON; and all three
 corrective attempts. Delete array-shape tests and definitions in the same change.
 
-### KTD3 — Preserve assignments and qualify the new exact contracts
+### KTD3 — Delegate the superseded route and qualification design
 
-Both changes alter Neural Stage Descriptor behavior. Recompute and test the effective Synthetic
-Topic Generation, Graph Enrichment, and Scaffold Generation hashes; Study Item Bank and every
-unaffected operation hash must remain byte-identical. The Topic profile remains `9 + 10 = 19`.
-
-Before local production activation, run exact forced-tool calls through:
-
-1. shared MiMo and Topic DeepSeek Grounding Generation with context-bearing inputs for the three
-   observed defect classes;
-2. shared DeepSeek and Topic Xiaomi answerers with one-, three-, and six-key objects; and
-3. every reachable existing provider fallback for those public aliases.
-
-Use complete effective prompts, strict named tools, frozen sampling/reasoning inputs, exact model,
-quantization, deployment, and physical-provider attribution. A semantic preflight is inspected but
-never upgraded to end-to-end usefulness. If the same assignment cannot serve the new contract,
-record `FIX_FIRST`; do not substitute a model, widen quantization, add client-side alias switching,
-or increase retries. A Provider Route amendment requires its own evidence before activation.
-
-### KTD4 — Use existing observation owners
-
-Keep reports in gitignored `tmp/`. For every inspected first-attempt call, reconstruct the initial
-messages through the same descriptor `templateData` and `renderPromptFile` path production uses,
-paired with the exact typed input recoverable from operation artifacts and tagged tool outputs. If
-an exact input cannot be recovered, state that limit; do not call source text alone a rendered
-prompt. Persisted stage-error detail remains the authority for corrective-attempt failures.
-
-Read calls, tokens, recorded spend, and usage-derived BYOK estimates through
-`new LiteLlmSpendLogsReadAdapter(url, readLitellmProxyConfig())`. Report recorded and estimated spend
-separately. Every zero-error, zero-asset, or zero-fallback assertion must include a positive control
-over the same operation rows. Do not add a table, migration, observer port, callback, Admin Lab
-surface, or tracked report for this qualification.
-
-### KTD5 — Requalify every affected real-use consumer
-
-After deterministic and served-contract gates pass, rebuild the exact local production composition,
-reset only the development application database, and run serially:
-
-1. Topic Expeditions for Cellular Respiration, Database Transaction Isolation Levels, Comparative
-   Advantage in Classical Economics, and one Cellular repeat;
-2. the smallest current real curated-source Graph Enrichment fixture that actually exercises a
-   generated prerequisite through Source-less Grounding Admission; and
-3. one production-model generated Support Step that actually exercises Grounding Generation and
-   Verification Answering.
-
-All four Topic operations must become atomically `ready`; at least one must exercise every one of
-the nineteen conceptual stages. Inspect every generated Grounding Bundle, every admission verdict,
-the full prerequisite graph, all difficulty bands, every Layer Purpose and Concept Lesson, every
-Blueprint, every admitted/rejected Study Item, all verification outputs, and both Cellular variants.
-The three prior scope defects must be absent or explicitly and correctly qualified. The answerer
-must have exact key coverage with no forced-tool exhaustion, hidden fallback, or unexplained retry.
-
-Inspect the generated prerequisite and Support Step beside their admitted grounding and consuming
-artifact. A stage HTTP/schema pass is not usefulness evidence. A rejection remains valid evidence
-but does not qualify a Topic operation as ready. Do not compensate with weaker admission, lower
-quorum, regenerated Grounding, a lexical veto, or discarded failing outputs.
-
-Record end-to-end and per-stage wall time, calls, tokens, recorded/estimated cost, aliases,
-deployments, providers, retries, and errors. This plan does not tune execution width or claim the
-420-second goal; it supplies the successful quality baseline the latency plan currently lacks.
+The preserved-assignment matrix, observation procedure, and affected-consumer campaign previously
+owned here are superseded by the
+[operation-neutral successor](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md#locked-technical-design).
+That plan keeps the U0 identity context and U1 exact-key answer object but changes their Model
+Assignments as an independent role bundle under ADR-0023. This plan must not issue another provider
+draw, mutate a loaded process, or duplicate the successor's Validation Log.
 
 ## Implementation units and commit boundaries
 
@@ -254,32 +201,13 @@ deployments, providers, retries, and errors. This plan does not tune execution w
    scheduling, and admission policy unchanged.
 4. Run the changed-package suites/typechecks/lint, append U1 evidence, and commit.
 
-### U2 — Served-contract qualification and activation
+### U2–U4 — Superseded; no executable batch
 
-1. Run KTD3's bounded matrices before changing a loaded process. Stop at the first complete pass per
-   exact route; one excluded transport failure may retry once, never a semantic/schema miss.
-2. Rebuild and activate only the exact committed local production composition through the root
-   runbook and host boundary. Verify source/config hashes and health.
-3. Send unique tagged public-alias calls and match alias, deployment, model, quantization, provider,
-   forced tool, key coverage, and identity context. Append U2 evidence and commit status separately.
-
-### U3 — Affected-consumer real-use qualification
-
-1. Execute KTD5 through the real-use route and build one disposable joined report using KTD4.
-2. Inspect every required output and error/fallback; assign `PASS`, `FIX_FIRST`, `INCONCLUSIVE`, or
-   the narrower verdict the evidence supports. Do not proceed past a `FIX_FIRST` seam.
-3. Append exact operation ids, current hashes, authority, quality findings, latency, calls, tokens,
-   recorded/estimated cost, and persistence positive controls. Commit the detailed evidence.
-
-### U4 — Consolidate and unblock latency work
-
-1. Run the relevant repository gate after U3 passes. A full workspace gate is required only if the
-   changed dependency graph makes the focused package gates insufficient; record the chosen scope.
-2. Move durable mechanics to source/README/validation skill as appropriate, current outcome to
-   `TODO.md`, and no reversible prompt/schema detail to an ADR.
-3. Mark the latency plan ready only if U3 supplies a successful quality baseline. Record the exact
-   remaining 420-second and soak gates without claiming release.
-4. Commit detailed U4 evidence, then consolidation and plan deletion separately under AGENTS.md.
+The execution-order successor owns served contracts, activation, real-use qualification, repository
+gates, and latency handback. After it passes, consolidate U0–U1 as the implemented context and
+correlation outcome, link the durable successor outcome from `TODO.md`, and delete this plan in a
+separate commit. If the successor blocks, leave this plan on hold rather than restoring the retired
+MiMo Grounding route.
 
 ## Deterministic acceptance matrix
 
@@ -294,37 +222,29 @@ deployments, providers, retries, and errors. This plan does not tune execution w
 - Verification planning, answering, and judgment retain their current scheduling, caps, failure
   drain, question counts, sample count, quorum, one-target judgments, and stage tags.
 - Effective hashes change for every affected source-less operation and no unaffected operation;
-  every reachable route resolves to its pre-plan Model Assignment.
+  the successor owns their newly approved Model Assignments and Provider Routes.
 - Topic Expedition remains exactly nineteen conceptual stages, and no learner/persistence/HTTP
   contract changes.
 
 ## Evidence and decision gates
 
-The candidate passes only when:
+The U0–U1 implementation remains accepted only when:
 
-1. Every changed descriptor and reachable route passes the exact served contract with attributable
-   model, quantization, provider, and retry evidence.
-2. The four Topic runs all reach `ready`, collectively exercise all nineteen stages, and pass direct
-   inspection across the three domains and repeated topic.
-3. Grounding output correctly handles the three established scope defects without relying on later
-   sentences to narrow an earlier false definition.
-4. Answering has exact correlation under the failure-shaped object and no forced-tool exhaustion.
-5. Graph Enrichment and Support Step gates exercise the changed shared seams and their persisted
-   outputs are useful and provenance-honest.
-6. Every executed descriptor has inspected input/output evidence; all learner assets, errors,
-   retries, and fallbacks are accounted for.
-7. Recorded and estimated cost remain distinguished, and every zero-row claim has a same-query
-   positive control.
+1. Identity context remains batch-local, deterministic, domain/context isolated, and invisible to
+   callers other than through the unchanged admission outcome.
+2. Answer correlation remains a strict exact-key object at the provider seam and the unchanged
+   ordered port result at the application seam.
+3. The successor passes every served-route and affected-consumer gate under its approved topology;
+   this plan does not restate or independently qualify those claims.
 
-Any failed item is `FIX_FIRST`. Green automated suites, direct preflights, or partial operations do
-not qualify learner usefulness. A passing plan still does not authorize release before the latency
-plan's 420-second baseline and two-run soak.
+Green automated suites or the completed U0–U1 commits do not qualify learner usefulness. The
+successor's passing evidence still does not authorize release before the latency plan's 420-second
+baseline and soak.
 
 ## Out of scope and safety boundaries
 
-- No model reassignment, quantization change, new provider, stage combine/remove, new pipeline,
-  retrieval, regeneration, verifier-authored patch, quorum/sample reduction, execution-width tune,
-  or learner UX mechanic.
+- No further source, route, provider, or runtime work is authorized by this on-hold plan. The linked
+  successor exclusively owns the approved model reassignment and its safety boundaries.
 - No persisted schema, migration, HTTP contract, Admin Lab surface, permanent evaluation module,
   logging callback, or tracked report.
 - Do not retry the discarded prompt-only scope audit, definition-decomposition schema, or neural
@@ -438,12 +358,12 @@ plan's 420-second baseline and two-run soak.
 
 ### Open findings
 
-- **FIX_FIRST — shared MiMo Grounding cannot currently pass the new exact served contract.** The
-  first U2 direct-route call produced one expected forced tool from the expected model/provider but
-  invalid JSON arguments. Before resuming U2, establish a conventional root-cause correction that
-  stays within the locked assignment, FP8 route, retry budget, and unchanged Grounding Bundle
-  schema; commit that correction as a new candidate, then restart KTD3 at the failed shared MiMo
-  Grounding route. Do not treat another draw from revision `61da45e` as evidence, widen routing,
-  increase retries, or activate the local production composition first.
-- The latency plan remains blocked until U3 produces one successful, fully inspected quality
-  baseline. Do not restart width calibration from the current all-failed operations.
+- **NEXT:** execute the
+  [operation-neutral DeepSeek Grounding plan](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md)
+  at README order 1. Do not resume this plan's superseded U2 matrix.
+- Revision `61da45e` failed its first qualifying shared-MiMo observation with malformed tool JSON.
+  That result remains valid for the old candidate but does not prove persistent MiMo incapability or
+  identity-context causation. The owner-approved topology retires MiMo Grounding rather than
+  claiming to repair it.
+- The latency plan remains blocked until the successor produces one successful, fully inspected
+  quality baseline. Do not restart width calibration from the current all-failed operations.
