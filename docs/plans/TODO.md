@@ -4,12 +4,12 @@
 
 ## TODO
 
-- **DeepSeek Flash Topic Expedition cutover — U3 route recovery next.** Follow the
+- **DeepSeek Flash Topic Expedition cutover — U3 bounded sample resumes next.** Follow the
   [active plan](./2026-08-23-001-cut-over-topic-expedition-generation-to-deepseek-flash.md). It
-  retains the exact GPT-OSS FP4 assignment but adds the first fully qualified Parasail backup after
-  Novita shared-pool exhaustion. Next reload LiteLLM, rebuild the API, prove served fallback
-  attribution, and resume the remaining serial KTD5 expeditions. The candidate remains unqualified
-  for release.
+  retains the exact GPT-OSS FP4 assignment, and both the Novita primary and qualified Parasail
+  backup now serve all three exact descriptors with loaded-deployment attribution. Next run the
+  clean Database retry, Comparative Advantage, and Cellular repeat serially, then inspect the joined
+  report. The candidate remains unqualified for release.
 
 - **Topic Expedition generation latency — blocked; U3 remains `FIX_FIRST`.** Follow
   [the active plan](./2026-08-22-001-repair-topic-expedition-generation-latency.md) in U0–U4 order.

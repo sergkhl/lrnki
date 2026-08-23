@@ -12,9 +12,9 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-23-001 — Cut Over Topic Expedition Generation to DeepSeek Flash and Measure Stage Value](./2026-08-23-001-cut-over-topic-expedition-generation-to-deepseek-flash.md)
-   — **In progress; U3 route-capacity recovery candidate ready.** Cellular exposed a correct
-   semantic rejection and Database exposed Novita shared-pool exhaustion. Reload and prove the
-   qualified same-assignment Parasail fallback, then resume the remaining serial KTD5 sample.
+   — **In progress; U3 route recovery live.** Novita primary and Parasail backup both served the
+   three exact GPT descriptors with loaded-deployment attribution. Resume the remaining serial KTD5
+   sample and inspect its descriptor outputs and learner assets.
 
 2. [2026-08-22-001 — Restore Topic Expedition Generation to Seven Minutes](./2026-08-22-001-repair-topic-expedition-generation-latency.md)
    — **Blocked in U3 (`FIX_FIRST`).** The bounded pipeline and shared stage profile are complete,

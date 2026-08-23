@@ -7,7 +7,7 @@ execution: code
 
 # Cut Over Topic Expedition Generation to DeepSeek Flash and Measure Stage Value
 
-**Status:** In progress — U3 exposed and repaired a GPT route-capacity defect; served fallback proof next
+**Status:** In progress — U3 route recovery live; bounded real-use sample resumes next
 
 **Decision state:** Locked. The accepted direction, dated comparison, and known quality defects
 remain in the
@@ -575,14 +575,22 @@ hidden by prompt tuning, regeneration, lower quorum, lexical rejection, or an un
   `git diff --check` passed. This is local source, direct-provider, runtime-failure, and inspected
   partial real-use evidence—not loaded-fallback, completed-sample, learner-usefulness, or release
   evidence.
+- Local activation at `3938f19` changed LiteLLM's negative-control inventory from 45 groups without
+  the backup to 46 with it loaded. The rebuilt API was healthy with byte-identical host/container
+  config hash `e0da1cb7f9c9`; an initial image-unpack capacity failure was excluded, only unused build
+  cache was pruned, and the same committed image then built and started. Tag
+  `topic-u3-fallback-3938f19-proof-a1` attributed all three public aliases to recovered Novita
+  deployment `0782fdd8f130`; tag `topic-u3-fallback-3938f19-backup-a1` attributed the same three
+  validator-accepted descriptors to Parasail deployment `d6d3a934aa6`. No natural fallthrough
+  occurred, so this proves both loaded legs and deterministic alias linkage—not an observed runtime
+  error transition. The remaining serial sample will capture one if Novita fails naturally.
 
 ### Open findings
 
-- **NEXT:** reload LiteLLM from this committed config, rebuild the learner API because the config is
-  an operation-hash build input, and prove all three public GPT aliases fall through to the exact
-  Parasail deployment in served-call attribution. Then resume the serial KTD5 sample with a clean
-  Database retry, Comparative Advantage, and the Cellular Respiration repeat; inspect the joined
-  report before assigning final learner-quality verdicts.
+- **NEXT:** resume the serial KTD5 sample through the fresh production composition with a clean
+  Database retry, Comparative Advantage, and the Cellular Respiration repeat. Capture any natural
+  Novita-to-Parasail transition, then inspect the joined report before assigning final learner-
+  quality verdicts.
 - U4 remains gated by U3. The active route invalidates prior usefulness evidence for all affected
   consumers; U3 is the first current candidate evidence, and final release qualification remains
   intentionally deferred until the pipeline shape settles.
