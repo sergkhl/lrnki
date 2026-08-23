@@ -441,112 +441,25 @@ hidden by prompt tuning, regeneration, lower quorum, lexical rejection, or an un
 
 ## Validation Log
 
-### Planning research and interview — 2026-08-23 — complete
+### U0–U2 — scoped cutover mechanics — 2026-08-23 — complete
 
-- Official-model evidence: DeepSeek's current official Flash model card identifies V4 Flash 0731
-  as the release superseding the preview; the official catalog has no later Flash release. The
-  immutable upstream snapshot and exact runtime Model Assignment are frozen above.
-- Repository evidence: prompt frontmatter plus the current alias map produce nine direct Topic
-  generators, eleven supporting planner/judge consumers whose assignment or route must change, and
-  a broader 13-prompt collateral set that a global swap would wrongly move. The production
-  composition currently has no scoped override except the boundary-probe factory's optional model.
-- Blueprint evidence: ADR-0026 and current source make the planner the neural sparse-family/facet
-  decision. Its fallback is passage-count-only and its input does not contain intrinsic difficulty,
-  so deleting it or claiming it already plans calibrated difficulty is unsupported.
-- Current-data evidence: the local application database contains no current expedition/enrichment/
-  Study Item artifact suitable as a baseline. LiteLLM has historical stage timing and spend, but a
-  new Model Assignment invalidates its learner-usefulness conclusions.
-- Frozen answers: preserve the full initial pipeline; DeepSeek generates; MiMo is the Topic primary
-  independent family; GPT-OSS remains the planner/challenger/ordering family on an exact FP4 route;
-  the boundary probe remains unchanged. Evidence precedes any simplification.
-- Scope refinement: validation is deliberately bounded to data needed for the next topology
-  decision. This is planning and provider-catalog evidence only—not implemented, local real-use,
-  release, deployed, browser, native, or physical-device evidence.
-
-### U0 — frozen identities and pre-change baseline — 2026-08-23 — complete
-
-- Source baseline at `7360475`: Synthetic Topic Generation config hash
-  `synthetic-topic-generation-7b8549a3e0cc`, Study Item Bank config hash
-  `study-item-bank-d574e02753f9`, and 19 conceptual stages (nine enrichment plus ten Study Item
-  Bank). The exact ordered profile remains source-owned by `TOPIC_EXPEDITION_STAGE_PROFILE`.
-- Current-to-scoped alias map: `kg-domain-inference`, `kg-concept-synthesis`, and
-  `kg-claim-extraction` map to `kg-topic-expedition-generation`; `kg-independent-judge`,
-  `kg-claim-verification-answerer`, `kg-claim-factuality-judge`,
-  `kg-claim-verification-planner`, `kg-claim-factuality-challenger`, and
-  `kg-prerequisite-ordering` each map to their corresponding Topic-scoped alias in KTD3. The
-  Knowledge-Boundary Probe remains outside the override.
-- Catalog refresh at `2026-08-23T10:40:00Z`: the official Flash release and immutable snapshot remain
-  `deepseek-ai/DeepSeek-V4-Flash-0731@7872f01b1d1fe23eabc4c98b48bffcef5a386062`. OpenRouter still
-  reports `deepinfra/fp8` at $0.08/$0.18 and `parasail/fp8` at $0.14/$0.28 per million input/output
-  tokens for DeepSeek; both advertise forced tools, temperature, and seed. Xiaomi MiMo remains
-  `xiaomi/fp8` at $0.14/$0.28 and advertises forced tools and temperature, but not seed. GPT-OSS
-  remains `coreweave/fp4` at $0.03/$0.17 and `parasail/fp4` at $0.10/$0.75; both advertise forced
-  tools, temperature, seed, and reasoning effort. Prices exclude cache-read charges.
-- Development queue query against `lrnki`: six historical operation rows were the same-query
-  positive control; zero operations were running and zero running rows belonged to enrichment or
-  Study Item Bank. `learner_expeditions` was empty. No provider call, config reload, source change,
-  or learner-quality claim occurred in U0; catalog fields remain candidates for U2 served-call
-  qualification.
-
-### U1 — inactive Topic-scoped routing seam — 2026-08-23 — complete
-
-- One `withModelOverride` helper now clones a Neural Stage Descriptor without changing its prompt,
-  schema, mapper, stage tag, or default identity. The existing Topic adapter factories accept one
-  optional override, and effective Synthetic Topic Generation and Study Item Bank descriptor
-  builders remain the single registry-owned membership source for both default and scoped hashes.
-- Effective Grounding Generation propagates the selected model into both the forced-tool call and
-  Generated Grounding Bundle provenance. Topic hash tests cover all seven routing roles; default
-  Synthetic Topic Generation, Study Item Bank, Graph Enrichment, and Scaffold hashes remain the U0
-  values, and the application-owned profile remains 19 stages.
-- Local automated evidence: the focused override/provenance/routing tests passed, all 184
-  `@lrnki/infrastructure-litellm` tests passed, its typecheck passed, targeted lint passed, and
-  `git diff --check` passed. Production composition, prompt frontmatter, `litellm/config.yaml`,
-  persistence, HTTP contracts, and runtime routes are unchanged. This proves only the inactive
-  source seam and deterministic identities—not provider compatibility, activation, real use,
-  deployed behavior, browser, native, or physical-device behavior.
-
-### U2 — exact scoped routes active and attributable — 2026-08-23 — complete
-
-- Direct-provider qualification used the complete effective prompt, temperature 0, seed 7, exact
-  strict named-tool schema, reasoning policy, quantization, one physical-provider pin, and no
-  fallback. The final matrices passed DeepInfra FP8 for all nine generators, Xiaomi FP8 for all
-  eight MiMo roles, and Novita FP4 for all three GPT-OSS roles. Every accepted result had exact
-  model/provider attribution and validator-accepted tool arguments; reasoning was absent where
-  disabled, while seed remains best-effort rather than a reproducibility guarantee.
-- Discarded routes did not qualify: Parasail DeepSeek remained throttled on Matching Generation;
-  Mancer DeepSeek and Nebius GPT were catalog-filtered; CoreWeave GPT failed two complex schemas;
-  and the original MiMo candidates were catalog-filtered under `require_parameters`. Owner-authorized
-  empirical MiMo screening without that prefilter passed Xiaomi 8/8, stopped before an unnecessary
-  full Parasail matrix, and rejected Novita for reasoning leakage. This evidence is direct
-  OpenRouter/provider contract only—not loaded-alias, persistence, or learner-usefulness evidence.
-- Local activation candidate: Topic production composition now owns one seven-alias routing value
-  and passes it to every affected port plus both operation hashes. The canonical LiteLLM config
-  resolves those aliases to one DeepInfra DeepSeek deployment, one exact Xiaomi FP8 MiMo deployment,
-  and one Novita FP4 GPT-OSS deployment with medium reasoning; none has a fallback. Shared aliases
-  and non-Topic composition remain unchanged. Candidate hashes are
-  `synthetic-topic-generation-299166f6ba7c` and `study-item-bank-02d755d9fae1`.
-- Local automated evidence: focused production-constant and resolved-route tests passed; the full
-  infrastructure-LiteLLM and learner-API suites passed, both package typechecks passed, targeted
-  lint passed, and `git diff --check` passed. One root `tsx -e` hash print was excluded because that
-  eval context cannot resolve workspace aliases; the package-scoped rerun produced the hashes above.
-  This proves the committed source/config candidate only, not a loaded LiteLLM process or served
-  alias.
-- Local shared-runtime activation: the sole host worktree was clean at committed candidate
-  `3d418a3`, Docker used that checkout, and LiteLLM's read-only bind resolved to its canonical config.
-  The old process was the negative control—37 loaded models and no Topic group. A detached recreate
-  produced a new container; its initial bounded health wait was excluded while Prisma migration was
-  still running, then the same container became healthy with 45 models and all three exact groups.
-- Served-alias attribution: proof tag `topic-u2-3d418a3-proof-a1` had zero rows before seven
-  zero-retry production-client calls. All seven returned validator-accepted forced tools. SpendLogs
-  then contained exactly seven successful rows and seven aliases: one DeepInfra DeepSeek, three
-  Xiaomi MiMo, and three Novita GPT-OSS. `/model/info` resolved their three deployment ids to the
-  expected base models; no fallback row appeared. Two malformed read-only `jq` projections were
-  excluded and corrected without another model call.
-- Production-composition freshness: host and learner-API container hashes for
-  `learnerGeneration.ts` matched, the watcher-started process was healthy, and its internal `/health`
-  returned 200. This is local shared-runtime source, loaded-route, provider-attribution, and forced-
-  tool evidence—not a complete Topic Expedition, persistence, learner usefulness, browser, native,
-  physical-device, deployed, or final-release evidence.
+- Source inspection froze the nine affected generators, eleven supporting consumers, seven scoped
+  aliases, and the source-owned `9 + 10 = 19` profile. One descriptor override seam now supplies the
+  effective ports and operation hashes without changing prompts, schemas, mappers, stage tags,
+  shared aliases, non-Topic composition, or default operation identities.
+- Exact forced-tool matrices qualified DeepInfra FP8 for all nine DeepSeek generators, Xiaomi FP8
+  for all eight MiMo roles, and Novita plus Parasail FP4 for all three GPT-OSS roles. The latter two
+  are one Model Assignment behind attributable primary/fallback groups; every other examined route
+  was filtered, failed a required schema, leaked reasoning, or stopped after the first complete
+  provider passed.
+- The final local production composition loaded every scoped group and served uniquely tagged,
+  validator-accepted calls with matching alias, deployment, model, quantization, and physical
+  provider. Current hashes are `synthetic-topic-generation-dd501cd6075b` and
+  `study-item-bank-02d755d9fae1`; natural Novita-to-Parasail recovery is recorded in U3.
+- Focused routing and composition tests, the full infrastructure-LiteLLM and learner-API suites,
+  both package typechecks, targeted lint, and whitespace validation passed. This is deterministic
+  source plus local shared-runtime provider-contract evidence—not learner usefulness, deployed,
+  browser, native, physical-device, or release evidence.
 
 ### U3 — bounded real-use sample — 2026-08-23 — complete (`FIX_FIRST`)
 
