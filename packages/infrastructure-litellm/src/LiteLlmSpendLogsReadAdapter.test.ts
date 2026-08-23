@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { STAGE_TAGS } from "@lrnki/domain-core";
-import { NON_LLM_STAGES } from "@lrnki/application";
+import { NON_LLM_STAGES, operationTimelineLlmSpendStageTags } from "@lrnki/application";
 import {
   estimateUnbilledSpend,
   liteLlmOperationTimelineStageTags,
@@ -166,7 +166,9 @@ test("every MiMo-routed production deployment declares token prices in litellm/c
 
 test("uses the application Operation Timeline LLM stage catalog for spend reads", () => {
   const tags = liteLlmOperationTimelineStageTags();
-  assert.deepEqual(tags, Object.values(STAGE_TAGS));
+  assert.deepEqual(tags, operationTimelineLlmSpendStageTags());
+  assert.equal(tags.includes(STAGE_TAGS.discoveryCoverageAudit), false);
+  assert.equal(tags.includes(STAGE_TAGS.scaffoldContentCongruence), true);
   assert.equal(new Set<string>(tags).has(NON_LLM_STAGES.persist), false);
   assert.equal(new Set<string>(tags).has(NON_LLM_STAGES.symbolicDisposal), false);
 });

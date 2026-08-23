@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
+import { CONCEPT_CANONICALIZATION_SELECTION_DECISION_TYPE } from "@lrnki/domain-core";
 import { createDatabaseClient } from "./db";
 import { PostgresJourneyLineageRead } from "./PostgresJourneyLineageRead";
 import { seedLearner } from "./testSupport";
@@ -14,6 +15,7 @@ maybe("resolves an enrichment through its graph version to every direct extracti
   const sourceDocumentId = randomUUID();
   const runIds = [randomUUID(), randomUUID()];
   const graphVersionId = randomUUID();
+  const canonicalizationOperationId = randomUUID();
   const enrichmentId = randomUUID();
   try {
     await sql`
@@ -41,6 +43,11 @@ maybe("resolves an enrichment through its graph version to every direct extracti
         VALUES (${randomUUID()}, ${graphVersionId}, ${runId}, ${sourceResourceId})`;
     }
     await sql`
+      INSERT INTO refinement_decisions
+        (refinement_decision_id, graph_version_id, decision_type, subject, outcome, rationale, provenance)
+      VALUES
+        (${randomUUID()}, ${graphVersionId}, ${CONCEPT_CANONICALIZATION_SELECTION_DECISION_TYPE}, ${sql.json({ artifactId: canonicalizationOperationId })}, 'selected', 'test', ${sql.json({})})`;
+    await sql`
       INSERT INTO graph_enrichments
         (enrichment_id, graph_version_id, enrichment_config_hash, status, judge_model, difficulty_method)
       VALUES (${enrichmentId}, ${graphVersionId}, 'test', 'succeeded', 'test', 'test')`;
@@ -48,6 +55,7 @@ maybe("resolves an enrichment through its graph version to every direct extracti
     assert.deepEqual(await new PostgresJourneyLineageRead(sql).resolveJourney(enrichmentId), {
       enrichmentId,
       graphVersionId,
+      canonicalizationOperationId,
       extractionRunIds: [...runIds].sort()
     });
   } finally {

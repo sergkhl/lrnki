@@ -5,6 +5,7 @@ import {
   NON_LLM_STAGES,
   OPERATION_TIMELINE_CATALOG,
   isLlmStage,
+  operationTimelineAllowedNeuralStages,
   operationTimelineLlmSpendStageTags,
   operationTimelineStageKind,
   spendStageBelongsToOperation,
@@ -23,11 +24,7 @@ test("classifies the closed LLM vocabulary as LLM and non-LLM stages as non-LLM"
   assert.equal(operationTimelineStageKind("not-a-real-stage"), "unknown");
 });
 
-// R2: the catalog's LLM stages must be exactly the closed STAGE_TAGS vocabulary — no
-// orphaned live tag (a tag no operation owns) and no dead tag (a tag no operation runs).
-// This set-equality property replaces the hand-copied per-operation stage lists that used
-// to restate the catalog: those could only ever re-encode the same gap, never catch it.
-test("catalog LLM stages are exactly the closed stage-tag vocabulary", () => {
+test("catalog LLM stages are drawn from the closed stage-tag vocabulary", () => {
   const catalogLlmStages = new Set(
     Object.values(OPERATION_TIMELINE_CATALOG)
       .flat()
@@ -35,10 +32,10 @@ test("catalog LLM stages are exactly the closed stage-tag vocabulary", () => {
       .map(({ stage }) => stage)
   );
   const vocabulary = new Set<string>(Object.values(STAGE_TAGS));
-  const orphanedTags = [...vocabulary].filter((tag) => !catalogLlmStages.has(tag));
   const unknownStages = [...catalogLlmStages].filter((stage) => !vocabulary.has(stage));
-  assert.deepEqual(orphanedTags, [], `stage tags no operation catalogs: ${orphanedTags.join(", ")}`);
   assert.deepEqual(unknownStages, [], `catalog LLM stages absent from STAGE_TAGS: ${unknownStages.join(", ")}`);
+  assert.equal(catalogLlmStages.has(STAGE_TAGS.discoveryCoverageAudit), false, "measurement-only audit is not an operation stage");
+  assert.equal(catalogLlmStages.has(STAGE_TAGS.scaffoldContentCongruence), true, "scaffold generation uses the shared descriptor inside its operation");
 });
 
 test("catalog non-LLM stages are drawn from the known non-LLM vocabulary", () => {
@@ -79,6 +76,24 @@ test("checks operation ownership without claiming unknown stages", () => {
   assert.equal(stageBelongsToOperation("not-a-real-stage", "extraction"), false);
 });
 
+test("allowed neural stages are derived from the catalog, including shared ownership", () => {
+  for (const operationType of ["enrichment", "scaffold"] as const) {
+    assert.equal(
+      operationTimelineAllowedNeuralStages(operationType).has(STAGE_TAGS.knowledgeBoundaryProbe),
+      true,
+      operationType
+    );
+  }
+  assert.equal(
+    operationTimelineAllowedNeuralStages("extraction").has(STAGE_TAGS.knowledgeBoundaryProbe),
+    false
+  );
+  assert.equal(
+    operationTimelineAllowedNeuralStages("extraction").has(STAGE_TAGS.discoveryCoverageAudit),
+    false
+  );
+});
+
 test("spend ownership excludes non-LLM and unknown stages", () => {
   assert.equal(spendStageBelongsToOperation(STAGE_TAGS.admission, "extraction"), true);
   assert.equal(spendStageBelongsToOperation(STAGE_TAGS.admission, "enrichment"), false);
@@ -86,9 +101,16 @@ test("spend ownership excludes non-LLM and unknown stages", () => {
   assert.equal(spendStageBelongsToOperation("not-a-real-stage", "extraction"), false);
 });
 
-test("LiteLLM spend-stage tags are LLM-only", () => {
+test("LiteLLM spend-stage inventory is derived from cataloged LLM stages only", () => {
   const tags = operationTimelineLlmSpendStageTags();
-  assert.deepEqual(tags, Object.values(STAGE_TAGS));
+  const expected = [...new Set(
+    Object.values(OPERATION_TIMELINE_CATALOG)
+      .flat()
+      .filter((descriptor) => descriptor.kind === "llm")
+      .map((descriptor) => descriptor.stage)
+  )];
+  assert.deepEqual(tags, expected);
   assert.ok(tags.every((stage) => operationTimelineStageKind(stage) === "llm"));
   assert.equal(new Set<string>(tags).has(NON_LLM_STAGES.persist), false);
+  assert.equal(tags.includes(STAGE_TAGS.discoveryCoverageAudit), false);
 });

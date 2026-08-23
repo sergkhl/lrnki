@@ -5,8 +5,7 @@ import type {
   ScaffoldGenerationConfig,
   SyntheticGenerationConfig
 } from "@lrnki/application";
-import { STAGE_TAGS, type StageTag } from "@lrnki/domain-core";
-import type { OperationType } from "@lrnki/ports";
+import { STAGE_TAGS } from "@lrnki/domain-core";
 import { admissionDecisionsDescriptor, admissionLabelJudgmentDescriptor, conceptDiscoveryDescriptor, coreSelectionDescriptor, definitionEntailmentDescriptor, definitionPassageQualityDescriptor, evidenceProfileExtractionDescriptor } from "./extractionAdapters";
 import { mintingDurabilityDescriptor, prerequisiteOrderingDescriptor, rescuedNodeLabelingDescriptor, rescueDurabilityDescriptor } from "./enrichmentAdapters";
 import { nodeMergeAdjudicationDescriptor, NODE_EMBEDDING_MODEL } from "./dedupAdapters";
@@ -31,30 +30,19 @@ import { discoveryCoverageAuditDescriptor } from "./discoveryCoverageAuditAdapte
 import { operationConfigHash } from "./operationConfigHash";
 import type { AnyNeuralStageDescriptor } from "./forcedToolStage";
 
-// ONE closed operation-centric registry of every Neural Operation (plan 2026-07-16-004 KTD7,
-// ADR-0034). Each entry owns its operation-config seed, the Operation Timeline arm its stages run
-// under, its runtime forced-tool descriptor set, and the embedding stages it runs that are not
-// forced-tool descriptors. Every operation hash, the deduplicated all-descriptor inventory for
-// schema-shape checks, and the descriptor↔timeline completeness tests derive from this registry —
-// there is no second manually maintained descriptor list.
+// ONE closed configuration registry of every Neural Operation (ADR-0034). It owns descriptor
+// membership and mechanical configuration hashes only. Operation-to-stage membership belongs to
+// the application Operation Timeline catalog and is deliberately absent here.
 
 export type NeuralOperationRegistryEntry = {
   // Human-stable prefix of the operation's derived config hash.
   configSeed: string;
-  // The Operation Timeline operation_type this operation's stages attribute under. Graph
-  // Enrichment and Synthetic Topic Generation are separate neural operations that BOTH map to
-  // `enrichment`; completeness checks union entries by timeline type.
-  timelineType: OperationType;
   descriptors: readonly AnyNeuralStageDescriptor[];
-  // LLM spend stages the operation runs through the embedding client rather than a forced-tool
-  // descriptor (they still carry the ambient operation tag, so they join the cost report).
-  embeddingStages: readonly StageTag[];
 };
 
 export const neuralOperationRegistry = {
   extraction: {
     configSeed: "source-extraction",
-    timelineType: "extraction",
     descriptors: [
       conceptDiscoveryDescriptor,
       admissionDecisionsDescriptor,
@@ -63,18 +51,14 @@ export const neuralOperationRegistry = {
       definitionEntailmentDescriptor,
       definitionPassageQualityDescriptor(),
       admissionLabelJudgmentDescriptor
-    ],
-    embeddingStages: []
+    ]
   },
   conceptCanonicalization: {
     configSeed: "concept-canonicalization",
-    timelineType: "canonicalization",
-    descriptors: [nodeMergeAdjudicationDescriptor],
-    embeddingStages: [STAGE_TAGS.nodeEmbedding]
+    descriptors: [nodeMergeAdjudicationDescriptor]
   },
   graphEnrichment: {
     configSeed: "graph-enrichment",
-    timelineType: "enrichment",
     descriptors: [
       prerequisiteOrderingDescriptor,
       missingPrerequisiteProposalDescriptor,
@@ -91,12 +75,10 @@ export const neuralOperationRegistry = {
       definitionPassageQualityDescriptor(STAGE_TAGS.rescueDefinitionQuality),
       intrinsicDifficultyBandingDescriptor,
       intrinsicDifficultyComparisonDescriptor
-    ],
-    embeddingStages: [STAGE_TAGS.nodeEmbedding]
+    ]
   },
   syntheticTopicGeneration: {
     configSeed: "synthetic-topic-generation",
-    timelineType: "enrichment",
     descriptors: [
       declaredDomainInferenceDescriptor,
       conceptSetSynthesisDescriptor,
@@ -109,12 +91,10 @@ export const neuralOperationRegistry = {
       prerequisiteOrderingDescriptor,
       intrinsicDifficultyBandingDescriptor,
       intrinsicDifficultyComparisonDescriptor
-    ],
-    embeddingStages: [STAGE_TAGS.nodeEmbedding]
+    ]
   },
   studyItemBank: {
     configSeed: "study-item-bank",
-    timelineType: "study_items",
     descriptors: [
       layerPurposeGenerationDescriptor,
       conceptLessonGenerationDescriptor,
@@ -126,15 +106,13 @@ export const neuralOperationRegistry = {
       optionSelectKeyVerificationDescriptor,
       impostorKeyVerificationDescriptor,
       matchingAssignmentVerificationDescriptor
-    ],
-    embeddingStages: []
+    ]
   },
   // The complete Scaffold runtime descriptor family: outline, shared source-less admission,
   // generated content, congruence, and one-shot Answer-Key Verification. The probe's K-answer
   // agreement embeds through the embedding client under the scaffold operation tag.
   scaffoldGeneration: {
     configSeed: "learner-scaffold-generation",
-    timelineType: "scaffold",
     descriptors: [
       scaffoldOutlineGenerationDescriptor,
       knowledgeBoundaryProbeDescriptor,
@@ -146,20 +124,18 @@ export const neuralOperationRegistry = {
       scaffoldContentGenerationDescriptor,
       scaffoldContentCongruenceDescriptor,
       optionSelectKeyVerificationDescriptor
-    ],
-    embeddingStages: [STAGE_TAGS.nodeEmbedding]
+    ]
   }
 } as const satisfies Record<string, NeuralOperationRegistryEntry>;
 
 export type NeuralOperationName = keyof typeof neuralOperationRegistry;
 
-// Measurement-only descriptors (ADR-0013/0028 instruments) claimed in the Operation Timeline
-// catalog purely to name their owning pipeline arm: their calls carry NO operation_id, so they
-// never join an operation's cost report and never contribute to an operation config hash.
+// Measurement-only descriptors (ADR-0013/0028 instruments) carry no operation id, never join an
+// Operation Timeline, and never contribute to an operation config hash.
 // `scaffold-content-congruence` is NOT here — its descriptor genuinely runs inside the scaffold
 // operation (the re-pick) and is registered there; the standing audit merely reuses it.
-export const measurementNeuralStageDescriptors: readonly { descriptor: AnyNeuralStageDescriptor; claimedTimelineType: OperationType }[] = [
-  { descriptor: discoveryCoverageAuditDescriptor as AnyNeuralStageDescriptor, claimedTimelineType: "extraction" }
+export const measurementNeuralStageDescriptors: readonly AnyNeuralStageDescriptor[] = [
+  discoveryCoverageAuditDescriptor as AnyNeuralStageDescriptor
 ];
 
 // Deduplicated (by stage config identity) inventory of every registered runtime descriptor, for

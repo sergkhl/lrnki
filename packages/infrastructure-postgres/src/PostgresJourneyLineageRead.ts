@@ -1,3 +1,4 @@
+import { CONCEPT_CANONICALIZATION_SELECTION_DECISION_TYPE } from "@lrnki/domain-core";
 import type { JourneyDisplay, JourneyLineage, JourneyLineageReadPort } from "@lrnki/ports";
 import type { Sql } from "postgres";
 
@@ -5,10 +6,21 @@ export class PostgresJourneyLineageRead implements JourneyLineageReadPort {
   constructor(private readonly sql: Sql) {}
 
   async resolveJourney(enrichmentId: string): Promise<JourneyLineage | undefined> {
-    const headers = await this.sql<{ graph_version_id: string | null }[]>`
-      SELECT graph_version_id
-      FROM graph_enrichments
-      WHERE enrichment_id = ${enrichmentId}
+    const headers = await this.sql<{
+      graph_version_id: string | null;
+      canonicalization_operation_id: string | null;
+    }[]>`
+      SELECT ge.graph_version_id,
+             (
+               SELECT rd.subject->>'artifactId'
+               FROM refinement_decisions rd
+               WHERE rd.graph_version_id = ge.graph_version_id
+                 AND rd.decision_type = ${CONCEPT_CANONICALIZATION_SELECTION_DECISION_TYPE}
+               ORDER BY rd.refinement_decision_id
+               LIMIT 1
+             ) AS canonicalization_operation_id
+      FROM graph_enrichments ge
+      WHERE ge.enrichment_id = ${enrichmentId}
       LIMIT 1`;
     const header = headers[0];
     if (!header) return undefined;
@@ -24,6 +36,7 @@ export class PostgresJourneyLineageRead implements JourneyLineageReadPort {
     return {
       enrichmentId,
       graphVersionId: header.graph_version_id,
+      canonicalizationOperationId: header.canonicalization_operation_id,
       extractionRunIds: memberships.map((row) => row.run_id)
     };
   }

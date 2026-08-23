@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
 import test from "node:test";
+import { STAGE_TAGS } from "@lrnki/domain-core";
+import { runWithOperationContext } from "@lrnki/domain-core/operation-context";
+import { installNodeOperationContext } from "@lrnki/domain-core/operation-context-node";
 import type { StageErrorDetail } from "@lrnki/ports";
+import type { Sql } from "postgres";
 import { createDatabaseClient } from "./db";
 import { PostgresOperationTimelineRead } from "./PostgresOperationTimelineRead";
 import { PostgresRunProgressReporter } from "./PostgresRunProgressReporter";
@@ -14,6 +18,36 @@ import { purgeOperationRun } from "./testSupport";
 // isolated test database is left exactly as it was found.
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const maybe = databaseUrl ? test : test.skip;
+
+installNodeOperationContext();
+
+test("timeline stage writes reject an unowned ambient pair before issuing SQL", async () => {
+  let sqlCalls = 0;
+  const sql = (() => {
+    sqlCalls += 1;
+    throw new Error("SQL must not be issued");
+  }) as unknown as Sql;
+  const reporter = new PostgresRunProgressReporter(sql);
+  const operationId = randomUUID();
+  const context = {
+    operationType: "extraction",
+    operationId,
+    allowedTimelineStages: new Set([STAGE_TAGS.admission]),
+    allowedNeuralStages: new Set([STAGE_TAGS.admission])
+  };
+
+  for (const write of [
+    () => reporter.enterStage({ operationType: "extraction", operationId, stage: STAGE_TAGS.prerequisiteOrdering }),
+    () => reporter.recordProgress({ operationType: "extraction", operationId, stage: STAGE_TAGS.prerequisiteOrdering, done: 1 }),
+    () => reporter.completeStage({ operationType: "extraction", operationId, stage: STAGE_TAGS.prerequisiteOrdering, ok: true })
+  ]) {
+    await assert.rejects(
+      () => runWithOperationContext(context, write),
+      /does not own timeline stage prerequisite-ordering/
+    );
+  }
+  assert.equal(sqlCalls, 0);
+});
 
 maybe("beginOperation commits a running parent row visible to a SEPARATE connection (KTD3 autocommit)", async () => {
   const sql = createDatabaseClient(databaseUrl);
@@ -261,18 +295,45 @@ maybe("failStaleOperations marks only stale running operation rows failed", asyn
   }
 });
 
-// KTD7 (plan 2026-07-16-004 U3): the scaffold operation's config identity is REQUIRED at begin
-// (DB CHECK) — a scaffold attempt has no artifact row of its own to carry provenance.
-maybe("the database rejects a scaffold operation begun without a config hash", async () => {
+maybe("the database rejects canonicalization and scaffold operations begun without a config hash", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  const operationIds = [randomUUID(), randomUUID()];
+  try {
+    const reporter = new PostgresRunProgressReporter(sql);
+    for (const [index, operationType] of (["canonicalization", "scaffold"] as const).entries()) {
+      await assert.rejects(
+        () => reporter.beginOperation({ operationType, operationId: operationIds[index]! }),
+        /check|config_hash/i
+      );
+    }
+    const [{ count }] = await sql<{ count: number }[]>`
+      SELECT count(*)::int AS count
+      FROM operation_runs
+      WHERE operation_id IN (${operationIds[0]}, ${operationIds[1]})`;
+    assert.equal(count, 0, "the rejected begin persisted no row");
+  } finally {
+    for (const operationId of operationIds) await purgeOperationRun(sql, operationId);
+    await sql.end({ timeout: 5 });
+  }
+});
+
+maybe("a canonicalization operation records its required config hash and stages", async () => {
   const sql = createDatabaseClient(databaseUrl);
   const operationId = randomUUID();
   try {
-    await assert.rejects(
-      () => new PostgresRunProgressReporter(sql).beginOperation({ operationType: "scaffold", operationId }),
-      /check|config_hash/i
-    );
-    const [{ count }] = await sql<{ count: number }[]>`SELECT count(*)::int AS count FROM operation_runs WHERE operation_id = ${operationId}`;
-    assert.equal(count, 0, "the rejected begin persisted no row");
+    const reporter = new PostgresRunProgressReporter(sql);
+    await reporter.beginOperation({
+      operationType: "canonicalization",
+      operationId,
+      configHash: "concept-canonicalization-abc123"
+    });
+    await reporter.enterStage({ operationType: "canonicalization", operationId, stage: "node-embedding" });
+    await reporter.completeStage({ operationType: "canonicalization", operationId, stage: "node-embedding", ok: true });
+    await reporter.completeOperation({ operationType: "canonicalization", operationId, status: "succeeded" });
+
+    const detail = await new PostgresOperationTimelineRead(sql).getOperationTimeline(operationId, "canonicalization");
+    assert.equal(detail?.summary.configHash, "concept-canonicalization-abc123");
+    assert.deepEqual(detail?.stages.map((stage) => stage.stage), ["node-embedding"]);
   } finally {
     await purgeOperationRun(sql, operationId);
     await sql.end({ timeout: 5 });
@@ -312,7 +373,7 @@ maybe("a no-stage scaffold operation records its config hash at begin and succee
   }
 });
 
-maybe("non-scaffold operations keep a null config hash (their identities live on artifact rows)", async () => {
+maybe("operations without a required timeline identity may keep a null config hash", async () => {
   const sql = createDatabaseClient(databaseUrl);
   const operationId = randomUUID();
   try {

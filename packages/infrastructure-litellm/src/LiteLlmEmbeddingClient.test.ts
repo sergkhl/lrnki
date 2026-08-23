@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
-import { runWithOperationTag } from "@lrnki/domain-core/operation-tag-context";
+import { STAGE_TAGS } from "@lrnki/domain-core";
+import { runWithOperationContext } from "@lrnki/domain-core/operation-context";
 import { EmbeddingExhaustionError, LiteLlmEmbeddingClient } from "./LiteLlmEmbeddingClient";
 import { resetLiteLlmFetchForTests, setLiteLlmFetchForTests, type LiteLlmFetchInit } from "./liteLlmFetch";
 
@@ -86,8 +87,27 @@ test("tag: the node-embedding tag travels in metadata.tags", async () => {
 
 test("tag: the ambient operation tag follows the stage tag", async () => {
   const capture = stubResponse({ data: [{ index: 0, embedding: [0.1] }] });
-  await runWithOperationTag("op-1", () => client().embed({ model: "m", texts: ["x"], tags: ["node-embedding"] }));
-  assert.deepEqual(capture.read().body.metadata, { tags: ["node-embedding", "op-1"] });
+  await runWithOperationContext({
+    operationId: "op-1",
+    operationType: "canonicalization",
+    allowedTimelineStages: new Set([STAGE_TAGS.nodeEmbedding]),
+    allowedNeuralStages: new Set([STAGE_TAGS.nodeEmbedding])
+  }, () => client().embed({ model: "m", texts: ["x"], tags: [STAGE_TAGS.nodeEmbedding] }));
+  assert.deepEqual(capture.read().body.metadata, { tags: [STAGE_TAGS.nodeEmbedding, "op-1"] });
+});
+
+test("tag: a stage the ambient operation does not own fails before HTTP dispatch", async () => {
+  const capture = stubResponse({ data: [{ index: 0, embedding: [0.1] }] });
+  await assert.rejects(
+    () => runWithOperationContext({
+      operationId: "op-1",
+      operationType: "extraction",
+      allowedTimelineStages: new Set([STAGE_TAGS.admission]),
+      allowedNeuralStages: new Set([STAGE_TAGS.admission])
+    }, () => client().embed({ model: "m", texts: ["x"], tags: [STAGE_TAGS.nodeEmbedding] })),
+    /does not own neural stage node-embedding/
+  );
+  assert.equal(capture.calls(), 0);
 });
 
 test("tag: no tags omits metadata entirely", async () => {

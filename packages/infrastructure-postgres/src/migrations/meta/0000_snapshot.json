@@ -1,5 +1,5 @@
 {
-  "id": "06209d3f-8ac2-4dee-898f-b459c8927179",
+  "id": "8b5183a8-0cfd-4103-8c8b-2355f251a6e5",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -6256,7 +6256,7 @@
       "checkConstraints": {
         "operation_runs_operation_type_check": {
           "name": "operation_runs_operation_type_check",
-          "value": "operation_type IN ('extraction', 'minting', 'enrichment', 'study_items', 'scaffold')"
+          "value": "operation_type IN ('extraction', 'canonicalization', 'minting', 'enrichment', 'study_items', 'scaffold')"
         },
         "operation_runs_status_check": {
           "name": "operation_runs_status_check",
@@ -6264,7 +6264,7 @@
         },
         "operation_runs_check": {
           "name": "operation_runs_check",
-          "value": "operation_type <> 'scaffold' OR config_hash IS NOT NULL"
+          "value": "operation_type NOT IN ('canonicalization', 'scaffold') OR config_hash IS NOT NULL"
         }
       },
       "isRLSEnabled": false

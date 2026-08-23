@@ -29,10 +29,6 @@ export const OPERATION_TIMELINE_CATALOG: Record<OperationType, readonly Operatio
     llm(STAGE_TAGS.cepExtraction),
     llm(STAGE_TAGS.definitionPassageQuality),
     llm(STAGE_TAGS.assertionEntailment),
-    // Measurement-mode stage (plan 2026-07-10-004 KTD2): claimed here only to satisfy
-    // the stage-tag set-equality test and name the owning pipeline arm. Audit calls
-    // carry no operation_id, so no operation's cost report ever aggregates this row.
-    llm(STAGE_TAGS.discoveryCoverageAudit),
     nonLlm(NON_LLM_STAGES.persist)
   ],
   canonicalization: [
@@ -113,6 +109,14 @@ const ownedStagesByOperation = new Map<OperationType, ReadonlySet<string>>(
     new Set(stages.map((descriptor) => descriptor.stage))
   ])
 );
+const ownedNeuralStagesByOperation = new Map<OperationType, ReadonlySet<StageTag>>(
+  Object.entries(OPERATION_TIMELINE_CATALOG).map(([operationType, stages]) => [
+    operationType as OperationType,
+    new Set(stages.flatMap((descriptor) =>
+      descriptor.kind === "llm" && isStageTag(descriptor.stage) ? [descriptor.stage] : []
+    ))
+  ])
+);
 
 export const isLlmStage = isStageTag;
 
@@ -126,10 +130,24 @@ export function stageBelongsToOperation(stage: string, operationType: OperationT
   return ownedStagesByOperation.get(operationType)?.has(stage) ?? false;
 }
 
+export function operationTimelineAllowedStages(operationType: OperationType): ReadonlySet<string> {
+  return ownedStagesByOperation.get(operationType) ?? new Set<string>();
+}
+
 export function spendStageBelongsToOperation(stage: string, operationType: OperationType): boolean {
   return isLlmStage(stage) && stageBelongsToOperation(stage, operationType);
 }
 
+export function operationTimelineAllowedNeuralStages(operationType: OperationType): ReadonlySet<StageTag> {
+  return ownedNeuralStagesByOperation.get(operationType) ?? new Set<StageTag>();
+}
+
 export function operationTimelineLlmSpendStageTags(): readonly StageTag[] {
-  return Object.values(STAGE_TAGS);
+  return [...new Set(
+    Object.values(OPERATION_TIMELINE_CATALOG)
+      .flatMap((stages) => stages)
+      .flatMap((descriptor) =>
+        descriptor.kind === "llm" && isStageTag(descriptor.stage) ? [descriptor.stage] : []
+      )
+  )];
 }

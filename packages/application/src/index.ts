@@ -116,6 +116,8 @@ export {
 export {
   NON_LLM_STAGES,
   OPERATION_TIMELINE_CATALOG,
+  operationTimelineAllowedNeuralStages,
+  operationTimelineAllowedStages,
   operationTimelineLlmSpendStageTags,
   stageBelongsToOperation,
   spendStageBelongsToOperation

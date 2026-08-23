@@ -1,6 +1,6 @@
-import { deepStripNullBytes } from "@lrnki/domain-core";
-import { currentOperationTag } from "@lrnki/domain-core/operation-tag-context";
-import { installNodeOperationTagContext } from "@lrnki/domain-core/operation-tag-context-node";
+import { deepStripNullBytes, isStageTag } from "@lrnki/domain-core";
+import { requireAmbientOperationNeuralStageOwnership } from "@lrnki/domain-core/operation-context";
+import { installNodeOperationContext } from "@lrnki/domain-core/operation-context-node";
 import type { ForcedToolFailureAttempt, StageErrorDetail, StageErrorReporting } from "@lrnki/ports";
 import { ZodError, type ZodType } from "zod";
 import { createLiteLlmDispatcher, liteLlmFetch, withLiteLlmDispatcher } from "./liteLlmFetch";
@@ -8,7 +8,7 @@ import { classifyTransportFailure, LiteLlmHttpError, runWithTransportRetries } f
 
 export { LiteLlmHttpError } from "./liteLlmRetry";
 
-installNodeOperationTagContext();
+installNodeOperationContext();
 
 export type JsonSchema = Record<string, unknown>;
 export type ToolMessage = { role: "system" | "user" | "assistant"; content: string };
@@ -28,6 +28,13 @@ export class LiteLlmForcedToolClient {
   }
 
   async call<T>(input: { model: string; messages: ToolMessage[]; toolName: string; toolDescription: string; parameters: JsonSchema; validator: ZodType<T>; tags?: string[]; maxRetries?: number }): Promise<T> {
+    // The application catalog is the sole owner of operation-to-stage membership. Its
+    // allowed set arrives through the ambient context; reject a wrong pair before the
+    // retry loop can issue or wrap a request. With no ambient operation (measurement),
+    // stage tags remain valid and no operation id is attached.
+    const operationContext = requireAmbientOperationNeuralStageOwnership(
+      (input.tags ?? []).filter(isStageTag)
+    );
     // Retry budget for transient model deviations (zero/multiple tool calls,
     // malformed arguments, network blips) — a Zod validation failure inside
     // `callOnce` throws into this loop and re-prompts. A per-call `maxRetries`
@@ -50,7 +57,7 @@ export class LiteLlmForcedToolClient {
         return this.callOnce({
           ...input,
           messages: attemptMessages
-        });
+        }, operationContext?.operationId);
       },
       classify: classifyForcedToolFailure,
       onExhausted: (attempts, lastError) => {
@@ -59,9 +66,8 @@ export class LiteLlmForcedToolClient {
     });
   }
 
-  private async callOnce<T>(input: { model: string; messages: ToolMessage[]; toolName: string; toolDescription: string; parameters: JsonSchema; validator: ZodType<T>; tags?: string[] }): Promise<T> {
-    const operationTag = currentOperationTag();
-    const tags = [...(input.tags ?? []), ...(operationTag ? [operationTag] : [])];
+  private async callOnce<T>(input: { model: string; messages: ToolMessage[]; toolName: string; toolDescription: string; parameters: JsonSchema; validator: ZodType<T>; tags?: string[] }, operationId?: string): Promise<T> {
+    const tags = [...(input.tags ?? []), ...(operationId ? [operationId] : [])];
     const response = await liteLlmFetch(`${this.options.baseUrl.replace(/\/$/, "")}/v1/chat/completions`, withLiteLlmDispatcher({
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${this.options.apiKey}` },

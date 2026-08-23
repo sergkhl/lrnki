@@ -11,8 +11,8 @@ import type {
   PrerequisiteConceptContext,
   WholeSetOrdering
 } from "@lrnki/domain-core";
-import { currentOperationTag } from "@lrnki/domain-core/operation-tag-context";
-import { installNodeOperationTagContext } from "@lrnki/domain-core/operation-tag-context-node";
+import { currentOperationContext } from "@lrnki/domain-core/operation-context";
+import { installNodeOperationContext } from "@lrnki/domain-core/operation-context-node";
 import type {
   DifficultyPort,
   EnrichmentRunStorePort,
@@ -35,7 +35,7 @@ import type {
   SourceLessGroundingAdmission
 } from "./sourceLessGroundingAdmission";
 
-installNodeOperationTagContext();
+installNodeOperationContext();
 
 // Recording reporter fake: captures ordered reporter calls so a test asserts the
 // enrichment timeline lifecycle without a database (rule 11). Replaces the deleted
@@ -255,7 +255,7 @@ test("the enrichment operation context reaches concurrent ordering calls", async
   const ports = buildPorts({
     onOrder: async () => {
       await Promise.resolve();
-      assert.equal(currentOperationTag(), "e1");
+      assert.equal(currentOperationContext()?.operationId, "e1");
     }
   });
   await run(ports);

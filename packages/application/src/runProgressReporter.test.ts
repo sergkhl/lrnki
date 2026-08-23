@@ -1,15 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { STAGE_TAGS } from "@lrnki/domain-core";
-import { currentOperationTag } from "@lrnki/domain-core/operation-tag-context";
-import { installNodeOperationTagContext } from "@lrnki/domain-core/operation-tag-context-node";
-import type { RunProgressReporterPort, StageErrorDetail } from "@lrnki/ports";
+import { currentOperationContext } from "@lrnki/domain-core/operation-context";
+import { installNodeOperationContext } from "@lrnki/domain-core/operation-context-node";
+import type { OperationType, RunProgressReporterPort, StageErrorDetail } from "@lrnki/ports";
+import { OPERATION_TIMELINE_CATALOG } from "./operationTimelineCatalog";
 import { bracketStage, noopRunProgressReporter, NON_LLM_STAGES, isLlmStage, runInstrumentedOperation, toStageErrorDetail } from "./runProgressReporter";
 
 // Deterministic contract tests (rule 11): the no-op default and the closed
 // stage-vocabulary helper. No model judgment is asserted.
 
-installNodeOperationTagContext();
+installNodeOperationContext();
 
 test("noopRunProgressReporter resolves every method with no value and no throw", async () => {
   await assert.doesNotReject(noopRunProgressReporter.beginOperation({ operationType: "extraction", operationId: "op-1" }));
@@ -103,10 +104,43 @@ test("bracketStage closes a successful stage ok with no error detail", async () 
   assert.deepEqual(reporter.completed, [{ ok: true, errorDetail: undefined }]);
 });
 
-test("runInstrumentedOperation begins before stages, completes succeeded, returns result, and sets operation tag", async () => {
+test("every catalog-owned stage is accepted by its operation", async () => {
+  for (const [operationType, stages] of Object.entries(OPERATION_TIMELINE_CATALOG)) {
+    const reporter = recordingReporter();
+    const bracket = bracketStage(reporter, operationType as OperationType, `op-${operationType}`);
+    for (const descriptor of stages) {
+      await bracket(descriptor.stage, async () => undefined);
+    }
+    assert.equal(
+      reporter.events.filter((event) => event.startsWith("enter:")).length,
+      stages.length,
+      operationType
+    );
+  }
+});
+
+test("a stage not owned by the operation fails before a timeline write", async () => {
+  const reporter = recordingReporter();
+  const bracket = bracketStage(reporter, "extraction", "op-1");
+  await assert.rejects(
+    () => bracket(STAGE_TAGS.prerequisiteOrdering, async () => undefined),
+    /does not own timeline stage prerequisite-ordering/
+  );
+  assert.deepEqual(reporter.events, []);
+});
+
+test("runInstrumentedOperation begins before stages, completes succeeded, returns result, and sets operation context", async () => {
   const reporter = recordingReporter();
   const result = await runInstrumentedOperation(reporter, "extraction", "op-1", async (runStage) => {
-    assert.equal(currentOperationTag(), "op-1");
+    assert.deepEqual(currentOperationContext(), {
+      operationId: "op-1",
+      operationType: "extraction",
+      allowedTimelineStages: new Set(OPERATION_TIMELINE_CATALOG.extraction
+        .map((descriptor) => descriptor.stage)),
+      allowedNeuralStages: new Set(OPERATION_TIMELINE_CATALOG.extraction
+        .filter((descriptor) => descriptor.kind === "llm")
+        .map((descriptor) => descriptor.stage))
+    });
     return runStage(STAGE_TAGS.cepExtraction, async () => 42);
   });
 
@@ -236,7 +270,7 @@ test("a failed stage-close write preserves the carrier error so transience stays
 
   const runStage = bracketStage(unreachableStore, "enrichment", "op-1");
   await assert.rejects(
-    () => runStage(STAGE_TAGS.cepExtraction, async () => { throw original; }),
+    () => runStage(STAGE_TAGS.prerequisiteOrdering, async () => { throw original; }),
     (rejected: unknown) => rejected === original
   );
   // The carrier survived, so downstream classification still sees a transient exhaustion.

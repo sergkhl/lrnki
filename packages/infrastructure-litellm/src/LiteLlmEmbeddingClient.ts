@@ -1,5 +1,6 @@
-import { currentOperationTag } from "@lrnki/domain-core/operation-tag-context";
-import { installNodeOperationTagContext } from "@lrnki/domain-core/operation-tag-context-node";
+import { isStageTag } from "@lrnki/domain-core";
+import { requireAmbientOperationNeuralStageOwnership } from "@lrnki/domain-core/operation-context";
+import { installNodeOperationContext } from "@lrnki/domain-core/operation-context-node";
 import type { ForcedToolFailureAttempt, StageErrorDetail, StageErrorReporting } from "@lrnki/ports";
 import { createLiteLlmDispatcher, liteLlmFetch, withLiteLlmDispatcher } from "./liteLlmFetch";
 import { classifyTransportFailure, LiteLlmHttpError, runWithTransportRetries } from "./liteLlmRetry";
@@ -17,7 +18,7 @@ import { classifyTransportFailure, LiteLlmHttpError, runWithTransportRetries } f
 // treat the embedding signal as UNAVAILABLE and skip dedup rather than proposing pairs
 // from a malformed signal. Embeddings only PROPOSE candidate pairs; a separate
 // adjudicator decides each merge (AGENTS rule 20).
-installNodeOperationTagContext();
+installNodeOperationContext();
 
 type EmbeddingResponse = {
   data?: Array<{ embedding?: unknown; index?: unknown }>;
@@ -31,6 +32,9 @@ export class LiteLlmEmbeddingClient {
   }
 
   async embed(input: { model: string; texts: string[]; tags?: string[] }): Promise<number[][]> {
+    const operationContext = requireAmbientOperationNeuralStageOwnership(
+      (input.tags ?? []).filter(isStageTag)
+    );
     // No texts → no HTTP call; an empty embedding set is a valid (degenerate) result,
     // never an error.
     if (input.texts.length === 0) return [];
@@ -38,7 +42,7 @@ export class LiteLlmEmbeddingClient {
     // timeouts, classified per-attempt trail, 429-aware backoff.
     return runWithTransportRetries({
       maxRetries: this.options.maxRetries ?? 2,
-      attemptOnce: () => this.embedOnce(input),
+      attemptOnce: () => this.embedOnce(input, operationContext?.operationId),
       classify: (attempt, error) => classifyTransportFailure(attempt, error) ?? { attempt, kind: "other" },
       onExhausted: (attempts, lastError) => {
         throw new EmbeddingExhaustionError(input.model, attempts, lastError);
@@ -46,9 +50,8 @@ export class LiteLlmEmbeddingClient {
     });
   }
 
-  private async embedOnce(input: { model: string; texts: string[]; tags?: string[] }): Promise<number[][]> {
-    const operationTag = currentOperationTag();
-    const tags = [...(input.tags ?? []), ...(operationTag ? [operationTag] : [])];
+  private async embedOnce(input: { model: string; texts: string[]; tags?: string[] }, operationId?: string): Promise<number[][]> {
+    const tags = [...(input.tags ?? []), ...(operationId ? [operationId] : [])];
     const response = await liteLlmFetch(`${this.options.baseUrl.replace(/\/$/, "")}/v1/embeddings`, withLiteLlmDispatcher({
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${this.options.apiKey}` },

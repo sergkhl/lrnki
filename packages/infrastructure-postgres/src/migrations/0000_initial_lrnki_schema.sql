@@ -927,9 +927,9 @@ CREATE TABLE "operation_runs" (
 	"completed_at" timestamp with time zone,
 	"config_hash" text,
 	CONSTRAINT "operation_runs_operation_type_operation_id_key" UNIQUE("operation_type","operation_id"),
-	CONSTRAINT "operation_runs_operation_type_check" CHECK (operation_type IN ('extraction', 'minting', 'enrichment', 'study_items', 'scaffold')),
+	CONSTRAINT "operation_runs_operation_type_check" CHECK (operation_type IN ('extraction', 'canonicalization', 'minting', 'enrichment', 'study_items', 'scaffold')),
 	CONSTRAINT "operation_runs_status_check" CHECK (status IN ('running', 'succeeded', 'failed')),
-	CONSTRAINT "operation_runs_check" CHECK (operation_type <> 'scaffold' OR config_hash IS NOT NULL)
+	CONSTRAINT "operation_runs_check" CHECK (operation_type NOT IN ('canonicalization', 'scaffold') OR config_hash IS NOT NULL)
 );
 --> statement-breakpoint
 ALTER TABLE "account" ADD CONSTRAINT "account_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

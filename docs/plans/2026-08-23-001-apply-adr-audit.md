@@ -7,7 +7,7 @@ execution: code
 
 # Apply the ADR Audit Without Changing ADR-0006 or Cross-Family Rules
 
-**Status:** In progress — U0–U1 complete; U2 next
+**Status:** In progress — U0–U2 complete; U3 next
 
 **Decision state:** Locked. The accepted audit findings and fixed assumptions are implementation
 inputs, not an invitation to reopen Concept Canonicalization, Operation Timeline ownership,
@@ -361,7 +361,44 @@ without implementing that follow-up.
   generated schema, PostgreSQL append/read behavior, ambient wrong-stage rejection, Processing
   Journey lineage, real-model usefulness, or local database publication; U2 and U4 own those gates.
 
+### U2 — Operation ownership, lineage, and persisted type — complete; local automated and isolated-database evidence
+
+- Single ownership: `OPERATION_TIMELINE_CATALOG` now derives each operation's allowed timeline and
+  neural-stage sets plus the LiteLLM spend-stage inventory. The ambient scope carries operation ID,
+  type, and those allowed sets. The stage bracket and PostgreSQL reporter reject an unowned timeline
+  stage before issuing a write; forced-tool and embedding clients reject an unowned neural tag before
+  entering transport retry or dispatch. Discovery Coverage Audit no longer belongs to Extraction, while Scaffold Content
+  Congruence remains owned by Scaffold because generation invokes it.
+- Infrastructure boundary: the neural registry now owns descriptor membership and mechanical
+  configuration identities only. `timelineType`, `claimedTimelineType`, embedding-stage membership,
+  and both cross-layer set-equality tests were deleted. Ambient-free measurement calls still
+  dispatch with their measurement tag and no operation ID. Shared neural stages dispatched under
+  every operation the application catalog owns.
+- Lineage/reporting: `JourneyLineage` carries the selected canonicalization operation ID derived
+  from the graph version's mechanically generated canonicalization-selection refinement decision.
+  Processing Journey and cost/timing reports now order Extraction Runs, Concept Canonicalization,
+  Graph-Version Build, Graph Enrichment, and Study Item Bank; canonicalization SpendLogs join by the
+  same operation ID.
+- Persisted shape: the code-first operation schema admits `canonicalization` and requires
+  `config_hash` for both canonicalization and scaffold rows. `pnpm db:generate` regenerated the
+  `0000` SQL, snapshot, and journal together; `pnpm db:check` confirmed source/baseline parity.
+- Automated evidence: application passed 804/804, infrastructure-LiteLLM passed 179/179, and the
+  PostgreSQL local-only run passed 15/15 with DB cases correctly skipped there. All affected
+  package typechecks and `git diff --check` passed. The focused ownership set proved every catalog
+  stage accepted, wrong pairs rejected before reporter/HTTP side effects, shared ownership, and
+  ambient-free measurement.
+- Isolated database evidence: `pnpm test:db` targeted and reset only `lrnki_test`, passed the 9/9
+  migration-state matrix and the repository's DB-enabled workspace suites. The new cases proved
+  canonicalization/scaffold hash rejection, canonicalization hash/stage readback, selected-artifact
+  lineage, artifact append/read immutability, and atomic graph publication against PostgreSQL.
+- Evidence boundary: this proves local source behavior, generated-schema parity, and isolated
+  PostgreSQL behavior. It does not qualify production-model Concept Canonicalization usefulness,
+  live LiteLLM SpendLogs, deployed behavior, browser behavior, or any native/device layer.
+
 ### Open findings
 
-- U2 must finish the application-owned ambient stage check, lineage, generated operation constraint,
-  and database-backed canonicalization requirements before any DB or real-use claim is qualified.
+- U3 must repair the audited ADR/workflow/glossary/runbook boundaries and record the decided DeepSeek
+  follow-up before the semantic real-use gate begins.
+- U4 must still qualify Concept Canonicalization decisions, replay, and SpendLogs through the
+  production Model Assignments; automated and isolated-database success is not semantic-quality
+  evidence.

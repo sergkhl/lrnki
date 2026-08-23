@@ -121,12 +121,13 @@ test("operation scope can disambiguate operation types that share one id", async
   assert.ok(!report?.operations[0].stages.some((row) => row.stage === STAGE_TAGS.prerequisiteOrdering));
 });
 
-test("journey scope rolls up two extraction runs, minting, enrichment, and study items", async () => {
+test("journey scope rolls up extraction, canonicalization, minting, enrichment, and study items in order", async () => {
   const dependencies = ports({
-    lineage: { enrichmentId: "enr-1", graphVersionId: "gv-1", extractionRunIds: ["run-a", "run-b"] },
+    lineage: { enrichmentId: "enr-1", graphVersionId: "gv-1", canonicalizationOperationId: "canonical-1", extractionRunIds: ["run-a", "run-b"] },
     details: [
       detail("run-a", "extraction", [[STAGE_TAGS.admission, 1000]]),
       detail("run-b", "extraction", [[STAGE_TAGS.admission, 2000]]),
+      detail("canonical-1", "canonicalization", [[STAGE_TAGS.nodeEmbedding, 500]]),
       detail("gv-1", "minting", [[NON_LLM_STAGES.persist, 300]]),
       detail("enr-1", "enrichment", [[STAGE_TAGS.prerequisiteOrdering, 4000]]),
       detail("enr-1", "study_items", [
@@ -138,6 +139,7 @@ test("journey scope rolls up two extraction runs, minting, enrichment, and study
     spend: [
       { operationId: "run-a", stage: STAGE_TAGS.admission, logCount: 1, totalSpend: 0.1, estimatedSpend: 0, totalTokens: 100 },
       { operationId: "run-b", stage: STAGE_TAGS.admission, logCount: 2, totalSpend: 0.2, estimatedSpend: 0, totalTokens: 200 },
+      { operationId: "canonical-1", stage: STAGE_TAGS.nodeEmbedding, logCount: 1, totalSpend: 0, estimatedSpend: 0, totalTokens: 50 },
       { operationId: "enr-1", stage: STAGE_TAGS.prerequisiteOrdering, logCount: 3, totalSpend: 0.3, estimatedSpend: 0, totalTokens: 300 },
       { operationId: "enr-1", stage: STAGE_TAGS.conceptLessonGeneration, logCount: 1, totalSpend: 0.1, estimatedSpend: 0, totalTokens: 100 },
       { operationId: "enr-1", stage: STAGE_TAGS.studyItemGeneration, logCount: 4, totalSpend: 0.4, estimatedSpend: 0, totalTokens: 400 },
@@ -145,8 +147,15 @@ test("journey scope rolls up two extraction runs, minting, enrichment, and study
     ]
   });
   const report = await costTimingReport({ scope: { journeyAnchorEnrichmentId: "enr-1" }, ...dependencies });
-  assert.equal(report?.operations.length, 5);
-  assert.deepEqual(report?.total, { wallClockMs: 15300, calls: 16, costUsd: 1.6, costEstimated: false, tokens: 1600 });
+  assert.deepEqual(report?.operations.map((row) => row.operationType), [
+    "extraction",
+    "extraction",
+    "canonicalization",
+    "minting",
+    "enrichment",
+    "study_items"
+  ]);
+  assert.deepEqual(report?.total, { wallClockMs: 15800, calls: 17, costUsd: 1.6, costEstimated: false, tokens: 1650 });
   assert.deepEqual(report?.operations.find((row) => row.operationType === "minting")?.subtotal, {
     wallClockMs: 300,
     calls: 0,
@@ -166,7 +175,7 @@ test("journey scope rolls up two extraction runs, minting, enrichment, and study
 
 test("cost-source failure preserves wall-clock and marks cost totals unavailable", async () => {
   const dependencies = ports({
-    lineage: { enrichmentId: "enr-1", graphVersionId: "gv-1", extractionRunIds: [] },
+    lineage: { enrichmentId: "enr-1", graphVersionId: "gv-1", canonicalizationOperationId: null, extractionRunIds: [] },
     details: [
       detail("gv-1", "minting", [[NON_LLM_STAGES.persist, 300]]),
       detail("enr-1", "enrichment", [[STAGE_TAGS.prerequisiteOrdering, 4000]]),

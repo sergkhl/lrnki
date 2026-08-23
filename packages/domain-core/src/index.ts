@@ -1940,9 +1940,7 @@ export const STAGE_TAGS = {
   // Discovery-coverage audit (plan 2026-07-10-004, KTD2): a MEASUREMENT stage, not a
   // pipeline stage. K-sampled cross-family judgments over an extraction run's admitted
   // set, invoked by the durable `kg-worker audit-discovery-coverage` command. Audit
-  // calls carry NO operation_id, so they can never pollute an operation's cost report;
-  // the catalog claim under `extraction` only satisfies stage-tag set-equality and
-  // names the owning pipeline arm.
+  // calls carry NO operation_id, so they never join an Operation Timeline or cost report.
   discoveryCoverageAudit: "discovery-coverage-audit",
   // Learner-Scoped Scaffold generation (plan 2026-07-12-002 U3): a minimal outline proposal
   // and compact lesson/item content generation. Scaffold also reuses deeper-module stage
@@ -1953,8 +1951,8 @@ export const STAGE_TAGS = {
   // Scaffold-content congruence audit (plan 2026-07-16-001, KTD2): a MEASUREMENT stage, not a
   // pipeline stage. K-sampled cross-family judgments over an enrichment's persisted generated
   // Support Steps, invoked by the durable `kg-worker audit-scaffold-content` command. Audit calls
-  // carry NO operation_id, so they can never pollute an operation's cost report; the catalog claim
-  // under `scaffold` only satisfies stage-tag set-equality and names the owning pipeline arm.
+  // carry NO operation_id. Scaffold generation also uses this descriptor inside its own operation,
+  // so that application-owned use remains a cataloged scaffold stage.
   scaffoldContentCongruence: "scaffold-content-congruence"
 } as const;
 

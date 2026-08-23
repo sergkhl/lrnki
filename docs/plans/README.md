@@ -12,9 +12,9 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-23-001 — Apply the ADR Audit Without Changing ADR-0006 or Cross-Family Rules](./2026-08-23-001-apply-adr-audit.md)
-   — **In progress; U2 next.** Concept Canonicalization and deterministic artifact replay are locally
-   verified. Next, make the
-   application catalog the sole Operation Timeline membership owner, and correct the audited durable
+   — **In progress; U3 next.** Concept Canonicalization, deterministic artifact replay,
+   application-owned Operation Timeline membership, Processing Journey lineage, and the generated
+   operation constraint are locally and database verified. Next, correct the audited durable
    documentation boundaries without changing Model Assignments, ADR-0006, or cross-family rules.
 
 2. [2026-08-22-001 — Restore Topic Expedition Generation to Seven Minutes](./2026-08-22-001-repair-topic-expedition-generation-latency.md)

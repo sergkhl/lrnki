@@ -4,8 +4,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./operation-tag-context": "./src/operationTagContext.ts",
-    "./operation-tag-context-node": "./src/operationTagContextNode.ts"
+    "./operation-context": "./src/operationContext.ts",
+    "./operation-context-node": "./src/operationContextNode.ts"
   },
   "scripts": {
     "test": "tsx --test src/*.test.ts",

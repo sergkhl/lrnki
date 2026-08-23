@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { requireAmbientOperationTimelineStageOwnership } from "@lrnki/domain-core/operation-context";
 import type { OperationType, RunProgressReporterPort, StageErrorDetail } from "@lrnki/ports";
 import type { Sql } from "postgres";
 
@@ -23,7 +24,7 @@ export class PostgresRunProgressReporter implements RunProgressReporterPort {
 
   // Insert the parent `running` row at entry. Idempotent-tolerant: a re-begin for
   // the same operation leaves the existing row (including its config_hash) untouched.
-  // The DB CHECK requires config_hash for `scaffold` rows (KTD7).
+  // The DB CHECK requires config_hash for canonicalization and scaffold rows.
   async beginOperation(input: { operationType: OperationType; operationId: string; configHash?: string }): Promise<void> {
     await this.sql`
       INSERT INTO operation_runs (operation_run_id, operation_type, operation_id, status, config_hash, started_at, last_progress_at)
@@ -34,6 +35,7 @@ export class PostgresRunProgressReporter implements RunProgressReporterPort {
   // Open a stage: set the parent's current_stage and reset its per-stage progress
   // counters, then insert the child stage row — one CTE statement.
   async enterStage(input: { operationType: OperationType; operationId: string; stage: string; total?: number }): Promise<void> {
+    requireAmbientOperationTimelineStageOwnership(input);
     await this.sql`
       WITH parent AS (
         UPDATE operation_runs
@@ -53,6 +55,7 @@ export class PostgresRunProgressReporter implements RunProgressReporterPort {
   // the parent and the currently-open child row for this stage. Monotonic by the
   // caller's contract (done only increases within a stage).
   async recordProgress(input: { operationType: OperationType; operationId: string; stage: string; done: number }): Promise<void> {
+    requireAmbientOperationTimelineStageOwnership(input);
     await this.sql`
       WITH parent AS (
         UPDATE operation_runs
@@ -72,6 +75,7 @@ export class PostgresRunProgressReporter implements RunProgressReporterPort {
   // `error_detail` so the operator timeline can show WHY (ADR-0006 fail-closed, inspectable);
   // an ok close clears it. Still one statement on the autocommit handle.
   async completeStage(input: { operationType: OperationType; operationId: string; stage: string; ok: boolean; errorDetail?: StageErrorDetail }): Promise<void> {
+    requireAmbientOperationTimelineStageOwnership(input);
     await this.sql`
       UPDATE operation_run_stages s
       SET ended_at = now(), ok = ${input.ok}, error_detail = ${input.errorDetail ? this.sql.json(input.errorDetail as unknown as Parameters<Sql["json"]>[0]) : null}

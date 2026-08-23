@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { z } from "zod";
-import { runWithOperationTag } from "@lrnki/domain-core/operation-tag-context";
+import { STAGE_TAGS } from "@lrnki/domain-core";
+import { runWithOperationContext } from "@lrnki/domain-core/operation-context";
+import { noopRunProgressReporter, runInstrumentedOperation } from "@lrnki/application";
 import { ForcedToolExhaustionError, LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import { resetLiteLlmFetchForTests, setLiteLlmFetchForTests, type LiteLlmFetchInit } from "./liteLlmFetch";
 
@@ -63,8 +65,61 @@ test("call with tags includes metadata.tags in the request body", async () => {
 
 test("call appends the ambient operation tag after the stage tag", async () => {
   const capture = captureBody();
-  await runWithOperationTag("op-1", () => client().call({ ...baseInput, tags: ["enrichment-judge"] }));
-  assert.deepEqual(capture.read().metadata, { tags: ["enrichment-judge", "op-1"] });
+  await runWithOperationContext({
+    operationId: "op-1",
+    operationType: "enrichment",
+    allowedTimelineStages: new Set([STAGE_TAGS.prerequisiteOrdering]),
+    allowedNeuralStages: new Set([STAGE_TAGS.prerequisiteOrdering])
+  }, () => client().call({ ...baseInput, tags: [STAGE_TAGS.prerequisiteOrdering] }));
+  assert.deepEqual(capture.read().metadata, { tags: [STAGE_TAGS.prerequisiteOrdering, "op-1"] });
+});
+
+test("a wrong operation-to-neural-stage pair fails before an HTTP request", async () => {
+  let calls = 0;
+  setLiteLlmFetchForTests(async () => {
+    calls += 1;
+    throw new Error("must not dispatch");
+  });
+
+  await assert.rejects(
+    () => runInstrumentedOperation(
+      noopRunProgressReporter,
+      "extraction",
+      "op-wrong-stage",
+      () => client().call({ ...baseInput, tags: [STAGE_TAGS.prerequisiteOrdering] })
+    ),
+    /does not own neural stage prerequisite-ordering/
+  );
+  assert.equal(calls, 0);
+});
+
+test("a shared neural stage dispatches for every operation that the catalog owns", async () => {
+  const response = () => new Response(
+      JSON.stringify({ choices: [{ message: { tool_calls: [{ function: { name: "submit_thing", arguments: JSON.stringify({ ok: true }) } }] } }] }),
+      { status: 200, headers: { "content-type": "application/json" } }
+    );
+  const capture = captureBodies([response(), response()]);
+  for (const operationType of ["enrichment", "scaffold"] as const) {
+    await runInstrumentedOperation(
+      noopRunProgressReporter,
+      operationType,
+      `op-${operationType}`,
+      () => client().call({ ...baseInput, tags: [STAGE_TAGS.knowledgeBoundaryProbe] })
+    );
+  }
+  assert.deepEqual(
+    capture.read().map(({ body }) => body.metadata),
+    [
+      { tags: [STAGE_TAGS.knowledgeBoundaryProbe, "op-enrichment"] },
+      { tags: [STAGE_TAGS.knowledgeBoundaryProbe, "op-scaffold"] }
+    ]
+  );
+});
+
+test("a measurement stage with no ambient operation dispatches without an operation tag", async () => {
+  const capture = captureBody();
+  await client().call({ ...baseInput, tags: [STAGE_TAGS.discoveryCoverageAudit] });
+  assert.deepEqual(capture.read().metadata, { tags: [STAGE_TAGS.discoveryCoverageAudit] });
 });
 
 test("call with no tags omits metadata entirely (no empty key)", async () => {

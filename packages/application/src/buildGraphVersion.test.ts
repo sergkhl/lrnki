@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { ArtifactEnvelope, BuildEvidenceProfile, ConceptCanonicalizationArtifact, ConceptIdentityDecision, ConceptIdentityRef, GraphSnapshot, PublishedConceptIdentity, RefinementDecisionRecord, RunForBuild } from "@lrnki/domain-core";
 import { CONCEPT_CANONICALIZATION_ARTIFACT_TYPE, CONCEPT_CANONICALIZATION_SELECTION_DECISION_TYPE, CONCEPT_IDENTITY_DECISION_TYPE } from "@lrnki/domain-core";
-import { currentOperationTag } from "@lrnki/domain-core/operation-tag-context";
-import { installNodeOperationTagContext } from "@lrnki/domain-core/operation-tag-context-node";
+import { currentOperationContext } from "@lrnki/domain-core/operation-context";
+import { installNodeOperationContext } from "@lrnki/domain-core/operation-context-node";
 import type { ExtractionRunStorePort, GraphVersionStorePort, RunProgressReporterPort } from "@lrnki/ports";
 import { buildGraphVersion } from "./buildGraphVersion";
 import { NON_LLM_STAGES } from "./runProgressReporter";
 
-installNodeOperationTagContext();
+installNodeOperationContext();
 
 type ReporterCall =
   | { method: "beginOperation"; operationType: string; operationId: string }
@@ -294,7 +294,7 @@ test("the minting operation establishes its ambient operation tag", async () => 
   const checkingRunStore: ExtractionRunStorePort = {
     ...runStore,
     async runsForBuildByIds(runIds) {
-      assert.equal(currentOperationTag(), "gv-context");
+      assert.equal(currentOperationContext()?.operationId, "gv-context");
       return runStore.runsForBuildByIds(runIds);
     }
   };

@@ -20,7 +20,7 @@ import { readPromptFile } from "./promptFile";
 // descriptors, whose calls carry no operation_id but still cross the same wire.
 const allDescriptors: readonly AnyNeuralStageDescriptor[] = [
   ...allNeuralOperationDescriptors,
-  ...measurementNeuralStageDescriptors.map((entry) => entry.descriptor)
+  ...measurementNeuralStageDescriptors
 ];
 
 function descriptorAlias(descriptor: AnyNeuralStageDescriptor): string {

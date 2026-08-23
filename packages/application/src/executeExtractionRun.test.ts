@@ -9,8 +9,8 @@ import {
   type ExtractionRunResult,
   type StructuredDocument
 } from "@lrnki/domain-core";
-import { currentOperationTag } from "@lrnki/domain-core/operation-tag-context";
-import { installNodeOperationTagContext } from "@lrnki/domain-core/operation-tag-context-node";
+import { currentOperationContext } from "@lrnki/domain-core/operation-context";
+import { installNodeOperationContext } from "@lrnki/domain-core/operation-context-node";
 import type {
   AdmissionLabelJudgmentPort,
   AssertionEntailmentJudgmentPort,
@@ -22,7 +22,7 @@ import type {
 import { executeExtractionRun } from "./executeExtractionRun";
 import { NON_LLM_STAGES } from "./runProgressReporter";
 
-installNodeOperationTagContext();
+installNodeOperationContext();
 
 // A recording reporter fake: captures the ordered reporter calls so tests assert the
 // timeline lifecycle (begin → stages → complete) without a database (rule 11).
@@ -626,7 +626,7 @@ test("the extraction operation context reaches its async stage fan-out", async (
     async (input) => definitionFor[input.subject.candidateKey],
     candidates,
     admission,
-    { onDiscovery: () => assert.equal(currentOperationTag(), "run-1") }
+    { onDiscovery: () => assert.equal(currentOperationContext()?.operationId, "run-1") }
   ).run();
 });
 

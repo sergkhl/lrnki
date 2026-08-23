@@ -37,12 +37,12 @@ export const operationRuns = pgTable(
     ),
     check(
       "operation_runs_operation_type_check",
-      sql`operation_type IN ('extraction', 'minting', 'enrichment', 'study_items', 'scaffold')`,
+      sql`operation_type IN ('extraction', 'canonicalization', 'minting', 'enrichment', 'study_items', 'scaffold')`,
     ),
     check("operation_runs_status_check", sql`status IN ('running', 'succeeded', 'failed')`),
     check(
       "operation_runs_check",
-      sql`operation_type <> 'scaffold' OR config_hash IS NOT NULL`,
+      sql`operation_type NOT IN ('canonicalization', 'scaffold') OR config_hash IS NOT NULL`,
     ),
   ],
 );

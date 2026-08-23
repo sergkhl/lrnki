@@ -4,11 +4,12 @@
 
 ## TODO
 
-- **ADR audit — in progress; U2 next.** Follow
-  [the first active plan](./2026-08-23-001-apply-adr-audit.md) in U0–U5 order. U1 now owns immutable
-  semantic/exact Concept Canonicalization artifacts and LLM-free deterministic build replay. Next,
-  finish application-owned Operation Timeline stage enforcement, Processing Journey lineage, the
-  code-first operation constraint/hash rule, and their database tests. Preserve ADR-0006, every
+- **ADR audit — in progress; U3 next.** Follow
+  [the first active plan](./2026-08-23-001-apply-adr-audit.md) in U0–U5 order. U1–U2 now own immutable
+  Concept Canonicalization artifacts, LLM-free deterministic replay, application-owned stage
+  membership, full Processing Journey lineage, and the regenerated operation constraint. Next,
+  repair the audited ADR/workflow/glossary/runbook boundaries and record the decided DeepSeek
+  follow-up without implementing it. Preserve ADR-0006, every
   cross-family rule, current one-pass admission behavior, all Model Assignments, the ten original
   local commits, and unrelated skill worktree changes.
 

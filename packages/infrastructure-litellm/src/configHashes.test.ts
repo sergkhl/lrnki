@@ -4,49 +4,19 @@ import {
   DEFAULT_ENRICHMENT_CONFIG,
   DEFAULT_CONCEPT_CANONICALIZATION_CONFIG,
   DEFAULT_SCAFFOLD_GENERATION_CONFIG,
-  DEFAULT_SYNTHETIC_GENERATION_CONFIG,
-  OPERATION_TIMELINE_CATALOG
+  DEFAULT_SYNTHETIC_GENERATION_CONFIG
 } from "@lrnki/application";
 import { STAGE_TAGS } from "@lrnki/domain-core";
-import type { OperationType } from "@lrnki/ports";
 import {
   allNeuralOperationDescriptors,
   conceptCanonicalizationConfigHash,
   graphEnrichmentConfigHash,
-  measurementNeuralStageDescriptors,
   neuralOperationRegistry,
   scaffoldGenerationConfigHash,
   syntheticGenerationConfigHash
 } from "./configHashes";
 import { operationConfigHash } from "./operationConfigHash";
 import { readPromptFile } from "./promptFile";
-
-// KTD7 (plan 2026-07-16-004 U3): the registry is CLOSED against the Operation Timeline catalog.
-// For each timeline operation type, the union of registered runtime LLM stages (descriptor stage
-// tags + embedding stages) plus the explicitly classified measurement claims must EQUAL — not
-// merely subset — the catalog's LLM stage set. A stage the catalog claims that no registry entry
-// runs, or a registered stage the catalog never claims, both fail here.
-test("registered operation stages union-equal the catalog's LLM stage set per timeline type", () => {
-  const registeredByTimeline = new Map<OperationType, Set<string>>();
-  const claim = (timelineType: OperationType, stage: string): void => {
-    const stages = registeredByTimeline.get(timelineType) ?? new Set<string>();
-    stages.add(stage);
-    registeredByTimeline.set(timelineType, stages);
-  };
-  for (const entry of Object.values(neuralOperationRegistry)) {
-    for (const descriptor of entry.descriptors) claim(entry.timelineType, descriptor.stageTag);
-    for (const stage of entry.embeddingStages) claim(entry.timelineType, stage);
-  }
-  for (const measurement of measurementNeuralStageDescriptors) {
-    claim(measurement.claimedTimelineType, measurement.descriptor.stageTag);
-  }
-
-  for (const [operationType, stages] of Object.entries(OPERATION_TIMELINE_CATALOG)) {
-    const catalogLlm = stages.filter((stage) => stage.kind === "llm").map((stage) => stage.stage).sort();
-    const registered = [...(registeredByTimeline.get(operationType as OperationType) ?? new Set<string>())].sort();
-    assert.deepEqual(registered, catalogLlm, `timeline type ${operationType}`);
-  }
-});
 
 test("Concept Canonicalization identity is complete and excludes execution-only concurrency", () => {
   const config = DEFAULT_CONCEPT_CANONICALIZATION_CONFIG;
@@ -91,42 +61,6 @@ test("Concept Canonicalization identity is complete and excludes execution-only 
     semantic,
     "the adjudicator descriptor and Model Assignment are part of identity"
   );
-});
-
-// Stage sharing is derived from the two authorities themselves. There is no hand-maintained
-// SHARED_STAGES exception list that can drift when another consumer adopts a deep module.
-test("registry stage-owner sets exactly match the Operation Timeline catalog", () => {
-  const registryOwners = new Map<string, Set<OperationType>>();
-  for (const entry of Object.values(neuralOperationRegistry)) {
-    for (const stage of [...entry.descriptors.map((descriptor) => descriptor.stageTag), ...entry.embeddingStages]) {
-      const owners = registryOwners.get(stage) ?? new Set<OperationType>();
-      owners.add(entry.timelineType);
-      registryOwners.set(stage, owners);
-    }
-  }
-  for (const measurement of measurementNeuralStageDescriptors) {
-    const stage = measurement.descriptor.stageTag;
-    const owners = registryOwners.get(stage) ?? new Set<OperationType>();
-    owners.add(measurement.claimedTimelineType);
-    registryOwners.set(stage, owners);
-  }
-  const catalogOwners = new Map<string, Set<OperationType>>();
-  for (const [operationType, stages] of Object.entries(OPERATION_TIMELINE_CATALOG)) {
-    for (const descriptor of stages) {
-      if (descriptor.kind !== "llm") continue;
-      const owners = catalogOwners.get(descriptor.stage) ?? new Set<OperationType>();
-      owners.add(operationType as OperationType);
-      catalogOwners.set(descriptor.stage, owners);
-    }
-  }
-  const stages = new Set([...registryOwners.keys(), ...catalogOwners.keys()]);
-  for (const stage of stages) {
-    assert.deepEqual(
-      [...(registryOwners.get(stage) ?? [])].sort(),
-      [...(catalogOwners.get(stage) ?? [])].sort(),
-      stage
-    );
-  }
 });
 
 test("Graph Enrichment registers the complete shared admission stage family", () => {

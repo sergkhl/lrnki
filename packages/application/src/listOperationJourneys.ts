@@ -72,6 +72,9 @@ function membersForLineage(
 ): OperationTimelineDetail[] {
   const refs: OperationRef[] = [
     ...lineage.extractionRunIds.map((operationId): OperationRef => ({ operationId, operationType: "extraction" })),
+    ...(lineage.canonicalizationOperationId
+      ? [{ operationId: lineage.canonicalizationOperationId, operationType: "canonicalization" } satisfies OperationRef]
+      : []),
     ...(lineage.graphVersionId ? [{ operationId: lineage.graphVersionId, operationType: "minting" } satisfies OperationRef] : []),
     { operationId: lineage.enrichmentId, operationType: "enrichment" },
     { operationId: lineage.enrichmentId, operationType: "study_items" }

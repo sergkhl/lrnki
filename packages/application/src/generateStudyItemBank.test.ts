@@ -14,14 +14,14 @@ import type {
   RejectedStudyItem,
   StudyItem
 } from "@lrnki/domain-core";
-import { currentOperationTag } from "@lrnki/domain-core/operation-tag-context";
-import { installNodeOperationTagContext } from "@lrnki/domain-core/operation-tag-context-node";
+import { currentOperationContext } from "@lrnki/domain-core/operation-context";
+import { installNodeOperationContext } from "@lrnki/domain-core/operation-context-node";
 import type { ConceptLessonGenerationPort, ConceptLessonRedundancyJudgmentPort, ConceptLessonStorePort, EnrichmentRunStorePort, GraphVersionStorePort, MatchingAssignmentVerificationPort, RunProgressReporterPort, StageErrorDetail, StudyItemBankStorePort, StudyItemGenerationPort, AnswerKeyVerificationPort } from "@lrnki/ports";
 import { generateStudyItemBank, OPTION_SELECT_GENERATION_ATTEMPTS } from "./generateStudyItemBank";
 import { NON_LLM_STAGES } from "./runProgressReporter";
 import { STUDY_ITEM_BANK_STAGE_GROUP } from "./topicExpeditionStageProfile";
 
-installNodeOperationTagContext();
+installNodeOperationContext();
 
 function passage(sourceBlockId: string, evidenceQuote: string): PublishedEvidencePassage {
   return { sourceResourceId: "res-1", sourceBlockId, evidenceQuote, headingPath: [], locator: {} };
@@ -527,7 +527,7 @@ test("the study-item operation context reaches generation calls", async () => {
     conceptLessonStore: capturingLessonStore().store,
     studyItemGeneration: generationReturning({
       optionSelect: { "node-c1": osDraft("rules that govern memory") },
-      onGenerate: () => assert.equal(currentOperationTag(), "enr-1")
+      onGenerate: () => assert.equal(currentOperationContext()?.operationId, "enr-1")
     }),
     studyItemBankStore: store
   });

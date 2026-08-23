@@ -1,7 +1,17 @@
 import type { OperationType, RunProgressReporterPort, StageErrorDetail } from "@lrnki/ports";
-import { runWithOperationTag } from "@lrnki/domain-core/operation-tag-context";
+import {
+  OperationTimelineStageOwnershipError,
+  runWithOperationContext
+} from "@lrnki/domain-core/operation-context";
 import { bestEffort } from "./bestEffort";
-import { isLlmStage, NON_LLM_STAGES, type NonLlmStage } from "./operationTimelineCatalog";
+import {
+  isLlmStage,
+  NON_LLM_STAGES,
+  operationTimelineAllowedNeuralStages,
+  operationTimelineAllowedStages,
+  stageBelongsToOperation,
+  type NonLlmStage
+} from "./operationTimelineCatalog";
 
 // The reporter seam's application-facing surface (KTD4, R7). Operations import the
 // no-op default and the shared stage vocabulary from here; the worker injects the
@@ -39,10 +49,10 @@ export { isLlmStage, NON_LLM_STAGES, type NonLlmStage };
 export type StageBracket = <T>(stage: string, fn: () => Promise<T>, total?: number) => Promise<T>;
 
 // Instrumented operation wrapper shared by every operation (ADR-0029). It owns the
-// operation lifecycle: ambient operation tag, begin-at-entry, exactly one terminal
+// operation lifecycle: ambient operation context, begin-at-entry, exactly one terminal
 // status, and propagation of the original result/error. `configHash` is the optional
-// operation config identity persisted with the begin write (KTD7) — required for
-// `scaffold` operations, which have no artifact row of their own to carry provenance.
+// operation config identity persisted with the begin write — required for canonicalization
+// and scaffold operations.
 export async function runInstrumentedOperation<T>(
   reporter: RunProgressReporterPort,
   operationType: OperationType,
@@ -50,7 +60,12 @@ export async function runInstrumentedOperation<T>(
   fn: (runStage: StageBracket) => Promise<T>,
   configHash?: string
 ): Promise<T> {
-  return runWithOperationTag(operationId, async () => {
+  return runWithOperationContext({
+    operationId,
+    operationType,
+    allowedTimelineStages: operationTimelineAllowedStages(operationType),
+    allowedNeuralStages: operationTimelineAllowedNeuralStages(operationType)
+  }, async () => {
     await reporter.beginOperation({ operationType, operationId, ...(configHash !== undefined ? { configHash } : {}) });
     const runStage = bracketStage(reporter, operationType, operationId);
     // Liveness heartbeat while the operation is open: stage boundaries alone leave
@@ -85,6 +100,9 @@ const HEARTBEAT_INTERVAL_MS = 30_000;
 // for stages that iterate.
 export function bracketStage(reporter: RunProgressReporterPort, operationType: OperationType, operationId: string): StageBracket {
   return async <T>(stage: string, fn: () => Promise<T>, total?: number): Promise<T> => {
+    if (!stageBelongsToOperation(stage, operationType)) {
+      throw new OperationTimelineStageOwnershipError(operationType, operationId, stage);
+    }
     await reporter.enterStage({ operationType, operationId, stage, total });
     try {
       const result = await fn();

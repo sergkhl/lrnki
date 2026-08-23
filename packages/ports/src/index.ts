@@ -1657,6 +1657,7 @@ export interface OperationStageSpendReadPort {
 export interface JourneyLineage {
   enrichmentId: string;
   graphVersionId: string | null;
+  canonicalizationOperationId: string | null;
   extractionRunIds: string[];
 }
 
