@@ -7,7 +7,7 @@ execution: code
 
 # Cut Over Topic Expedition Generation to DeepSeek Flash and Measure Stage Value
 
-**Status:** Blocked in U2 — owner route-contract decision required
+**Status:** In progress — U2 empirical MiMo qualification authorized
 
 **Decision state:** Locked. The accepted direction, dated comparison, and known quality defects
 remain in the
@@ -170,13 +170,13 @@ the corresponding global alias:
 
 | Scoped alias | Consumers | Exact Model Assignment | Provider Route |
 | --- | --- | --- | --- |
-| `kg-topic-expedition-generation` | all nine direct generators | DeepSeek V4 Flash 0731, FP8, reasoning off, temperature 0, seed 7 | `deepinfra/fp8` → `mancer/fp8` |
-| `kg-topic-expedition-independent-judge` | difficulty banding/comparison, lesson redundancy, both key verifiers, matching assignment | Xiaomi MiMo v2.5, FP8, reasoning off, temperature 0, seed 7 | `parasail/fp8` → `novita/fp8` |
-| `kg-topic-expedition-claim-verification-answerer` | draft-blind answers | same MiMo assignment | `parasail/fp8` → `novita/fp8` |
-| `kg-topic-expedition-claim-factuality-judge` | primary factuality judgments | same MiMo assignment | `parasail/fp8` → `novita/fp8` |
-| `kg-topic-expedition-claim-verification-planner` | verification questions | OpenAI `gpt-oss-120b`, FP4, reasoning effort `medium`, temperature 0, seed 7 | `novita/fp4` → `nebius/fp4` |
-| `kg-topic-expedition-claim-factuality-challenger` | second-family factuality judgments | same GPT-OSS assignment | `novita/fp4` → `nebius/fp4` |
-| `kg-topic-expedition-prerequisite-ordering` | whole-set ordering | same GPT-OSS assignment | `novita/fp4` → `nebius/fp4` |
+| `kg-topic-expedition-generation` | all nine direct generators | DeepSeek V4 Flash 0731, FP8, reasoning off, temperature 0, seed 7 | `deepinfra/fp8` only |
+| `kg-topic-expedition-independent-judge` | difficulty banding/comparison, lesson redundancy, both key verifiers, matching assignment | Xiaomi MiMo v2.5, FP8, reasoning off, temperature 0, best-effort seed 7 | first full-pass route from `xiaomi/fp8`, `parasail/fp8`, `novita/fp8`; one provider only |
+| `kg-topic-expedition-claim-verification-answerer` | draft-blind answers | same MiMo assignment | same selected MiMo provider |
+| `kg-topic-expedition-claim-factuality-judge` | primary factuality judgments | same MiMo assignment | same selected MiMo provider |
+| `kg-topic-expedition-claim-verification-planner` | verification questions | OpenAI `gpt-oss-120b`, FP4, reasoning effort `medium`, temperature 0, seed 7 | `novita/fp4` only |
+| `kg-topic-expedition-claim-factuality-challenger` | second-family factuality judgments | same GPT-OSS assignment | `novita/fp4` only |
+| `kg-topic-expedition-prerequisite-ordering` | whole-set ordering | same GPT-OSS assignment | `novita/fp4` only |
 
 The GPT-OSS choice follows the official
 [`gpt-oss-120b` model contract](https://developers.openai.com/api/docs/models/gpt-oss-120b):
@@ -184,15 +184,21 @@ reasoning effort is explicit rather than provider-defaulted. The current Digital
 routes report unknown quantization and therefore cannot qualify under the repository's Model
 Assignment rules.
 
-The first U2 matrix disqualified Xiaomi FP8, CoreWeave FP4, and Parasail FP4 under the complete body;
-Parasail DeepSeek FP8 also remained throttled for one descriptor. The amended matrix preserves every
-Model Assignment and deterministic field while selecting only current endpoints that declare the
-exact quantization, forced tools, seed, and reasoning control: Mancer for DeepSeek fallback,
-Parasail → Novita for MiMo, and Novita → Nebius for GPT-OSS. DeepInfra, Parasail, and Novita are the
-three distinct primary-provider failure domains. Prices at amendment time were respectively
-$0.14/$0.45, $0.14/$0.28 → $0.168/$0.336, and $0.05/$0.25 → $0.15/$0.60 per million input/output
-tokens. These are frozen candidates until the amended direct preflight passes; do not substitute a
-different endpoint without another recorded amendment.
+The first two U2 matrices proved the complete descriptor contract on DeepInfra for all nine
+DeepSeek roles and Novita for all three GPT-OSS roles; their failed Mancer and Nebius backups are
+removed. Owner authorization on 2026-08-23 also permits empirical MiMo qualification without
+OpenRouter's `require_parameters` catalog prefilter. The direct request still sends temperature 0,
+seed 7, reasoning disabled, the exact strict forced named tool and schema, `quantizations: ["fp8"]`,
+one exact `only`/`order` provider pin, and `allow_fallbacks: false`. Seed remains the owning client's
+documented best-effort input, not a reproducibility guarantee.
+
+Qualify MiMo in `xiaomi/fp8`, `parasail/fp8`, then `novita/fp8` order. Probe the answerer contract on
+all three, then run the other seven descriptors on each still-eligible provider until the first
+provider passes all eight; stop there, with 24 calls as the hard maximum. A schema, forced-tool,
+reasoning, provider, or quantization failure disqualifies that provider; only an excluded transport
+or rate-limit attempt may receive one cooldown retry. Freeze the first full-pass provider in the
+Validation Log before editing configuration. The candidate prices are respectively $0.14/$0.28,
+$0.14/$0.28, and $0.168/$0.336 per million input/output tokens.
 
 Those route claims are a dated snapshot of OpenRouter's endpoint catalogs for
 [DeepSeek](https://openrouter.ai/api/v1/models/deepseek/deepseek-v4-flash-0731/endpoints),
@@ -200,15 +206,18 @@ Those route claims are a dated snapshot of OpenRouter's endpoint catalogs for
 [GPT-OSS](https://openrouter.ai/api/v1/models/openai/gpt-oss-120b/endpoints); the served-call checks,
 not catalog text, qualify the implementation.
 
-Create Topic-only MiMo deployment groups with explicit FP8 quantization and reasoning-disabled
-Parasail/Novita pins. Do not alter the shared MiMo deployment merely to make the new judge identity
-exact; doing so would broaden the config-identity change to unrelated consumers.
+Create one Topic-only MiMo deployment group with explicit FP8 quantization, reasoning disabled, the
+qualified provider pin, and no `require_parameters` prefilter. Do not alter the shared MiMo
+deployment merely to make the new judge identity exact; doing so would broaden the config-identity
+change to unrelated consumers. All seven scoped aliases are deliberately single-provider during
+this development-candidate campaign; OpenRouter fallback remains disabled, and a later fallback
+requires its own complete descriptor preflight and recorded amendment.
 
 The Knowledge-Boundary Probe remains Meta Llama with its current Qwen fallback. The resulting
 Grounding Admission has DeepSeek generation, MiMo answer/primary judgment, and GPT-OSS planning and
 challenge. Tests resolve every reachable deployment—not just alias strings—and prove that the
-generator, primary judge, and challenger are three distinct model families and that every fallback
-preserves its alias's exact assignment.
+generator, primary judge, and challenger are three distinct model families and each single-provider
+deployment preserves its alias's exact assignment.
 
 ### KTD4 — Inspect existing evidence instead of adding instrumentation
 
@@ -322,25 +331,26 @@ appear redundant.
 
 ### U2 — Preflight and activate the exact routes
 
-1. Before reloading LiteLLM, send the complete deterministic-client request body and exact forced
-   named-tool schema directly to every reachable provider for each newly routed descriptor. Retain
-   the nine complete DeepInfra passes from the first matrix; the amended bounded matrix adds nine
-   Mancer generator cases, eight MiMo descriptors × two providers, and three GPT descriptors × two
-   providers: 31 new calls.
-2. Fail on ignored sampling fields, reasoning leakage, malformed tool arguments, missing forced-tool
-   calls, a provider/quantization mismatch, or an undeclared fallback. Do not replace a failed route
-   ad hoc.
-3. Only after every direct-provider preflight passes, add the seven aliases and the Topic-specific
-   DeepSeek fallback, MiMo, and GPT deployment groups to `litellm/config.yaml`; reuse the already
-   exact DeepInfra primary. Atomically pass the one routing value from Topic production composition
-   to the prepared factories and hashes. Add focused config tests for alias/fallback resolution,
-   exact assignments, cross-family invariants, and non-Topic identity stability.
+1. Retain the nine complete DeepInfra and three Novita GPT-OSS passes. Qualify MiMo with the bounded
+   selection procedure in KTD3: omit only `require_parameters`, probe all three candidates with the
+   answerer contract, and complete the remaining seven descriptors in order until one provider
+   passes all eight. Stop after the first full pass; never exceed 24 calls plus one retry for an
+   excluded transport or rate-limit attempt.
+2. Fail on reasoning leakage, malformed tool arguments, missing forced-tool calls, a provider or
+   quantization mismatch, or an undeclared fallback. Keep seed 7 in every request but do not claim
+   reproducibility or provider enforcement beyond the client's documented best-effort contract.
+3. Only after the direct-provider preflight passes, add the seven aliases and single-provider
+   Topic-specific DeepSeek, MiMo, and GPT deployment groups to `litellm/config.yaml`; reuse the
+   already exact DeepInfra deployment where possible. Atomically pass the one routing value from
+   Topic production composition to the prepared factories and hashes. Add focused config tests for
+   alias/deployment resolution, exact assignments, cross-family invariants, and non-Topic identity
+   stability.
 4. Activate the committed config only through the root README deployment/reload runbook. Shared
    Compose may run only from the deploy checkout on its host and detached; if that cannot be done,
    record the exact manual action in `BLOCKERS.md` instead of claiming live evidence.
 5. Verify `/models`, then send uniquely tagged calls through every scoped public alias. Match
-   `model_group`, loaded deployment id, base model, and physical provider in SpendLogs. Exercise each
-   backup directly; one controlled fallback check per two-provider assignment is sufficient.
+   `model_group`, loaded deployment id, base model, and physical provider in SpendLogs. Confirm that
+   every alias has exactly one reachable deployment and no hidden fallback.
 6. Append one U2 entry with the exact identity/route verdict and commit.
 
 ### U3 — Run the bounded real-use sample
@@ -523,17 +533,18 @@ hidden by prompt tuning, regeneration, lower quorum, lexical rejection, or an un
   incompatibility is therefore not a seed-only defect, and the frozen exact route cannot be
   activated without changing the accepted proof contract, Provider Route resilience, or supporting
   Model Assignment topology.
+- Owner decision: empirical MiMo qualification without `require_parameters` is authorized. The
+  complete request retains seed 7 as best-effort, reasoning disabled, exact FP8/provider pins, no
+  fallback, and every strict forced-tool/schema check. DeepInfra-only DeepSeek and Novita-only
+  GPT-OSS retain their complete passing matrices; failed backups are no longer candidates.
 
 ### Open findings
 
-- **OWNER ACTION:** resolve the route-contract choice in
-  [BLOCKERS](./BLOCKERS.md). Recommended: amend U2 to empirically qualify one provider-pinned MiMo
-  route without OpenRouter's `require_parameters` catalog filter, keep `seed` explicitly
-  best-effort as its owning client already documents, and start with the fully passed DeepInfra-only
-  DeepSeek and Novita-only GPT routes. Alternatives are a new supporting-judge Model Assignment
-  design or abandoning the cutover. Any choice must be recorded before more provider calls.
-- U3 and U4 are not actionable while U2 is blocked. No scoped alias, deployment group, config file,
-  or running route changed, so prior evidence has not yet been invalidated by this plan.
+- **NEXT:** run the bounded MiMo served-call selection in KTD3 and freeze the first provider that
+  passes all eight descriptors. Do not edit configuration or activate U2 before that evidence is
+  committed.
+- U3 and U4 remain gated by U2. No scoped alias, deployment group, config file, or running route has
+  changed, so prior evidence has not yet been invalidated by this plan.
 - All prior usefulness evidence for the nine generators and eleven reassigned/re-routed supporting
   consumers becomes unqualified when U2 activates. U3 is the first current DeepSeek candidate
   evidence; final release evidence remains intentionally deferred until the pipeline shape settles.

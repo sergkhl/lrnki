@@ -4,12 +4,12 @@
 
 ## TODO
 
-- **DeepSeek Flash Topic Expedition cutover — blocked in U2; owner decision required.** Follow the
+- **DeepSeek Flash Topic Expedition cutover — in progress in U2.** Follow the
   [active plan](./2026-08-23-001-cut-over-topic-expedition-generation-to-deepseek-flash.md). It
-  has a validated inactive seam and passing DeepInfra/Novita routes, but no exact MiMo route passed
-  the required-parameter contract and the fallback diagnosis did not clear U2. Resolve the linked
-  [owner blocker](./BLOCKERS.md) before more provider calls. No route is active; the candidate
-  remains unqualified for release.
+  has a validated inactive seam, passing single-provider DeepInfra/Novita routes, and authorization
+  to qualify one MiMo provider without the catalog prefilter. Run the bounded eight-descriptor
+  served-call selection and commit its exact route verdict before configuration. No route is active;
+  the candidate remains unqualified for release.
 
 - **Topic Expedition generation latency — blocked; U3 remains `FIX_FIRST`.** Follow
   [the active plan](./2026-08-22-001-repair-topic-expedition-generation-latency.md) in U0–U4 order.
