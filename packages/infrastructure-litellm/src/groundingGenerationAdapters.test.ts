@@ -16,7 +16,7 @@ function groundingAdapterReturning(canned: {
   definitions: { text: string }[];
   mentions: { text: string }[];
   rationale: string;
-}) {
+}, modelOverride?: string) {
   const calls: unknown[] = [];
   const client = {
     async call(input: unknown) {
@@ -24,7 +24,7 @@ function groundingAdapterReturning(canned: {
       return canned;
     }
   } as unknown as LiteLlmForcedToolClient;
-  return { adapter: createGroundingGenerationPort(client), calls };
+  return { adapter: createGroundingGenerationPort(client, modelOverride), calls };
 }
 
 test("generates an owner-neutral bundle conditioned on one closed scaffolded anchor", async () => {
@@ -95,6 +95,25 @@ test("originating-topic grounding produces no anchor references", async () => {
   assert.deepEqual(bundle.groundingAnchorReferences, []);
   const call = calls[0] as { messages: { content: string }[] };
   assert.ok(call.messages.some((message) => message.content.includes("Originating topic: \"Feedback systems\"")));
+});
+
+test("a scoped generation override drives both the provider call and Grounding Bundle provenance", async () => {
+  const model = "kg-topic-expedition-generation";
+  const { adapter, calls } = groundingAdapterReturning({
+    definitions: [{ text: "A feedback loop routes an output signal back into a system input." }],
+    mentions: [],
+    rationale: "First-class topic concept."
+  }, model);
+
+  const bundle = await adapter.generate({
+    declaredDomain: "systems science",
+    canonicalLabel: "Feedback loop",
+    context: { kind: "originating_topic", topic: "Feedback systems" }
+  });
+
+  assert.equal(adapter.model, model);
+  assert.equal(bundle.generatingModel, model);
+  assert.equal((calls[0] as { model: string }).model, model);
 });
 
 test("malformed Grounding Generation arguments fail closed through the forced-tool client", async () => {

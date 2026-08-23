@@ -13,7 +13,7 @@ import type {
   RescuedNodeLabelingPort
 } from "@lrnki/ports";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
-import { executeForcedToolStage, type NeuralStageDescriptor } from "./forcedToolStage";
+import { executeForcedToolStage, withModelOverride, type NeuralStageDescriptor } from "./forcedToolStage";
 import { readPromptFile } from "./promptFile";
 import {
   buildPrerequisiteOrderingSchema,
@@ -72,10 +72,14 @@ export const prerequisiteOrderingDescriptor: NeuralStageDescriptor<
   mapResult: (result) => ({ edges: result.edges })
 };
 
-export function createPrerequisiteOrderingPort(client: LiteLlmForcedToolClient): PrerequisiteOrderingPort {
+export function createPrerequisiteOrderingPort(
+  client: LiteLlmForcedToolClient,
+  modelOverride?: string
+): PrerequisiteOrderingPort {
+  const descriptor = withModelOverride(prerequisiteOrderingDescriptor, modelOverride);
   return {
-    model: readPromptFile(prerequisiteOrderingDescriptor.promptPath).model,
-    order: (input) => executeForcedToolStage(client, prerequisiteOrderingDescriptor, input)
+    model: modelOverride ?? readPromptFile(prerequisiteOrderingDescriptor.promptPath).model,
+    order: (input) => executeForcedToolStage(client, descriptor, input)
   };
 }
 

@@ -7,7 +7,7 @@ import type {
   GroundingGenerationPort
 } from "@lrnki/ports";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
-import { executeForcedToolStage, type NeuralStageDescriptor } from "./forcedToolStage";
+import { executeForcedToolStage, withModelOverride, type NeuralStageDescriptor } from "./forcedToolStage";
 import { readPromptFile } from "./promptFile";
 import {
   generatedGroundingBundleSchema,
@@ -71,17 +71,21 @@ export const groundingGenerationDescriptor: NeuralStageDescriptor<
     canonicalLabel: input.canonicalLabel,
     contextLines: formatGroundingAdmissionContext(input.context)
   }),
-  mapResult: (result, input) => generatedBundleFromResult(
+  mapResult: (result, input, model) => generatedBundleFromResult(
     result,
     input.context,
-    readPromptFile(groundingGenerationDescriptor.promptPath).model
+    model
   )
 };
 
-export function createGroundingGenerationPort(client: LiteLlmForcedToolClient): GroundingGenerationPort {
+export function createGroundingGenerationPort(
+  client: LiteLlmForcedToolClient,
+  modelOverride?: string
+): GroundingGenerationPort {
+  const descriptor = withModelOverride(groundingGenerationDescriptor, modelOverride);
   return {
-    model: readPromptFile(groundingGenerationDescriptor.promptPath).model,
-    generate: (input) => executeForcedToolStage(client, groundingGenerationDescriptor, input)
+    model: modelOverride ?? readPromptFile(groundingGenerationDescriptor.promptPath).model,
+    generate: (input) => executeForcedToolStage(client, descriptor, input)
   };
 }
 
@@ -136,11 +140,13 @@ export const claimVerificationQuestionPlanningDescriptor: NeuralStageDescriptor<
 };
 
 export function createClaimVerificationQuestionPlanningPort(
-  client: LiteLlmForcedToolClient
+  client: LiteLlmForcedToolClient,
+  modelOverride?: string
 ): ClaimVerificationQuestionPlanningPort {
+  const descriptor = withModelOverride(claimVerificationQuestionPlanningDescriptor, modelOverride);
   return {
-    model: readPromptFile(claimVerificationQuestionPlanningDescriptor.promptPath).model,
-    plan: (input) => executeForcedToolStage(client, claimVerificationQuestionPlanningDescriptor, input)
+    model: modelOverride ?? readPromptFile(claimVerificationQuestionPlanningDescriptor.promptPath).model,
+    plan: (input) => executeForcedToolStage(client, descriptor, input)
   };
 }
 
@@ -169,11 +175,13 @@ export const claimVerificationAnsweringDescriptor: NeuralStageDescriptor<
 };
 
 export function createClaimVerificationAnsweringPort(
-  client: LiteLlmForcedToolClient
+  client: LiteLlmForcedToolClient,
+  modelOverride?: string
 ): ClaimVerificationAnsweringPort {
+  const descriptor = withModelOverride(claimVerificationAnsweringDescriptor, modelOverride);
   return {
-    model: readPromptFile(claimVerificationAnsweringDescriptor.promptPath).model,
-    answer: (input) => executeForcedToolStage(client, claimVerificationAnsweringDescriptor, input)
+    model: modelOverride ?? readPromptFile(claimVerificationAnsweringDescriptor.promptPath).model,
+    answer: (input) => executeForcedToolStage(client, descriptor, input)
   };
 }
 
@@ -228,20 +236,24 @@ export const claimFactualityChallengeDescriptor: NeuralStageDescriptor<
 };
 
 export function createClaimFactualityJudgmentPort(
-  client: LiteLlmForcedToolClient
+  client: LiteLlmForcedToolClient,
+  modelOverride?: string
 ): ClaimFactualityJudgmentPort {
+  const descriptor = withModelOverride(claimFactualityJudgmentDescriptor, modelOverride);
   return {
-    model: readPromptFile(claimFactualityJudgmentDescriptor.promptPath).model,
-    judge: (input) => executeForcedToolStage(client, claimFactualityJudgmentDescriptor, input)
+    model: modelOverride ?? readPromptFile(claimFactualityJudgmentDescriptor.promptPath).model,
+    judge: (input) => executeForcedToolStage(client, descriptor, input)
   };
 }
 
 export function createClaimFactualityChallengePort(
-  client: LiteLlmForcedToolClient
+  client: LiteLlmForcedToolClient,
+  modelOverride?: string
 ): ClaimFactualityJudgmentPort {
+  const descriptor = withModelOverride(claimFactualityChallengeDescriptor, modelOverride);
   return {
-    model: readPromptFile(claimFactualityChallengeDescriptor.promptPath).model,
-    judge: (input) => executeForcedToolStage(client, claimFactualityChallengeDescriptor, input)
+    model: modelOverride ?? readPromptFile(claimFactualityChallengeDescriptor.promptPath).model,
+    judge: (input) => executeForcedToolStage(client, descriptor, input)
   };
 }
 

@@ -7,7 +7,7 @@ execution: code
 
 # Cut Over Topic Expedition Generation to DeepSeek Flash and Measure Stage Value
 
-**Status:** In progress — U0 complete; U1 next
+**Status:** In progress — U1 complete; U2 next
 
 **Decision state:** Locked. The accepted direction, dated comparison, and known quality defects
 remain in the
@@ -468,11 +468,29 @@ hidden by prompt tuning, regeneration, lower quorum, lexical rejection, or an un
   or learner-quality claim occurred in U0; catalog fields remain candidates for U2 served-call
   qualification.
 
+### U1 — inactive Topic-scoped routing seam — 2026-08-23 — complete
+
+- One `withModelOverride` helper now clones a Neural Stage Descriptor without changing its prompt,
+  schema, mapper, stage tag, or default identity. The existing Topic adapter factories accept one
+  optional override, and effective Synthetic Topic Generation and Study Item Bank descriptor
+  builders remain the single registry-owned membership source for both default and scoped hashes.
+- Effective Grounding Generation propagates the selected model into both the forced-tool call and
+  Generated Grounding Bundle provenance. Topic hash tests cover all seven routing roles; default
+  Synthetic Topic Generation, Study Item Bank, Graph Enrichment, and Scaffold hashes remain the U0
+  values, and the application-owned profile remains 19 stages.
+- Local automated evidence: the focused override/provenance/routing tests passed, all 184
+  `@lrnki/infrastructure-litellm` tests passed, its typecheck passed, targeted lint passed, and
+  `git diff --check` passed. Production composition, prompt frontmatter, `litellm/config.yaml`,
+  persistence, HTTP contracts, and runtime routes are unchanged. This proves only the inactive
+  source seam and deterministic identities—not provider compatibility, activation, real use,
+  deployed behavior, browser, native, or physical-device behavior.
+
 ### Open findings
 
-- **NEXT:** U1 adds the inactive descriptor-override seam, effective Topic descriptor builders, and
-  focused hash/model/stage-count tests. U2–U4 remain open; no source or `litellm/config.yaml` cutover
-  has occurred under this plan.
+- **NEXT:** U2 must preflight the complete deterministic request and exact forced-tool schema for
+  every newly routed descriptor against every candidate physical provider before editing or
+  reloading `litellm/config.yaml`. Only a wholly passing matrix may activate the one routing value;
+  U3–U4 remain open.
 - CoreWeave/Parasail GPT FP4 and the Topic-only Xiaomi FP8 group remain candidate routes until their
   complete forced-tool preflights and served-call attribution pass.
 - Xiaomi's current endpoint catalog omits `seed`; U2 must prove the complete deterministic request

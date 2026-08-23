@@ -4,12 +4,12 @@
 
 ## TODO
 
-- **DeepSeek Flash Topic Expedition cutover — in progress; U0 complete, U1 next.** Follow the
+- **DeepSeek Flash Topic Expedition cutover — in progress; U1 complete, U2 next.** Follow the
   [active plan](./2026-08-23-001-cut-over-topic-expedition-generation-to-deepseek-flash.md). It
-  has frozen the current hashes, 19-stage topology, idle development queue, and catalog candidates.
-  Add and validate the inactive Topic-scoped descriptor override seam next; no route is activated.
-  The candidate remains unqualified for release until the final pipeline shape and its follow-up
-  gate are complete.
+  now has one inactive descriptor override seam and routing-sensitive Topic hashes while all default
+  identities and the 19-stage topology remain stable. Preflight every exact forced-tool request on
+  each candidate provider before activation; no route is active. The candidate remains unqualified
+  for release until the final pipeline shape and its follow-up gate are complete.
 
 - **Topic Expedition generation latency — blocked; U3 remains `FIX_FIRST`.** Follow
   [the active plan](./2026-08-22-001-repair-topic-expedition-generation-latency.md) in U0–U4 order.

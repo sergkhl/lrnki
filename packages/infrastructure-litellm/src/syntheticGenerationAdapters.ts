@@ -2,7 +2,7 @@ import type { KnowledgeBoundaryProbeAnswer, SynthesizedConcept } from "@lrnki/do
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import type { ConceptSetSynthesisPort, KnowledgeBoundaryProbePort } from "@lrnki/ports";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
-import { executeForcedToolStage, type NeuralStageDescriptor } from "./forcedToolStage";
+import { executeForcedToolStage, withModelOverride, type NeuralStageDescriptor } from "./forcedToolStage";
 import { readPromptFile } from "./promptFile";
 import {
   conceptSetSynthesisSchema,
@@ -28,10 +28,14 @@ export const conceptSetSynthesisDescriptor: NeuralStageDescriptor<
   mapResult: (result) => result.concepts
 };
 
-export function createConceptSetSynthesisPort(client: LiteLlmForcedToolClient): ConceptSetSynthesisPort {
+export function createConceptSetSynthesisPort(
+  client: LiteLlmForcedToolClient,
+  modelOverride?: string
+): ConceptSetSynthesisPort {
+  const descriptor = withModelOverride(conceptSetSynthesisDescriptor, modelOverride);
   return {
-    model: readPromptFile(conceptSetSynthesisDescriptor.promptPath).model,
-    synthesize: (input) => executeForcedToolStage(client, conceptSetSynthesisDescriptor, input)
+    model: modelOverride ?? readPromptFile(conceptSetSynthesisDescriptor.promptPath).model,
+    synthesize: (input) => executeForcedToolStage(client, descriptor, input)
   };
 }
 
@@ -53,9 +57,7 @@ export const knowledgeBoundaryProbeDescriptor: NeuralStageDescriptor<
 };
 
 export function createKnowledgeBoundaryProbePort(client: LiteLlmForcedToolClient, modelOverride?: string): KnowledgeBoundaryProbePort {
-  const descriptor = modelOverride
-    ? { ...knowledgeBoundaryProbeDescriptor, modelOverride }
-    : knowledgeBoundaryProbeDescriptor;
+  const descriptor = withModelOverride(knowledgeBoundaryProbeDescriptor, modelOverride);
   return {
     model: modelOverride ?? readPromptFile(knowledgeBoundaryProbeDescriptor.promptPath).model,
     probe: (input) => executeForcedToolStage(client, descriptor, input)

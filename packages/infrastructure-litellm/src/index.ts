@@ -176,9 +176,12 @@ export {
   scaffoldGenerationConfigHash,
   withGraphEnrichmentConfigHash,
   withSyntheticGenerationConfigHash,
+  effectiveSyntheticTopicGenerationDescriptors,
+  effectiveStudyItemBankDescriptors,
   neuralOperationRegistry,
   allNeuralOperationDescriptors,
   measurementNeuralStageDescriptors,
   type NeuralOperationName,
-  type NeuralOperationRegistryEntry
+  type NeuralOperationRegistryEntry,
+  type TopicExpeditionModelRouting
 } from "./configHashes";

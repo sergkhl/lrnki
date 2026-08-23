@@ -2,7 +2,7 @@ import { STAGE_TAGS, type ConceptLessonRedundancyJudgment, type ConceptLessonSec
 import type { ConceptLessonRedundancyJudgmentPort } from "@lrnki/ports";
 import type { z } from "zod";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
-import { executeForcedToolStage, type NeuralStageDescriptor } from "./forcedToolStage";
+import { executeForcedToolStage, withModelOverride, type NeuralStageDescriptor } from "./forcedToolStage";
 import { readPromptFile } from "./promptFile";
 import { conceptLessonRedundancyJudgmentSchema, conceptLessonRedundancyJudgmentValidator } from "./toolSchemas";
 
@@ -43,10 +43,14 @@ export const conceptLessonRedundancyJudgmentDescriptor: NeuralStageDescriptor<
   }))
 };
 
-export function createConceptLessonRedundancyJudgmentPort(client: LiteLlmForcedToolClient): ConceptLessonRedundancyJudgmentPort {
+export function createConceptLessonRedundancyJudgmentPort(
+  client: LiteLlmForcedToolClient,
+  modelOverride?: string
+): ConceptLessonRedundancyJudgmentPort {
+  const descriptor = withModelOverride(conceptLessonRedundancyJudgmentDescriptor, modelOverride);
   return {
-    model: readPromptFile(conceptLessonRedundancyJudgmentDescriptor.promptPath).model,
-    judge: (input) => executeForcedToolStage(client, conceptLessonRedundancyJudgmentDescriptor, input)
+    model: modelOverride ?? readPromptFile(conceptLessonRedundancyJudgmentDescriptor.promptPath).model,
+    judge: (input) => executeForcedToolStage(client, descriptor, input)
   };
 }
 

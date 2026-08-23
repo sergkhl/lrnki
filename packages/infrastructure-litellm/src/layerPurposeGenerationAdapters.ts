@@ -2,7 +2,7 @@ import { STAGE_TAGS } from "@lrnki/domain-core";
 import type { LayerPurposeGenerationPort } from "@lrnki/ports";
 import type { z } from "zod";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
-import { executeForcedToolStage, type NeuralStageDescriptor } from "./forcedToolStage";
+import { executeForcedToolStage, withModelOverride, type NeuralStageDescriptor } from "./forcedToolStage";
 import { readPromptFile } from "./promptFile";
 import { layerPurposeSchema, layerPurposeValidator } from "./toolSchemas";
 
@@ -40,9 +40,13 @@ export const layerPurposeGenerationDescriptor: NeuralStageDescriptor<
   }
 };
 
-export function createLayerPurposeGenerationPort(client: LiteLlmForcedToolClient): LayerPurposeGenerationPort {
+export function createLayerPurposeGenerationPort(
+  client: LiteLlmForcedToolClient,
+  modelOverride?: string
+): LayerPurposeGenerationPort {
+  const descriptor = withModelOverride(layerPurposeGenerationDescriptor, modelOverride);
   return {
-    model: readPromptFile(layerPurposeGenerationDescriptor.promptPath).model,
-    generate: (input) => executeForcedToolStage(client, layerPurposeGenerationDescriptor, input)
+    model: modelOverride ?? readPromptFile(layerPurposeGenerationDescriptor.promptPath).model,
+    generate: (input) => executeForcedToolStage(client, descriptor, input)
   };
 }

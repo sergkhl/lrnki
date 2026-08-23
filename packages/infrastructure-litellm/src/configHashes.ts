@@ -28,11 +28,56 @@ import { scaffoldContentGenerationDescriptor, scaffoldOutlineGenerationDescripto
 import { scaffoldContentCongruenceDescriptor } from "./scaffoldContentCongruenceAdapters";
 import { discoveryCoverageAuditDescriptor } from "./discoveryCoverageAuditAdapters";
 import { operationConfigHash } from "./operationConfigHash";
-import type { AnyNeuralStageDescriptor } from "./forcedToolStage";
+import { withModelOverride, type AnyNeuralStageDescriptor } from "./forcedToolStage";
 
 // ONE closed configuration registry of every Neural Operation (ADR-0034). It owns descriptor
 // membership and mechanical configuration hashes only. Operation-to-stage membership belongs to
 // the application Operation Timeline catalog and is deliberately absent here.
+
+export type TopicExpeditionModelRouting = Readonly<{
+  generation: string;
+  independentJudge: string;
+  claimVerificationAnswerer: string;
+  claimFactualityJudge: string;
+  claimVerificationPlanner: string;
+  claimFactualityChallenger: string;
+  prerequisiteOrdering: string;
+}>;
+
+export function effectiveSyntheticTopicGenerationDescriptors(
+  routing?: TopicExpeditionModelRouting
+): readonly AnyNeuralStageDescriptor[] {
+  return [
+    withModelOverride(declaredDomainInferenceDescriptor, routing?.generation),
+    withModelOverride(conceptSetSynthesisDescriptor, routing?.generation),
+    knowledgeBoundaryProbeDescriptor,
+    withModelOverride(groundingGenerationDescriptor, routing?.generation),
+    withModelOverride(claimVerificationQuestionPlanningDescriptor, routing?.claimVerificationPlanner),
+    withModelOverride(claimVerificationAnsweringDescriptor, routing?.claimVerificationAnswerer),
+    withModelOverride(claimFactualityJudgmentDescriptor, routing?.claimFactualityJudge),
+    withModelOverride(claimFactualityChallengeDescriptor, routing?.claimFactualityChallenger),
+    withModelOverride(prerequisiteOrderingDescriptor, routing?.prerequisiteOrdering),
+    withModelOverride(intrinsicDifficultyBandingDescriptor, routing?.independentJudge),
+    withModelOverride(intrinsicDifficultyComparisonDescriptor, routing?.independentJudge)
+  ];
+}
+
+export function effectiveStudyItemBankDescriptors(
+  routing?: TopicExpeditionModelRouting
+): readonly AnyNeuralStageDescriptor[] {
+  return [
+    withModelOverride(layerPurposeGenerationDescriptor, routing?.generation),
+    withModelOverride(conceptLessonGenerationDescriptor, routing?.generation),
+    withModelOverride(conceptLessonRedundancyJudgmentDescriptor, routing?.independentJudge),
+    withModelOverride(studyItemBlueprintDescriptor, routing?.generation),
+    withModelOverride(studyOptionSelectGenerationDescriptor, routing?.generation),
+    withModelOverride(studyImpostorGenerationDescriptor, routing?.generation),
+    withModelOverride(studyMatchingGenerationDescriptor, routing?.generation),
+    withModelOverride(optionSelectKeyVerificationDescriptor, routing?.independentJudge),
+    withModelOverride(impostorKeyVerificationDescriptor, routing?.independentJudge),
+    withModelOverride(matchingAssignmentVerificationDescriptor, routing?.independentJudge)
+  ];
+}
 
 export type NeuralOperationRegistryEntry = {
   // Human-stable prefix of the operation's derived config hash.
@@ -79,34 +124,11 @@ export const neuralOperationRegistry = {
   },
   syntheticTopicGeneration: {
     configSeed: "synthetic-topic-generation",
-    descriptors: [
-      declaredDomainInferenceDescriptor,
-      conceptSetSynthesisDescriptor,
-      knowledgeBoundaryProbeDescriptor,
-      groundingGenerationDescriptor,
-      claimVerificationQuestionPlanningDescriptor,
-      claimVerificationAnsweringDescriptor,
-      claimFactualityJudgmentDescriptor,
-      claimFactualityChallengeDescriptor,
-      prerequisiteOrderingDescriptor,
-      intrinsicDifficultyBandingDescriptor,
-      intrinsicDifficultyComparisonDescriptor
-    ]
+    descriptors: effectiveSyntheticTopicGenerationDescriptors()
   },
   studyItemBank: {
     configSeed: "study-item-bank",
-    descriptors: [
-      layerPurposeGenerationDescriptor,
-      conceptLessonGenerationDescriptor,
-      conceptLessonRedundancyJudgmentDescriptor,
-      studyItemBlueprintDescriptor,
-      studyOptionSelectGenerationDescriptor,
-      studyImpostorGenerationDescriptor,
-      studyMatchingGenerationDescriptor,
-      optionSelectKeyVerificationDescriptor,
-      impostorKeyVerificationDescriptor,
-      matchingAssignmentVerificationDescriptor
-    ]
+    descriptors: effectiveStudyItemBankDescriptors()
   },
   // The complete Scaffold runtime descriptor family: outline, shared source-less admission,
   // generated content, congruence, and one-shot Answer-Key Verification. The probe's K-answer
@@ -181,9 +203,12 @@ export function graphEnrichmentConfigHash(config: GraphEnrichmentConfig): string
   });
 }
 
-export function syntheticGenerationConfigHash(config: SyntheticGenerationConfig): string {
+export function syntheticGenerationConfigHash(
+  config: SyntheticGenerationConfig,
+  routing?: TopicExpeditionModelRouting
+): string {
   const entry = neuralOperationRegistry.syntheticTopicGeneration;
-  return operationConfigHash(entry.configSeed, entry.descriptors, {
+  return operationConfigHash(entry.configSeed, effectiveSyntheticTopicGenerationDescriptors(routing), {
     ...syntheticBehaviorConfig(config),
     nodeEmbeddingModel: NODE_EMBEDDING_MODEL
   }, {
@@ -191,9 +216,9 @@ export function syntheticGenerationConfigHash(config: SyntheticGenerationConfig)
   });
 }
 
-export function studyItemBankConfigHash(): string {
+export function studyItemBankConfigHash(routing?: TopicExpeditionModelRouting): string {
   const entry = neuralOperationRegistry.studyItemBank;
-  return operationConfigHash(entry.configSeed, entry.descriptors);
+  return operationConfigHash(entry.configSeed, effectiveStudyItemBankDescriptors(routing));
 }
 
 // The complete Scaffold operation identity (KTD7): every runtime descriptor plus the application
@@ -217,8 +242,11 @@ export function withGraphEnrichmentConfigHash(config: GraphEnrichmentConfig): Gr
   return { ...config, enrichmentConfigHash: graphEnrichmentConfigHash(config) };
 }
 
-export function withSyntheticGenerationConfigHash(config: SyntheticGenerationConfig): SyntheticGenerationConfig {
-  return { ...config, enrichmentConfigHash: syntheticGenerationConfigHash(config) };
+export function withSyntheticGenerationConfigHash(
+  config: SyntheticGenerationConfig,
+  routing?: TopicExpeditionModelRouting
+): SyntheticGenerationConfig {
+  return { ...config, enrichmentConfigHash: syntheticGenerationConfigHash(config, routing) };
 }
 
 function withoutEnrichmentConfigHash<T extends { enrichmentConfigHash: string }>(config: T): Omit<T, "enrichmentConfigHash"> {

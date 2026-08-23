@@ -1,7 +1,7 @@
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import type { DeclaredDomainInferencePort } from "@lrnki/ports";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
-import { executeForcedToolStage, type NeuralStageDescriptor } from "./forcedToolStage";
+import { executeForcedToolStage, withModelOverride, type NeuralStageDescriptor } from "./forcedToolStage";
 import { readPromptFile } from "./promptFile";
 import { declaredDomainInferenceSchema, declaredDomainInferenceValidator } from "./toolSchemas";
 
@@ -22,9 +22,13 @@ export const declaredDomainInferenceDescriptor: NeuralStageDescriptor<
   mapResult: (result) => ({ declaredDomain: result.declaredDomain })
 };
 
-export function createDeclaredDomainInferencePort(client: LiteLlmForcedToolClient): DeclaredDomainInferencePort {
+export function createDeclaredDomainInferencePort(
+  client: LiteLlmForcedToolClient,
+  modelOverride?: string
+): DeclaredDomainInferencePort {
+  const descriptor = withModelOverride(declaredDomainInferenceDescriptor, modelOverride);
   return {
-    model: readPromptFile(declaredDomainInferenceDescriptor.promptPath).model,
-    infer: (input) => executeForcedToolStage(client, declaredDomainInferenceDescriptor, input)
+    model: modelOverride ?? readPromptFile(declaredDomainInferenceDescriptor.promptPath).model,
+    infer: (input) => executeForcedToolStage(client, descriptor, input)
   };
 }

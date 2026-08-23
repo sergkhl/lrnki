@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
-import { executeForcedToolStage, stageConfigHash, type NeuralStageDescriptor } from "./forcedToolStage";
+import {
+  executeForcedToolStage,
+  stageConfigHash,
+  withModelOverride,
+  type NeuralStageDescriptor
+} from "./forcedToolStage";
 import { renderPromptFile } from "./promptFile";
 import { buildPrerequisiteOrderingSchema, buildPrerequisiteOrderingValidator } from "./toolSchemas";
 
@@ -67,6 +72,24 @@ test("generic executor renders, builds schema from input, passes tags and maps r
   assert.deepEqual(call.tags, [STAGE_TAGS.prerequisiteOrdering]);
   assert.equal(call.maxRetries, 1);
   assert.ok(call.parameters.properties);
+});
+
+test("one descriptor override changes execution and hash without mutating the base descriptor", async () => {
+  const calls: Array<{ model: string }> = [];
+  const client = {
+    async call(input: { model: string }) {
+      calls.push(input);
+      return { edges: [] };
+    }
+  } as unknown as LiteLlmForcedToolClient;
+  const overridden = withModelOverride(pilotDescriptor, "kg-topic-expedition-prerequisite-ordering");
+
+  await executeForcedToolStage(client, overridden, pilotDescriptor.sentinelInput);
+
+  assert.equal(pilotDescriptor.modelOverride, undefined);
+  assert.equal(overridden.modelOverride, "kg-topic-expedition-prerequisite-ordering");
+  assert.equal(calls[0]?.model, "kg-topic-expedition-prerequisite-ordering");
+  assert.notEqual(stageConfigHash(overridden), stageConfigHash(pilotDescriptor));
 });
 
 test("stage config hash includes prompt bytes, schema, and scalar descriptor identity", () => {

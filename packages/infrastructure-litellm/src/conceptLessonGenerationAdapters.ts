@@ -3,7 +3,7 @@ import { STAGE_TAGS } from "@lrnki/domain-core";
 import type { ConceptLessonGenerationPort } from "@lrnki/ports";
 import type { z } from "zod";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
-import { executeForcedToolStage, type NeuralStageDescriptor } from "./forcedToolStage";
+import { executeForcedToolStage, withModelOverride, type NeuralStageDescriptor } from "./forcedToolStage";
 import { readPromptFile } from "./promptFile";
 import { conceptLessonSchema, conceptLessonValidator } from "./toolSchemas";
 
@@ -75,10 +75,14 @@ export const conceptLessonGenerationDescriptor: NeuralStageDescriptor<
   }
 };
 
-export function createConceptLessonGenerationPort(client: LiteLlmForcedToolClient): ConceptLessonGenerationPort {
+export function createConceptLessonGenerationPort(
+  client: LiteLlmForcedToolClient,
+  modelOverride?: string
+): ConceptLessonGenerationPort {
+  const descriptor = withModelOverride(conceptLessonGenerationDescriptor, modelOverride);
   return {
-    model: readPromptFile(conceptLessonGenerationDescriptor.promptPath).model,
-    generate: (input) => executeForcedToolStage(client, conceptLessonGenerationDescriptor, input)
+    model: modelOverride ?? readPromptFile(conceptLessonGenerationDescriptor.promptPath).model,
+    generate: (input) => executeForcedToolStage(client, descriptor, input)
   };
 }
 

@@ -19,7 +19,7 @@ import type {
 } from "@lrnki/ports";
 import type { z } from "zod";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
-import { executeForcedToolStage, type NeuralStageDescriptor } from "./forcedToolStage";
+import { executeForcedToolStage, withModelOverride, type NeuralStageDescriptor } from "./forcedToolStage";
 import { readPromptFile } from "./promptFile";
 import {
   answerKeyVerificationSchema,
@@ -273,40 +273,59 @@ export const matchingAssignmentVerificationDescriptor: NeuralStageDescriptor<
   }))
 };
 
-export function createStudyItemGenerationPort(client: LiteLlmForcedToolClient): StudyItemGenerationPort {
+export function createStudyItemGenerationPort(
+  client: LiteLlmForcedToolClient,
+  modelOverride?: string
+): StudyItemGenerationPort {
+  const optionSelectDescriptor = withModelOverride(studyOptionSelectGenerationDescriptor, modelOverride);
+  const impostorDescriptor = withModelOverride(studyImpostorGenerationDescriptor, modelOverride);
+  const matchingDescriptor = withModelOverride(studyMatchingGenerationDescriptor, modelOverride);
   return {
-    model: readPromptFile(studyOptionSelectGenerationDescriptor.promptPath).model,
-    generateOptionSelect: (input) => executeForcedToolStage(client, studyOptionSelectGenerationDescriptor, input),
-    generateImpostor: (input) => executeForcedToolStage(client, studyImpostorGenerationDescriptor, input),
-    generateMatching: (input) => executeForcedToolStage(client, studyMatchingGenerationDescriptor, input)
+    model: modelOverride ?? readPromptFile(studyOptionSelectGenerationDescriptor.promptPath).model,
+    generateOptionSelect: (input) => executeForcedToolStage(client, optionSelectDescriptor, input),
+    generateImpostor: (input) => executeForcedToolStage(client, impostorDescriptor, input),
+    generateMatching: (input) => executeForcedToolStage(client, matchingDescriptor, input)
   };
 }
 
-export function createStudyItemBlueprintPort(client: LiteLlmForcedToolClient): StudyItemBlueprintPort {
+export function createStudyItemBlueprintPort(
+  client: LiteLlmForcedToolClient,
+  modelOverride?: string
+): StudyItemBlueprintPort {
+  const descriptor = withModelOverride(studyItemBlueprintDescriptor, modelOverride);
   return {
-    model: readPromptFile(studyItemBlueprintDescriptor.promptPath).model,
-    plan: (input) => executeForcedToolStage(client, studyItemBlueprintDescriptor, input)
+    model: modelOverride ?? readPromptFile(studyItemBlueprintDescriptor.promptPath).model,
+    plan: (input) => executeForcedToolStage(client, descriptor, input)
   };
 }
 
 // One port, two stages: the item type selects which descriptor — and therefore which
 // STAGE_TAG the call's spend and wall-clock attribute to — while the prompt and schema are
 // identical. The application never names a stage tag; it names an item type.
-export function createAnswerKeyVerificationPort(client: LiteLlmForcedToolClient): AnswerKeyVerificationPort {
+export function createAnswerKeyVerificationPort(
+  client: LiteLlmForcedToolClient,
+  modelOverride?: string
+): AnswerKeyVerificationPort {
+  const optionSelectDescriptor = withModelOverride(optionSelectKeyVerificationDescriptor, modelOverride);
+  const impostorDescriptor = withModelOverride(impostorKeyVerificationDescriptor, modelOverride);
   return {
-    model: readPromptFile(optionSelectKeyVerificationDescriptor.promptPath).model,
+    model: modelOverride ?? readPromptFile(optionSelectKeyVerificationDescriptor.promptPath).model,
     verify: (input) => executeForcedToolStage(
       client,
-      input.itemType === "impostor" ? impostorKeyVerificationDescriptor : optionSelectKeyVerificationDescriptor,
+      input.itemType === "impostor" ? impostorDescriptor : optionSelectDescriptor,
       input
     )
   };
 }
 
-export function createMatchingAssignmentVerificationPort(client: LiteLlmForcedToolClient): MatchingAssignmentVerificationPort {
+export function createMatchingAssignmentVerificationPort(
+  client: LiteLlmForcedToolClient,
+  modelOverride?: string
+): MatchingAssignmentVerificationPort {
+  const descriptor = withModelOverride(matchingAssignmentVerificationDescriptor, modelOverride);
   return {
-    model: readPromptFile(matchingAssignmentVerificationDescriptor.promptPath).model,
-    verify: (input) => executeForcedToolStage(client, matchingAssignmentVerificationDescriptor, input)
+    model: modelOverride ?? readPromptFile(matchingAssignmentVerificationDescriptor.promptPath).model,
+    verify: (input) => executeForcedToolStage(client, descriptor, input)
   };
 }
 

@@ -13,7 +13,7 @@ export type NeuralStageDescriptor<TInput, TArgs, TResult> = {
   sentinelInput: TInput;
   maxRetries?: number;
   templateData: (input: TInput) => Record<string, unknown>;
-  mapResult: (args: TArgs, input: TInput) => TResult;
+  mapResult: (args: TArgs, input: TInput, model: string) => TResult;
 };
 
 // Existential erasure of a descriptor for the heterogeneous config-hash arrays: TInput is
@@ -30,8 +30,15 @@ export type AnyNeuralStageDescriptor = {
   sentinelInput: unknown;
   maxRetries?: number;
   templateData: (input: never) => Record<string, unknown>;
-  mapResult: (args: never, input: never) => unknown;
+  mapResult: (args: never, input: never, model: string) => unknown;
 };
+
+export function withModelOverride<TInput, TArgs, TResult>(
+  descriptor: NeuralStageDescriptor<TInput, TArgs, TResult>,
+  modelOverride?: string
+): NeuralStageDescriptor<TInput, TArgs, TResult> {
+  return modelOverride === undefined ? descriptor : { ...descriptor, modelOverride };
+}
 
 export async function executeForcedToolStage<TInput, TArgs, TResult>(
   client: LiteLlmForcedToolClient,
@@ -39,8 +46,9 @@ export async function executeForcedToolStage<TInput, TArgs, TResult>(
   input: TInput
 ): Promise<TResult> {
   const rendered = renderPromptFile(descriptor.promptPath, descriptor.templateData(input));
+  const model = descriptor.modelOverride ?? rendered.model;
   const args = await client.call({
-    model: descriptor.modelOverride ?? rendered.model,
+    model,
     messages: rendered.messages,
     toolName: rendered.toolName,
     toolDescription: rendered.toolDescription,
@@ -49,7 +57,7 @@ export async function executeForcedToolStage<TInput, TArgs, TResult>(
     tags: [descriptor.stageTag],
     ...(descriptor.maxRetries !== undefined ? { maxRetries: descriptor.maxRetries } : {})
   });
-  return descriptor.mapResult(args, input);
+  return descriptor.mapResult(args, input, model);
 }
 
 export function stageConfigHash(descriptor: AnyNeuralStageDescriptor): string {

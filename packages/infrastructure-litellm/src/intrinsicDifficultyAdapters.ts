@@ -3,7 +3,7 @@ import { STAGE_TAGS } from "@lrnki/domain-core";
 import type { IntrinsicDifficultyJudgmentPort } from "@lrnki/ports";
 import { renderConcept } from "./enrichmentAdapters";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
-import { executeForcedToolStage, type NeuralStageDescriptor } from "./forcedToolStage";
+import { executeForcedToolStage, withModelOverride, type NeuralStageDescriptor } from "./forcedToolStage";
 import { readPromptFile, renderPromptFile } from "./promptFile";
 import { buildDifficultyBandsSchema, buildDifficultyBandsValidator, difficultyComparisonSchema, difficultyComparisonValidator } from "./toolSchemas";
 
@@ -59,11 +59,16 @@ export const intrinsicDifficultyComparisonDescriptor: NeuralStageDescriptor<
   mapResult: (result) => ({ harder: result.harder })
 };
 
-export function createIntrinsicDifficultyJudgmentPort(client: LiteLlmForcedToolClient): IntrinsicDifficultyJudgmentPort {
+export function createIntrinsicDifficultyJudgmentPort(
+  client: LiteLlmForcedToolClient,
+  modelOverride?: string
+): IntrinsicDifficultyJudgmentPort {
+  const bandingDescriptor = withModelOverride(intrinsicDifficultyBandingDescriptor, modelOverride);
+  const comparisonDescriptor = withModelOverride(intrinsicDifficultyComparisonDescriptor, modelOverride);
   return {
-    model: readPromptFile(intrinsicDifficultyBandingDescriptor.promptPath).model,
-    bandDomainSet: (input) => executeForcedToolStage(client, intrinsicDifficultyBandingDescriptor, input),
-    compareHarder: (input) => executeForcedToolStage(client, intrinsicDifficultyComparisonDescriptor, input)
+    model: modelOverride ?? readPromptFile(intrinsicDifficultyBandingDescriptor.promptPath).model,
+    bandDomainSet: (input) => executeForcedToolStage(client, bandingDescriptor, input),
+    compareHarder: (input) => executeForcedToolStage(client, comparisonDescriptor, input)
   };
 }
 
