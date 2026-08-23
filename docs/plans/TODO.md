@@ -4,12 +4,11 @@
 
 ## TODO
 
-- **Operation-neutral DeepSeek Grounding — in progress; U0–U1 complete, U2 next.** Follow
-  [the execution-order plan](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md). The
-  primary-only source/config candidate unifies node production, Grounding Admission, and generated-
-  layer judgment without changing unrelated identities or the nineteen-stage profile. Run the fixed
-  direct-route matrix and add a proposed provider fallback only after its complete descriptor set
-  passes; do not reload LiteLLM or rebuild the API in U2.
+- **Operation-neutral DeepSeek Grounding — in progress; U0–U1 complete, U2 `FIX_FIRST`.** Follow
+  [the execution-order plan](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md). DeepInfra
+  and Xiaomi passed their complete direct sets; DeepSeek Parasail failed all three Grounding
+  semantics and stays unreachable. Retry the Novita challenger only after its temporary upstream
+  429 clears, then run the two never-reached GPT-OSS Parasail cases before activation.
 
 - **Source-less Grounding context and answer correlation — on hold; U0–U1 complete.** The
   [predecessor plan](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md) retains

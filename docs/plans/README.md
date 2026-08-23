@@ -12,10 +12,10 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-23-003 — Unify Source-less Grounding on DeepSeek](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md)
-   — **In progress; U0–U1 complete, U2 next.** The primary-only source/config candidate gives all
-   three Source-less Grounding consumers one operation-neutral topology while preserving unrelated
-   identities and the nineteen-stage profile. Run the exact direct-route matrix; do not activate the
-   candidate or add a fallback until that route's complete descriptor set passes.
+   — **In progress; U0–U1 complete, U2 `FIX_FIRST`.** DeepInfra and Xiaomi passed their complete
+   direct sets, while the proposed DeepSeek Parasail fallback failed all three semantic Grounding
+   checks and remains unreachable. Novita's challenger exhausted its envelope on temporary upstream
+   429s; recheck that case before the two unrun GPT-OSS Parasail cases or any activation.
 
 2. [2026-08-23-002 — Deepen Source-less Grounding Context and Answer Correlation](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md)
    — **On hold; U0–U1 complete.** Identity context and exact-key answer correlation are committed.
