@@ -4,6 +4,13 @@
 
 ## TODO
 
+- **ADR audit — ready; U1 next.** Follow
+  [the first active plan](./2026-08-23-001-apply-adr-audit.md) in U0–U5 order. The ready-plan commit
+  precedes all source work. Next, create the immutable Concept Canonicalization operation and make
+  Graph-Version Build consume its explicitly selected artifact without model or embedding calls.
+  Preserve ADR-0006, every cross-family rule, current one-pass admission behavior, all Model
+  Assignments, the ten local commits, and unrelated skill worktree changes.
+
 - **Topic Expedition generation latency — blocked; U3 remains `FIX_FIRST`.** Follow
   [the active plan](./2026-08-22-001-repair-topic-expedition-generation-latency.md) in U0–U4 order.
   The bounded admission pipeline and honest 19-stage Journal profile are complete, but equal widths
