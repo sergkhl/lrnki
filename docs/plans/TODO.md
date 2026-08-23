@@ -4,12 +4,12 @@
 
 ## TODO
 
-- **Operation-neutral DeepSeek Grounding — ready; implementation not started.** Follow
-  [the execution-order plan](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md). Move the
-  complete Source-less topology together: DeepSeek produces graph nodes and Grounding; MiMo answers
-  and judges them; GPT-OSS plans, challenges, and orders. Preserve Concept Canonicalization, Topic's
-  learner-asset routing, the application interface, context/correlation changes, admission policy,
-  and consumer contracts.
+- **Operation-neutral DeepSeek Grounding — in progress; U0 complete, U1 next.** Follow
+  [the execution-order plan](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md). The clean
+  pre-cutover source/config and loaded-router inventory are frozen. Implement the complete primary-
+  route topology together while preserving Concept Canonicalization, Topic's learner-asset routing,
+  the application interface, context/correlation changes, admission policy, and consumer contracts;
+  do not draw providers or reload a process before the U1 candidate is committed.
 
 - **Source-less Grounding context and answer correlation — on hold; U0–U1 complete.** The
   [predecessor plan](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md) retains

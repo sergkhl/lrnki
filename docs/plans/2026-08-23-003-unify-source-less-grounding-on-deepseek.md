@@ -7,7 +7,7 @@ execution: code
 
 # Unify Source-less Node Generation and Grounding on DeepSeek
 
-**Status:** Ready — implementation not started
+**Status:** In progress — U0 complete; U1 next
 
 **Decision state:** Locked by owner decision on 2026-08-23. DeepSeek V4 Flash 0731 owns Grounding
 Generation for every Source-less Grounding Admission consumer. Preserving ADR-0023 makes the paired
@@ -501,13 +501,33 @@ direct preflight, successful retry, or HTTP 200 does not substitute for real-use
   contract, loaded composition, real-use, deployed, browser, native, physical-device, latency, or
   release evidence exists for this plan.
 
+### U0 — freeze the pre-cutover source and loaded-environment snapshot — 2026-08-23 — complete
+
+- The pre-cutover snapshot was clean at `fddf171`; `git worktree list --porcelain` reported only the
+  main checkout, so no second worktree had claimed the exclusive model-topology unit. Direct source
+  inspection confirmed the shared and Topic-specific claim-role aliases, `kg-concept-synthesis`,
+  and caller-owned Topic admission overrides were still present before U1.
+- The focused configuration baseline passed all 13 tests:
+  `pnpm --filter @lrnki/infrastructure-litellm exec tsx --test
+  src/topicExpeditionRouting.test.ts src/configHashes.test.ts`. It froze default Graph Enrichment
+  `3cd73a12f2f2`, Scaffold `be49ba010024`, default Synthetic `901788bb7bd4`, Topic Synthetic
+  `9a8f4f1cb34b`, default Study Item Bank `d574e02753f9`, Topic Study Item Bank `02d755d9fae1`, and
+  the nineteen-stage Topic profile under the old topology.
+- The host-local LiteLLM `/models` inventory, authenticated from the root environment, still exposed
+  the eight old shared/Topic claim-role aliases plus `kg-concept-synthesis` and exposed none of the
+  seven neutral aliases. The existing application and router containers were healthy, but no
+  candidate source/config was loaded or exercised. No provider draw, Compose lifecycle action,
+  process reload, database write, deployment, or release action occurred.
+- This is repository/source and loaded-router inventory evidence only. It proves the reviewable U1
+  baseline and absence of an already-active candidate; it is not a served-contract, Model
+  Assignment, real-use, deployed, browser, native, physical-device, latency, or release result.
+
 ### Open findings
 
-- **NEXT:** finish U0 by re-verifying the current lane, source/config, and loaded-environment snapshot,
-  append only portable evidence, and commit this ready plan plus its handoff documents once. Re-read
-  the index, then execute U1 only. Do not run a new provider draw or mutate a loaded process before
-  the neutral aliases, effective descriptors, composition wiring, and expected hash changes exist as
-  one reviewable candidate.
+- **NEXT:** execute U1 only: implement KTD1–KTD5 as one reviewable, primary-route source/config
+  candidate; delete the superseded aliases and routing fields; prove exact assignment independence,
+  affected hashes, and non-leakage with focused local checks; then persist and commit before any
+  provider draw, LiteLLM reload, API rebuild, or loaded-process mutation.
 - Parasail FP8 is only a proposed source-less generation fallback. U2 must qualify Concept Set
   Synthesis, missing-prerequisite proposal, and all three context-bearing Grounding cases there
   before adding either alias-keyed fallback to the candidate config; if it fails, keep those roles
