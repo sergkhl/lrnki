@@ -75,10 +75,9 @@ hosted provider serves byte-identical weights. The versioned OpenRouter model id
 quantization, inference settings, and provider attribution together are the runtime evidence. No
 moving `latest`, preview, Pro, alternate quantization, or unknown-quantization fallback is allowed.
 
-The pinned generation Provider Route is the existing attributable `deepinfra/fp8` primary with an
-amended `mancer/fp8` LiteLLM fallback. OpenRouter internal fallback remains disabled on both
-deployments. U2 retains the complete DeepInfra pass and exercises the exact production body and
-every newly routed generator schema on Mancer before accepting the cutover.
+The pinned generation Provider Route is the attributable `deepinfra/fp8` deployment only.
+OpenRouter and LiteLLM fallback are both disabled for the scoped alias; U2's complete served-call
+matrix, not endpoint catalog text, qualifies all nine generator schemas on that route.
 
 ### Re-derived consumer set
 
@@ -503,46 +502,18 @@ hidden by prompt tuning, regeneration, lower quorum, lexical rejection, or an un
 
 ### U2 — exact scoped routes active and attributable — 2026-08-23 — complete
 
-- A disposable probe built the complete temperature-0/seed-7 request and exact strict named-tool
-  schema from all 20 effective descriptors, then pinned the frozen quantization and one physical
-  provider per call. The initial matrix ran 32 cases; only throttled Parasail DeepSeek cases were
-  rerun. No alias, deployment group, config file, or running service changed.
-- DeepSeek: DeepInfra FP8 passed all nine generator descriptors. Parasail FP8 passed eight; Study
-  Item Blueprint passed after an initial `429`, while Matching Generation returned `429` twice and
-  remains operationally unqualified. Every valid DeepSeek response had matching provider/model
-  attribution, one schema-valid forced tool call, and no reasoning output.
-- MiMo: Xiaomi FP8 served none of the eight judge/answer descriptors; OpenRouter returned `404` for
-  the complete required-parameter body. GPT-OSS: CoreWeave FP4 passed Prerequisite Ordering, but the
-  planner returned schema-invalid string entries and the challenger emitted no tool call. Parasail
-  FP4 served none of the three descriptors under the complete body (`404`). These are route-contract
-  failures, so U2 correctly stopped before activation.
-- Evidence authority: direct OpenRouter/provider contract and physical-provider attribution only.
-  The calls did not exercise the LiteLLM aliases, a deployed config, a Topic Expedition, persisted
-  artifacts, learner usefulness, browser, native, or physical-device behavior.
-- Route amendment: the same DeepSeek, MiMo, and GPT-OSS Model Assignments are now frozen to the
-  replacement Provider Routes in KTD3. The resulting 31-call matrix passed only the three Novita
-  FP4 GPT-OSS descriptors. Mancer served none of nine DeepSeek descriptors, Parasail and Novita
-  served none of eight MiMo descriptors each, and Nebius served none of three GPT-OSS descriptors;
-  OpenRouter filtered every failure with `404` under the complete required-parameter body. No config
-  or running route changed.
-- Route diagnosis: removing `seed` from one otherwise complete MiMo answerer request did not make
-  Xiaomi, Parasail, or Novita routable under `require_parameters: true`; all three retained the same
-  filter rejection. Parasail DeepSeek Matching Generation remained `429` after cooldown. The
-  incompatibility is therefore not a seed-only defect, and the frozen exact route cannot be
-  activated without changing the accepted proof contract, Provider Route resilience, or supporting
-  Model Assignment topology.
-- Owner decision: empirical MiMo qualification without `require_parameters` is authorized. The
-  complete request retains seed 7 as best-effort, reasoning disabled, exact FP8/provider pins, no
-  fallback, and every strict forced-tool/schema check. DeepInfra-only DeepSeek and Novita-only
-  GPT-OSS retain their complete passing matrices; failed backups are no longer candidates.
-- Empirical MiMo verdict: the three-provider answerer screen passed on Xiaomi and Parasail; Novita
-  was disqualified for reasoning leakage despite schema-valid forced-tool arguments. Xiaomi then
-  passed the other seven descriptors, freezing an 8/8 `xiaomi/fp8` route. All Xiaomi responses
-  reported the expected provider and model, one matching schema-valid tool call, and no reasoning;
-  no retry was needed, and the stop-on-first-full-pass rule avoided unneeded Parasail calls.
-- Evidence authority remains direct OpenRouter served-call contract and physical-provider
-  attribution only. The empirical calls did not exercise LiteLLM aliases, loaded configuration,
-  Topic Expedition persistence, learner usefulness, browser, native, or physical-device behavior.
+- Direct-provider qualification used the complete effective prompt, temperature 0, seed 7, exact
+  strict named-tool schema, reasoning policy, quantization, one physical-provider pin, and no
+  fallback. The final matrices passed DeepInfra FP8 for all nine generators, Xiaomi FP8 for all
+  eight MiMo roles, and Novita FP4 for all three GPT-OSS roles. Every accepted result had exact
+  model/provider attribution and validator-accepted tool arguments; reasoning was absent where
+  disabled, while seed remains best-effort rather than a reproducibility guarantee.
+- Discarded routes did not qualify: Parasail DeepSeek remained throttled on Matching Generation;
+  Mancer DeepSeek and Nebius GPT were catalog-filtered; CoreWeave GPT failed two complex schemas;
+  and the original MiMo candidates were catalog-filtered under `require_parameters`. Owner-authorized
+  empirical MiMo screening without that prefilter passed Xiaomi 8/8, stopped before an unnecessary
+  full Parasail matrix, and rejected Novita for reasoning leakage. This evidence is direct
+  OpenRouter/provider contract only—not loaded-alias, persistence, or learner-usefulness evidence.
 - Local activation candidate: Topic production composition now owns one seven-alias routing value
   and passes it to every affected port plus both operation hashes. The canonical LiteLLM config
   resolves those aliases to one DeepInfra DeepSeek deployment, one exact Xiaomi FP8 MiMo deployment,
