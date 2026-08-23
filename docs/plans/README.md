@@ -12,9 +12,9 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-23-001 — Cut Over Topic Expedition Generation to DeepSeek Flash and Measure Stage Value](./2026-08-23-001-cut-over-topic-expedition-generation-to-deepseek-flash.md)
-   — **In progress; U3 complete (`FIX_FIRST`), U4 next.** Provider fallback passed under natural
-   load, but all four qualifying expeditions failed before persistence: three on cross-domain
-   Grounding scope and one on MiMo answerer schema exhaustion. Complete the 19-row matrix.
+   — **In progress; U4 matrix complete.** `DEEPEN` only Grounding Generation and Verification
+   Answering; `KEEP` the other 17 stages. Create the focused final-qualification successor, then
+   consolidate this plan.
 
 2. [2026-08-22-001 — Restore Topic Expedition Generation to Seven Minutes](./2026-08-22-001-repair-topic-expedition-generation-latency.md)
    — **Blocked in U3 (`FIX_FIRST`).** The bounded pipeline and shared stage profile are complete,

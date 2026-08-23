@@ -7,7 +7,7 @@ execution: code
 
 # Cut Over Topic Expedition Generation to DeepSeek Flash and Measure Stage Value
 
-**Status:** In progress — U3 complete (`FIX_FIRST`); U4 stage matrix next
+**Status:** In progress — U4 matrix complete; successor and consolidation next
 
 **Decision state:** Locked. The accepted direction, dated comparison, and known quality defects
 remain in the
@@ -393,7 +393,7 @@ appear redundant.
 - All nine direct generator descriptors resolve to the frozen DeepSeek assignment through primary
   and fallback routes; no route has moving model id, different quantization, or reasoning enabled.
 - MiMo Topic judge aliases resolve only to the declared-FP8 Xiaomi deployment. GPT Topic aliases
-  resolve only to the declared-FP4 CoreWeave and Parasail deployments with reasoning effort medium.
+  resolve only to the declared-FP4 Novita and Parasail deployments with reasoning effort medium.
 - Resolved generator, primary judge, and challenger families are pairwise distinct; aliases being
   different is not accepted as proof.
 - Effective Topic descriptor changes alter the Synthetic Topic Generation and Study Item Bank
@@ -470,8 +470,9 @@ hidden by prompt tuning, regeneration, lower quorum, lexical rejection, or an un
   attempt terminal failures before persistence; the four retained expedition rows are same-query
   positive controls for zero enrichments, nodes, edges, lessons, Study Items, and rejections.
 - Settled SpendLogs contained 1,296 successful calls, 2,619,560 prompt plus 1,007,488 completion
-  tokens, $0.25040813645 spend, and 61 naturally selected Parasail-backup calls. The terminal gate
-  snapshots had 1,291 rows; the joined report waited for five delayed logs before aggregating. The
+  tokens, $0.25040813645 recorded spend, and 61 naturally selected Parasail-backup calls. The
+  terminal gate snapshots had 1,291 rows; the joined report waited for five delayed logs before
+  aggregating. The
   earlier three-attempt Database run is excluded route-recovery evidence: nine Novita shared-pool
   429s led to the qualified same-assignment fallback, which then served cleanly under real load.
 - Declared Domain fit passed for Cell Biology, Database Systems, and International Economics;
@@ -493,11 +494,47 @@ hidden by prompt tuning, regeneration, lower quorum, lexical rejection, or an un
   remains explicit. Evidence authority is local production composition, development Postgres, and
   production LLM routes—not deployed, browser, native, physical-device, or release qualification.
 
+### U4 — stage-disposition matrix — 2026-08-23 — complete
+
+Metrics are `summed operation-stage wall span / calls / prompt+completion tokens / recorded spend`.
+Repeatable verification brackets overlap, so wall spans are not additive critical-path time. `H`,
+`M`, and `L` are confidence; `final run` means one complete mixed-domain qualification after the
+accepted fixes, with direct persisted-asset inspection.
+
+| Conceptual stage | Distinct input → output; consumer / substitute | Bounded-sample metrics | Contribution, invariant, disposition / smallest next experiment |
+| --- | --- | ---: | --- |
+| Declared Domain Inference | Topic → field label; every later prompt / none | 11 s / 4 / 1,917 / $0.000140992 | All four labels fit three domains. **KEEP H**; confirm in final run. |
+| Concept Set Synthesis | Topic + domain → bounded concepts; admission and graph / none | 23 s / 4 / 5,620 / $0.000665932 | Broad sets exposed foundation and boundary claims. **KEEP M**; inspect focus in final run. |
+| Knowledge-Boundary Probe | Concept + domain → sampled core/boundary verdict; Grounding Admission / none | 63 s / 600 / 559,710 / $0.07234150245 | Independent filter and fallback worked; no redundancy evidence. **KEEP M**; measure retained/rejected concepts in final run. |
+| Grounding Generation | Candidate + domain/context → Generated Grounding Bundle; judges, graph, lessons / none | 24 s / 58 / 91,247 / $0.0043814 | Repeated cross-domain decontextualization and universalized scope. Preserve one draft and atomic admission. **DEEPEN H**; repair the generation contract and repeat the three defect classes. |
+| Verification Question Planning | Generated targets + context → atomic questions; blind answerer and judges / none | 587 s / 138 / 327,327 / $0.06024033 | Questions enabled replicated, target-specific objections. Planner must remain separate from draft-blind answering. **KEEP H**; confirm coverage in final run. |
+| Verification Answering | Opaque questions + context → draft-blind answers; factuality panel / none | 2,887 s / 171 / 772,122 / recorded $0 | Successful answers exposed scope errors, but one packet exhausted three schema-invalid attempts. Preserve target blindness. **DEEPEN H**; schema-stress the same assignment, then run end to end. |
+| Factuality Judgment | Targets + independent answers → cross-family dispositions; atomic admission / none | 3,189 s / 261 / 1,830,497 / $0.1122519 | Correctly vetoed all three material scope defects. Generator self-judgment and weakened quorum remain forbidden. **KEEP H**; inspect accepted and rejected targets in final run. |
+| Prerequisite Ordering | Admitted node evidence → sampled directed prerequisite edges; learner path / none | not reached | No current output evidence; independence from generator remains required. **KEEP L**; execute and inspect the full DAG in final run. |
+| Intrinsic Difficulty | Admitted node evidence → comparative consensus bands; learner progression / none | not reached | No current output evidence; prerequisite structure is not a substitute. **KEEP L**; inspect set-relative coherence in final run. |
+| Layer Purpose Generation | Domain + concept labels → capability statement; learner overview / mechanical template only | not reached | Semantic value under the new generator is unknown. **KEEP L**; compare the statement with the complete layer in final run. |
+| Concept Lesson Generation | Node + admitted grounding + neighbors → grounded lesson; learner and all item generators / none | not reached | Prior long/off-node prose concern is unqualified under this assignment. **KEEP L**; inspect every lesson and grounding citation in final run. |
+| Lesson Redundancy Judgment | Lesson sections → redundancy verdicts; lesson retry/drop / structural checks are not semantic substitutes | not reached | No evidence that the judge duplicates assembly. **KEEP L**; inspect judgments and surviving sections in final run. |
+| Study Item Blueprint | Lesson + siblings + supported families → sparse family/facet plan; three generators / passage-count pre-gate only | not reached | Earlier off-node facets remain untested; fallback is not semantically equivalent. **KEEP L**; inspect every plan and downstream facet use in final run. |
+| Option-select Generation | Lesson grounding + siblings + facet → guarded option draft; key verifier / none | not reached | Earlier off-node/over-broad and label-cue risks remain untested. **KEEP L**; inspect every draft, retry, and admitted item in final run. |
+| Matching Generation | Lesson grounding + siblings + facet → guarded board; assignment verifier / none | not reached | Earlier label-cued and false-match risks remain untested. **KEEP L**; inspect every cell and facet in final run. |
+| Impostor Generation | Lesson grounding + siblings + facet → truths plus planted lie; key verifier / none | not reached | Correctness and off-node focus remain untested. **KEEP L**; inspect every statement, lie source, and reveal in final run. |
+| Option-select Key Verification | Hidden-key question/candidates + grounding → truth verdicts; item admission / no semantic substitute | not reached | Independent key checking remains a trust boundary. **KEEP L**; inspect all candidate verdicts in final run. |
+| Impostor Key Verification | Hidden-lie statements + grounding → truth verdicts; item admission / no semantic substitute | not reached | False teaching must continue to fail closed. **KEEP L**; inspect all candidate verdicts in final run. |
+| Matching Assignment Verification | Hidden pairing + full N×N board → fit grid; item admission / per-claim truth is insufficient | not reached | Cross-pair ambiguity has a distinct defect class. **KEEP L**; inspect the full grid and settlement in final run. |
+
+The seven executed rows account for 1,236 calls and 3,588,440 tokens. The remaining 60 calls,
+38,608 tokens, and $0.00038608 are the non-profile node-embedding helper, reconciling the U3 total.
+Xiaomi calls recorded zero spend, so cost is an observability result, not a free-service claim.
+No row supports `COMBINE` or `REMOVE`; therefore no targeted repeat ran. Session authorization
+freezes the smallest material change as `DEEPEN` for Grounding Generation and Verification
+Answering only; all other rows remain `KEEP` through final qualification.
+
 ### Open findings
 
-- **NEXT:** complete U4's 19-row disposition matrix. Keep all twelve unexecuted stages under
-  insufficient evidence, deepen only the observed Grounding/answerer seams, and do not run another
-  topic unless a proposed `COMBINE` or `REMOVE` requires it. Create the smallest successor that owns
-  the accepted deepening and final qualification before consolidating this plan.
-- Restore prompt-message observability in that successor or amend the inspection workflow to its
-  actual storage boundary; do not claim rendered-prompt evidence from empty SpendLogs rows.
+- **NEXT:** create and link the smallest ready successor owning only Grounding Generation,
+  Verification Answering, prompt/cost observability, and final 19-stage qualification; then record
+  the U4 handoff and consolidate this plan.
+- Restore prompt-message observability or amend the inspection workflow to its actual storage
+  boundary, and restore attributable Xiaomi cost before a release claim. Do not infer rendered
+  prompts or zero actual cost from the current SpendLogs rows.

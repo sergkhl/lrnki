@@ -4,12 +4,11 @@
 
 ## TODO
 
-- **DeepSeek Flash Topic Expedition cutover — U3 `FIX_FIRST`; U4 matrix next.** Follow the
+- **DeepSeek Flash Topic Expedition cutover — U4 matrix complete; successor next.** Follow the
   [active plan](./2026-08-23-001-cut-over-topic-expedition-generation-to-deepseek-flash.md). It
-  proved the Novita-to-Parasail fallback under natural load, but all four qualifying expeditions
-  failed before learner-asset persistence: three on cross-domain Grounding scope and one on MiMo
-  answerer schema exhaustion. Complete the 19-row disposition matrix and create the focused
-  deepening/final-qualification successor. The candidate remains unqualified for release.
+  assigns `DEEPEN` only to Grounding Generation and Verification Answering and keeps the other 17
+  stages. Create the focused deepening/final-qualification successor and consolidate this plan.
+  The candidate remains unqualified for release.
 
 - **Topic Expedition generation latency — blocked; U3 remains `FIX_FIRST`.** Follow
   [the active plan](./2026-08-22-001-repair-topic-expedition-generation-latency.md) in U0–U4 order.
