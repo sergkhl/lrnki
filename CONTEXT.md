@@ -108,16 +108,18 @@ _Avoid_: build, publication, claim extraction
 
 **Graph-Version Build**:
 The deterministic assembly and atomic publication of an asserted graph version from an explicit base
-version and selected Extraction Runs.
+version, selected Extraction Runs, and the explicitly selected immutable Concept Canonicalization
+artifact.
 _Avoid_: extraction, enrichment
 
 **Static Graph Refinement**:
-The Graph-Version Build activity that resolves Concept identity and unions CEP evidence without
-creating inferred graph facts.
+The Graph-Version Build activity that applies selected Concept identity decisions and unions CEP
+evidence without creating inferred graph facts.
 _Avoid_: Graph Enrichment, inference
 
 **Concept Canonicalization**:
-The domain-scoped process that decides whether source Candidates represent one Concept.
+The domain-scoped operation that decides whether source Candidates represent one Concept and records
+the selected inputs, captured published identities, and outcomes in an immutable artifact.
 _Avoid_: raw-cosine auto-merge, prerequisite derivation
 
 **Graph Enrichment**:
@@ -169,8 +171,9 @@ concepts that must remain outside trusted learner surfaces.
 _Avoid_: verbalized confidence, lexical overlap
 
 **Processing Journey**:
-A read-only inspection scope joining one Enrichment Run to its contributing extraction, publication,
-enrichment, and study-asset operations; it is not an orchestration identity.
+A read-only inspection scope joining one Enrichment Run to its contributing extraction,
+canonicalization, publication, enrichment, and study-asset operations; it is not an orchestration
+identity.
 _Avoid_: pipeline run, workflow instance, journey entity
 
 ## Learner experience

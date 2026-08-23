@@ -23,6 +23,9 @@ Recall Challenges are earned retrieval checks over already-passed neutral items.
 corrective rather than punitive, their evidence never changes acquisition mastery, and postponing one
 may delay its reward but never the next prerequisite-valid learning stop.
 
+Any proposal to use graded evidence as acquisition-mastery evidence triggers a new architectural and
+product review. That trigger does not authorize changing mastery semantics by itself.
+
 Automatic support follows a ladder from clearer feedback through retries and sequencing before
 creating learner-scoped content. An explicit Explorable Term request may open a Scaffold Detour
 immediately because that branch cannot earn neutral progress or rewards
@@ -32,9 +35,6 @@ Learner interaction is mobile-first and accessible. State cannot rely on color a
 preferences receive equivalent information, haptics are event-bound and semantic, and decorative or
 social presentation may not become a parallel objective. Themed copy remains downstream under
 [ADR-0033](0033-plain-identifiers-single-themed-vocabulary-mapping.md).
-
-Every new mechanic must identify its learner-visible goal, its mastery relationship, its challenge
-curve, likely distractions, and the focused evidence needed to judge real use before implementation.
 
 ## Context
 

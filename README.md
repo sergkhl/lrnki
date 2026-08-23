@@ -14,7 +14,7 @@ structure and study assets from it, and serves them to a learner app as a playab
 
 Apps:
 
-- `apps/kg-worker`: extraction, graph-version build, and enrichment CLI
+- `apps/kg-worker`: extraction, Concept Canonicalization, graph-version build, and enrichment CLI
 - `apps/learner-api`: typed learner HTTP API (Hono)
 - `apps/learner-app`: universal Expo learner app (web + Android)
 - `apps/admin-lab`: Next.js operator inspection surface
@@ -41,6 +41,29 @@ pnpm db:migrate
 pnpm dev:admin      # Admin Lab (Next.js)
 pnpm dev:learner    # Learner app web (Expo, no browser auto-open)
 ```
+
+### Concept Canonicalization and graph publication
+
+Publication is an explicit two-command handoff under
+[ADR-0017](docs/adr/0017-split-extraction-runs-from-graph-version-builds.md). Pass the inspected,
+successful Extraction Run IDs in the intended order:
+
+```bash
+pnpm worker:kg canonicalize-concepts [--exact-label-only] [--base <graphVersionId>] <runId>...
+pnpm worker:kg inspect-concept-canonicalization <artifactId> [--json]
+pnpm worker:kg build-graph-version --canonicalization <artifactId> [--base <graphVersionId>] <runId>...
+```
+
+`canonicalize-concepts` defaults to semantic mode, runs the configured embedding proposer and
+identity adjudicator, then prints the immutable artifact ID and a stable decision summary.
+`--exact-label-only` records the attributable no-neural mode. Inspect the summary or full JSON before
+publication.
+
+`build-graph-version` makes no model or embedding calls. Its base version and ordered run list must
+exactly match the selected artifact; unknown, malformed, mismatched, or registry-conflicting inputs
+fail closed. When extending a graph, pass the same `--base` to both commands. These commands use the
+database and, in semantic mode, LiteLLM, so load the repo-root `.env` as shown above before running
+them.
 
 `docker compose up -d --build` starts the stack. Compose brings the application schema to current
 through the one-shot `migrate` service after PostgreSQL becomes healthy, and starts the learner API

@@ -10,16 +10,18 @@ result remains inspectable but outside trusted learner surfaces; it never become
 guess.
 
 Passing the probe is necessary but not sufficient. Generated grounding is checked by an independent
-claim-targeted verification sequence: plan atomic questions from the draft, answer them without the
-draft, then compare the answers to the original passages. The correction boundary is monotonic and
-drop-only—verification may reject grounded problematic passages or the draft, but may not author
-replacement learner text. Grounding generation is one-pass: if verification leaves no Definition
-Passage, factual rejection ends admission and never re-enters generation. Each consumer retains its
-own fail-closed outcome policy for that rejection.
+factual verifier before admission. The verifier may reject material or abstain, but it may not author
+replacement learner text or make generated text masquerade as source evidence. Source policy owns
+the current claim projection, sampling, quorum, attempt budget, passage settlement, retry, and
+consumer failure outcome.
+
+A future bounded retry is compatible with this decision only when it generates a fresh, complete
+Generated Grounding Bundle and sends that new draft through Source-less Grounding Admission from the
+start. A verifier may never patch rejected predicates into a replacement draft.
 
 This policy covers model-grounded prerequisite nodes, Synthetic Topic Generation, and generated
-Support Steps. Source-cited content uses its source-verification contract instead. Web-grounded
-retrieval remains deferred under
+Support Steps. Source-cited content uses its source-verification contract instead. Retrieval-backed
+grounding remains deferred under
 [ADR-0023](0023-grounding-origin-model-and-cross-family-generated-node-judge.md); no retrieval content
 is admitted until its source, acceptance, provenance, and learner-surface policy are decided.
 
@@ -31,7 +33,6 @@ intrinsic verifier is not a trustworthy replacement author.
 ## Context
 
 Long-tail source-less synthesis can be confidently wrong, and the generator cannot validate itself.
-Selective abstention plus independent claim verification limits that risk without presenting generated
-content as source evidence. An intrinsic verifier or self-audit cannot reliably conserve the rejected
-draft's predicates while authoring a replacement, so finite one-pass admission trades recall for a
-clear safety boundary.
+Selective abstention plus independent factual verification limits that risk without presenting
+generated content as source evidence. Requiring any new draft to restart admission keeps the
+verification boundary inspectable without making a verifier the replacement author.

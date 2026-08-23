@@ -4,12 +4,13 @@
 
 ## TODO
 
-- **ADR audit — in progress; U3 next.** Follow
+- **ADR audit — in progress; U4 next.** Follow
   [the first active plan](./2026-08-23-001-apply-adr-audit.md) in U0–U5 order. U1–U2 now own immutable
   Concept Canonicalization artifacts, LLM-free deterministic replay, application-owned stage
-  membership, full Processing Journey lineage, and the regenerated operation constraint. Next,
-  repair the audited ADR/workflow/glossary/runbook boundaries and record the decided DeepSeek
-  follow-up without implementing it. Preserve ADR-0006, every
+  membership, full Processing Journey lineage, and the regenerated operation constraint. U3
+  corrected the audited ADR/workflow/glossary/runbook boundaries and recorded the decided DeepSeek
+  follow-up without implementing it. Next, run the production-model semantic canonicalization,
+  deterministic replay, SpendLog, and local publication gate. Preserve ADR-0006, every
   cross-family rule, current one-pass admission behavior, all Model Assignments, the ten original
   local commits, and unrelated skill worktree changes.
 
@@ -18,14 +19,16 @@
   The bounded admission pipeline and honest 19-stage Journal profile are complete, but equal widths
   8, 12, and 16 all exceeded seven minutes during enrichment and every settled attempt rejected
   over-broad Grounding Bundles. Production-model prompt/schema and pre-draft trials did not clear
-  the unchanged admission contract and were discarded. Keep width four and U4 gated pending the
-  owner-gated Grounding Generation scope decision in [BLOCKERS](./BLOCKERS.md).
+  the unchanged admission contract and were discarded. Keep width four and U4 gated behind the
+  DeepSeek cutover and pipeline-simplification follow-up below.
 
-- **Generation model evaluation — shaping; no implementation plan is ready.** The
-  [brainstorm](../brainstorms/2026-08-08-002-generation-model-evaluation.md) owns the dated evidence,
-  candidate options, carried generation changes, and open decisions. Resume with a planning
-  interview, one decision at a time, starting with change scope; judge ownership is required only if
-  grounding generation moves.
+- **DeepSeek Flash generation cutover — direction decided; no implementation plan is ready.** The
+  [brainstorm](../brainstorms/2026-08-08-002-generation-model-evaluation.md) owns the dated evidence
+  and follow-up scope. Recheck the latest official Flash release, pin one exact Model Assignment,
+  then interview one decision at a time about which expedition generation stages to remove/combine
+  and which remaining independent judge satisfies the unchanged ADRs. Release validation qualifies
+  the selected assignment, route, consumers, latency, cost, and learner quality; it does not reopen
+  the model choice.
 
 ## COMPLETED
 

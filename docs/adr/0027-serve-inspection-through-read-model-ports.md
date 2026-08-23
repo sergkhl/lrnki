@@ -6,12 +6,12 @@ Status: Accepted
 
 Pure inspection surfaces use read-only ports that return finished **Inspection Read Models**. The
 storage adapter owns queries and row stitching; UI code does not embed SQL or JSON_TABLE access.
-Inspection contract types live in `ports`.
 
 Learner-facing projections combine persisted reads with adaptation compute such as mastery
 composition, node classification, frontier selection, and path projection. They are application
 use-cases rather than read-model ports, so all consuming UIs share one orchestration boundary.
-Projection types live in `application`.
+
+Source interfaces own the current location and exact shape of both boundaries.
 
 Neither boundary exposes raw persistence rows to UI code. Valid absence may return `undefined`; real
 database errors propagate to the application error boundary. Environment-specific demo or empty

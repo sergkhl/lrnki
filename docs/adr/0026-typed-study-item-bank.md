@@ -24,11 +24,9 @@ generated and cannot masquerade as quotes.
 Two semantic verification questions remain distinct:
 
 - Answer-Key Verification classifies every candidate's truth for an owner-neutral learning subject
-  and checks answer-key uniqueness. Neutral option-select and impostor activities use one informed
-  regeneration and retain their type-specific unavailable-judge dispositions. A generated Support
-  Step uses the same option-select rule once inside each complete content attempt; its unavailable
-  judge is a required failure. Candidate presentation is deterministic and independent of the
-  server key, generated position, stable IDs, and neutral-node identity.
+  and checks answer-key uniqueness. Candidate presentation is deterministic and independent of the
+  server key, generated position, stable IDs, and neutral-node identity. Source policy and source
+  types own each consumer's current attempt budget and unavailable outcome.
 - Matching Assignment Verification checks whether a whole matching board has exactly one defensible
   assignment; individually true pairs do not answer that question.
 

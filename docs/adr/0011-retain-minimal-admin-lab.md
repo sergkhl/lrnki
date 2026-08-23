@@ -14,6 +14,10 @@ It must not embed domain decisions, own storage queries that belong behind read 
 ([ADR-0027](0027-serve-inspection-through-read-model-ports.md)), silently select or publish model
 output, or mutate an immutable published graph or Derived Graph Layer.
 
+A concrete need for an operator mutation that cannot remain in the CLI or owning API triggers a new
+review of an authenticated, authorized, and audited action boundary. That trigger starts a decision;
+it does not authorize Admin Lab mutation by itself.
+
 ## Context
 
 The project needs a compact place to inspect provenance and evaluate end-to-end behavior before

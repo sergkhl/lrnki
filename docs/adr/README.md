@@ -19,7 +19,7 @@ Creation, scope, and retirement rules live in [AGENTS.md](../../AGENTS.md#docume
 - [0013 — Real-source quality validation](./0013-verify-quality-by-real-source-inspection.md)
 - [0015 — Cross-source Concept identity](./0015-deterministic-cross-source-identity.md)
 - [0016 — CEP typed evidence vocabulary](./0016-retire-relation-registry-keep-one-cep-assertion.md)
-- [0017 — Extraction Runs and Graph-Version Builds](./0017-split-extraction-runs-from-graph-version-builds.md)
+- [0017 — Extraction Runs, Concept Canonicalization, and Graph-Version Builds](./0017-split-extraction-runs-from-graph-version-builds.md)
 - [0019 — Derived Graph Layer ownership](./0019-graph-enrichment-derived-layer.md)
 - [0023 — Grounding-origin model](./0023-grounding-origin-model-and-cross-family-generated-node-judge.md)
 - [0024 — Learner-neutral intrinsic difficulty](./0024-learner-neutral-intrinsic-difficulty.md)

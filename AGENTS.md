@@ -29,6 +29,12 @@ definitions and repair their references in the same change.
   result of a real trade-off. Keep one decision per ADR, state current policy and rationale, and omit
   implementation walkthroughs, rollout history, validation transcripts, and exact interfaces or
   persisted shapes. Delete a fully superseded ADR and repair inbound links; never reuse its number.
+- Accepted ADRs bind shipped behavior, and ADR numbers do not define precedence. An agent must not
+  silently ignore a conflicting ADR: report the contradiction, run an authorized non-production
+  experiment, or propose an amendment or replacement. A replacement states the changed invariant
+  and repairs every affected reference in the same change. Reversible algorithms, limits, exact
+  interfaces, and exact persisted shapes belong to source or an active plan unless they satisfy the
+  ADR retention test above.
 - A brainstorm may own accepted framing, requirements, and unresolved product decisions. Turn it
   into a plan only after those decisions are resolved enough to implement.
 - Keep only ready or in-progress implementation plans. When a plan finishes, first move durable
@@ -138,6 +144,10 @@ definitions and repair their references in the same change.
 
 22. Prioritize the Learner App's game UX and enforce
     [ADR-0032](docs/adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
+    Before implementing a new mechanic, record its learner-visible goal, mastery relationship,
+    challenge curve, likely distractions, and the focused real-use evidence that will judge it. If
+    the mechanic proposes graded evidence as acquisition-mastery evidence, stop for the review that
+    ADR-0032 requires; the planning checklist does not authorize that change.
 
 23. Run `docker compose` for the shared environment only from the deploy checkout on its host, and
     always detached (`-d`). Never from inside an agent container that binds the workspace at a

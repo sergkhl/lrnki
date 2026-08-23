@@ -9,9 +9,11 @@ domains and formats. Automated tests cover the deterministic envelope—schema v
 policy transforms, and graph algorithms—but do not declare a canned model judgment semantically
 correct.
 
-Benchmarks and labeled harnesses may diagnose one live decision, then are removed when they no longer
-change it. Stable source fixtures remain in fixtures; generated evaluation artifacts remain
-gitignored.
+Durable evaluation code and versioned human judgments are permitted when they name the consumer and
+Model Assignment they evaluate. They support repeated measurement and diagnosis but must not become
+a canned semantic oracle that allows deterministic suite success to declare neural output correct.
+Stable source fixtures remain in `fixtures/`; generated evaluation artifacts remain in gitignored
+`tmp/`.
 
 Quality evidence is scoped to the [Model Assignment](../../CONTEXT.md#model-operations) and consumer
 that produced it. Reassigning an alias therefore requires the affected consumers to be re-gated or
@@ -23,5 +25,5 @@ operational qualification. The enforcement details live in
 ## Context
 
 A frozen oracle and model-authored label aligner helped diagnose earlier defects but were not human
-gold. Retaining them would create a second quality system and invite deterministic tests to substitute
-for real model behavior.
+gold. Named, reviewable evaluation material can preserve useful judgments without creating a second
+quality authority or letting deterministic tests substitute for real model behavior.

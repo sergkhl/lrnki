@@ -460,10 +460,11 @@ seven-minute threshold does not apply to this contention soak.
   contention soak or consolidate this plan as completed without a qualifying single-run pass.
 - The problem class is now researched, but the conventional repair changes Grounding Generation,
   which this locked plan excludes, and the bounded prompt/schema and pre-draft trials did not clear
-  the current admission contract. The concrete next action is the owner-gated change-scope decision
-  recorded in [BLOCKERS.md](./BLOCKERS.md), followed by a ready plan; do not retry the rejected
-  variants or hide the defect with a weaker judge, lower quorum, model swap, lexical veto, or
-  regenerated draft.
+  the current admission contract. The concrete next action is the decided
+  [DeepSeek Flash cutover and pipeline-simplification follow-up](../brainstorms/2026-08-08-002-generation-model-evaluation.md),
+  which must become a ready plan before implementation; do not retry the rejected variants or hide
+  the defect with a weaker judge, lower quorum, unqualified model swap, lexical veto, or regenerated
+  draft.
 - A future passing run must provide both the successful end-to-end latency baseline and direct
   persisted-artifact inspection this calibration could not produce. Failed enrichment durations
   are lower bounds and quality evidence, never atomic-readiness claims.

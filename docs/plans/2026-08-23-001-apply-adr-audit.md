@@ -7,7 +7,7 @@ execution: code
 
 # Apply the ADR Audit Without Changing ADR-0006 or Cross-Family Rules
 
-**Status:** In progress — U0–U2 complete; U3 next
+**Status:** In progress — U0–U3 complete; U4 next
 
 **Decision state:** Locked. The accepted audit findings and fixed assumptions are implementation
 inputs, not an invitation to reopen Concept Canonicalization, Operation Timeline ownership,
@@ -367,8 +367,8 @@ without implementing that follow-up.
   neural-stage sets plus the LiteLLM spend-stage inventory. The ambient scope carries operation ID,
   type, and those allowed sets. The stage bracket and PostgreSQL reporter reject an unowned timeline
   stage before issuing a write; forced-tool and embedding clients reject an unowned neural tag before
-  entering transport retry or dispatch. Discovery Coverage Audit no longer belongs to Extraction, while Scaffold Content
-  Congruence remains owned by Scaffold because generation invokes it.
+  entering transport retry or dispatch. Discovery Coverage Audit no longer belongs to Extraction,
+  while Scaffold Content Congruence remains owned by Scaffold because generation invokes it.
 - Infrastructure boundary: the neural registry now owns descriptor membership and mechanical
   configuration identities only. `timelineType`, `claimedTimelineType`, embedding-stage membership,
   and both cross-layer set-equality tests were deleted. Ambient-free measurement calls still
@@ -395,10 +395,43 @@ without implementing that follow-up.
   PostgreSQL behavior. It does not qualify production-model Concept Canonicalization usefulness,
   live LiteLLM SpendLogs, deployed behavior, browser behavior, or any native/device layer.
 
+### U3 — ADR, workflow, glossary, runbook, and follow-up correction — complete; documentation evidence
+
+- ADR boundaries: the audited ADRs now retain durable decisions and review triggers while source
+  types, source policy, and active plans own reversible algorithms, exact limits, interfaces,
+  package placement, and persisted shapes. Extraction Run, immutable Concept Canonicalization
+  artifact, and deterministic Graph-Version Build are three explicit records. The application
+  catalog owns operation-stage membership; infrastructure owns Neural Stage Descriptors and
+  mechanical configuration hashes; ambient checks enforce the application-owned relation without
+  introducing another map.
+- Governance and language: `AGENTS.md` now states that accepted ADRs bind shipped behavior, numbers
+  do not create precedence, contradictions cannot be silently ignored, replacements must state the
+  changed invariant and repair references, and reversible detail stays in source or an active plan.
+  The Game UX implementation checklist moved there. `CONTEXT.md` names the immutable
+  canonicalization artifact and its explicit selection by Graph-Version Build without duplicating
+  implementation detail.
+- Operator surface: the root README documents canonicalize, inspect, and artifact-selected build
+  commands, including exact-label mode, matching selection requirements, LLM-free build behavior,
+  and fail-closed replay compatibility.
+- Follow-up direction: the generation brainstorm and TODO now record the DeepSeek Flash cutover as
+  decided rather than hypothetical. The dated official model card identifies
+  `DeepSeek-V4-Flash-0731` as superseding the preview release, while repository configuration
+  already assigns it to judge roles. A future ready plan must recheck the official release, pin one
+  exact Model Assignment, and interview only expedition stage simplification and the remaining
+  independent judge. The resolved manual scope decision was removed from `BLOCKERS.md`; the Topic
+  Expedition latency plan remains `FIX_FIRST` behind that follow-up.
+- Documentation checks: every local target in the 23 in-scope changed Markdown files resolved,
+  file-size policies remained within their limits, and `git diff --check` passed. Diffs from
+  starting revision `ab15107` are empty for ADR-0006 and `litellm/config.yaml`. A zero-context audit
+  found no added or deleted cross-family policy content and no new definition of “cross-family.”
+- Evidence boundary: this proves repository documentation ownership, links, and protected-diff
+  invariants. It does not qualify production-model semantics, live SpendLogs, local real-use graph
+  publication, deployment, browser behavior, or any native/device layer.
+
 ### Open findings
 
-- U3 must repair the audited ADR/workflow/glossary/runbook boundaries and record the decided DeepSeek
-  follow-up before the semantic real-use gate begins.
 - U4 must still qualify Concept Canonicalization decisions, replay, and SpendLogs through the
   production Model Assignments; automated and isolated-database success is not semantic-quality
   evidence.
+- U5 must run the full repository/protected-diff gates, consolidate durable status, and delete this
+  completed plan only after the detailed validation record is committed.

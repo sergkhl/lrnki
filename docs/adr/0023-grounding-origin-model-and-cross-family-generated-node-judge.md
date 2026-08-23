@@ -4,9 +4,8 @@ Status: Accepted
 
 ## Decision
 
-Every graph node records one Grounding Origin: document_anchored, source_mentioned, llm_grounded, or
-the reserved web_grounded. The origin determines the trust layer: only document-anchored Concepts are
-asserted; all other nodes are derived.
+Every graph node records one Grounding Origin from the closed union owned by source types. The origin
+determines the trust layer: only document-anchored Concepts are asserted; all other nodes are derived.
 
 Source-grounded passages must match their cited source. Model-grounded passages are explicitly
 generated and can never claim verbatim provenance. The role of a derived node explains why it was
@@ -17,8 +16,8 @@ generator. Independence is a property of the pair, so moving either side must pr
 same change. The judge alias resolves to one attributable deployment; the current alias-to-deployment
 mapping belongs to litellm/config.yaml.
 
-Web-grounded content remains reserved rather than implemented. Retrieval sources, acceptance,
-provenance, and learner-surface policy require a separate decision before that origin may be used.
+Retrieval-backed grounding remains deferred. Its sources, acceptance, provenance, and
+learner-surface policy require a separate decision before source types may admit such an origin.
 
 ## Context
 

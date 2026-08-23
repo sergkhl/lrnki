@@ -8,9 +8,11 @@ Embeddings may support similarity, retrieval, and candidate generation. For iden
 propose near-duplicates; an explicit deterministic rule or measured semantic adjudicator makes and
 records the merge decision. Raw similarity never creates or merges a Concept or derived node.
 
-Embeddings must not propose, gate, order, or derive prerequisite edges. Those directional judgments
-operate over the whole derived node set under
-[ADR-0019](0019-graph-enrichment-derived-layer.md).
+Embeddings must not decide, gate, order, or create prerequisite edges. A measured module may use
+them only to propose candidates for a separate authoritative prerequisite method when the full node
+set remains available to that method, proposal recall is evaluated, and embedding failure cannot
+remove a node, suppress or order a candidate, or create an edge. Directional judgments continue to
+operate over the whole derived node set under [ADR-0019](0019-graph-enrichment-derived-layer.md).
 
 Any embedding use is an explicit measured module whose failure cannot silently change authoritative
 identity or graph structure.
