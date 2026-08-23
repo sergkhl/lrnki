@@ -1,5 +1,5 @@
 ---
-model: kg-independent-judge
+model: kg-generated-node-judge
 lrnki:
   toolName: submit_minting_durability_judgment
   toolDescription: Submit whether the proposed assumed-prerequisite concept is durable for the anchor.

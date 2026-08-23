@@ -11,6 +11,7 @@ export type { NeuralClientBaseOptions, NeuralClients } from "./neuralClients";
 export {
   LiteLlmNodeEmbeddingAdapter,
   NODE_EMBEDDING_MODEL,
+  GENERATED_NODE_JUDGE_MODEL,
   createNodeMergeAdjudicationPort,
   nodeMergeAdjudicationDescriptor
 } from "./dedupAdapters";

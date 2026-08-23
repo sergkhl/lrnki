@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { claimVerificationAnsweringDescriptor } from "./groundingGenerationAdapters";
+import { groundingGenerationDescriptor } from "./groundingGenerationAdapters";
 import {
   modelAssignmentIdentity,
   modelRoutingBehaviorIdentity,
@@ -10,7 +10,7 @@ import {
 } from "./litellmProxyConfig";
 import { operationConfigHash } from "./operationConfigHash";
 
-const ROLE = "kg-claim-verification-answerer";
+const ROLE = "kg-grounding-generation";
 const MODEL = "openrouter/deepseek/deepseek-v4-flash-0731";
 const PRIMARY = MODEL;
 const BACKUP = "openrouter/deepseek/deepseek-v4-flash-0731-parasail-backup";
@@ -137,7 +137,7 @@ test("missing or ambiguous quantization fails closed with a provider-sensitive r
 test("exact operation identity still follows provider, fallback, and router behavior", () => {
   const hash = (candidate: LitellmProxyConfig): string => operationConfigHash(
     "routing-probe",
-    [claimVerificationAnsweringDescriptor],
+    [groundingGenerationDescriptor],
     {},
     { litellmConfig: candidate }
   );
@@ -172,12 +172,11 @@ test("exact operation identity still follows provider, fallback, and router beha
   assert.throws(() => hash(missingDeployment), /has no declared deployment/);
 });
 
-test("the three configured DeepSeek aliases share the DeepInfra primary and exact Parasail fallback", () => {
+test("neutral DeepSeek generation aliases are primary-only while the source judge keeps its fallback", () => {
   const proxy = readLitellmProxyConfig();
   const aliases = [
-    "kg-independent-judge",
-    "kg-claim-verification-answerer",
-    "kg-claim-factuality-judge"
+    "kg-source-less-node-generation",
+    "kg-grounding-generation"
   ];
   const deepSeekGroups = proxy.deployments
     .filter((deployment) => deployment.model === MODEL)
@@ -187,7 +186,6 @@ test("the three configured DeepSeek aliases share the DeepInfra primary and exac
 
   const identities = aliases.map((alias) => modelAssignmentIdentity(alias, proxy));
   assert.deepEqual(identities[1], identities[0]);
-  assert.deepEqual(identities[2], identities[0]);
   assert.deepEqual(identities[0]?.assignments.map((assignment) => assignment.quantization), [{ value: "fp8" }]);
 
   const expectedBehavior = (provider: "deepinfra/fp8" | "parasail/fp8") => ({
@@ -210,10 +208,13 @@ test("the three configured DeepSeek aliases share the DeepInfra primary and exac
   for (const alias of aliases) {
     const route = modelRoutingBehaviorIdentity(alias, proxy);
     assert.equal(route.primary.modelGroup, PRIMARY);
-    assert.deepEqual(route.fallbacks.map((fallback) => fallback.modelGroup), [BACKUP]);
+    assert.deepEqual(route.fallbacks, [], `${alias} remains primary-only until U2`);
     assert.equal(route.primary.deployments.length, 1);
-    assert.equal(route.fallbacks[0]?.deployments.length, 1);
     assert.deepEqual(route.primary.deployments[0]?.behavior, expectedBehavior("deepinfra/fp8"));
-    assert.deepEqual(route.fallbacks[0]?.deployments[0]?.behavior, expectedBehavior("parasail/fp8"));
   }
+
+  const sourceJudge = modelRoutingBehaviorIdentity("kg-independent-judge", proxy);
+  assert.equal(sourceJudge.primary.modelGroup, PRIMARY);
+  assert.deepEqual(sourceJudge.fallbacks.map((fallback) => fallback.modelGroup), [BACKUP]);
+  assert.deepEqual(sourceJudge.fallbacks[0]?.deployments[0]?.behavior, expectedBehavior("parasail/fp8"));
 });

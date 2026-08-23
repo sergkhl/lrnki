@@ -1,5 +1,5 @@
 ---
-model: kg-claim-extraction
+model: kg-grounding-generation
 lrnki:
   toolName: submit_generated_grounding_bundle
   toolDescription: Submit source-less generated grounding passages for one candidate concept.

@@ -8,7 +8,11 @@ import type {
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import { admissionDecisionsDescriptor, admissionLabelJudgmentDescriptor, conceptDiscoveryDescriptor, coreSelectionDescriptor, definitionEntailmentDescriptor, definitionPassageQualityDescriptor, evidenceProfileExtractionDescriptor } from "./extractionAdapters";
 import { mintingDurabilityDescriptor, prerequisiteOrderingDescriptor, rescuedNodeLabelingDescriptor, rescueDurabilityDescriptor } from "./enrichmentAdapters";
-import { nodeMergeAdjudicationDescriptor, NODE_EMBEDDING_MODEL } from "./dedupAdapters";
+import {
+  GENERATED_NODE_JUDGE_MODEL,
+  nodeMergeAdjudicationDescriptor,
+  NODE_EMBEDDING_MODEL
+} from "./dedupAdapters";
 import { missingPrerequisiteProposalDescriptor } from "./missingPrerequisiteProposalAdapters";
 import {
   claimFactualityChallengeDescriptor,
@@ -37,10 +41,6 @@ import { withModelOverride, type AnyNeuralStageDescriptor } from "./forcedToolSt
 export type TopicExpeditionModelRouting = Readonly<{
   generation: string;
   independentJudge: string;
-  claimVerificationAnswerer: string;
-  claimFactualityJudge: string;
-  claimVerificationPlanner: string;
-  claimFactualityChallenger: string;
   prerequisiteOrdering: string;
 }>;
 
@@ -49,16 +49,16 @@ export function effectiveSyntheticTopicGenerationDescriptors(
 ): readonly AnyNeuralStageDescriptor[] {
   return [
     withModelOverride(declaredDomainInferenceDescriptor, routing?.generation),
-    withModelOverride(conceptSetSynthesisDescriptor, routing?.generation),
+    conceptSetSynthesisDescriptor,
     knowledgeBoundaryProbeDescriptor,
-    withModelOverride(groundingGenerationDescriptor, routing?.generation),
-    withModelOverride(claimVerificationQuestionPlanningDescriptor, routing?.claimVerificationPlanner),
-    withModelOverride(claimVerificationAnsweringDescriptor, routing?.claimVerificationAnswerer),
-    withModelOverride(claimFactualityJudgmentDescriptor, routing?.claimFactualityJudge),
-    withModelOverride(claimFactualityChallengeDescriptor, routing?.claimFactualityChallenger),
+    groundingGenerationDescriptor,
+    claimVerificationQuestionPlanningDescriptor,
+    claimVerificationAnsweringDescriptor,
+    claimFactualityJudgmentDescriptor,
+    claimFactualityChallengeDescriptor,
     withModelOverride(prerequisiteOrderingDescriptor, routing?.prerequisiteOrdering),
-    withModelOverride(intrinsicDifficultyBandingDescriptor, routing?.independentJudge),
-    withModelOverride(intrinsicDifficultyComparisonDescriptor, routing?.independentJudge)
+    intrinsicDifficultyBandingDescriptor,
+    intrinsicDifficultyComparisonDescriptor
   ];
 }
 
@@ -116,7 +116,7 @@ export const neuralOperationRegistry = {
       rescueDurabilityDescriptor,
       rescuedNodeLabelingDescriptor,
       mintingDurabilityDescriptor,
-      nodeMergeAdjudicationDescriptor,
+      withModelOverride(nodeMergeAdjudicationDescriptor, GENERATED_NODE_JUDGE_MODEL),
       definitionPassageQualityDescriptor(STAGE_TAGS.rescueDefinitionQuality),
       intrinsicDifficultyBandingDescriptor,
       intrinsicDifficultyComparisonDescriptor

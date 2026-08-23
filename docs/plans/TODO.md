@@ -4,12 +4,12 @@
 
 ## TODO
 
-- **Operation-neutral DeepSeek Grounding — in progress; U0 complete, U1 next.** Follow
-  [the execution-order plan](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md). The clean
-  pre-cutover source/config and loaded-router inventory are frozen. Implement the complete primary-
-  route topology together while preserving Concept Canonicalization, Topic's learner-asset routing,
-  the application interface, context/correlation changes, admission policy, and consumer contracts;
-  do not draw providers or reload a process before the U1 candidate is committed.
+- **Operation-neutral DeepSeek Grounding — in progress; U0–U1 complete, U2 next.** Follow
+  [the execution-order plan](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md). The
+  primary-only source/config candidate unifies node production, Grounding Admission, and generated-
+  layer judgment without changing unrelated identities or the nineteen-stage profile. Run the fixed
+  direct-route matrix and add a proposed provider fallback only after its complete descriptor set
+  passes; do not reload LiteLLM or rebuild the API in U2.
 
 - **Source-less Grounding context and answer correlation — on hold; U0–U1 complete.** The
   [predecessor plan](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md) retains

@@ -542,8 +542,8 @@ export interface ClaimFactualityJudgmentPort {
 
 // Concept-set synthesis (R1, R2, KTD7). ONE forced-tool call generates a bounded
 // concept set from `topic + declaredDomain` alone — no source, no coverage/grain gate
-// in this build. The generator stays on the production extractor family (AGENTS rule 5); the probe below
-// is a cross-family second opinion.
+// in this build. The port is assignment-neutral; prompt frontmatter and LiteLLM config
+// own the producer/judge topology.
 export interface ConceptSetSynthesisPort {
   readonly model: string;
   synthesize(input: { topic: string; declaredDomain: string }): Promise<SynthesizedConcept[]>;

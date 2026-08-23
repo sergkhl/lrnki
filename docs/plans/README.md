@@ -12,10 +12,10 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-23-003 — Unify Source-less Grounding on DeepSeek](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md)
-   — **In progress; U0 complete, U1 next.** The clean pre-cutover source/config and loaded-router
-   inventory are frozen. Give all three Source-less Grounding consumers one operation-neutral
-   topology: DeepSeek produces source-less nodes and Grounding, MiMo answers and judges, and GPT-OSS
-   plans/challenges/orders; implement the primary-route candidate before any provider draw or reload.
+   — **In progress; U0–U1 complete, U2 next.** The primary-only source/config candidate gives all
+   three Source-less Grounding consumers one operation-neutral topology while preserving unrelated
+   identities and the nineteen-stage profile. Run the exact direct-route matrix; do not activate the
+   candidate or add a fallback until that route's complete descriptor set passes.
 
 2. [2026-08-23-002 — Deepen Source-less Grounding Context and Answer Correlation](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md)
    — **On hold; U0–U1 complete.** Identity context and exact-key answer correlation are committed.

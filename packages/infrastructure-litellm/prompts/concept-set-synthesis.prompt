@@ -1,5 +1,5 @@
 ---
-model: kg-concept-synthesis
+model: kg-source-less-node-generation
 lrnki:
   toolName: submit_synthesized_concepts
   toolDescription: Submit the bounded set of durable, independently-teachable concepts for the topic.

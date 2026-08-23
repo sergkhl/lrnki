@@ -1,5 +1,5 @@
 ---
-model: kg-claim-factuality-judge
+model: kg-grounding-factuality-judge
 lrnki:
   toolName: submit_claim_factuality_judgments
   toolDescription: Submit one structured falsification audit and accept-or-reject judgment for every listed positive claim target.

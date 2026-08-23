@@ -1,5 +1,5 @@
 ---
-model: kg-independent-judge
+model: kg-generated-node-judge
 lrnki:
   toolName: submit_difficulty_bands
   toolDescription: Submit one relative intrinsic-difficulty band (1-5) per listed domain concept.

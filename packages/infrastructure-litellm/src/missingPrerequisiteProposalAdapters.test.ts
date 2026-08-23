@@ -33,7 +33,7 @@ test("proposes assumed-prior prerequisites for one anchor, conditioned on its ev
   assert.equal(proposals[0].proposedLabel, "Stack allocation");
 
   const call = calls[0] as { model: string; toolName: string; messages: { content: string }[] };
-  assert.equal(call.model, "kg-claim-extraction");
+  assert.equal(call.model, "kg-source-less-node-generation");
   assert.equal(call.toolName, "submit_missing_prerequisites");
   assert.ok(call.messages.some((message) => message.content.includes("Copy Trait")));
   assert.ok(call.messages.some((message) => message.content.includes("Ownership")));

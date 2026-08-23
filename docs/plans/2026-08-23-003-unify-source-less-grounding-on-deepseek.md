@@ -7,7 +7,7 @@ execution: code
 
 # Unify Source-less Node Generation and Grounding on DeepSeek
 
-**Status:** In progress — U0 complete; U1 next
+**Status:** In progress — U0–U1 complete; U2 next
 
 **Decision state:** Locked by owner decision on 2026-08-23. DeepSeek V4 Flash 0731 owns Grounding
 Generation for every Source-less Grounding Admission consumer. Preserving ADR-0023 makes the paired
@@ -522,12 +522,55 @@ direct preflight, successful retry, or HTTP 200 does not substitute for real-use
   baseline and absence of an already-active candidate; it is not a served-contract, Model
   Assignment, real-use, deployed, browser, native, physical-device, latency, or release result.
 
+### U1 — implement the primary-only operation-neutral topology — 2026-08-23 — complete
+
+- The five Grounding Admission prompts now request operation-neutral aliases. Concept Set Synthesis
+  and missing-prerequisite proposal share `kg-source-less-node-generation`; minting durability and
+  both intrinsic-difficulty descriptors use `kg-generated-node-judge`. Graph Enrichment overrides
+  only its generated-layer merge descriptor to that judge, while Concept Canonicalization keeps the
+  base source-family judge. The worker constructs those two merge adapters separately.
+- `TopicExpeditionModelRouting` now owns only learner-asset generation, learner-asset judgment, and
+  prerequisite ordering. Topic and worker Source-less Grounding compositions use prompt defaults,
+  so Graph Enrichment, default/Topic Synthetic, and Scaffold resolve the same five admission roles.
+  The nine superseded public aliases/fallback entries and four caller routing fields have no active
+  source/config references; the regression test retains their names only to prove absence.
+- Route tests resolve the seven candidate aliases to DeepInfra DeepSeek FP8 with reasoning off,
+  Xiaomi MiMo FP8 with reasoning off, or Novita GPT-OSS FP4 with medium reasoning as approved. Each
+  alias is primary-only for U1, every generator/judge family pairing is distinct by resolved Model
+  Assignment, and no deployment group was duplicated.
+- Exact candidate hashes are Graph Enrichment `b9e03231cc3a`, Scaffold `3d2fd6f627c7`, default
+  Synthetic `baaa3b539272`, and Topic Synthetic `6184e63adc3e`. Default/Topic Study Item Bank remain
+  `d574e02753f9` / `02d755d9fae1`; Extraction remains `114ec9e8ddf5`; semantic Concept
+  Canonicalization remains `ce3969a22bea`; Topic remains nineteen conceptual stages.
+- Local automated checks passed: all 194 `@lrnki/infrastructure-litellm` tests, all eight worker
+  tests, the focused learner composition test, all eleven workspace typechecks, targeted ESLint,
+  retired runtime-reference searches, and `git diff --check`. The falsification runs exposed only
+  intentionally stale operation baselines and renamed model expectations; those were re-frozen and
+  the complete package suite then passed.
+- No provider request, database write, Compose lifecycle action, LiteLLM reload, API rebuild,
+  deployment, browser, native, physical-device, or release action occurred. The currently loaded
+  router still serves the pre-U1 topology; source and loaded-process evidence remain distinct.
+
+#### Real-use quality evaluation
+
+- **Milestone:** primary-only operation-neutral source/config candidate.
+- **Fixture and source type:** not run; U2 must qualify exact provider contracts before U3 may load
+  the candidate and U4 may exercise consumers.
+- **Real model calls used:** no.
+- **Result:** `BLOCKED` at this implementation unit by the ordered direct-route and activation gates.
+- **Useful output observed / defects observed / changes after inspection:** none evaluated.
+- **Remaining caveats:** structural reliability, served assignment, provider reachability, and all
+  affected-consumer usefulness remain unqualified.
+- **Safe to continue downstream:** yes to U2 direct-route qualification only; no to activation or
+  consumer-quality claims.
+
 ### Open findings
 
-- **NEXT:** execute U1 only: implement KTD1–KTD5 as one reviewable, primary-route source/config
-  candidate; delete the superseded aliases and routing fields; prove exact assignment independence,
-  affected hashes, and non-leakage with focused local checks; then persist and commit before any
-  provider draw, LiteLLM reload, API rebuild, or loaded-process mutation.
+- **NEXT:** execute U2 only: reverify endpoint metadata, then run KTD6 once per fixed case through
+  the unchanged retry envelope. Stop the matrix at the first terminal exhaustion or assignment/route
+  mismatch. Add a proposed alias fallback only after its complete descriptor set passes, re-freeze
+  routes and affected hashes, persist exact attributable attempts and semantic inspection, and
+  commit before any LiteLLM reload or API rebuild.
 - Parasail FP8 is only a proposed source-less generation fallback. U2 must qualify Concept Set
   Synthesis, missing-prerequisite proposal, and all three context-bearing Grounding cases there
   before adding either alias-keyed fallback to the candidate config; if it fails, keep those roles

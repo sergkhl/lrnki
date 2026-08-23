@@ -210,9 +210,9 @@ const mintingInput = {
   anchor: { canonicalLabel: "Borrowing", definitionQuotes: ["Borrowing lets code access a value without taking ownership."] }
 };
 
-test("minting durability judge runs on the independent cross-family alias", () => {
-  assert.equal(readPromptFile(mintingDurabilityDescriptor.promptPath).model, "kg-independent-judge");
-  assert.equal(mintingAdapterReturning({ verdict: "durable", rationale: "r" }).model, "kg-independent-judge");
+test("minting durability judge runs on the operation-neutral generated-node alias", () => {
+  assert.equal(readPromptFile(mintingDurabilityDescriptor.promptPath).model, "kg-generated-node-judge");
+  assert.equal(mintingAdapterReturning({ verdict: "durable", rationale: "r" }).model, "kg-generated-node-judge");
 });
 
 test("minting durability judge passes through the validated verdict", async () => {

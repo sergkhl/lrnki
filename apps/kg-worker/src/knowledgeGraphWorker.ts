@@ -61,6 +61,7 @@ import {
   LiteLlmForcedToolClient,
   LiteLlmSpendLogsReadAdapter,
   LiteLlmNodeEmbeddingAdapter,
+  GENERATED_NODE_JUDGE_MODEL,
   createNodeMergeAdjudicationPort,
   createClaimFactualityChallengePort,
   createClaimFactualityJudgmentPort,
@@ -228,17 +229,15 @@ function buildContext() {
     // Node-minting identity proposal plus the finished source-less admission module below.
     // The raw grounding generator is construction-only and cannot bypass admission here.
     missingPrerequisiteProposal: createMissingPrerequisiteProposalPort(deterministicClient),
-    // Synthetic topic generation, second pipeline arm (plan 2026-06-30-001, ADR-0019
-    // amended). Concept-set synthesis stays on the production extractor family with deterministic
-    // decoding for a stable concept set (AGENTS rule 5); the knowledge-boundary probe rides the
-    // MODERATE-temperature cross-family client so its K draws disperse at the model's
-    // knowledge boundary (KTD4).
+    // Synthetic topic generation uses the operation-neutral source-less node producer. The
+    // knowledge-boundary probe rides the MODERATE-temperature cross-family client so its K draws
+    // disperse at the model's knowledge boundary.
     conceptSetSynthesis: createConceptSetSynthesisPort(deterministicClient),
     knowledgeBoundaryProbe,
     sourceLessGroundingAdmission,
     graphConfig,
     syntheticConfig,
-    // Measured rescue durability judge (U3): cross-family independent judge
+    // Measured source-mentioned rescue durability judge: cross-family independent judge
     // (kg-independent-judge) decides whether each aggregated source_mentioned rescue
     // candidate is a durable prerequisite before it becomes a derived node. Drop-only,
     // fail-open-with-flag; the generator never grades rescue durability.
@@ -254,17 +253,19 @@ function buildContext() {
     // its spend joins the enrichment operation (ADR-0029). Drops hollow rescued optional
     // definitions before they reach study items; fails closed = preserve.
     rescuedDefinitionQualityJudge: createDefinitionPassageQualityJudgmentPort(deterministicClient, STAGE_TAGS.rescueDefinitionQuality),
-    // Measured minting durability judge: cross-family independent judge gates every
-    // reserved assumed-prerequisite proposal before source-less admission. Drop-only,
-    // fail-open-with-flag; the enabled minting path requires this dependency.
+    // The operation-neutral generated-node judge gates every DeepSeek prerequisite proposal before
+    // source-less admission. Drop-only, fail-open-with-flag; the enabled minting path requires this
+    // dependency.
     mintingDurabilityJudge: createMintingDurabilityJudgmentPort(deterministicClient),
-    // Semantic-dedup ports (plan U1/U2, AGENTS rule 20). Embeddings PROPOSE within-domain
-    // near-duplicate pairs (kg-node-embedding); a cross-family adjudicator DECIDES each
-    // merge (kg-independent-judge, deterministic decoding), so the generation family
-    // never decides its own merges. Both opt-in: enrich
-    // without them for the U7 baseline.
+    // Semantic-dedup ports (AGENTS rule 20). Embeddings PROPOSE within-domain near-duplicate
+    // pairs. Concept Canonicalization keeps the source-family independent judge, while generated
+    // Graph layers use MiMo so DeepSeek never decides a merge over its own nodes or Grounding.
     nodeEmbedding,
-    nodeMergeAdjudicator: createNodeMergeAdjudicationPort(deterministicClient),
+    conceptCanonicalizationNodeMergeAdjudicator: createNodeMergeAdjudicationPort(deterministicClient),
+    generatedNodeMergeAdjudicator: createNodeMergeAdjudicationPort(
+      deterministicClient,
+      GENERATED_NODE_JUDGE_MODEL
+    ),
     difficulty: createIntrinsicDifficultyPort(createIntrinsicDifficultyJudgmentPort(deterministicClient), DEFAULT_ENRICHMENT_CONFIG.difficultySampleCount),
     enrichmentStore: new PostgresEnrichmentRunStore(sql),
     // Learner Study Loop (ADR-0026): option-select study-item generation stays on the
@@ -386,7 +387,7 @@ async function canonicalizeConceptsCommand(ctx: Context, args: string[]) {
     graphStore: ctx.graphStore,
     canonicalizationStore: ctx.canonicalizationStore,
     embedding: ctx.nodeEmbedding,
-    adjudicator: ctx.nodeMergeAdjudicator,
+    adjudicator: ctx.conceptCanonicalizationNodeMergeAdjudicator,
     reporter: ctx.runProgressReporter
   });
   printCanonicalizationSummary(summarizeConceptCanonicalization(artifact));
@@ -486,7 +487,7 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
     // Dedup is opt-in (plan U3): ENRICH_DISABLE_DEDUP unsets both ports to produce the
     // exact-label baseline run for the U7 rule-14 comparison (same command, ports unset).
     nodeEmbedding: process.env.ENRICH_DISABLE_DEDUP ? undefined : ctx.nodeEmbedding,
-    nodeMergeAdjudicator: process.env.ENRICH_DISABLE_DEDUP ? undefined : ctx.nodeMergeAdjudicator,
+    nodeMergeAdjudicator: process.env.ENRICH_DISABLE_DEDUP ? undefined : ctx.generatedNodeMergeAdjudicator,
     difficulty: ctx.difficulty,
     enrichmentStore: ctx.enrichmentStore,
     config: ctx.graphConfig,

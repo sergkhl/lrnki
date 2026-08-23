@@ -3,7 +3,7 @@ import type { NodeEmbeddingPort, NodeMergeAdjudicationPort } from "@lrnki/ports"
 import { LiteLlmEmbeddingClient } from "./LiteLlmEmbeddingClient";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import { STAGE_TAGS } from "@lrnki/domain-core";
-import { executeForcedToolStage, type NeuralStageDescriptor } from "./forcedToolStage";
+import { executeForcedToolStage, withModelOverride, type NeuralStageDescriptor } from "./forcedToolStage";
 import { readPromptFile } from "./promptFile";
 import { nodeMergeAdjudicationSchema, nodeMergeAdjudicationValidator } from "./toolSchemas";
 
@@ -16,6 +16,7 @@ import { nodeMergeAdjudicationSchema, nodeMergeAdjudicationValidator } from "./t
 // Default embedding alias (wired in litellm/config.yaml → qwen3-embedding-8b). The
 // propose-side signal for within-domain near-duplicate detection.
 export const NODE_EMBEDDING_MODEL = "kg-node-embedding";
+export const GENERATED_NODE_JUDGE_MODEL = "kg-generated-node-judge";
 
 // Embedding propose adapter (U1). Returns one finite-number vector per derived-node text
 // through the embedding transport, fail-closed on any shape mismatch (R13) so the dedup
@@ -68,10 +69,14 @@ export const nodeMergeAdjudicationDescriptor: NeuralStageDescriptor<
   mapResult: (result) => ({ decision: result.decision, rationale: result.rationale })
 };
 
-export function createNodeMergeAdjudicationPort(client: LiteLlmForcedToolClient): NodeMergeAdjudicationPort {
+export function createNodeMergeAdjudicationPort(
+  client: LiteLlmForcedToolClient,
+  modelOverride?: string
+): NodeMergeAdjudicationPort {
+  const descriptor = withModelOverride(nodeMergeAdjudicationDescriptor, modelOverride);
   return {
-    model: readPromptFile(nodeMergeAdjudicationDescriptor.promptPath).model,
-    adjudicate: (input) => executeForcedToolStage(client, nodeMergeAdjudicationDescriptor, input)
+    model: modelOverride ?? readPromptFile(nodeMergeAdjudicationDescriptor.promptPath).model,
+    adjudicate: (input) => executeForcedToolStage(client, descriptor, input)
   };
 }
 

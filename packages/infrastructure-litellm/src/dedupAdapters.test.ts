@@ -27,9 +27,9 @@ function stubToolCall(args: unknown): { read: () => Record<string, unknown> } {
   return { read: () => captured };
 }
 
-function adapter() {
+function adapter(modelOverride?: string) {
   const client = new LiteLlmForcedToolClient({ baseUrl: "http://localhost:4000", apiKey: "sk-local", timeoutMs: 5000, maxRetries: 0 });
-  return createNodeMergeAdjudicationPort(client);
+  return createNodeMergeAdjudicationPort(client, modelOverride);
 }
 
 const pair = {
@@ -66,4 +66,12 @@ test("requests carry the node-merge-adjudication stage tag and the forced tool",
   const body = capture.read();
   assert.deepEqual(body.metadata, { tags: ["node-merge-adjudication"] });
   assert.deepEqual(body.tool_choice, { type: "function", function: { name: "submit_node_merge_decision" } });
+});
+
+test("a generated-layer composition override changes both the port identity and served model", async () => {
+  const capture = stubToolCall({ decision: "keep_distinct", rationale: "x" });
+  const generatedLayer = adapter("kg-generated-node-judge");
+  assert.equal(generatedLayer.model, "kg-generated-node-judge");
+  await generatedLayer.adjudicate(pair);
+  assert.equal(capture.read().model, "kg-generated-node-judge");
 });

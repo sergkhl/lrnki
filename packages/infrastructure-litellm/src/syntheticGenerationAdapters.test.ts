@@ -21,7 +21,7 @@ function clientReturning(canned: unknown, capture?: Capture): LiteLlmForcedToolC
 }
 
 test("synthesis descriptor frontmatter owns the DeepSeek-family synthesis alias", () => {
-  assert.equal(readPromptFile(conceptSetSynthesisDescriptor.promptPath).model, "kg-concept-synthesis");
+  assert.equal(readPromptFile(conceptSetSynthesisDescriptor.promptPath).model, "kg-source-less-node-generation");
 });
 
 test("probe descriptor frontmatter owns the small cross-family probe alias", () => {

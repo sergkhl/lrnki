@@ -58,13 +58,13 @@ test("generates an owner-neutral bundle conditioned on one closed scaffolded anc
 
   assert.equal("derivedNodeId" in bundle, false);
   assert.equal(bundle.groundingOrigin, "llm_grounded");
-  assert.equal(bundle.generatingModel, "kg-claim-extraction");
+  assert.equal(bundle.generatingModel, "kg-grounding-generation");
   assert.deepEqual(bundle.groundingAnchorReferences, ["copy"]);
   assert.equal(bundle.definitions[0].verbatimCheck.disposition, "not_applicable_by_grounding");
   assert.equal(bundle.mentions[0].passageType, "mention");
 
   const call = calls[0] as { model: string; toolName: string; messages: { content: string }[] };
-  assert.equal(call.model, "kg-claim-extraction");
+  assert.equal(call.model, "kg-grounding-generation");
   assert.equal(call.toolName, "submit_generated_grounding_bundle");
   assert.ok(call.messages.some((message) => message.content.includes("Candidate concept: \"Stack allocation\"")));
   assert.ok(call.messages.some((message) => message.content.includes("same identity: \"Automatic storage duration\"")));
@@ -186,7 +186,7 @@ test("planning sees owner-neutral targets while the external answer model receiv
   });
 
   assert.equal(calls[0].toolName, "submit_claim_verification_questions");
-  assert.equal(calls[0].model, "kg-claim-verification-planner");
+  assert.equal(calls[0].model, "kg-grounding-verification-planner");
   assert.ok(calls[0].messages.some((message) => message.content.includes("Draft-only marker")));
   assert.ok(calls[0].messages.some((message) => message.content.includes('{"targetKey":"definition:0","targetPurpose":"definition","text":"Draft-only marker defines the mechanism."}')));
   assert.ok(calls[0].messages.some((message) => message.content.includes("code-owned positive claim targets")));
@@ -236,7 +236,7 @@ test("planning sees owner-neutral targets while the external answer model receiv
     "mention:0"
   ]);
   assert.equal(calls[1].toolName, "submit_claim_verification_answers");
-  assert.equal(calls[1].model, "kg-claim-verification-answerer");
+  assert.equal(calls[1].model, "kg-grounding-verification-answerer");
   assert.ok(calls[1].messages.some((message) => message.content.includes("closest commonly confused concepts")));
   assert.ok(calls[1].messages.some((message) => message.content.includes("What distinguishes the two mechanisms?")));
   assert.ok(calls[1].messages.some((message) => message.content.includes("Correct a false premise")));
@@ -472,8 +472,8 @@ test("the factuality adapter returns judgments only and cannot settle or rewrite
   assert.deepEqual(challengerJudgments, judgments);
   const call = calls[0] as { model: string; toolName: string; tags: string[]; messages: { content: string }[] };
   const challengeCall = calls[1] as { model: string; toolName: string; tags: string[]; messages: { content: string }[] };
-  assert.equal(call.model, "kg-claim-factuality-judge");
-  assert.equal(challengeCall.model, "kg-claim-factuality-challenger");
+  assert.equal(call.model, "kg-grounding-factuality-judge");
+  assert.equal(challengeCall.model, "kg-grounding-factuality-challenger");
   assert.equal(call.toolName, "submit_claim_factuality_judgments");
   assert.equal(challengeCall.toolName, call.toolName);
   assert.deepEqual(call.tags, ["grounding-factuality-revision"]);

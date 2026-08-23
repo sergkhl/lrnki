@@ -1,5 +1,5 @@
 ---
-model: kg-independent-judge
+model: kg-generated-node-judge
 lrnki:
   toolName: submit_difficulty_comparison
   toolDescription: Submit which of the two listed concepts is intrinsically harder to master.

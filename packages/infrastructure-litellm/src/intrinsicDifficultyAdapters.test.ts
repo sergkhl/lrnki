@@ -99,7 +99,7 @@ test("bandDomainSet renders the numbered menu, bounds the call, and returns numb
     { conceptNumber: 2, band: 4, rationale: "integrates several ideas" }
   ]);
   const call = calls[0] as { model: string; toolName: string; maxRetries: number; messages: { content: string }[] };
-  assert.equal(call.model, "kg-independent-judge");
+  assert.equal(call.model, "kg-generated-node-judge");
   assert.equal(call.toolName, "submit_difficulty_bands");
   assert.equal(call.maxRetries, 2);
   assert.ok(call.messages.some((message) => message.content.includes("Concept 1: \"Example Concept\"")));
@@ -122,8 +122,8 @@ test("compareHarder presents both concepts symmetrically and returns only the di
   assert.ok(call.messages.some((message) => message.content.includes("Second concept: \"Second Concept\"")));
 });
 
-test("adapter defaults to the independent judge alias", () => {
-  assert.equal(createIntrinsicDifficultyJudgmentPort({} as LiteLlmForcedToolClient).model, "kg-independent-judge");
+test("adapter defaults to the operation-neutral generated-node judge alias", () => {
+  assert.equal(createIntrinsicDifficultyJudgmentPort({} as LiteLlmForcedToolClient).model, "kg-generated-node-judge");
 });
 
 test("rubric prompts and schema descriptions remain domain-neutral", () => {

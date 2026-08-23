@@ -1,5 +1,5 @@
 ---
-model: kg-claim-extraction
+model: kg-source-less-node-generation
 lrnki:
   toolName: submit_missing_prerequisites
   toolDescription: Submit the prerequisite concepts the source assumes but does not teach for one anchor.

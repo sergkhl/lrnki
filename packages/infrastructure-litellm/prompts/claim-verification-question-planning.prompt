@@ -1,5 +1,5 @@
 ---
-model: kg-claim-verification-planner
+model: kg-grounding-verification-planner
 lrnki:
   toolName: submit_claim_verification_questions
   toolDescription: Submit draft-independent factual questions covering every listed positive claim target.

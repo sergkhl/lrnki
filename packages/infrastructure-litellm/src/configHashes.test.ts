@@ -203,7 +203,7 @@ test("the all-descriptor inventory deduplicates shared descriptors", () => {
   ]);
   assert.deepEqual(claimJudges.map(
     (descriptor) => descriptor.modelOverride ?? readPromptFile(descriptor.promptPath).model
-  ), ["kg-claim-factuality-judge", "kg-claim-factuality-challenger"]);
+  ), ["kg-grounding-factuality-judge", "kg-grounding-factuality-challenger"]);
   assert.equal(
     allNeuralOperationDescriptors.filter(
       (descriptor) => descriptor.stageTag === STAGE_TAGS.groundingFactualityRevision
@@ -307,9 +307,9 @@ test("dropping any shared admission descriptor changes Graph Enrichment identity
 // same DeepSeek Provider Route, so an intentional route change re-baselines them together even
 // when their Model Assignment is preserved. Non-behavioral refactors must not perturb them.
 test("default operation config hashes are stable across the registry derivation", () => {
-  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-3cd73a12f2f2");
-  assert.equal(scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG), "learner-scaffold-generation-be49ba010024");
-  assert.equal(syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG), "synthetic-topic-generation-901788bb7bd4");
+  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-b9e03231cc3a");
+  assert.equal(scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG), "learner-scaffold-generation-3d2fd6f627c7");
+  assert.equal(syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG), "synthetic-topic-generation-baaa3b539272");
 });
 
 test("synthetic execution widths do not change identity while probe behavior still does", () => {

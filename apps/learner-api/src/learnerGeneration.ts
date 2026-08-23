@@ -46,10 +46,6 @@ import type { DatabaseClient } from "./db";
 export const TOPIC_EXPEDITION_MODEL_ROUTING = {
   generation: "kg-topic-expedition-generation",
   independentJudge: "kg-topic-expedition-independent-judge",
-  claimVerificationAnswerer: "kg-topic-expedition-claim-verification-answerer",
-  claimFactualityJudge: "kg-topic-expedition-claim-factuality-judge",
-  claimVerificationPlanner: "kg-topic-expedition-claim-verification-planner",
-  claimFactualityChallenger: "kg-topic-expedition-claim-factuality-challenger",
   prerequisiteOrdering: "kg-topic-expedition-prerequisite-ordering"
 } as const satisfies TopicExpeditionModelRouting;
 
@@ -70,18 +66,12 @@ export function createLearnerTopicExpeditionGeneration(sql: DatabaseClient): Top
   const sourceLessGroundingAdmission = createSourceLessGroundingAdmission({
     knowledgeBoundaryProbe: createKnowledgeBoundaryProbePort(probeClient),
     embedding: new LiteLlmNodeEmbeddingAdapter(embeddingClient),
-    groundingGeneration: createGroundingGenerationPort(deterministicClient, routing.generation),
-    claimVerificationQuestionPlanning: createClaimVerificationQuestionPlanningPort(
-      deterministicClient,
-      routing.claimVerificationPlanner
-    ),
-    claimVerificationAnswering: createClaimVerificationAnsweringPort(
-      deterministicClient,
-      routing.claimVerificationAnswerer
-    ),
+    groundingGeneration: createGroundingGenerationPort(deterministicClient),
+    claimVerificationQuestionPlanning: createClaimVerificationQuestionPlanningPort(deterministicClient),
+    claimVerificationAnswering: createClaimVerificationAnsweringPort(deterministicClient),
     claimFactualityJudgments: [
-      createClaimFactualityJudgmentPort(deterministicClient, routing.claimFactualityJudge),
-      createClaimFactualityChallengePort(deterministicClient, routing.claimFactualityChallenger)
+      createClaimFactualityJudgmentPort(deterministicClient),
+      createClaimFactualityChallengePort(deterministicClient)
     ],
     policy: syntheticConfig.sourceLessGroundingAdmission
   });
@@ -95,11 +85,11 @@ export function createLearnerTopicExpeditionGeneration(sql: DatabaseClient): Top
         declaredDomain: activity.declaredDomain,
         onDeclaredDomain: activity.onDeclaredDomain,
         declaredDomainInference: createDeclaredDomainInferencePort(deterministicClient, routing.generation),
-        conceptSetSynthesis: createConceptSetSynthesisPort(deterministicClient, routing.generation),
+        conceptSetSynthesis: createConceptSetSynthesisPort(deterministicClient),
         sourceLessGroundingAdmission,
         prerequisiteOrdering: createPrerequisiteOrderingPort(deterministicClient, routing.prerequisiteOrdering),
         difficulty: createIntrinsicDifficultyPort(
-          createIntrinsicDifficultyJudgmentPort(deterministicClient, routing.independentJudge),
+          createIntrinsicDifficultyJudgmentPort(deterministicClient),
           DEFAULT_ENRICHMENT_CONFIG.difficultySampleCount
         ),
         enrichmentStore,

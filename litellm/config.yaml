@@ -510,22 +510,14 @@ router_settings:
   # allowed_fails: 1
   enable_pre_call_checks: false
   cooldown_time: 15
-  # Explicit cross-deployment fallbacks, keyed on the request aliases. The knowledge-boundary
-  # probe retains its small cross-family Qwen backup. GPT-OSS roles move from DigitalOcean to
-  # same-model Groq only after an error. All three DeepSeek roles move from DeepInfra to the
-  # shared same-assignment Parasail group. The three Topic GPT aliases likewise move from Novita to
-  # their empirically qualified same-assignment Parasail group after an error. Separate groups keep
-  # every provider route attributable.
+  # Explicit cross-deployment fallbacks, keyed on request aliases. The knowledge-boundary probe,
+  # source-family independent judge, and general/Topic prerequisite ordering retain their qualified
+  # routes. The seven operation-neutral Source-less Grounding aliases deliberately have no fallback
+  # in the U1 candidate; U2 adds one only after its complete exact descriptor matrix passes.
   fallbacks:
     - kg-knowledge-boundary-probe: ["openrouter/qwen/qwen3-30b-a3b-instruct-2507"]
-    - kg-claim-verification-planner: ["openrouter/openai/gpt-oss-120b-groq-backup"]
     - kg-independent-judge: ["openrouter/deepseek/deepseek-v4-flash-0731-parasail-backup"]
-    - kg-claim-verification-answerer: ["openrouter/deepseek/deepseek-v4-flash-0731-parasail-backup"]
-    - kg-claim-factuality-judge: ["openrouter/deepseek/deepseek-v4-flash-0731-parasail-backup"]
-    - kg-claim-factuality-challenger: ["openrouter/openai/gpt-oss-120b-groq-backup"]
     - kg-prerequisite-ordering: ["openrouter/openai/gpt-oss-120b-groq-backup"]
-    - kg-topic-expedition-claim-verification-planner: ["openrouter/openai/gpt-oss-120b-topic-expedition-parasail-backup"]
-    - kg-topic-expedition-claim-factuality-challenger: ["openrouter/openai/gpt-oss-120b-topic-expedition-parasail-backup"]
     - kg-topic-expedition-prerequisite-ordering: ["openrouter/openai/gpt-oss-120b-topic-expedition-parasail-backup"]
   # disable_cooldowns: true
   # default_litellm_params:
@@ -545,35 +537,21 @@ router_settings:
     # Production generation assignment. The unresolved DeepSeek comparison, its evidence gap, and
     # scope options are owned by docs/brainstorms/2026-08-08-002-generation-model-evaluation.md.
     kg-claim-extraction: openrouter/xiaomi/mimo-v2.5
-    # Synthetic topic generation, second pipeline arm (ADR-0019 amended, plan
-    # 2026-06-30-001). Concept-set synthesis is the source-less analog of Candidate
-    # Discovery, so it stays on the production extractor family (AGENTS rule 5). The
-    # knowledge-boundary probe is a SMALL cross-family alias (llama-4-scout, Meta MoE
-    # ~17B active) independent of the MiMo synthesizer (KTD4): the K-sampled
-    # dispersion of a small model exposes its knowledge boundary. Forced tool_choice on
-    # the probe alias is empirically verified before locking (U2 verification); its
-    # moderate probe temperature is set on the client the worker constructs, not here.
-    # Reliability: this deployment honors forced tool_choice only via Groq on OpenRouter,
-    # so router_settings.fallbacks routes to a small cross-family Qwen3-30B-A3B deployment
-    # when a sustained Groq 429 would otherwise stall generation.
-    kg-concept-synthesis: openrouter/xiaomi/mimo-v2.5
+    # Source-less graph-node identity and Grounding use one operation-neutral DeepSeek assignment.
+    # Verification answering and primary/generated-node judgment use MiMo; planning and factuality
+    # challenge use GPT-OSS. These U1 aliases are primary-only until U2 qualifies each proposed
+    # provider fallback through its complete strict forced-tool descriptor set. The deployment
+    # groups are reused exactly; alias names own roles, not duplicate deployments.
+    kg-source-less-node-generation: openrouter/deepseek/deepseek-v4-flash-0731
+    kg-grounding-generation: openrouter/deepseek/deepseek-v4-flash-0731
+    kg-grounding-verification-planner: openrouter/openai/gpt-oss-120b-topic-expedition-novita
+    kg-grounding-verification-answerer: openrouter/xiaomi/mimo-v2.5-topic-expedition
+    kg-grounding-factuality-judge: openrouter/xiaomi/mimo-v2.5-topic-expedition
+    kg-grounding-factuality-challenger: openrouter/openai/gpt-oss-120b-topic-expedition-novita
+    kg-generated-node-judge: openrouter/xiaomi/mimo-v2.5-topic-expedition
+    # The knowledge-boundary probe remains a small cross-family alias. Its K-sampled dispersion
+    # exposes the boundary; the moderate temperature is owned by the constructed probe client.
     kg-knowledge-boundary-probe: openrouter/meta-llama/llama-4-scout
-    # Target-aware verification planning and draft-blind answering use reasoning-grade deployments
-    # under separately attributable aliases. U1's literal-strength discrimination matrix found that
-    # the former small shared deployment could turn a proposed assertion into a leading question and
-    # then repeat it as an answer. GPT-OSS-120B plans; pinned DeepSeek V4 Flash 0731 answers without
-    # target text. Neither settles learner text. Two independently sampled evidence packets reach
-    # the panel below, with a third complete packet only for an unreplicated objection.
-    kg-claim-verification-planner: openrouter/openai/gpt-oss-120b
-    kg-claim-verification-answerer: openrouter/deepseek/deepseek-v4-flash-0731
-    # Final Grounding Admission factuality panel. Separate aliases make both model assignments part
-    # of the operation config identity without changing any other kg-independent-judge consumer.
-    # DeepSeek 0731 and its DeepInfra→Parasail Provider Route are owned above; the
-    # challenger is provider-pinned GPT-OSS-120B. The families showed complementary blind spots,
-    # so neither settles alone: a model vetoes only after independently repeating the same rejection
-    # across separately planned and answered packets.
-    kg-claim-factuality-judge: openrouter/deepseek/deepseek-v4-flash-0731
-    kg-claim-factuality-challenger: openrouter/openai/gpt-oss-120b
     # Learner generation helper: infer a Declared Domain from the learner's
     # topic inside source-less concept generation. Stays on the production
     # extractor (AGENTS rule 5).
@@ -591,12 +569,10 @@ router_settings:
     # openrouter/qwen/qwen3-235b-a22b-2507 was forced-tool OK and faster but failed
     # quality parity, so the incumbent stays.
     kg-prerequisite-ordering: openrouter/openai/gpt-oss-120b
-    # Independent production judge (ADR-0007/0005): the concept-vs-proposition admission judge, the
-    # optional-assertion entailment judge, semantic-dedup merge adjudication, and Study Item Key
-    # Verification. Grounding factuality is deliberately owned by the claim-specific alias above
-    # after its separate U1 qualification. DeepSeek v4 flash is cross-family independent of
-    # the MiMo extractor, so the judge is never the extractor grading its own output, and it is
-    # cheaper than the gpt-oss-120b it replaced ($0.08/$0.18 vs $0.15/$0.60 per Mtok).
+    # Independent source-family judge (ADR-0007/0005): concept-vs-proposition admission,
+    # optional-assertion entailment, Concept Canonicalization merge adjudication, source-mentioned
+    # rescue judgments, and Study Item Key Verification. Generated-layer judgments use the
+    # operation-neutral MiMo alias above so DeepSeek never grades its own generated nodes.
     # ONE Model Assignment, deliberately: the provider-only fallback is attributable through
     # LiteLLM SpendLogs and does not mix model revision, quantization, or inference behavior. Moving
     # off the Groq-pinned gpt-oss-120b also removes the shared-account request-rate ceiling that took
@@ -605,19 +581,13 @@ router_settings:
     # (The off-core oracle triangle and label aligner were retired after the admission-precision fix;
     # see ADR-0013.)
     kg-independent-judge: openrouter/deepseek/deepseek-v4-flash-0731
-    # Topic Expedition cutover: seven public aliases preserve the global routes above while the
-    # source-less generation composition selects one exact DeepInfra/Xiaomi/GPT-OSS topology. The
-    # three GPT aliases have one same-assignment Parasail fallback after Novita failure; all
-    # OpenRouter deployments disable internal fallback.
+    # Topic owns only learner-asset generation/judgment and prerequisite ordering. Source-less node
+    # production, Grounding Admission, and generated-layer judgment use the neutral aliases above.
     kg-topic-expedition-generation: openrouter/deepseek/deepseek-v4-flash-0731
     kg-topic-expedition-independent-judge: openrouter/xiaomi/mimo-v2.5-topic-expedition
-    kg-topic-expedition-claim-verification-answerer: openrouter/xiaomi/mimo-v2.5-topic-expedition
-    kg-topic-expedition-claim-factuality-judge: openrouter/xiaomi/mimo-v2.5-topic-expedition
-    kg-topic-expedition-claim-verification-planner: openrouter/openai/gpt-oss-120b-topic-expedition-novita
-    kg-topic-expedition-claim-factuality-challenger: openrouter/openai/gpt-oss-120b-topic-expedition-novita
     kg-topic-expedition-prerequisite-ordering: openrouter/openai/gpt-oss-120b-topic-expedition-novita
-    # Derived-node semantic-dedup PROPOSE signal (plan U1, ADR-0012, AGENTS rule 20).
-    # Embeddings only propose near-duplicate candidate pairs within a Declared Domain;
-    # a separate cross-family adjudicator (kg-independent-judge) DECIDES each merge.
-    # Never used to derive prerequisites.
+    # Derived-node semantic-dedup PROPOSE signal (ADR-0012, AGENTS rule 20). Embeddings only
+    # propose near-duplicate pairs. Composition selects `kg-independent-judge` for source Concept
+    # Canonicalization and `kg-generated-node-judge` for generated Graph layers; raw similarity
+    # never decides a merge and embeddings never derive prerequisites.
     kg-node-embedding: openrouter/qwen/qwen3-embedding-8b

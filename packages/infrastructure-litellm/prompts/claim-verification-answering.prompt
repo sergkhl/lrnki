@@ -1,5 +1,5 @@
 ---
-model: kg-claim-verification-answerer
+model: kg-grounding-verification-answerer
 lrnki:
   toolName: submit_claim_verification_answers
   toolDescription: Submit a draft-blind factual answer object keyed by every exact listed verification question key.
