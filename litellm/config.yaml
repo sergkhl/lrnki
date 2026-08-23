@@ -181,10 +181,10 @@ model_list:
             - "google-vertex"
             - "google-ai-studio"
 
-  # Topic Expedition planner/challenger/ordering assignment. Novita FP4 passed all three exact
-  # strict forced-tool descriptors with temperature 0, seed 7, and medium reasoning. This group is
-  # intentionally single-provider: the scoped aliases have no router fallback, so attribution and
-  # Model Assignment identity stay exact during the development-candidate campaign.
+  # Topic Expedition planner/challenger/ordering primary. Novita FP4 passed all three exact strict
+  # forced-tool descriptors with temperature 0, seed 7, and medium reasoning. OpenRouter fallback
+  # stays disabled inside the deployment; LiteLLM owns the explicit, attributable same-assignment
+  # fallback below.
   - model_name: "openrouter/openai/gpt-oss-120b-topic-expedition-novita"
     litellm_params:
       model: "openrouter/openai/gpt-oss-120b"
@@ -202,6 +202,32 @@ model_list:
             - "novita/fp4"
           order:
             - "novita/fp4"
+          allow_fallbacks: false
+    model_info:
+      mode: "chat"
+      max_input_tokens: 131072
+
+  # Same Topic Expedition GPT-OSS Model Assignment, pinned to Parasail FP4. Novita's shared pool
+  # exhausted the production forced-tool retry budget during U3. Parasail passed all three exact
+  # descriptors only when the inaccurate OpenRouter `require_parameters` catalog prefilter was
+  # omitted; the served calls still carried temperature 0, seed 7, medium reasoning, the strict
+  # forced tool/schema, exact FP4 pin, and no OpenRouter fallback.
+  - model_name: "openrouter/openai/gpt-oss-120b-topic-expedition-parasail-backup"
+    litellm_params:
+      model: "openrouter/openai/gpt-oss-120b"
+      api_key: os.environ/OPENROUTER_API_KEY
+      input_cost_per_token: 0.0000001
+      output_cost_per_token: 0.00000075
+      extra_body:
+        reasoning:
+          effort: "medium"
+        provider:
+          quantizations:
+            - "fp4"
+          only:
+            - "parasail/fp4"
+          order:
+            - "parasail/fp4"
           allow_fallbacks: false
     model_info:
       mode: "chat"
@@ -487,8 +513,9 @@ router_settings:
   # Explicit cross-deployment fallbacks, keyed on the request aliases. The knowledge-boundary
   # probe retains its small cross-family Qwen backup. GPT-OSS roles move from DigitalOcean to
   # same-model Groq only after an error. All three DeepSeek roles move from DeepInfra to the
-  # shared same-assignment Parasail group. Separate groups keep every provider route attributable.
-  # Topic Expedition aliases are intentionally absent: each owns one preflighted provider only.
+  # shared same-assignment Parasail group. The three Topic GPT aliases likewise move from Novita to
+  # their empirically qualified same-assignment Parasail group after an error. Separate groups keep
+  # every provider route attributable.
   fallbacks:
     - kg-knowledge-boundary-probe: ["openrouter/qwen/qwen3-30b-a3b-instruct-2507"]
     - kg-claim-verification-planner: ["openrouter/openai/gpt-oss-120b-groq-backup"]
@@ -497,6 +524,9 @@ router_settings:
     - kg-claim-factuality-judge: ["openrouter/deepseek/deepseek-v4-flash-0731-parasail-backup"]
     - kg-claim-factuality-challenger: ["openrouter/openai/gpt-oss-120b-groq-backup"]
     - kg-prerequisite-ordering: ["openrouter/openai/gpt-oss-120b-groq-backup"]
+    - kg-topic-expedition-claim-verification-planner: ["openrouter/openai/gpt-oss-120b-topic-expedition-parasail-backup"]
+    - kg-topic-expedition-claim-factuality-challenger: ["openrouter/openai/gpt-oss-120b-topic-expedition-parasail-backup"]
+    - kg-topic-expedition-prerequisite-ordering: ["openrouter/openai/gpt-oss-120b-topic-expedition-parasail-backup"]
   # disable_cooldowns: true
   # default_litellm_params:
   #   temperature: 0.5
@@ -576,8 +606,9 @@ router_settings:
     # see ADR-0013.)
     kg-independent-judge: openrouter/deepseek/deepseek-v4-flash-0731
     # Topic Expedition cutover: seven public aliases preserve the global routes above while the
-    # source-less generation composition selects one exact DeepInfra/Xiaomi/Novita topology. None
-    # has a router_settings fallback; all OpenRouter deployments also disable internal fallback.
+    # source-less generation composition selects one exact DeepInfra/Xiaomi/GPT-OSS topology. The
+    # three GPT aliases have one same-assignment Parasail fallback after Novita failure; all
+    # OpenRouter deployments disable internal fallback.
     kg-topic-expedition-generation: openrouter/deepseek/deepseek-v4-flash-0731
     kg-topic-expedition-independent-judge: openrouter/xiaomi/mimo-v2.5-topic-expedition
     kg-topic-expedition-claim-verification-answerer: openrouter/xiaomi/mimo-v2.5-topic-expedition

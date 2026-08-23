@@ -4,12 +4,12 @@
 
 ## TODO
 
-- **DeepSeek Flash Topic Expedition cutover — U2 complete; U3 next.** Follow the
+- **DeepSeek Flash Topic Expedition cutover — U3 route recovery next.** Follow the
   [active plan](./2026-08-23-001-cut-over-topic-expedition-generation-to-deepseek-flash.md). It
-  has completed U2: all seven aliases serve the exact DeepInfra/Xiaomi/Novita topology with loaded
-  deployment and SpendLogs attribution. Next hard-reset only the local application database, run
-  the three KTD5 topics plus the Cellular Respiration repeat, and inspect the joined real-use report.
-  The active candidate remains unqualified for release.
+  retains the exact GPT-OSS FP4 assignment but adds the first fully qualified Parasail backup after
+  Novita shared-pool exhaustion. Next reload LiteLLM, rebuild the API, prove served fallback
+  attribution, and resume the remaining serial KTD5 expeditions. The candidate remains unqualified
+  for release.
 
 - **Topic Expedition generation latency — blocked; U3 remains `FIX_FIRST`.** Follow
   [the active plan](./2026-08-22-001-repair-topic-expedition-generation-latency.md) in U0–U4 order.

@@ -7,7 +7,7 @@ execution: code
 
 # Cut Over Topic Expedition Generation to DeepSeek Flash and Measure Stage Value
 
-**Status:** In progress — U2 complete; U3 bounded real-use sample next
+**Status:** In progress — U3 exposed and repaired a GPT route-capacity defect; served fallback proof next
 
 **Decision state:** Locked. The accepted direction, dated comparison, and known quality defects
 remain in the
@@ -173,9 +173,9 @@ the corresponding global alias:
 | `kg-topic-expedition-independent-judge` | difficulty banding/comparison, lesson redundancy, both key verifiers, matching assignment | Xiaomi MiMo v2.5, FP8, reasoning off, temperature 0, best-effort seed 7 | `xiaomi/fp8` only |
 | `kg-topic-expedition-claim-verification-answerer` | draft-blind answers | same MiMo assignment | `xiaomi/fp8` only |
 | `kg-topic-expedition-claim-factuality-judge` | primary factuality judgments | same MiMo assignment | `xiaomi/fp8` only |
-| `kg-topic-expedition-claim-verification-planner` | verification questions | OpenAI `gpt-oss-120b`, FP4, reasoning effort `medium`, temperature 0, seed 7 | `novita/fp4` only |
-| `kg-topic-expedition-claim-factuality-challenger` | second-family factuality judgments | same GPT-OSS assignment | `novita/fp4` only |
-| `kg-topic-expedition-prerequisite-ordering` | whole-set ordering | same GPT-OSS assignment | `novita/fp4` only |
+| `kg-topic-expedition-claim-verification-planner` | verification questions | OpenAI `gpt-oss-120b`, FP4, reasoning effort `medium`, temperature 0, seed 7 | `novita/fp4` primary; `parasail/fp4` fallback |
+| `kg-topic-expedition-claim-factuality-challenger` | second-family factuality judgments | same GPT-OSS assignment | same primary and fallback |
+| `kg-topic-expedition-prerequisite-ordering` | whole-set ordering | same GPT-OSS assignment | same primary and fallback |
 
 The GPT-OSS choice follows the official
 [`gpt-oss-120b` model contract](https://developers.openai.com/api/docs/models/gpt-oss-120b):
@@ -206,9 +206,14 @@ not catalog text, qualify the implementation.
 Create one Topic-only MiMo deployment group with explicit FP8 quantization, reasoning disabled, the
 qualified provider pin, and no `require_parameters` prefilter. Do not alter the shared MiMo
 deployment merely to make the new judge identity exact; doing so would broaden the config-identity
-change to unrelated consumers. All seven scoped aliases are deliberately single-provider during
-this development-candidate campaign; OpenRouter fallback remains disabled, and a later fallback
-requires its own complete descriptor preflight and recorded amendment.
+change to unrelated consumers. OpenRouter fallback remains disabled for every scoped deployment.
+
+U3 amended only the GPT Provider Route after Novita's shared upstream pool exhausted the production
+retry budget. Parasail's catalog prefilter rejected all three descriptors with
+`require_parameters`, but the repository-authorized empirical matrix passed all three exact served
+calls when only that filter was omitted. LiteLLM therefore owns one alias-keyed Parasail FP4 backup
+for each GPT role. Primary and fallback share the exact model, quantization, reasoning policy, and
+sampling inputs; their separate groups keep physical-provider attribution explicit.
 
 The Knowledge-Boundary Probe remains Meta Llama with its current Qwen fallback. The resulting
 Grounding Admission has DeepSeek generation, MiMo answer/primary judgment, and GPT-OSS planning and
@@ -543,12 +548,41 @@ hidden by prompt tuning, regeneration, lower quorum, lexical rejection, or an un
   tool evidence—not a complete Topic Expedition, persistence, learner usefulness, browser, native,
   physical-device, deployed, or final-release evidence.
 
+### U3 — bounded sample and same-assignment route recovery — 2026-08-23 — in progress
+
+- The local application schemas were reset and the rebuilt production-composed API started from an
+  empty Topic queue. Cellular Respiration operation `ce077719-5ef1-42c1-9334-e8fb0f16a5d5`
+  reached Grounding Admission in 879 seconds, where MiMo and GPT independently rejected the same
+  universalized mitochondrial Pyruvate Oxidation claim. Inspection classified this as the known
+  decontextualization/non-atomic factual-scope problem class, not a route defect; zero learner assets
+  persisted. Its 327 successful-call positive control covered 947,565 tokens and $0.04861505475.
+- Database Transaction Isolation Levels exhausted three supervised attempts:
+  `bec9d1ed-c4ba-4ee2-8342-5ae9fd438ee0`, `91e8ac76-b876-472d-894f-bbc30ec10e93`, and
+  `e667ddb7-7f70-4804-8824-1573d65e3965`. Operation-stage detail and proxy logs attributed nine
+  forced-tool HTTP 429s to Novita's OpenRouter shared upstream pool. The same-operation positive
+  control contained 704 successful calls, 1,018,676 tokens, and $0.08408492495; zero learner assets
+  persisted. The 1,450-second terminal failure is `FIX_FIRST` Provider Route capacity evidence.
+- Fallback qualification kept the GPT-OSS FP4 Model Assignment fixed. Parasail and Nebius were each
+  catalog-filtered 3/3 with `require_parameters`; CoreWeave's served planner and challenger violated
+  their strict schemas. Under the root-README exception, Parasail then passed planner, challenger,
+  and ordering 3/3 with exact FP4 pin, medium reasoning present, validator-accepted forced tools,
+  and internal fallback off. No second empirical provider matrix ran after that first full pass.
+- The committed candidate retains Novita primary and adds one alias-keyed Parasail backup to the
+  three GPT roles. Deterministic route tests prove exactly one deployment per leg and one Model
+  Assignment across each primary/fallback pair. Candidate hashes are
+  `synthetic-topic-generation-dd501cd6075b` and `study-item-bank-02d755d9fae1`; focused routing,
+  full infrastructure-LiteLLM and learner-API suites, both package typechecks, targeted lint, and
+  `git diff --check` passed. This is local source, direct-provider, runtime-failure, and inspected
+  partial real-use evidence—not loaded-fallback, completed-sample, learner-usefulness, or release
+  evidence.
+
 ### Open findings
 
-- **NEXT:** apply the validation skill's real-use route, hard-reset only the local development
-  application database, verify an empty Topic queue, and run the three KTD5 topics plus the Cellular
-  Respiration repeat through the fresh production composition. Build and inspect the joined report
-  before assigning any learner-quality verdict.
+- **NEXT:** reload LiteLLM from this committed config, rebuild the learner API because the config is
+  an operation-hash build input, and prove all three public GPT aliases fall through to the exact
+  Parasail deployment in served-call attribution. Then resume the serial KTD5 sample with a clean
+  Database retry, Comparative Advantage, and the Cellular Respiration repeat; inspect the joined
+  report before assigning final learner-quality verdicts.
 - U4 remains gated by U3. The active route invalidates prior usefulness evidence for all affected
   consumers; U3 is the first current candidate evidence, and final release qualification remains
   intentionally deferred until the pipeline shape settles.

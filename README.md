@@ -218,6 +218,10 @@ during restart is expected). A `pnpm-lock.yaml` change made while watch is activ
 image rebuild it requires. If that file changed while watch was stopped, use
 `pnpm dev:api:rebuild` before resuming.
 
+`litellm/config.yaml` is also a learner-API image build input: operation hashes resolve the exact
+model, provider, and fallback topology from that file. After changing it, reload LiteLLM as below
+and run `pnpm dev:api:rebuild`; source sync alone leaves the API calculating stale identities.
+
 Both commands start Compose services detached and leave only the file watcher in the foreground. If
 the watcher is not on screen, changes are not syncing; ending it leaves the detached API running.
 Stop it before deploying: `scripts/deploy-learner-api.sh` refuses while one is attached because a

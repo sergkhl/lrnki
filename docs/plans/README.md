@@ -12,9 +12,9 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-23-001 — Cut Over Topic Expedition Generation to DeepSeek Flash and Measure Stage Value](./2026-08-23-001-cut-over-topic-expedition-generation-to-deepseek-flash.md)
-   — **In progress; U2 complete, U3 real-use sample next.** All seven scoped aliases are loaded and
-   attributed to the exact DeepInfra/Xiaomi/Novita topology. Reset only the local application data,
-   run the four bounded KTD5 expeditions, and inspect every descriptor output and learner asset.
+   — **In progress; U3 route-capacity recovery candidate ready.** Cellular exposed a correct
+   semantic rejection and Database exposed Novita shared-pool exhaustion. Reload and prove the
+   qualified same-assignment Parasail fallback, then resume the remaining serial KTD5 sample.
 
 2. [2026-08-22-001 — Restore Topic Expedition Generation to Seven Minutes](./2026-08-22-001-repair-topic-expedition-generation-latency.md)
    — **Blocked in U3 (`FIX_FIRST`).** The bounded pipeline and shared stage profile are complete,

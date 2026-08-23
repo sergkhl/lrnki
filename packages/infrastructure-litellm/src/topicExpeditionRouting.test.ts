@@ -56,6 +56,7 @@ const routing: TopicExpeditionModelRouting = {
 const DEEPSEEK_GROUP = "openrouter/deepseek/deepseek-v4-flash-0731";
 const MIMO_GROUP = "openrouter/xiaomi/mimo-v2.5-topic-expedition";
 const GPT_GROUP = "openrouter/openai/gpt-oss-120b-topic-expedition-novita";
+const GPT_FALLBACK_GROUP = "openrouter/openai/gpt-oss-120b-topic-expedition-parasail-backup";
 
 test("every Topic adapter factory exposes its effective scoped model without changing composition", () => {
   const client = {} as LiteLlmForcedToolClient;
@@ -142,6 +143,11 @@ test("Topic overrides change only Topic hashes while default identities and the 
   );
   assert.notEqual(studyItemBankConfigHash(resolvableRouting), studyItemBankConfigHash());
   assert.equal(
+    syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG, routing),
+    "synthetic-topic-generation-dd501cd6075b"
+  );
+  assert.equal(studyItemBankConfigHash(routing), "study-item-bank-02d755d9fae1");
+  assert.equal(
     syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG),
     "synthetic-topic-generation-7b8549a3e0cc"
   );
@@ -156,9 +162,13 @@ test("Topic overrides change only Topic hashes while default identities and the 
   assert.equal(TOPIC_EXPEDITION_STAGE_PROFILE.study_items.length, 10);
 });
 
-test("configured Topic aliases resolve one exact DeepInfra, Xiaomi, or Novita deployment with no fallback", () => {
+test("configured Topic aliases resolve exact assignments and only GPT has one qualified provider fallback", () => {
   const proxy = readLitellmProxyConfig();
-  const expected = new Map<string, { group: string; behavior: Record<string, unknown> }>([
+  const expected = new Map<string, {
+    group: string;
+    behavior: Record<string, unknown>;
+    fallback?: { group: string; behavior: Record<string, unknown> };
+  }>([
     [routing.generation, {
       group: DEEPSEEK_GROUP,
       behavior: {
@@ -221,6 +231,24 @@ test("configured Topic aliases resolve one exact DeepInfra, Xiaomi, or Novita de
           }
         },
         modelInfo: { mode: "chat", max_input_tokens: 131072 }
+      },
+      fallback: {
+        group: GPT_FALLBACK_GROUP,
+        behavior: {
+          litellmParams: {
+            model: "openrouter/openai/gpt-oss-120b",
+            extra_body: {
+              reasoning: { effort: "medium" },
+              provider: {
+                quantizations: ["fp4"],
+                only: ["parasail/fp4"],
+                order: ["parasail/fp4"],
+                allow_fallbacks: false
+              }
+            }
+          },
+          modelInfo: { mode: "chat", max_input_tokens: 131072 }
+        }
       }
     }] as const)
   ]);
@@ -230,7 +258,15 @@ test("configured Topic aliases resolve one exact DeepInfra, Xiaomi, or Novita de
     assert.equal(route.primary.modelGroup, routeExpectation.group, alias);
     assert.equal(route.primary.deployments.length, 1, alias);
     assert.deepEqual(route.primary.deployments[0]?.behavior, routeExpectation.behavior, alias);
-    assert.deepEqual(route.fallbacks, [], alias);
+    if (!routeExpectation.fallback) {
+      assert.deepEqual(route.fallbacks, [], alias);
+      continue;
+    }
+    assert.equal(route.fallbacks.length, 1, alias);
+    assert.equal(route.fallbacks[0]?.modelGroup, routeExpectation.fallback.group, alias);
+    assert.equal(route.fallbacks[0]?.deployments.length, 1, alias);
+    assert.deepEqual(route.fallbacks[0]?.deployments[0]?.behavior, routeExpectation.fallback.behavior, alias);
+    assert.equal(modelAssignmentIdentity(alias, proxy).assignments.length, 1, alias);
   }
 
   const assignmentModels = [
