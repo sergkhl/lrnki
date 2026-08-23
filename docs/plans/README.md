@@ -12,10 +12,9 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-23-003 — Unify Source-less Grounding on DeepSeek](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md)
-   — **In progress; U0–U2 complete, U3 next.** Every primary route and both GPT Parasail contracts
-   passed; the semantically failed DeepSeek Parasail fallback remains unreachable. Activate the exact
-   committed candidate through the detached host runbook and prove all seven public aliases plus
-   retired-alias absence before consumer real-use.
+   — **In progress; U0–U3 complete, U4 next.** The exact committed local composition is healthy;
+   all seven public aliases passed on their intended primaries with matched SpendLogs, and every
+   retired alias is absent. Run and inspect the fixed affected-consumer quality matrix next.
 
 2. [2026-08-23-002 — Deepen Source-less Grounding Context and Answer Correlation](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md)
    — **On hold; U0–U1 complete.** Identity context and exact-key answer correlation are committed.

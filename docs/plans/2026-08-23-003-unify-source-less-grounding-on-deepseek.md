@@ -7,7 +7,7 @@ execution: code
 
 # Unify Source-less Node Generation and Grounding on DeepSeek
 
-**Status:** In progress — U0–U2 complete; U3 next
+**Status:** In progress — U0–U3 complete; U4 next
 
 **Decision state:** Locked by owner decision on 2026-08-23. DeepSeek V4 Flash 0731 owns Grounding
 Generation for every Source-less Grounding Admission consumer. Preserving ADR-0023 makes the paired
@@ -595,10 +595,37 @@ direct preflight, successful retry, or HTTP 200 does not substitute for real-use
   defects excluded that fallback, and the qualified GPT fallback was added.
 - **Safe to continue downstream:** yes to U3 alias proof only; not yet to usefulness.
 
+### U3 — activate the committed local composition and prove aliases — 2026-08-23 — complete
+
+- Candidate `16ee119` was rebuilt and recreated through the detached root Compose runbook. The
+  running API image matched `lrnki-learner-api:latest`, was healthy, and contained byte-identical
+  copies of every U1/U2 source/config file; the loaded router config matched tracked SHA-256
+  `d0c04b90d8adcbd9982b21fb97b5eb0ae355e59a0aa4f4b60f05590d0546ac47`.
+- Authenticated `/models` exposed all seven neutral aliases and none of the eight retired claim-role
+  aliases or `kg-concept-synthesis`. `/model/info` exposed the four expected primary/fallback
+  deployment identities; the one router and one API process both served the candidate mapping.
+- One uniquely tagged production forced-tool call through each public alias passed on its first
+  upstream attempt. SpendLogs retained each requested alias and resolved by `model_id` to two
+  DeepInfra DeepSeek primary calls, two Novita GPT-OSS primary calls, and three Xiaomi MiMo primary
+  calls. No fallback was forced; U2 retains its direct GPT fallback proof.
+- The seven matched rows contained 11,332 prompt and 3,692 completion tokens and USD 0.000732492
+  recorded spend. A joined error-table query used those same seven rows as its positive control and
+  found zero matched errors; every response status and stored error field was clean.
+
+#### Real-use quality evaluation
+
+- **Milestone / fixture:** exact committed local activation; one descriptor sentinel per public alias.
+- **Real model calls / result:** seven public-alias contracts `PASS`; consumer usefulness remains
+  `INCONCLUSIVE` until U4 because these calls did not settle an affected operation.
+- **Useful output / defects / changes:** strict outputs mapped successfully; no route, retry, schema,
+  loaded-identity, retired-alias, SpendLog, or matched-error defect remained.
+- **Safe to continue downstream:** yes to U4 affected-consumer qualification only.
+
 ### Open findings
 
-- **NEXT:** execute U3 only: rebuild/recreate the exact committed local candidate through the root
-  detached host runbook, verify image/source/config identity and health, call all seven public aliases
-  with unique tags, reconcile SpendLogs, and prove retired aliases absent before any consumer run.
+- **NEXT:** execute U4 only: reset the development app database, run the four fixed Topic
+  Expeditions plus one worker-default Synthetic operation, the smallest real Graph Enrichment that
+  exercises generated prerequisite minting and merge adjudication, and one generated Support Step;
+  inspect every output, artifact, retry, error, fallback, spend row, and same-query positive control.
 - The latency plan remains blocked until U4 produces one successful, fully inspected quality
   baseline. This plan does not claim or tune the 420-second target.

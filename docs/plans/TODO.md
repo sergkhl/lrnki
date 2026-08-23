@@ -4,10 +4,11 @@
 
 ## TODO
 
-- **Operation-neutral DeepSeek Grounding — in progress; U0–U2 complete, U3 next.** Follow
-  [the execution-order plan](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md). All primary
-  routes and both GPT fallback contracts passed; DeepSeek Parasail stays unreachable after failing
-  all three Grounding semantics. Activate and prove the exact committed local aliases before U4.
+- **Operation-neutral DeepSeek Grounding — in progress; U0–U3 complete, U4 next.** Follow
+  [the execution-order plan](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md). The exact
+  local candidate is active and healthy; all seven public aliases passed on their intended primary
+  deployments with matched SpendLogs, zero matched errors, and no retired aliases loaded. Run and
+  inspect the complete affected-consumer quality matrix next.
 
 - **Source-less Grounding context and answer correlation — on hold; U0–U1 complete.** The
   [predecessor plan](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md) retains
