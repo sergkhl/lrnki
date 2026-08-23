@@ -7,7 +7,7 @@ execution: code
 
 # Cut Over Topic Expedition Generation to DeepSeek Flash and Measure Stage Value
 
-**Status:** In progress — U4 matrix complete; successor and consolidation next
+**Status:** In progress — U4 complete; successor ready; consolidation next
 
 **Decision state:** Locked. The accepted direction, dated comparison, and known quality defects
 remain in the
@@ -530,11 +530,12 @@ No row supports `COMBINE` or `REMOVE`; therefore no targeted repeat ran. Session
 freezes the smallest material change as `DEEPEN` for Grounding Generation and Verification
 Answering only; all other rows remain `KEEP` through final qualification.
 
+The ready successor is
+[Deepen Source-less Grounding Context and Answer Correlation](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md).
+It owns only the two accepted deepening seams, their shared-consumer quality gates, and the handoff
+to the existing latency plan. No simplification code or extra model run was added here.
+
 ### Open findings
 
-- **NEXT:** create and link the smallest ready successor owning only Grounding Generation,
-  Verification Answering, prompt/cost observability, and final 19-stage qualification; then record
-  the U4 handoff and consolidate this plan.
-- Restore prompt-message observability or amend the inspection workflow to its actual storage
-  boundary, and restore attributable Xiaomi cost before a release claim. Do not infer rendered
-  prompts or zero actual cost from the current SpendLogs rows.
+- **NEXT:** consolidate current outcome and durable references, then delete this completed plan in a
+  separate commit. The successor owns implementation and the actual prompt/cost observation paths.

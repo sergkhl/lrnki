@@ -12,12 +12,14 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-23-001 — Cut Over Topic Expedition Generation to DeepSeek Flash and Measure Stage Value](./2026-08-23-001-cut-over-topic-expedition-generation-to-deepseek-flash.md)
-   — **In progress; U4 matrix complete.** `DEEPEN` only Grounding Generation and Verification
-   Answering; `KEEP` the other 17 stages. Create the focused final-qualification successor, then
-   consolidate this plan.
+   — **In progress; U4 complete.** The focused successor is ready. Consolidate and delete this plan;
+   do not begin successor implementation in the same batch.
 
-2. [2026-08-22-001 — Restore Topic Expedition Generation to Seven Minutes](./2026-08-22-001-repair-topic-expedition-generation-latency.md)
+2. [2026-08-23-002 — Deepen Source-less Grounding Context and Answer Correlation](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md)
+   — **Ready; U0 next.** Supply batch-owned identity context, make answer correlation structural,
+   and qualify Topic, Graph Enrichment, and Support Step consumers before latency resumes.
+
+3. [2026-08-22-001 — Restore Topic Expedition Generation to Seven Minutes](./2026-08-22-001-repair-topic-expedition-generation-latency.md)
    — **Blocked in U3 (`FIX_FIRST`).** The bounded pipeline and shared stage profile are complete,
-   but widths 8, 12, and 16 missed the latency/quality contract and production-model remediation
-   trials failed. U4 remains gated behind the DeepSeek cutover's evidence and the resulting final
-   pipeline-shape decision.
+   but widths 8, 12, and 16 missed the latency/quality contract. Resume only after the deepening
+   successor supplies a successful, fully inspected quality baseline.

@@ -4,19 +4,25 @@
 
 ## TODO
 
-- **DeepSeek Flash Topic Expedition cutover — U4 matrix complete; successor next.** Follow the
+- **DeepSeek Flash Topic Expedition cutover — U4 complete; consolidate next.** Follow the
   [active plan](./2026-08-23-001-cut-over-topic-expedition-generation-to-deepseek-flash.md). It
-  assigns `DEEPEN` only to Grounding Generation and Verification Answering and keeps the other 17
-  stages. Create the focused deepening/final-qualification successor and consolidate this plan.
-  The candidate remains unqualified for release.
+  assigns `DEEPEN` only to Grounding Generation and Verification Answering, keeps the other 17
+  stages, and has created the ready successor. Consolidate and delete the cutover plan next. The
+  candidate remains unqualified for release.
+
+- **Source-less Grounding and answer correlation — ready; U0 next.** Follow the
+  [active plan](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md). Preserve
+  the deep admission interface while supplying batch-owned identity context and replacing answer
+  arrays with an exact key-indexed provider shape. Qualify all three affected consumers before
+  unblocking latency work.
 
 - **Topic Expedition generation latency — blocked; U3 remains `FIX_FIRST`.** Follow
   [the active plan](./2026-08-22-001-repair-topic-expedition-generation-latency.md) in U0–U4 order.
   The bounded admission pipeline and honest 19-stage Journal profile are complete, but equal widths
   8, 12, and 16 all exceeded seven minutes during enrichment and every settled attempt rejected
   over-broad Grounding Bundles. Production-model prompt/schema and pre-draft trials did not clear
-  the unchanged admission contract and were discarded. Keep width four and U4 gated behind the
-  cutover evidence and final pipeline-shape decision above.
+  the unchanged admission contract and were discarded. Keep width four and resume only after the
+  deepening plan supplies a successful, fully inspected quality baseline.
 
 ## COMPLETED
 
