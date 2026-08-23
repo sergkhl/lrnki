@@ -4,21 +4,20 @@
 
 ## TODO
 
+- **DeepSeek Flash Topic Expedition cutover — ready; execute first.** Follow the
+  [active plan](./2026-08-23-001-cut-over-topic-expedition-generation-to-deepseek-flash.md). It
+  preserves the current 19-stage topology, scopes the exact DeepSeek and independent-judge routes
+  to Topic Expedition, and collects a bounded per-stage quality/latency/cost dataset before any
+  simplification. The candidate remains unqualified for release until the final pipeline shape and
+  its follow-up gate are complete.
+
 - **Topic Expedition generation latency — blocked; U3 remains `FIX_FIRST`.** Follow
   [the active plan](./2026-08-22-001-repair-topic-expedition-generation-latency.md) in U0–U4 order.
   The bounded admission pipeline and honest 19-stage Journal profile are complete, but equal widths
   8, 12, and 16 all exceeded seven minutes during enrichment and every settled attempt rejected
   over-broad Grounding Bundles. Production-model prompt/schema and pre-draft trials did not clear
   the unchanged admission contract and were discarded. Keep width four and U4 gated behind the
-  DeepSeek cutover and pipeline-simplification follow-up below.
-
-- **DeepSeek Flash generation cutover — direction decided; no implementation plan is ready.** The
-  [brainstorm](../brainstorms/2026-08-08-002-generation-model-evaluation.md) owns the dated evidence
-  and follow-up scope. Recheck the latest official Flash release, pin one exact Model Assignment,
-  then interview one decision at a time about which expedition generation stages to remove/combine
-  and which remaining independent judge satisfies the unchanged ADRs. Release validation qualifies
-  the selected assignment, route, consumers, latency, cost, and learner quality; it does not reopen
-  the model choice.
+  cutover evidence and final pipeline-shape decision above.
 
 ## COMPLETED
 

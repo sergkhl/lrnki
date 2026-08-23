@@ -6,8 +6,9 @@ date: 2026-08-08
 
 # DeepSeek Flash Generation Cutover and Pipeline Simplification
 
-**Status:** Direction decided. A follow-up implementation plan is not ready; its planning interview
-must settle the pipeline shape and independent judge described below.
+**Status:** Interview resolved. The
+[ready implementation plan](../plans/2026-08-23-001-cut-over-topic-expedition-generation-to-deepseek-flash.md)
+owns the scoped cutover, independent-judge topology, and stage-value evidence gate.
 
 ## Decided direction
 
@@ -21,8 +22,8 @@ model card states that it supersedes the preview release, and the repository alr
 revision for judge roles. `litellm/config.yaml` remains the source of truth for the current
 alias-to-deployment mapping; this brainstorm does not change it or any Model Assignment.
 
-The ready follow-up plan must recheck the latest official Flash release and pin one exact
-[Model Assignment](../../CONTEXT.md#model-operations). It must not use a moving `latest` alias.
+The ready plan rechecked the official Flash catalog and owns the exact pinned
+[Model Assignment](../../CONTEXT.md#model-operations). It does not use a moving `latest` alias.
 
 ## Dated evidence and known defects
 
@@ -44,15 +45,11 @@ Grounding Bundles across domains and no qualifying end-to-end attempt.
 These defects remain inputs to the release gate. They do not reopen the model choice or justify a
 lexical veto, weaker admission, or a generator judging its own output.
 
-## Follow-up planning interview
+## Resolved handoff
 
-The interview decides, one question at a time:
-
-1. Which expedition generation stages should be removed or combined rather than moved unchanged?
-2. Which remaining independent judge satisfies the unchanged architectural decisions after that
-   simplification?
-
-The follow-up retains these constraints:
+The planning interview is complete. The ready plan owns the frozen initial pipeline shape and
+judge topology, then requires output evidence before a later plan may simplify stages. The handoff
+retains these constraints:
 
 - Re-derive the affected consumer set from prompt frontmatter and the current LiteLLM mapping.
 - **Grounding generation and its judge must stay cross-family.**
@@ -65,9 +62,10 @@ The follow-up retains these constraints:
 
 ## Release qualification
 
-The follow-up validation does not compare models to decide whether to proceed. It qualifies the
-pinned Model Assignment and Provider Route, every affected consumer, latency, cost, and
-learner-facing quality for release under
+Validation does not compare models to decide whether to proceed. The ready plan first gathers
+bounded stage-decision evidence; final-topology validation must then qualify the pinned Model
+Assignment and Provider Route, every affected consumer, latency, cost, and learner-facing quality
+for release under
 [ADR-0013](../adr/0013-verify-quality-by-real-source-inspection.md) and
 [ADR-0028](../adr/0028-measure-non-deterministic-quality-with-non-deterministic-methods.md).
 Affected prior quality evidence is re-run or explicitly marked unqualified.
