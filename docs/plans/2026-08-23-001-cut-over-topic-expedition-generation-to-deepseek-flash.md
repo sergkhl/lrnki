@@ -7,7 +7,7 @@ execution: code
 
 # Cut Over Topic Expedition Generation to DeepSeek Flash and Measure Stage Value
 
-**Status:** In progress — U2 `FIX_FIRST`; route-contract diagnosis next
+**Status:** Blocked in U2 — owner route-contract decision required
 
 **Decision state:** Locked. The accepted direction, dated comparison, and known quality defects
 remain in the
@@ -517,16 +517,23 @@ hidden by prompt tuning, regeneration, lower quorum, lexical rejection, or an un
   served none of eight MiMo descriptors each, and Nebius served none of three GPT-OSS descriptors;
   OpenRouter filtered every failure with `404` under the complete required-parameter body. No config
   or running route changed.
+- Route diagnosis: removing `seed` from one otherwise complete MiMo answerer request did not make
+  Xiaomi, Parasail, or Novita routable under `require_parameters: true`; all three retained the same
+  filter rejection. Parasail DeepSeek Matching Generation remained `429` after cooldown. The
+  incompatibility is therefore not a seed-only defect, and the frozen exact route cannot be
+  activated without changing the accepted proof contract, Provider Route resilience, or supporting
+  Model Assignment topology.
 
 ### Open findings
 
-- **NEXT:** diagnose the route contract before another amendment: use one MiMo descriptor to compare
-  the frozen body with a no-seed body under `require_parameters: true`, and recheck the previously
-  schema-valid Parasail DeepSeek Matching Generation case after cooldown. Preserve the passing
-  DeepInfra and Novita GPT evidence; U3–U4 remain gated.
-- The original Xiaomi, CoreWeave, and Parasail GPT routes failed; Parasail DeepSeek was not fully
-  reachable. Do not drop `seed`, weaken schemas, enable OpenRouter fallback, split one role across
-  different Model Assignments, or activate a partial replacement matrix to make U2 pass.
+- **OWNER ACTION:** resolve the route-contract choice in
+  [BLOCKERS](./BLOCKERS.md). Recommended: amend U2 to empirically qualify one provider-pinned MiMo
+  route without OpenRouter's `require_parameters` catalog filter, keep `seed` explicitly
+  best-effort as its owning client already documents, and start with the fully passed DeepInfra-only
+  DeepSeek and Novita-only GPT routes. Alternatives are a new supporting-judge Model Assignment
+  design or abandoning the cutover. Any choice must be recorded before more provider calls.
+- U3 and U4 are not actionable while U2 is blocked. No scoped alias, deployment group, config file,
+  or running route changed, so prior evidence has not yet been invalidated by this plan.
 - All prior usefulness evidence for the nine generators and eleven reassigned/re-routed supporting
   consumers becomes unqualified when U2 activates. U3 is the first current DeepSeek candidate
   evidence; final release evidence remains intentionally deferred until the pipeline shape settles.

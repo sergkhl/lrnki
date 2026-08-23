@@ -4,12 +4,12 @@
 
 ## TODO
 
-- **DeepSeek Flash Topic Expedition cutover — in progress; U2 is `FIX_FIRST`.** Follow the
+- **DeepSeek Flash Topic Expedition cutover — blocked in U2; owner decision required.** Follow the
   [active plan](./2026-08-23-001-cut-over-topic-expedition-generation-to-deepseek-flash.md). It
-  has a validated inactive seam and a fully passing Novita GPT route, but the amended DeepSeek
-  fallback and both MiMo routes were filtered under the complete body. Diagnose the MiMo sampling
-  contract and recheck Parasail DeepSeek after cooldown before another route amendment. No route is
-  active; the candidate remains unqualified for release.
+  has a validated inactive seam and passing DeepInfra/Novita routes, but no exact MiMo route passed
+  the required-parameter contract and the fallback diagnosis did not clear U2. Resolve the linked
+  [owner blocker](./BLOCKERS.md) before more provider calls. No route is active; the candidate
+  remains unqualified for release.
 
 - **Topic Expedition generation latency — blocked; U3 remains `FIX_FIRST`.** Follow
   [the active plan](./2026-08-22-001-repair-topic-expedition-generation-latency.md) in U0–U4 order.

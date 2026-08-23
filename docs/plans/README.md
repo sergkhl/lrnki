@@ -12,10 +12,10 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-23-001 — Cut Over Topic Expedition Generation to DeepSeek Flash and Measure Stage Value](./2026-08-23-001-cut-over-topic-expedition-generation-to-deepseek-flash.md)
-   — **In progress; U2 is `FIX_FIRST`, route diagnosis next.** Novita passed all GPT descriptors,
-   but the amended DeepSeek fallback and both MiMo routes were filtered under the complete body.
-   Isolate the sampling incompatibility and recheck the prior DeepSeek fallback before another
-   amendment; no runtime route changed.
+   — **Blocked in U2; owner route-contract decision required.** No exact MiMo route passed the
+   required-parameter filter, the DeepSeek fallback stayed unavailable, and the no-seed diagnostic
+   did not clear the incompatibility. Follow [the owner blocker](./BLOCKERS.md) before more calls;
+   no runtime route changed.
 
 2. [2026-08-22-001 — Restore Topic Expedition Generation to Seven Minutes](./2026-08-22-001-repair-topic-expedition-generation-latency.md)
    — **Blocked in U3 (`FIX_FIRST`).** The bounded pipeline and shared stage profile are complete,
