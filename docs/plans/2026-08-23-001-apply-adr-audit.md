@@ -7,7 +7,7 @@ execution: code
 
 # Apply the ADR Audit Without Changing ADR-0006 or Cross-Family Rules
 
-**Status:** In progress — U0–U3 complete; U4 next
+**Status:** In progress — U0–U4 complete; U5 next
 
 **Decision state:** Locked. The accepted audit findings and fixed assumptions are implementation
 inputs, not an invitation to reopen Concept Canonicalization, Operation Timeline ownership,
@@ -428,10 +428,76 @@ without implementing that follow-up.
   invariants. It does not qualify production-model semantics, live SpendLogs, local real-use graph
   publication, deployment, browser behavior, or any native/device layer.
 
+### U4 — Automated, database, and real-use gates — complete; local real-use `PASS`
+
+- Database preparation: the local `lrnki` schema had the superseded operation constraint and was
+  reset through `pnpm db:reset` after a recoverable dump to
+  `tmp/2026-08-23-adr-audit-pre-reset-lrnki.dump`; the LiteLLM database and other schemas were not
+  touched. All six manifest sources were registered on the new baseline. The gitignored PDF was
+  restored from the exact declared arXiv v2 source and parsed through a temporary container built
+  from the repository's pinned Docling image and `docling==2.102.1`; the container and temporary
+  image tag were removed after registration.
+- Inspected Extraction Runs: the ordered inputs were Docling PDF
+  `f5f124b8-1357-49dd-bf57-b2deb1bb9141` (40 Candidates, 8 core, 38 CEPs), native Markdown
+  `914e9bb0-033b-4aa4-bc15-e17e2280dd2e` (51 Candidates, 4 core, 48 CEPs), both in machine learning
+  systems, then OpenStax HTML `71ff6358-c29c-46c0-bc4e-7e80628105ad` (10 Candidates, 3 core, 8
+  CEPs) in molecular biology. All three runs succeeded without degradation; every one of their 15
+  core Candidate CEPs was complete and was inspected with its Definition Passages.
+- Defect found and fixed: the first public inspection correctly failed closed because postgres.js
+  hydrated `artifact_versions.created_at` as a `Date` while the narrow store claimed a string. The
+  adapter now validates and normalizes either runtime representation to ISO before returning the
+  envelope. A database regression proves the complete envelope round-trip and that a second write
+  cannot replace the first artifact; the focused regression passed 1/1 and the same persisted
+  real-use artifact then inspected successfully.
+- Semantic artifact: `bc33525e-77ce-455a-8e6f-72022192daaa`, config
+  `concept-canonicalization-ce3969a22bea`, captured the exact three-run order and empty published
+  registry. It recorded no merge, quarantine, or unavailable result. Both proposed pairs were
+  correctly distinct beside their definitions: abstract AI Research Agents versus the concrete
+  AIRA-dojo framework (cosine 0.725129), and the semi-conservative replication mechanism versus a
+  template strand component (cosine 0.710828). No decision crossed a Declared Domain and there was
+  no unsupported same-domain merge.
+- Replay: graph versions `227f8bab-7697-44f7-8321-5789335b5f28` and
+  `9efc7a9e-89c2-40b9-9d73-294e534907d1` each published 14 Concepts, 14 CEPs / 106 passages, and 13
+  typed assertions. Their graph-version-free snapshots were identical (`78146147a1360e06f1b2e68bf00065db`),
+  with identical identity/IRI (`697b624f4bafb72475d23b57becd432c`) and CEP
+  (`5efe8940f6c3b648a85bab8697d84f85`) hashes. Their four-record refinement sets were identical
+  (`dca0198443dfe4046a645cb27c6d4ac6`): the artifact selection, both copied semantic decisions, and
+  the deterministic exact-label union of Generalization Gap evidence from both parser sources.
+- Attribution: the artifact and canonicalization timeline row carry the same config identity.
+  Canonicalization joined four live SpendLogs through its operation ID: two
+  `openrouter/qwen/qwen3-embedding-8b` calls and two
+  `openrouter/deepseek/deepseek-v4-flash-0731` adjudications, 2,663 tokens and $0.00030886 recorded
+  spend. In the same positive-control query, each Graph-Version Build operation had zero model
+  logs and zero tokens.
+- Automated/database evidence: `pnpm db:check` confirmed the sole generated baseline. After the
+  read-adapter fix, `pnpm test:db` reset only `lrnki_test`, passed the 9-test migration matrix, and
+  completed every DB-enabled workspace suite; the focused ISO/immutability regression also passed
+  alone. Infrastructure-PostgreSQL typecheck, local tests, and `git diff --check` passed.
+
+#### Real-use quality evaluation
+
+- Milestone: immutable semantic Concept Canonicalization and deterministic LLM-free publication.
+- Fixture and source type: one paper through Docling PDF and native Markdown in machine learning
+  systems, plus OpenStax HTML in molecular biology.
+- Real model calls used: yes — the production embedding and independent adjudicator assignments.
+- Result: `PASS` after the persisted-envelope read defect was fixed.
+- Useful output observed: both high-similarity pairs were kept distinct for the correct semantic
+  reason; exact-label evidence unioned across parser variants; both publications replayed exactly.
+- Defects observed: PostgreSQL timestamp hydration initially made the new inspection command reject
+  its valid artifact. No semantic merge, quarantine, unavailable result, or cross-domain proposal
+  was defective.
+- Changes made after inspection: normalize the narrow store's timestamp at the database boundary
+  and cover immutable round-trip with a live PostgreSQL regression.
+- Remaining caveats: this gate covers 15 core Concepts and two semantic proposals with no existing
+  published registry; non-deterministic quality evidence remains scoped to these exact Model
+  Assignments and the Concept Canonicalization consumer. Automated tests own the broader registry,
+  malformed-artifact, unavailable, quarantine, and base-version cases.
+- Safe to continue downstream: yes.
+- Evidence boundary: this is local real-use, production-model, live-LiteLLM, and local-PostgreSQL
+  evidence. It is not deployed, production-data, browser, emulator/simulator, or physical-device
+  evidence.
+
 ### Open findings
 
-- U4 must still qualify Concept Canonicalization decisions, replay, and SpendLogs through the
-  production Model Assignments; automated and isolated-database success is not semantic-quality
-  evidence.
 - U5 must run the full repository/protected-diff gates, consolidate durable status, and delete this
   completed plan only after the detailed validation record is committed.

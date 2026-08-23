@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
-import type { ArtifactEnvelope, DerivedGraphLayer, EnrichmentRunTrace, ExtractionRunResult, GraphSnapshot, StructuredDocument } from "@lrnki/domain-core";
+import type { ArtifactEnvelope, ConceptCanonicalizationArtifact, DerivedGraphLayer, EnrichmentRunTrace, ExtractionRunResult, GraphSnapshot, StructuredDocument } from "@lrnki/domain-core";
 import { createDatabaseClient } from "./db";
+import { PostgresConceptCanonicalizationStore } from "./PostgresArtifacts";
 import { PostgresEnrichmentInspectionRead } from "./PostgresEnrichmentInspectionRead";
 import { PostgresEnrichmentRunStore } from "./PostgresEnrichmentStores";
 import { PostgresExtractionRunStore, PostgresGraphVersionStore, PostgresSourceRegistrationStore } from "./PostgresStores";
@@ -139,6 +140,42 @@ maybe("persists a run with CEP passages, assertions, and its immutable artifact 
     const [{ count: projectedCandidates }] = await sql<{ count: number }[]>`SELECT count(*)::int AS count FROM artifact_run_candidates WHERE run_id = ${runId}`;
     assert.equal(projectedCandidates, 2);
   } finally {
+    await sql.end();
+  }
+});
+
+maybe("round-trips an immutable Concept Canonicalization envelope with an ISO creation time", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  const artifactId = randomUUID();
+  const runId = randomUUID();
+  const artifact: ArtifactEnvelope<ConceptCanonicalizationArtifact> = {
+    artifactId,
+    artifactType: "concept_canonicalization",
+    producer: "test",
+    producerVersion: "0",
+    configHash: "concept-canonicalization-test",
+    createdAt: "2026-08-23T09:09:01.079Z",
+    payload: {
+      mode: "exact_label_only",
+      baseGraphVersionId: null,
+      runIds: [runId],
+      publishedConceptIdentities: [],
+      decisions: [],
+      unavailable: []
+    }
+  };
+  try {
+    const store = new PostgresConceptCanonicalizationStore(sql);
+    await store.persist(artifact);
+    await store.persist({
+      ...artifact,
+      createdAt: "2026-08-23T10:00:00.000Z",
+      configHash: "replacement-must-not-win"
+    });
+
+    assert.deepEqual(await store.getById(artifactId), artifact);
+  } finally {
+    await sql`DELETE FROM artifact_versions WHERE artifact_id = ${artifactId}`;
     await sql.end();
   }
 });

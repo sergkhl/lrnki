@@ -4,13 +4,15 @@
 
 ## TODO
 
-- **ADR audit — in progress; U4 next.** Follow
+- **ADR audit — in progress; U5 next.** Follow
   [the first active plan](./2026-08-23-001-apply-adr-audit.md) in U0–U5 order. U1–U2 now own immutable
   Concept Canonicalization artifacts, LLM-free deterministic replay, application-owned stage
   membership, full Processing Journey lineage, and the regenerated operation constraint. U3
   corrected the audited ADR/workflow/glossary/runbook boundaries and recorded the decided DeepSeek
-  follow-up without implementing it. Next, run the production-model semantic canonicalization,
-  deterministic replay, SpendLog, and local publication gate. Preserve ADR-0006, every
+  follow-up without implementing it. U4 passed production-model semantic inspection, exact local
+  replay, SpendLog attribution, and isolated database gates after fixing PostgreSQL timestamp
+  hydration at the artifact-store boundary. Next, run the full repository/protected-diff gate and
+  consolidate the completed plan. Preserve ADR-0006, every
   cross-family rule, current one-pass admission behavior, all Model Assignments, the ten original
   local commits, and unrelated skill worktree changes.
 

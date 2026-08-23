@@ -12,11 +12,12 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-23-001 — Apply the ADR Audit Without Changing ADR-0006 or Cross-Family Rules](./2026-08-23-001-apply-adr-audit.md)
-   — **In progress; U4 next.** Concept Canonicalization, deterministic artifact replay,
+   — **In progress; U5 next.** Concept Canonicalization, deterministic artifact replay,
    application-owned Operation Timeline membership, Processing Journey lineage, and the generated
    operation constraint are locally and database verified; the audited durable documentation
-   boundaries are repaired. Next, run the production-model semantic canonicalization and local
-   replay gate without changing Model Assignments, ADR-0006, or cross-family rules.
+   boundaries are repaired. Production-model semantic inspection, live SpendLog attribution, and
+   exact local replay passed after one database-boundary fix. Next, run the full repository and
+   protected-diff gate without changing Model Assignments, ADR-0006, or cross-family rules.
 
 2. [2026-08-22-001 — Restore Topic Expedition Generation to Seven Minutes](./2026-08-22-001-repair-topic-expedition-generation-latency.md)
    — **Blocked in U3 (`FIX_FIRST`).** The bounded pipeline and shared stage profile are complete,

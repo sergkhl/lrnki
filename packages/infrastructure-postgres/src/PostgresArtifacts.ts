@@ -40,7 +40,7 @@ export class PostgresConceptCanonicalizationStore
       producer_version: string;
       config_hash: string;
       payload: ConceptCanonicalizationArtifact;
-      created_at: string;
+      created_at: Date | string;
     }[]>`
       SELECT artifact_id, artifact_type, run_id, graph_version_id, producer, producer_version,
              config_hash, payload, created_at
@@ -57,8 +57,16 @@ export class PostgresConceptCanonicalizationStore
       producer: row.producer,
       producerVersion: row.producer_version,
       configHash: row.config_hash,
-      createdAt: row.created_at,
+      createdAt: isoTimestamp(row.created_at),
       payload: row.payload
     };
   }
+}
+
+function isoTimestamp(value: Date | string): string {
+  const timestamp = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(timestamp.getTime())) {
+    throw new Error("Concept Canonicalization artifact has an invalid created_at timestamp.");
+  }
+  return timestamp.toISOString();
 }
