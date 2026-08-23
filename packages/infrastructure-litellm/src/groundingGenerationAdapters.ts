@@ -30,7 +30,8 @@ type GroundingGenerationArgs = {
 type ClaimQuestionPlanningInput = Parameters<ClaimVerificationQuestionPlanningPort["plan"]>[0];
 type ClaimQuestionPlanningArgs = { questions: ClaimVerificationQuestion[] };
 type ClaimAnsweringInput = Parameters<ClaimVerificationAnsweringPort["answer"]>[0];
-type ClaimAnsweringArgs = { answers: Array<{ questionKey: string; answer: string }> };
+type ClaimAnsweringArgs = { answers: Readonly<Record<string, string>> };
+type ClaimAnsweringOutput = Awaited<ReturnType<ClaimVerificationAnsweringPort["answer"]>>;
 type ClaimJudgmentInput = Parameters<ClaimFactualityJudgmentPort["judge"]>[0];
 type ClaimJudgmentArgs = {
   judgments: Array<{
@@ -158,7 +159,7 @@ export function createClaimVerificationQuestionPlanningPort(
 export const claimVerificationAnsweringDescriptor: NeuralStageDescriptor<
   ClaimAnsweringInput,
   ClaimAnsweringArgs,
-  ClaimAnsweringArgs["answers"]
+  ClaimAnsweringOutput
 > = {
   promptPath: "claim-verification-answering.prompt",
   stageTag: STAGE_TAGS.groundingVerificationAnswering,
@@ -168,7 +169,17 @@ export const claimVerificationAnsweringDescriptor: NeuralStageDescriptor<
     declaredDomain: "sentinel domain",
     canonicalLabel: "Sentinel concept",
     context: { kind: "originating_topic", topic: "Sentinel topic" },
-    questions: [{ questionKey: "sentinel:q:0", question: "What is the established meaning of a sentinel concept?" }]
+    questions: [
+      { questionKey: "sentinel:verification:0:question:0", question: "What is the established meaning of a sentinel concept?" },
+      { questionKey: "sentinel:verification:0:question:1", question: "What is the nearest category boundary?" },
+      { questionKey: "sentinel:verification:0:question:2", question: "What conditions limit the concept?" },
+      { questionKey: "sentinel:verification:0:question:3", question: "What material variations are established?" },
+      { questionKey: "sentinel:verification:0:question:4", question: "What process roles must stay distinct?" },
+      {
+        questionKey: "sentinel-candidate:definition:0:claim:0:verification:2:question:5",
+        question: "What counterexample tests the strongest universal interpretation?"
+      }
+    ]
   },
   templateData: (input) => ({
     declaredDomain: input.declaredDomain,
@@ -176,7 +187,10 @@ export const claimVerificationAnsweringDescriptor: NeuralStageDescriptor<
     contextLines: formatGroundingAdmissionContext(input.context),
     questions: input.questions.map((question) => `[${question.questionKey}] ${question.question}`).join("\n")
   }),
-  mapResult: (result) => result.answers
+  mapResult: (result, input) => input.questions.map(({ questionKey }) => ({
+    questionKey,
+    answer: result.answers[questionKey]!
+  }))
 };
 
 export function createClaimVerificationAnsweringPort(

@@ -6,6 +6,7 @@ import {
   buildPrerequisiteOrderingSchema,
   buildPrerequisiteOrderingValidator,
   buildClaimFactualityJudgmentValidator,
+  buildClaimVerificationAnsweringSchema,
   buildClaimVerificationAnsweringValidator,
   buildClaimVerificationQuestionPlanningValidator,
   conceptAdmissionSchemaForCandidateKeys,
@@ -155,15 +156,35 @@ test("claim verification schemas require exact known-target, question, and judgm
     ]
   }), /too many verification questions/);
 
-  const answers = buildClaimVerificationAnsweringValidator(["q:0", "q:1"]);
-  assert.doesNotThrow(() => answers.parse({ answers: [
-    { questionKey: "q:1", answer: "The second answer." },
-    { questionKey: "q:0", answer: "The first answer." }
-  ] }));
-  assert.throws(() => answers.parse({ answers: [
-    { questionKey: "q:0", answer: "The first answer." },
-    { questionKey: "q:0", answer: "A duplicate answer." }
-  ] }), /duplicate questionKey/);
+  const answerKeys = ["q:0", "q:1"];
+  const answers = buildClaimVerificationAnsweringValidator(answerKeys);
+  assert.doesNotThrow(() => answers.parse({ answers: {
+    "q:1": "The second answer.",
+    "q:0": "The first answer."
+  } }));
+  assert.throws(() => answers.parse({ answers: { "q:0": "The first answer." } }));
+  assert.throws(() => answers.parse({ answers: {
+    "q:0": "The first answer.",
+    "q:1": "The second answer.",
+    unknown: "An extra answer."
+  } }));
+  assert.throws(() => answers.parse({ answers: {
+    "q:0": "The first answer.",
+    "q:1": ""
+  } }));
+  assert.throws(() => buildClaimVerificationAnsweringValidator(["q:0", "q:0"]), /duplicate input questionKey/);
+
+  const answeringSchema = buildClaimVerificationAnsweringSchema(answerKeys);
+  const answerObject = (answeringSchema.properties as Record<string, unknown>).answers as {
+    type: string;
+    properties: Record<string, unknown>;
+    required: string[];
+    additionalProperties: boolean;
+  };
+  assert.equal(answerObject.type, "object");
+  assert.deepEqual(Object.keys(answerObject.properties), answerKeys);
+  assert.deepEqual(answerObject.required, answerKeys);
+  assert.equal(answerObject.additionalProperties, false);
 
   const judgments = buildClaimFactualityJudgmentValidator(["definition:0", "mention:0"]);
   assert.doesNotThrow(() => judgments.parse({ judgments: [

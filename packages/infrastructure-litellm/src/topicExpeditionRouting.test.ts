@@ -144,18 +144,18 @@ test("Topic overrides change only Topic hashes while default identities and the 
   assert.notEqual(studyItemBankConfigHash(resolvableRouting), studyItemBankConfigHash());
   assert.equal(
     syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG, routing),
-    "synthetic-topic-generation-f8258c9c9332"
+    "synthetic-topic-generation-9a8f4f1cb34b"
   );
   assert.equal(studyItemBankConfigHash(routing), "study-item-bank-02d755d9fae1");
   assert.equal(
     syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG),
-    "synthetic-topic-generation-4fc21bcd9522"
+    "synthetic-topic-generation-901788bb7bd4"
   );
   assert.equal(studyItemBankConfigHash(), "study-item-bank-d574e02753f9");
-  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-7f3f772bb21e");
+  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-3cd73a12f2f2");
   assert.equal(
     scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG),
-    "learner-scaffold-generation-0a71975fa183"
+    "learner-scaffold-generation-be49ba010024"
   );
   assert.equal(TOPIC_EXPEDITION_STAGE_TOTAL, 19);
   assert.equal(TOPIC_EXPEDITION_STAGE_PROFILE.enrichment.length, 9);

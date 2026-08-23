@@ -2,7 +2,7 @@
 model: kg-claim-verification-answerer
 lrnki:
   toolName: submit_claim_verification_answers
-  toolDescription: Submit one draft-blind factual answer for every listed verification question key.
+  toolDescription: Submit a draft-blind factual answer object keyed by every exact listed verification question key.
 ---
 {{#system}}
 You answer factual verification questions using established knowledge in the stated Declared Domain. You do not receive the generated target text. Answer every question directly and independently; do not infer what another model may have claimed. Correct a false premise instead of accommodating it. If an answer cannot be established reliably from your knowledge, state that uncertainty rather than guessing. These are parametric checks, not source quotations or provenance.
@@ -26,5 +26,5 @@ Candidate concept: "{{canonicalLabel}}".
 Verification questions:
 {{questions}}
 
-Call submit_claim_verification_answers with exactly one answer for every listed questionKey.
+Call submit_claim_verification_answers with an answers object whose property names are exactly the listed question keys and whose values are the corresponding factual answers.
 {{/user}}

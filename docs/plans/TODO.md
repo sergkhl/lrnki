@@ -4,11 +4,11 @@
 
 ## TODO
 
-- **Source-less Grounding and answer correlation — in progress; U0 complete, U1 next.** Follow the
-  [active plan](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md). The deep
-  admission interface now supplies batch-owned aliases and exact-context peers to Grounding
-  Generation. Replace answer arrays with an exact key-indexed provider shape next, then qualify all
-  three affected consumers before unblocking latency work.
+- **Source-less Grounding and answer correlation — in progress; U0–U1 complete, U2 next.** Follow
+  the [active plan](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md).
+  Batch-owned identity context reaches Grounding Generation and answer correlation is now an exact
+  key-indexed provider object behind unchanged ports. Qualify every exact served route next, then
+  run all three affected consumers before unblocking latency work.
 
 - **Topic Expedition generation latency — blocked; U3 remains `FIX_FIRST`.** Follow
   [the active plan](./2026-08-22-001-repair-topic-expedition-generation-latency.md) in U0–U4 order.

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { afterEach, test } from "node:test";
 import {
   claimFactualityChallengeDescriptor,
   claimFactualityJudgmentDescriptor,
@@ -9,8 +9,13 @@ import {
   createClaimVerificationQuestionPlanningPort,
   createGroundingGenerationPort
 } from "./groundingGenerationAdapters";
-import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
+import { ForcedToolExhaustionError, LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
+import { resetLiteLlmFetchForTests, setLiteLlmFetchForTests, type LiteLlmFetchInit } from "./liteLlmFetch";
 import { MAX_CLAIM_VERIFICATION_QUESTIONS_PER_TARGET } from "./toolSchemas";
+
+afterEach(() => {
+  resetLiteLlmFetchForTests();
+});
 
 function groundingAdapterReturning(canned: {
   definitions: { text: string }[];
@@ -140,9 +145,9 @@ test("malformed Grounding Generation arguments fail closed through the forced-to
 });
 
 test("planning sees owner-neutral targets while the external answer model receives no target or draft text", async () => {
-  const calls: Array<{ model: string; toolName: string; messages: { content: string }[] }> = [];
+  const calls: Array<{ model: string; toolName: string; messages: { content: string }[]; parameters: Record<string, unknown> }> = [];
   const client = {
-    async call(input: { model: string; toolName: string; messages: { content: string }[] }) {
+    async call(input: { model: string; toolName: string; messages: { content: string }[]; parameters: Record<string, unknown> }) {
       calls.push(input);
       if (input.toolName === "submit_claim_verification_questions") {
         return {
@@ -152,12 +157,12 @@ test("planning sees owner-neutral targets while the external answer model receiv
           ]
         };
       }
+      const answerKeys = ((input.parameters.properties as Record<string, unknown>).answers as { required: string[] }).required;
       return {
-        answers: [
-          { questionKey: "q:2", answer: "It has a specific established role." },
-          { questionKey: "q:0", answer: "The named concept has distinct necessary features." },
-          { questionKey: "q:1", answer: "The mechanisms differ in their defining process." }
-        ]
+        answers: Object.fromEntries([...answerKeys].reverse().map((questionKey) => [
+          questionKey,
+          `Independent answer for ${questionKey}`
+        ]))
       };
     }
   } as unknown as LiteLlmForcedToolClient;
@@ -257,7 +262,126 @@ test("planning sees owner-neutral targets while the external answer model receiv
     assert.equal(calls[0].messages.some((message) => message.content.toLowerCase().includes(fixtureTerm)), false, `planner fixture-derived term leaked: ${fixtureTerm}`);
     assert.equal(calls[1].messages.some((message) => message.content.toLowerCase().includes(fixtureTerm)), false, `answerer fixture-derived term leaked: ${fixtureTerm}`);
   }
-  assert.deepEqual(answers.map((answer) => answer.questionKey), ["q:2", "q:0", "q:1"], "the adapter preserves opaque model correlation for application validation");
+  assert.deepEqual(
+    answers.map((answer) => answer.questionKey),
+    questions.map((_, index) => `q:${index}`),
+    "the adapter maps exact provider keys back to input order"
+  );
+});
+
+test("answer correlation uses an exact key object for one, three, and six questions", async (t) => {
+  const longKey = "candidate:definition:0:claim:0:verification:2:question:5";
+  const keySets = [
+    ["q:0"],
+    ["q:0", "q:1", "q:2"],
+    ["q:0", "q:1", "q:2", "q:3", "q:4", longKey]
+  ];
+
+  for (const keys of keySets) {
+    await t.test(`${keys.length} key object`, async () => {
+      const calls: Array<{ parameters: Record<string, unknown> }> = [];
+      const client = {
+        async call(input: { parameters: Record<string, unknown> }) {
+          calls.push(input);
+          return {
+            answers: Object.fromEntries([...keys].reverse().map((key) => [key, `Answer for ${key}`]))
+          };
+        }
+      } as unknown as LiteLlmForcedToolClient;
+      const result = await createClaimVerificationAnsweringPort(client).answer({
+        declaredDomain: "general",
+        canonicalLabel: "Correlation sentinel",
+        context: { kind: "originating_topic", topic: "Structural verification" },
+        questions: keys.map((questionKey) => ({ questionKey, question: `Question for ${questionKey}` }))
+      });
+
+      assert.deepEqual(result, keys.map((questionKey) => ({ questionKey, answer: `Answer for ${questionKey}` })));
+      const answersSchema = (calls[0]!.parameters.properties as Record<string, unknown>).answers as {
+        properties: Record<string, unknown>;
+        required: string[];
+        additionalProperties: boolean;
+      };
+      assert.deepEqual(Object.keys(answersSchema.properties), keys);
+      assert.deepEqual(answersSchema.required, keys);
+      assert.equal(answersSchema.additionalProperties, false);
+    });
+  }
+});
+
+test("duplicate input question keys fail before the answer provider call", async () => {
+  let calls = 0;
+  const client = {
+    async call() {
+      calls += 1;
+      return { answers: {} };
+    }
+  } as unknown as LiteLlmForcedToolClient;
+
+  await assert.rejects(() => createClaimVerificationAnsweringPort(client).answer({
+    declaredDomain: "general",
+    canonicalLabel: "Correlation sentinel",
+    context: { kind: "originating_topic", topic: "Structural verification" },
+    questions: [
+      { questionKey: "duplicate:key", question: "First question?" },
+      { questionKey: "duplicate:key", question: "Second question?" }
+    ]
+  }), /duplicate input questionKey/);
+  assert.equal(calls, 0);
+});
+
+test("the six-key answer contract records malformed and schema-invalid output across all three allowed attempts", async () => {
+  const keys = [
+    "q:0",
+    "q:1",
+    "q:2",
+    "q:3",
+    "q:4",
+    "candidate:definition:0:claim:0:verification:2:question:5"
+  ];
+  const complete = Object.fromEntries(keys.map((key) => [key, `Answer for ${key}`]));
+  const argumentAttempts = [
+    '{"answers":',
+    JSON.stringify({ answers: Object.fromEntries(keys.slice(0, -1).map((key) => [key, `Answer for ${key}`])) }),
+    JSON.stringify({ answers: { ...complete, extra: "Unexpected answer" } })
+  ];
+  const requestBodies: Record<string, unknown>[] = [];
+  let attempt = 0;
+  setLiteLlmFetchForTests(async (_url: string, init: LiteLlmFetchInit) => {
+    requestBodies.push(JSON.parse(init.body as string) as Record<string, unknown>);
+    const argumentsText = argumentAttempts[Math.min(attempt, argumentAttempts.length - 1)]!;
+    attempt += 1;
+    return new Response(JSON.stringify({
+      choices: [{ message: { tool_calls: [{ function: {
+        name: "submit_claim_verification_answers",
+        arguments: argumentsText
+      } }] } }]
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  });
+  const client = new LiteLlmForcedToolClient({
+    baseUrl: "http://localhost:4000",
+    apiKey: "sk-local",
+    timeoutMs: 5_000,
+    maxRetries: 2
+  });
+
+  await assert.rejects(() => createClaimVerificationAnsweringPort(client).answer({
+    declaredDomain: "general",
+    canonicalLabel: "Correlation sentinel",
+    context: { kind: "originating_topic", topic: "Structural verification" },
+    questions: keys.map((questionKey) => ({ questionKey, question: `Question for ${questionKey}` }))
+  }), (error: unknown) => {
+    assert.ok(error instanceof ForcedToolExhaustionError);
+    assert.equal(error.toolName, "submit_claim_verification_answers");
+    assert.deepEqual(error.attempts.map(({ kind }) => kind), ["invalid_json", "schema_invalid", "schema_invalid"]);
+    return true;
+  });
+
+  assert.equal(requestBodies.length, 3);
+  for (const body of requestBodies.slice(1)) {
+    const messages = body.messages as Array<{ role: string; content: string }>;
+    assert.equal(messages.at(-1)?.role, "user");
+    assert.match(messages.at(-1)?.content ?? "", /satisfies the provided schema/);
+  }
 });
 
 test("code-owned verification checks preserve the shared six-question cap per target", async () => {

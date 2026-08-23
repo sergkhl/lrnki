@@ -7,7 +7,7 @@ execution: code
 
 # Deepen Source-less Grounding Context and Answer Correlation
 
-**Status:** In progress — U0 complete; U1 exact-key answer object next
+**Status:** In progress — U0–U1 complete; U2 served-contract qualification next
 
 **Decision state:** Locked. Grounding Generation and Verification Answering are the only stages to
 `DEEPEN`; the other seventeen Topic Expedition stages remain `KEEP`. This plan fixes those two
@@ -386,10 +386,38 @@ plan's 420-second baseline and two-run soak.
   evidence. No production-model call, activated local composition, real-use artifact, deployed,
   browser, native, physical-device, latency, or release claim is made.
 
+### U1 — Exact-key answer object — 2026-08-23 — complete
+
+- Verification Answering now exposes every code-owned question key exactly once as a required
+  property of a strict `answers` object. Duplicate or empty input keys fail before provider
+  dispatch; missing, extra, and empty output values fail schema validation. The adapter maps the
+  provider object back to the unchanged ordered `ClaimVerificationAnswer[]` port result.
+- The answerer descriptor sentinel now carries six opaque production-shaped keys, including the
+  long colon-delimited failure shape. Focused tests passed for one-, three-, and six-key schemas,
+  reverse provider property order, malformed JSON, missing and extra properties across all three
+  allowed transport attempts, and independent application-level correlation failure. The initial
+  adapter run exposed one obsolete three-answer expectation while the planner correctly returned
+  nine questions; the corrected test now asserts complete input-order mapping.
+- The full `@lrnki/infrastructure-litellm` suite and typecheck passed. Focused application admission
+  and Topic stage-profile tests plus targeted ESLint passed, preserving packet scheduling,
+  concurrency, retry budget, draft blindness, question counts, replicated-rejection settlement,
+  one-target judgments, and the exact `9 + 10 = 19` Topic profile.
+- Current default identities are `graph-enrichment-3cd73a12f2f2`,
+  `learner-scaffold-generation-be49ba010024`, and
+  `synthetic-topic-generation-901788bb7bd4`; the Topic-scoped Synthetic identity is
+  `synthetic-topic-generation-9a8f4f1cb34b`. Study Item Bank remained byte-identical at
+  `study-item-bank-d574e02753f9` by default and `study-item-bank-02d755d9fae1` under Topic routing;
+  no unrelated descriptor or operation membership changed.
+- This is local source, strict-schema, retry-envelope, deterministic correlation, type, lint, hash,
+  and composition evidence. It does not prove any production model or reachable provider can serve
+  the new contracts, nor any real-use, deployed, browser, native, physical-device, latency, or
+  release claim.
+
 ### Open findings
 
-- **NEXT:** implement U1 only: replace the provider answer array with the request-specific exact-key
-  object, map it back to the unchanged ordered port result, replace the sentinel and focused tests,
-  re-baseline only affected identities, validate, persist all three status altitudes, and commit.
+- **NEXT:** execute U2 only: run the bounded exact-route Grounding and Verification Answering
+  matrices, stop on any semantic/schema miss, activate only the exact committed local production
+  composition through the root runbook if the preflight passes, verify unique tagged public-alias
+  calls and source/config health, persist all three status altitudes, and commit status separately.
 - The latency plan remains blocked until U3 produces one successful, fully inspected quality
   baseline. Do not restart width calibration from the current all-failed operations.

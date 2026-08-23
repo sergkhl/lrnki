@@ -275,28 +275,33 @@ export function buildClaimVerificationQuestionPlanningSchema(targetKeys: readonl
 // One answer per planned question. The answerer sees no draft, target text, or target key and
 // returns only independently generated parametric answers keyed to opaque displayed question keys.
 export function buildClaimVerificationAnsweringValidator(questionKeys: readonly string[]) {
-  const known = new Set(questionKeys);
+  requireUniqueQuestionKeys(questionKeys);
+  const answerByQuestionKey = Object.fromEntries(questionKeys.map((questionKey) => [
+    questionKey,
+    z.string().min(1).describe("A direct, self-contained factual answer from established domain knowledge; state that the answer is uncertain when it cannot be established reliably.")
+  ])) as Record<string, z.ZodString>;
   return z.object({
-    answers: z.array(z.object({
-      questionKey: z.string().min(1).describe("The exact opaque verification-question key as listed."),
-      answer: z.string().min(1).describe("A direct, self-contained factual answer from established domain knowledge; state that the answer is uncertain when it cannot be established reliably.")
-    }).strict()).length(questionKeys.length).describe("Exactly one independent answer for every listed verification-question key.")
-  }).strict().superRefine((value, ctx) => {
-    const seen = new Set<string>();
-    for (const answer of value.answers) {
-      if (!known.has(answer.questionKey)) ctx.addIssue({ code: "custom", message: `unknown questionKey ${answer.questionKey}` });
-      if (seen.has(answer.questionKey)) ctx.addIssue({ code: "custom", message: `duplicate questionKey ${answer.questionKey}` });
-      seen.add(answer.questionKey);
-    }
-    for (const questionKey of questionKeys) {
-      if (!seen.has(questionKey)) ctx.addIssue({ code: "custom", message: `missing questionKey ${questionKey}` });
-    }
-  });
+    answers: z.object(answerByQuestionKey).strict()
+      .describe("Exactly one independent answer value at every exact listed verification-question key.")
+  }).strict();
 }
 
 export const claimVerificationAnsweringValidator = buildClaimVerificationAnsweringValidator(["sentinel:q:0"]);
 export function buildClaimVerificationAnsweringSchema(questionKeys: readonly string[]): JsonSchema {
   return toForcedToolSchema(buildClaimVerificationAnsweringValidator(questionKeys));
+}
+
+function requireUniqueQuestionKeys(questionKeys: readonly string[]): void {
+  const seen = new Set<string>();
+  for (const questionKey of questionKeys) {
+    if (questionKey.trim().length === 0) {
+      throw new Error("Claim Verification Answering received an empty input questionKey.");
+    }
+    if (seen.has(questionKey)) {
+      throw new Error(`Claim Verification Answering received duplicate input questionKey ${JSON.stringify(questionKey)}.`);
+    }
+    seen.add(questionKey);
+  }
 }
 
 // --- Positive-claim factuality judgment: submit_claim_factuality_judgments ---
