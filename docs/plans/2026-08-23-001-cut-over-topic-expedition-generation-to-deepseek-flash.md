@@ -7,7 +7,7 @@ execution: code
 
 # Cut Over Topic Expedition Generation to DeepSeek Flash and Measure Stage Value
 
-**Status:** In progress — U3 route recovery live; bounded real-use sample resumes next
+**Status:** In progress — U3 complete (`FIX_FIRST`); U4 stage matrix next
 
 **Decision state:** Locked. The accepted direction, dated comparison, and known quality defects
 remain in the
@@ -548,49 +548,43 @@ hidden by prompt tuning, regeneration, lower quorum, lexical rejection, or an un
   tool evidence—not a complete Topic Expedition, persistence, learner usefulness, browser, native,
   physical-device, deployed, or final-release evidence.
 
-### U3 — bounded sample and same-assignment route recovery — 2026-08-23 — in progress
+### U3 — bounded real-use sample — 2026-08-23 — complete (`FIX_FIRST`)
 
-- The local application schemas were reset and the rebuilt production-composed API started from an
-  empty Topic queue. Cellular Respiration operation `ce077719-5ef1-42c1-9334-e8fb0f16a5d5`
-  reached Grounding Admission in 879 seconds, where MiMo and GPT independently rejected the same
-  universalized mitochondrial Pyruvate Oxidation claim. Inspection classified this as the known
-  decontextualization/non-atomic factual-scope problem class, not a route defect; zero learner assets
-  persisted. Its 327 successful-call positive control covered 947,565 tokens and $0.04861505475.
-- Database Transaction Isolation Levels exhausted three supervised attempts:
-  `bec9d1ed-c4ba-4ee2-8342-5ae9fd438ee0`, `91e8ac76-b876-472d-894f-bbc30ec10e93`, and
-  `e667ddb7-7f70-4804-8824-1573d65e3965`. Operation-stage detail and proxy logs attributed nine
-  forced-tool HTTP 429s to Novita's OpenRouter shared upstream pool. The same-operation positive
-  control contained 704 successful calls, 1,018,676 tokens, and $0.08408492495; zero learner assets
-  persisted. The 1,450-second terminal failure is `FIX_FIRST` Provider Route capacity evidence.
-- Fallback qualification kept the GPT-OSS FP4 Model Assignment fixed. Parasail and Nebius were each
-  catalog-filtered 3/3 with `require_parameters`; CoreWeave's served planner and challenger violated
-  their strict schemas. Under the root-README exception, Parasail then passed planner, challenger,
-  and ordering 3/3 with exact FP4 pin, medium reasoning present, validator-accepted forced tools,
-  and internal fallback off. No second empirical provider matrix ran after that first full pass.
-- The committed candidate retains Novita primary and adds one alias-keyed Parasail backup to the
-  three GPT roles. Deterministic route tests prove exactly one deployment per leg and one Model
-  Assignment across each primary/fallback pair. Candidate hashes are
-  `synthetic-topic-generation-dd501cd6075b` and `study-item-bank-02d755d9fae1`; focused routing,
-  full infrastructure-LiteLLM and learner-API suites, both package typechecks, targeted lint, and
-  `git diff --check` passed. This is local source, direct-provider, runtime-failure, and inspected
-  partial real-use evidence—not loaded-fallback, completed-sample, learner-usefulness, or release
-  evidence.
-- Local activation at `3938f19` changed LiteLLM's negative-control inventory from 45 groups without
-  the backup to 46 with it loaded. The rebuilt API was healthy with byte-identical host/container
-  config hash `e0da1cb7f9c9`; an initial image-unpack capacity failure was excluded, only unused build
-  cache was pruned, and the same committed image then built and started. Tag
-  `topic-u3-fallback-3938f19-proof-a1` attributed all three public aliases to recovered Novita
-  deployment `0782fdd8f130`; tag `topic-u3-fallback-3938f19-backup-a1` attributed the same three
-  validator-accepted descriptors to Parasail deployment `d6d3a934aa6`. No natural fallthrough
-  occurred, so this proves both loaded legs and deterministic alias linkage—not an observed runtime
-  error transition. The remaining serial sample will capture one if Novita fails naturally.
+- The four qualifying operations were Cellular Respiration `ce077719-5ef1-42c1-9334-e8fb0f16a5d5`
+  (879 seconds), Database Transaction Isolation Levels `da249653-5bc3-4c40-aa7f-1fe5a7897b77`
+  (1,059 seconds), Comparative Advantage `989edc35-4be5-4726-9891-cd5327221362` (587 seconds),
+  and Cellular repeat `b41ff2d5-0559-4b15-8b80-d3f2e7d21bc2` (785 seconds). All four were one-
+  attempt terminal failures before persistence; the four retained expedition rows are same-query
+  positive controls for zero enrichments, nodes, edges, lessons, Study Items, and rejections.
+- Settled SpendLogs contained 1,296 successful calls, 2,619,560 prompt plus 1,007,488 completion
+  tokens, $0.25040813645 spend, and 61 naturally selected Parasail-backup calls. The terminal gate
+  snapshots had 1,291 rows; the joined report waited for five delayed logs before aggregating. The
+  earlier three-attempt Database run is excluded route-recovery evidence: nine Novita shared-pool
+  429s led to the qualified same-assignment fallback, which then served cleanly under real load.
+- Declared Domain fit passed for Cell Biology, Database Systems, and International Economics;
+  concept coverage was broad enough to expose foundation and boundary claims. Grounding atomicity
+  and scope are `FIX_FIRST`: admission correctly rejected universalized mitochondrial Pyruvate
+  Oxidation, hidden-until-commit transaction isolation, and time-only labor productivity. The two
+  Cellular generations repeated the same narrow mitochondrial definitions, so this is the known
+  cross-domain decontextualization/non-atomic factual-scope class, not one anomalous observation.
+- The Cellular repeat independently failed because Xiaomi MiMo emitted schema-invalid answerer
+  arguments through all three corrective attempts; 38 successful same-operation answer calls are
+  the positive control. Operation-stage error detail, not the zero-error successful SpendLogs set,
+  owns that `FIX_FIRST` forced-tool verdict. No downstream graph-completion or Study Item stage ran,
+  so learner assets and those twelve stage-quality areas remain `INCONCLUSIVE`, never implicitly
+  passed.
+- One source-owned prompt and retained tool output per executed descriptor, all generated Grounding
+  Bundles, both Cellular variants, every stage error, and all provider legs were inspected. All
+  1,296 same-operation rows stored empty `messages` despite `store_prompts_in_spend_logs`; source
+  prompt files plus response arguments supplied the bounded inspection, and the observability gap
+  remains explicit. Evidence authority is local production composition, development Postgres, and
+  production LLM routes—not deployed, browser, native, physical-device, or release qualification.
 
 ### Open findings
 
-- **NEXT:** resume the serial KTD5 sample through the fresh production composition with a clean
-  Database retry, Comparative Advantage, and the Cellular Respiration repeat. Capture any natural
-  Novita-to-Parasail transition, then inspect the joined report before assigning final learner-
-  quality verdicts.
-- U4 remains gated by U3. The active route invalidates prior usefulness evidence for all affected
-  consumers; U3 is the first current candidate evidence, and final release qualification remains
-  intentionally deferred until the pipeline shape settles.
+- **NEXT:** complete U4's 19-row disposition matrix. Keep all twelve unexecuted stages under
+  insufficient evidence, deepen only the observed Grounding/answerer seams, and do not run another
+  topic unless a proposed `COMBINE` or `REMOVE` requires it. Create the smallest successor that owns
+  the accepted deepening and final qualification before consolidating this plan.
+- Restore prompt-message observability in that successor or amend the inspection workflow to its
+  actual storage boundary; do not claim rendered-prompt evidence from empty SpendLogs rows.
