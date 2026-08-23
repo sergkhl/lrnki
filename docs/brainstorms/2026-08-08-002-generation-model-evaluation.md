@@ -58,8 +58,7 @@ The follow-up retains these constraints:
 - **Grounding generation and its judge must stay cross-family.**
   [ADR-0023](../adr/0023-grounding-origin-model-and-cross-family-generated-node-judge.md) requires the
   generating and judging roles to move as an independent pair. The judge has no independently
-  qualified destination if the whole alias moves today. The verification boundary in
-  [ADR-0030](../adr/0030-confidence-gated-synthesis.md) also remains unchanged.
+  qualified destination if the whole alias moves today.
 - Treat earlier blueprint changes, extra attempts, and pipeline stages as scope candidates rather
   than inherited implementation requirements.
 - Keep the DeepSeek choice separate from Provider Route selection and qualification.

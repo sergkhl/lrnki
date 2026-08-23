@@ -7,7 +7,7 @@ execution: code
 
 # Apply the ADR Audit Without Changing ADR-0006 or Cross-Family Rules
 
-**Status:** In progress — U0–U4 complete; U5 next
+**Status:** Complete — U0–U5 closed; consolidation next
 
 **Decision state:** Locked. The accepted audit findings and fixed assumptions are implementation
 inputs, not an invitation to reopen Concept Canonicalization, Operation Timeline ownership,
@@ -497,7 +497,20 @@ without implementing that follow-up.
   evidence. It is not deployed, production-data, browser, emulator/simulator, or physical-device
   evidence.
 
+### U5 — Full repository and protected-diff gates — complete; local automated and documentation evidence
+
+- Repository gates: `pnpm run typecheck`, `pnpm run test`, `pnpm run lint`, `pnpm run build`, and
+  `pnpm db:check` passed. Lint reported 11 pre-existing warnings and zero errors; build exported web
+  without launching a browser. Root `pnpm check` was not invoked because it always runs excluded
+  Playwright; its non-browser constituents ran individually except unrelated destructive `tmp:clean`.
+- Protected invariants: starting-revision diffs are empty for ADR-0006, `litellm/config.yaml`, and the
+  source-less admission/synthetic-generation modules. Cross-family clauses in ADR-0023, ADR-0026,
+  ADR-0030, and the brainstorm match `ab15107`; no related policy, enforcement, or definition changed.
+- Documentation/hygiene: 197 local Markdown targets across 44 governing, ADR, plan, and brainstorm
+  files resolved, file-retention limits remain satisfied, and `git diff --check` passed.
+- Evidence boundary: local automated, build, schema, and documentation only; no browser, deployed,
+  production-data, emulator/simulator, or physical-device claim is made.
+
 ### Open findings
 
-- U5 must run the full repository/protected-diff gates, consolidate durable status, and delete this
-  completed plan only after the detailed validation record is committed.
+- None. Preserve this detailed record in history before the separate documentation consolidation.
