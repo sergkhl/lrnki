@@ -7,7 +7,7 @@ execution: code
 
 # Cut Over Topic Expedition Generation to DeepSeek Flash and Measure Stage Value
 
-**Status:** In progress — U2 `FIX_FIRST`; amended route preflight next
+**Status:** In progress — U2 `FIX_FIRST`; route-contract diagnosis next
 
 **Decision state:** Locked. The accepted direction, dated comparison, and known quality defects
 remain in the
@@ -512,13 +512,18 @@ hidden by prompt tuning, regeneration, lower quorum, lexical rejection, or an un
   The calls did not exercise the LiteLLM aliases, a deployed config, a Topic Expedition, persisted
   artifacts, learner usefulness, browser, native, or physical-device behavior.
 - Route amendment: the same DeepSeek, MiMo, and GPT-OSS Model Assignments are now frozen to the
-  replacement Provider Routes in KTD3. This is current endpoint-catalog and plan evidence only; no
-  replacement provider has passed a served call yet.
+  replacement Provider Routes in KTD3. The resulting 31-call matrix passed only the three Novita
+  FP4 GPT-OSS descriptors. Mancer served none of nine DeepSeek descriptors, Parasail and Novita
+  served none of eight MiMo descriptors each, and Nebius served none of three GPT-OSS descriptors;
+  OpenRouter filtered every failure with `404` under the complete required-parameter body. No config
+  or running route changed.
 
 ### Open findings
 
-- **NEXT:** run the 31-call amended direct-provider matrix exactly as frozen in KTD3. Only a wholly
-  passing matrix may edit `litellm/config.yaml` or activate the routing value; U3–U4 remain gated.
+- **NEXT:** diagnose the route contract before another amendment: use one MiMo descriptor to compare
+  the frozen body with a no-seed body under `require_parameters: true`, and recheck the previously
+  schema-valid Parasail DeepSeek Matching Generation case after cooldown. Preserve the passing
+  DeepInfra and Novita GPT evidence; U3–U4 remain gated.
 - The original Xiaomi, CoreWeave, and Parasail GPT routes failed; Parasail DeepSeek was not fully
   reachable. Do not drop `seed`, weaken schemas, enable OpenRouter fallback, split one role across
   different Model Assignments, or activate a partial replacement matrix to make U2 pass.
