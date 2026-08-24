@@ -12,10 +12,11 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-24-002 — Pause Synthetic Topic Generation and Diagnose Source-backed Generation](./2026-08-24-002-pause-synthetic-topic-and-diagnose-source-backed-generation.md)
-   — **In progress; U0–U4 complete, U5 learner assets are `FIX_FIRST`, and U6 is next.** The repaired
-   graph is safe, but the first Study Item gate dropped “for owned values” from Variable Binding and
-   its verifier silently restored that missing condition while accepting the answer. Repair literal
-   scope fidelity at generation and Answer-Key Verification, then rerun the same enrichment.
+   — **In progress; U0–U6 complete, U7 next, learner assets remain `FIX_FIRST`.** The code-owned
+   lesson-to-key projection preserves Variable Binding's qualifier in 31/31 current option-selects,
+   but fresh inspection found independent matching, impostor, lesson-context, and distractor-verifier
+   failures. Consolidate the bounded repair and owner-gated learner-asset decision; do not adopt the
+   current bank or spend on the same failed model/schema combinations.
 
 2. [2026-08-24-001 — Test a Same-Call Grounding Identity-Scope Audit](./2026-08-24-001-test-grounding-identity-scope-audit.md)
    — **Blocked; U0–U2 and U4 complete, candidate rejected, U3 skipped.** The first fixed

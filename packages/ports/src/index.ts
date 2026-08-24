@@ -867,9 +867,12 @@ export interface LessonReadStorePort {
 
 // Study Item generation (R9, R10). Forced named tool schemas routed through LiteLLM; the
 // generator stays on its production alias (AGENTS rule 5). `generateOptionSelect` returns a
-// pre-verification OptionSelectItemDraft (a grounded correct answer + three
-// sibling-conditioned distractors). The deterministic guard accepts or rejects —
-// semantic acceptance is NOT done here.
+// pre-verification OptionSelectItemDraft. The adapter makes the recognition question code-owned
+// and copies one application-selected Concept Lesson teaching unit into the correct option and
+// explanation while retaining that unit's existing grounding citation; the model generates only
+// the three sibling-conditioned distractors. This non-lossy projection makes qualifier
+// preservation between learner layers provable without a lexical semantic gate.
+// The deterministic guard accepts or rejects — semantic distractor acceptance is NOT done here.
 export interface StudyItemGenerationPort {
   readonly model: string;
   generateOptionSelect(input: {
@@ -877,6 +880,9 @@ export interface StudyItemGenerationPort {
     node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
     groundingProvenance: StudyItemGroundingProvenance;
     groundingPassages: StudyItemGroundingPassage[];
+    // Code-owned from a selected substantive lesson teaching unit. The model sees it only to
+    // write wrong alternatives and cannot rewrite the keyed answer.
+    correctAnswer: { text: string; citation: { passageId: string; evidenceQuote: string } };
     // Same-domain neighbor descriptors that flavor the distractors (prompt-context only;
     // a sibling-poor node still generates, just with thinner flavor — KTD3).
     siblings: { label: string; snippet: string }[];

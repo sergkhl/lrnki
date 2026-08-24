@@ -2,12 +2,12 @@
 model: kg-claim-extraction
 lrnki:
   toolName: submit_option_select_item
-  toolDescription: Submit one four-option study item: a grounded correct answer plus three sibling-flavored distractors.
+  toolDescription: Submit three sibling-flavored distractors for one code-owned correct description.
 ---
 {{#system}}
-You write ONE four-option multiple-choice study item for a single learning node, conditioned ONLY on the provided grounding passages. Produce exactly one CORRECT answer, grounded strictly in the provided passages, plus exactly THREE distractors. Also write a short explanation of why the correct answer is right, grounded in the provided passages. Cite the passage your correct answer derives from by its exact passageId, quoting a substring of the passage text. For source-grounded passages, the quote must be verbatim; for generated grounding, quote only the generated grounding passage text. The correctAnswer field must be an object with text and citation. The citation evidenceQuote must be copied exactly from one listed grounding passage; do not paraphrase the citation quote. Write three plausible but INCORRECT distractors in the same domain register as the provided neighboring topics, so wrong answers read like real domain answers. Each distractor must be clearly wrong for this question and never a paraphrase of the correct answer. Stay within the Declared Domain. Write domain-neutral, learner-facing language; never reference 'the passage' or 'the source' in the question. The neighbor list is internal context for flavoring distractors; its framing is never part of the item. {{> learner-copy-vocabulary}}
+You prepare the THREE wrong alternatives for ONE four-option recognition item about a single learning node. The application owns the question and the correct description shown below. It will copy that learner-visible Concept Lesson text without alteration into the correct option and explanation while retaining its verified grounding citation. You do not select, rewrite, summarize, qualify, or otherwise generate the correct claim.
 
-Finally, list up to five explorableTerms: specialized words or short phrases that appear verbatim in the QUESTION text and that a learner might need explained to understand it. Copy each term exactly as it appears in the question. Do not include the learning node's own name. Emit only genuinely unfamiliar terms and return an empty array when the question introduces none; never pad the list.
+Write exactly THREE plausible but INCORRECT distractors for the code-owned question "Which statement accurately describes [learning node]?" Keep each distractor in the same grammatical form, domain register, specificity, and approximate length as the correct description so formatting does not reveal the answer. Neighboring topics may flavor a distractor, but each distractor must remain clearly wrong for this learning node and must never paraphrase the correct description or any grounding passage. Stay within the Declared Domain. {{> learner-copy-vocabulary}}
 {{/system}}
 
 {{#user}}
@@ -17,9 +17,13 @@ Grounding provenance: {{groundingProvenance}}.
 Grounding passages (cite the correct answer by passageId):
 {{passages}}
 
+Code-owned correct description (do not rewrite):
+{{correctAnswerText}}
+Verified citation: [{{correctAnswerPassageId}}] "{{correctAnswerEvidenceQuote}}"
+
 Same-domain neighboring topics (flavor distractors after these; do NOT make a neighboring topic the correct answer):
 {{siblings}}
 {{facetBlock}}{{retryFeedbackBlock}}
 
-Call submit_option_select_item with a question, explanation, a correctAnswer (text + citation), exactly three distractors, and zero to five explorableTerms copied verbatim from the question.
+Call submit_option_select_item with exactly three distractors and no other fields.
 {{/user}}

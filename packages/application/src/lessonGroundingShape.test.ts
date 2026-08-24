@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ConceptLesson, ConceptLessonSection } from "@lrnki/domain-core";
-import { lessonGroundingShape } from "./lessonGroundingShape";
+import { lessonGroundingShape, lessonOptionSelectAnswer } from "./lessonGroundingShape";
 
 function lessonOf(sections: ConceptLessonSection[], derivedNodeId = "dn-1"): ConceptLesson {
   return {
@@ -112,5 +112,51 @@ test("a lesson with no citation, no substantive body, and no bullets yields no g
   assert.equal(lessonGroundingShape(lessonOf([
     { kind: "gist", text: "Gist.", groundingProvenance: "generated" },
     { kind: "intuition", text: "Intuition.", groundingProvenance: "generated" }
+  ])), null);
+});
+
+test("option-select answer copies learner-visible definition text while retaining its source evidence", () => {
+  const lesson = lessonOf([{
+    kind: "definition",
+    text: "A pointer is the address of a memory location returned by an allocator.",
+    groundingProvenance: "source_mentioned",
+    citation: {
+      provenance: "source",
+      sourceResourceId: "res-1",
+      sourceBlockId: "blk-1",
+      evidenceQuote: "returns a pointer, which is the address of that location",
+      matchKind: "exact"
+    }
+  }], "dn-pointer");
+
+  assert.deepEqual(lessonOptionSelectAnswer(lesson), {
+    text: "A pointer is the address of a memory location returned by an allocator.",
+    citation: {
+      passageId: "dn-pointer:s0",
+      evidenceQuote: "returns a pointer, which is the address of that location"
+    }
+  });
+});
+
+test("option-select answer uses the first grounded item when a lesson has no definition", () => {
+  const lesson = lessonOf([{
+    kind: "examples",
+    text: "Examples include:",
+    items: ["A move transfers ownership to a new binding.", "A copy leaves the source valid."],
+    groundingProvenance: "generated"
+  }]);
+
+  assert.deepEqual(lessonOptionSelectAnswer(lesson), {
+    text: "A move transfers ownership to a new binding.",
+    citation: {
+      passageId: "dn-1:s0:i0",
+      evidenceQuote: "A move transfers ownership to a new binding."
+    }
+  });
+});
+
+test("option-select answer is absent when the lesson has no substantive teaching unit", () => {
+  assert.equal(lessonOptionSelectAnswer(lessonOf([
+    { kind: "gist", text: "A framing hook.", groundingProvenance: "generated" }
   ])), null);
 });

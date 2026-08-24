@@ -305,7 +305,7 @@ test("only affected operation hashes change and Topic remains nineteen stages", 
     "synthetic-topic-generation-d78aba900512",
     "Topic Synthetic changes with the Grounding audit contract"
   );
-  assert.equal(studyItemBankConfigHash(routing), "study-item-bank-02d755d9fae1");
+  assert.equal(studyItemBankConfigHash(routing), "study-item-bank-a841a9e54fd7");
   assert.equal(
     syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG),
     "synthetic-topic-generation-3286a5adf7a3"
@@ -315,7 +315,7 @@ test("only affected operation hashes change and Topic remains nineteen stages", 
     "synthetic-topic-generation-9f81ce84488e",
     "default Synthetic changes with the Grounding audit contract"
   );
-  assert.equal(studyItemBankConfigHash(), "study-item-bank-d574e02753f9");
+  assert.equal(studyItemBankConfigHash(), "study-item-bank-30876e730c8a");
   assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-928893987225");
   assert.notEqual(
     graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG),

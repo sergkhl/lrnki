@@ -7,7 +7,8 @@ execution: code
 
 # Pause Synthetic Topic Generation and Diagnose Source-backed Generation
 
-**Status:** In progress — U0–U4 complete; U5 learner assets are `FIX_FIRST` and U6 is next
+**Status:** In progress — U0–U6 complete; U7 is next and the source-backed learner bank remains
+`FIX_FIRST` behind an owner decision
 
 **Decision state:** The owner decided on 2026-08-24 to pause fully anchor-less Synthetic Topic
 Generation and to diagnose the existing curated-source generation path before choosing another
@@ -394,10 +395,77 @@ Implementation units are exclusive and run in order. This plan declares no paral
   evidence. It does not qualify any of the other 85 items, learner usefulness, deployed behavior,
   production data, browser/native, simulator/emulator, physical-device, or release behavior.
 
+### U6 — non-lossy keyed-answer projection and fresh learner-asset gate — 2026-08-24 — complete,
+bank remains `FIX_FIRST`
+
+- The established defect class was lossy abstraction across generated learner layers plus
+  verifier-side premise repair. Directional factual-consistency work such as
+  [FENICE](https://aclanthology.org/2024.findings-acl.841/) and
+  [AlignScore](https://arxiv.org/abs/2305.16739) supports testing the candidate claim against its
+  evidence rather than accepting topical overlap. A prompt-only scope audit did not supply that
+  guarantee: DeepSeek named the omitted owned-value condition and a reference-binding
+  counterexample but still accepted the broadened answer; a split directional-entailment field and
+  the same schema on GPT-OSS also accepted it.
+- GLM 5.3 was tested as the requested lower-cost alternative without changing a tracked Model
+  Assignment. Its current Z.AI route rejected forced named `tool_choice` with “Tool choice must be
+  auto.” A direct `json_schema` response-format request returned HTTP success but did not follow the
+  supplied schema and still accepted the unsafe claim. JSON Schema therefore neither preserves
+  ADR-0006's current contract nor repairs the semantic failure; no GLM, GPT-OSS, or DeepSeek
+  reassignment was made.
+- Two deterministic alternatives were exhausted before selecting the repair. Stronger generator
+  instructions produced one safe direct draw but a fresh full bank reproduced the unqualified
+  Variable Binding answer. Copying the complete grounding passage made 30/30 keyed answers and
+  explanations exact to their citations, but exposed source fragments and Markdown as learner copy
+  (`returns a _pointer_`, a lower-case fragment, and a link-comment token), so that candidate was
+  discarded rather than misrepresented as usable.
+- The implemented deep seam now selects one substantive, learner-visible Concept Lesson teaching
+  unit in the application and passes its exact text plus already-derived citation to the
+  option-select port. The forced-tool schema permits the model to return only three distractors;
+  the adapter owns the generic question and copies the selected text unchanged into both the key
+  and explanation. This proves non-lossy lesson-to-option projection without a lexical semantic
+  veto and moves the default/Topic Study Item identities to `study-item-bank-30876e730c8a` and
+  `study-item-bank-a841a9e54fd7`.
+- Application-level tests prove the exact lesson-unit/citation input; adapter and closed-schema
+  tests prove model output cannot rewrite the key. The full application suite passed 810 tests,
+  infrastructure-litellm passed 194, the worker passed eight, all four affected typechecks passed,
+  targeted ESLint had zero errors and one pre-existing warning, and `git diff --check` passed.
+- A direct production-route Variable Binding kill gate returned a correct option and explanation
+  byte-for-byte equal to the qualified lesson text, including “for owned values”; the model supplied
+  only distractors. The first unauthenticated scratch invocation used the client's placeholder key
+  and received 401 before inference; the `.env`-loaded rerun is the qualifying call.
+- The final fresh bank over enrichment `ef5f3a7b-cb71-45f5-aec6-9abe7b4221cb` succeeded under the
+  new config in 351.038 seconds. It made 268 successful and zero non-success calls, used 554,153
+  tokens, recorded USD 0.015762 provider spend, and made no transport retry: 170 generation calls
+  used the configured Xiaomi route and 98 verification calls used DeepSeek on DeepInfra. It
+  persisted 33 current lessons, one lesson absence, 89 current items (31 option-select, 26 matching,
+  32 impostor), and 13 current rejections.
+- A same-query positive-control join proved all 31 current option-select keys, explanations,
+  question templates, citations, provenance labels, and config hashes exactly match their selected
+  lesson teaching unit. Variable Binding retained its full owned-value condition throughout. This
+  establishes only the repaired projection invariant, not semantic correctness of every lesson or
+  distractor.
+- Full payload inspection found the next invalid layer in behavior untouched by this unit. The
+  Pointer impostor calls “the identifier of a specific location” false even though address and
+  identifier are equivalent here; DeepSeek accepted that invented distinction. Variable Binding's
+  matching prompt again deletes “for owned values,” and its assignment verifier calls the shortened
+  claim an exact match. The option verifier calls String capacity's standard “maximum before
+  reallocation” formulation false merely because it differs from the supplied wording; for `drop`,
+  it explicitly acknowledges that reassignment is supported by the passage and then labels it false
+  as a “special case.” The Move lesson also generalizes a context-local source statement into an
+  unconditional move rule despite Copy semantics. These independent counterexamples show a
+  systemic lesson/item semantic-verification limit, not a remaining JSON/tool transport defect.
+- The exact keyed-answer drift is repaired, but the current learner bank is still `FIX_FIRST` and
+  must not be qualified or adopted as useful. Under KTD4, the failed DeepSeek/GPT-OSS/GLM probes and
+  unusable deterministic extractive candidate make the next policy/design choice owner-gated. This
+  is local automated, local production-model, and joined-development-database evidence only; it is
+  not deployment, production-data, browser/native, simulator/emulator, physical-device, or release
+  evidence.
+
 ### Open findings
 
-- U6 is next: make option-select generation preserve every material condition and make Answer-Key
-  Verification judge the literal candidate without importing a missing condition from grounding or
-  its own rationale. Add a domain-neutral qualifier-loss regression, keep the existing key-hidden
-  domain-truth contract, and run a fresh immutable Study Item Bank over enrichment
-  `ef5f3a7b-cb71-45f5-aec6-9abe7b4221cb` before inspecting any broader learner surface.
+- U7 is next: consolidate the bounded repair and close this diagnostic with the owner decision in
+  [BLOCKERS.md](./BLOCKERS.md). Do not qualify or adopt the current learner bank, spend more calls on
+  the same verifier/model combinations, replace forced tools with JSON Schema, or silently publish
+  extractive fragments. The source-backed graph remains the positive handback; learner-asset
+  generation remains owner-gated until the owner chooses a pause or a separately planned
+  deterministic/product or Model Assignment successor.

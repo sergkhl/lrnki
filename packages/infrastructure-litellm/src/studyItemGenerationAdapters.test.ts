@@ -10,11 +10,11 @@ test("generateOptionSelect assembles a draft: grounded correct + three generated
     async call(input: { toolName: string; messages: { content: string }[]; maxRetries?: number }) {
       calls.push(input);
       return {
-        question: "Where is memory allocated at runtime?",
-        explanation: "The heap is correct because the grounding says it allocates at runtime.",
-        correctAnswer: { text: "Heap", citation: { passageId: "b1", evidenceQuote: "the heap allocates at runtime" } },
-        distractors: ["Stack", "Register", "Cache"],
-        explorableTerms: ["runtime"]
+        distractors: [
+          "the stack allocates every value at runtime",
+          "a register allocates all dynamic data at runtime",
+          "the cache permanently owns every allocation at runtime"
+        ]
       };
     }
   } as unknown as LiteLlmForcedToolClient;
@@ -25,17 +25,18 @@ test("generateOptionSelect assembles a draft: grounded correct + three generated
     node: { derivedNodeId: "n1", canonicalLabel: "Heap", aliases: [] },
     groundingProvenance: "source_cep",
     groundingPassages: [{ passageId: "b1", kind: "definition", text: "the heap allocates at runtime", sourceResourceId: "res-1", sourceBlockId: "b1" }],
+    correctAnswer: { text: "Heap allocation reserves runtime memory.", citation: { passageId: "b1", evidenceQuote: "the heap allocates at runtime" } },
     siblings: [{ label: "Stack", snippet: "LIFO region for call frames" }]
   });
 
   assert.equal(draft.itemType, "option_select");
-  // U1: the adapter carries the raw explorableTerms through to the draft (validation is the guard's job).
-  assert.deepEqual(draft.explorableTerms, ["runtime"]);
-  assert.equal(draft.explanation, "The heap is correct because the grounding says it allocates at runtime.");
+  assert.equal(draft.question, "Which statement accurately describes Heap?");
+  assert.deepEqual(draft.explorableTerms, []);
+  assert.equal(draft.explanation, "Heap allocation reserves runtime memory.");
   assert.equal(draft.options.length, 4);
   const correct = draft.options.filter((o) => o.isCorrect);
   assert.equal(correct.length, 1);
-  assert.equal(correct[0].text, "Heap");
+  assert.equal(correct[0].text, "Heap allocation reserves runtime memory.");
   assert.equal(correct[0].provenance, "source");
   assert.deepEqual(correct[0].citation, { passageId: "b1", evidenceQuote: "the heap allocates at runtime" });
   for (const distractor of draft.options.filter((o) => !o.isCorrect)) {
@@ -46,16 +47,15 @@ test("generateOptionSelect assembles a draft: grounded correct + three generated
   assert.equal(calls[0].maxRetries, 4);
   // siblings flow into the prompt
   assert.ok(calls[0].messages.some((m) => m.content.includes("Stack")));
-  assert.ok(calls[0].messages.some((m) => m.content.includes("correctAnswer field must be an object")));
+  assert.ok(calls[0].messages.some((m) => m.content.includes("Heap allocation reserves runtime memory.")));
+  assert.ok(calls[0].messages.some((m) => m.content.includes("You do not select, rewrite, summarize, qualify")));
+  assert.ok(calls[0].messages.some((m) => m.content.includes("approximate length as the correct description")));
 });
 
 test("generateOptionSelect labels the correct answer 'generated' on a generated-grounding node", async () => {
   const client = {
     async call() {
       return {
-        question: "Q?",
-        explanation: "Ownership is correct because the grounding describes what it tracks.",
-        correctAnswer: { text: "Ownership", citation: { passageId: "p0", evidenceQuote: "tracks which binding frees a value" } },
         distractors: ["a", "b", "c"]
       };
     }
@@ -66,9 +66,13 @@ test("generateOptionSelect labels the correct answer 'generated' on a generated-
     node: { derivedNodeId: "n2", canonicalLabel: "Ownership", aliases: [] },
     groundingProvenance: "generated",
     groundingPassages: [{ passageId: "p0", kind: "definition", text: "tracks which binding frees a value", derivedNodeId: "n2" }],
+    correctAnswer: { text: "Ownership tracks which binding frees a value.", citation: { passageId: "p0", evidenceQuote: "tracks which binding frees a value" } },
     siblings: []
   });
-  assert.equal(draft.options.find((o) => o.isCorrect)!.provenance, "generated");
+  const correct = draft.options.find((o) => o.isCorrect)!;
+  assert.equal(correct.provenance, "generated");
+  assert.equal(correct.text, "Ownership tracks which binding frees a value.");
+  assert.equal(draft.explanation, "Ownership tracks which binding frees a value.");
 });
 
 test("generateImpostor assembles a draft: three cited truths + one generated impostor (sibling-sourced)", async () => {
@@ -190,37 +194,25 @@ test("impostorValidator rejects arguments missing reveal", () => {
   }));
 });
 
-test("optionSelectValidator rejects arguments missing correctAnswer", () => {
-  assert.throws(() => optionSelectValidator.parse({ question: "Q?", explanation: "Because.", distractors: ["a", "b", "c"] }));
-});
-
 test("optionSelectValidator rejects arguments missing distractors", () => {
-  assert.throws(() =>
-    optionSelectValidator.parse({ question: "Q?", explanation: "Because.", correctAnswer: { text: "x", citation: { passageId: "p", evidenceQuote: "q" } } })
-  );
+  assert.throws(() => optionSelectValidator.parse({}));
 });
 
 test("optionSelectValidator rejects the wrong distractor count (fail-closed, rule 6)", () => {
-  const base = { question: "Q?", explanation: "Because.", correctAnswer: { text: "x", citation: { passageId: "p", evidenceQuote: "q" } } };
-  assert.throws(() => optionSelectValidator.parse({ ...base, distractors: ["a", "b"] }));
-  assert.throws(() => optionSelectValidator.parse({ ...base, distractors: ["a", "b", "c", "d"] }));
-});
-
-test("optionSelectValidator rejects arguments missing explanation", () => {
-  assert.throws(() => optionSelectValidator.parse({
-    question: "Q?",
-    correctAnswer: { text: "x", citation: { passageId: "p", evidenceQuote: "q" } },
-    distractors: ["a", "b", "c"]
-  }));
+  assert.throws(() => optionSelectValidator.parse({ distractors: ["a", "b"] }));
+  assert.throws(() => optionSelectValidator.parse({ distractors: ["a", "b", "c", "d"] }));
 });
 
 test("optionSelectValidator accepts a well-formed argument set (shape only, no content assertion)", () => {
   const parsed = optionSelectValidator.parse({
-    question: "Q?",
-    explanation: "The correct option follows from the grounding.",
-    correctAnswer: { text: "x", citation: { passageId: "p", evidenceQuote: "q" } },
-    distractors: ["a", "b", "c"],
-    explorableTerms: []
+    distractors: ["a", "b", "c"]
   });
   assert.equal(parsed.distractors.length, 3);
+});
+
+test("optionSelectValidator rejects model attempts to rewrite the code-owned answer", () => {
+  assert.throws(() => optionSelectValidator.parse({
+    correctAnswer: "a model rewrite",
+    distractors: ["a", "b", "c"]
+  }));
 });

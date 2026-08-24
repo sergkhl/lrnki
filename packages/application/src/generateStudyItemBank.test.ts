@@ -248,12 +248,14 @@ function generationReturning(opts: {
   impostor?: Record<string, ImpostorItemDraft | "throw" | "absent">;
   matching?: Record<string, MatchingItemDraft | "throw" | "absent">;
   onGenerate?: () => void;
+  onGenerateOptionSelect?: (input: Parameters<StudyItemGenerationPort["generateOptionSelect"]>[0]) => void;
   onGenerateImpostor?: () => void;
 }): StudyItemGenerationPort {
   return {
     model: "mock-gen",
     async generateOptionSelect(input) {
       opts.onGenerate?.();
+      opts.onGenerateOptionSelect?.(input);
       const draft = opts.optionSelect?.[input.node.derivedNodeId];
       if (draft === undefined) throw new Error(`no canned option-select draft for ${input.node.derivedNodeId}`);
       if (draft === "throw") throw new Error("option-select generation failed");
@@ -388,6 +390,7 @@ test("a node whose lesson grounds an option-select that passes the guard persist
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
   const { store, persisted, persistedRejected } = capturingStore();
   const lessonStore = capturingLessonStore();
+  let optionSelectInput: Parameters<StudyItemGenerationPort["generateOptionSelect"]>[0] | undefined;
   const result = await generateStudyItemBank({
     enrichmentId: "enr-1",
     configHash: "cfg-1",
@@ -397,7 +400,10 @@ test("a node whose lesson grounds an option-select that passes the guard persist
     answerKeyVerification: keyVerifierPassing(),
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: lessonStore.store,
-    studyItemGeneration: generationReturning({ optionSelect: { "node-c1": osDraft("rules that govern memory") } }),
+    studyItemGeneration: generationReturning({
+      optionSelect: { "node-c1": osDraft("rules that govern memory") },
+      onGenerateOptionSelect(input) { optionSelectInput = input; }
+    }),
     studyItemBankStore: store,
     newConceptLessonId: () => "lesson-node-c1"
   });
@@ -413,6 +419,13 @@ test("a node whose lesson grounds an option-select that passes the guard persist
   assert.equal(lessonStore.lessons.length, 1);
   assert.equal(lessonStore.lessons[0].conceptLessonId, "lesson-node-c1", "the application mints the stable lesson identity before persistence");
   assert.ok(lessonStore.lessons[0].sections.some((s) => s.kind === "definition" && s.groundingProvenance === "source_cep"));
+  assert.deepEqual(optionSelectInput?.correctAnswer, {
+    text: "A definition restating the source.",
+    citation: {
+      passageId: lessonPassageId("node-c1", 1),
+      evidenceQuote: ownershipDef
+    }
+  }, "option generation receives an exact learner-visible lesson claim with that unit's resolved evidence");
 });
 
 test("structural blueprint pre-gate rejects matching and impostor when the lesson is too sparse", async () => {

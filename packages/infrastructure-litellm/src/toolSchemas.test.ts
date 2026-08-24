@@ -24,7 +24,6 @@ import {
   answerKeyVerificationValidator,
   impostorSchema,
   impostorValidator,
-  optionSelectValidator,
   scaffoldOutlineValidator,
   toolValidators
 } from "./toolSchemas";
@@ -443,21 +442,11 @@ test("owner-neutral Answer-Key Verification schema is registered and fail-closed
   assert.throws(() => answerKeyVerificationValidator.parse({ verdicts: [{ ordinal: 0, verdict: "maybe", reason: "unclear" }] }));
 });
 
-// Plan 2026-07-13-002 U1 (R2, AE1): Explorable Term capacity is five in BOTH forced-tool
-// term arrays (matching/impostor share the item array), while the Scaffold outline stays
-// capped at three Support Steps.
-test("explorable term schemas accept five terms and reject six; scaffold outline stays at three", () => {
+// Plan 2026-07-13-002 U1 (R2, AE1): generated learner-copy terms stay capped at five while
+// the Scaffold outline stays capped at three Support Steps. Option-select now has a code-owned
+// generic question and therefore returns no model-selected question terms.
+test("lesson explorable terms accept five and reject six; scaffold outline stays at three", () => {
   const terms = (n: number) => Array.from({ length: n }, (_, i) => `term-${i + 1}`);
-  const optionSelect = (explorableTerms: string[]) => ({
-    question: "q",
-    explanation: "e",
-    correctAnswer: { text: "a", citation: { passageId: "p-1", evidenceQuote: "quote" } },
-    distractors: ["d1", "d2", "d3"],
-    explorableTerms
-  });
-  assert.doesNotThrow(() => optionSelectValidator.parse(optionSelect(terms(5))));
-  assert.throws(() => optionSelectValidator.parse(optionSelect(terms(6))));
-
   const lesson = (count: number) => ({
     sections: [
       { kind: "gist", text: "A one-line organizer.", items: [], citationPassageId: null, citationEvidenceQuote: null, diagramCaption: null, diagramSpec: null }

@@ -58,7 +58,7 @@ import {
 import { selectSiblingContext } from "./selectSiblingContext";
 import { selectNodeGrounding } from "./selectNodeGrounding";
 import { selectLessonNeighborhood } from "./selectLessonNeighborhood";
-import { lessonGroundingShape, type LessonGroundingShape } from "./lessonGroundingShape";
+import { lessonGroundingShape, lessonOptionSelectAnswer, type LessonGroundingShape } from "./lessonGroundingShape";
 import { assembleConceptLesson, SUBSTANTIVE_KINDS } from "./assembleConceptLesson";
 import { STUDY_ITEM_BANK_STAGE_GROUP } from "./topicExpeditionStageProfile";
 
@@ -369,7 +369,7 @@ export async function generateStudyItemBank(input: {
   type NodeItemContext =
     | { kind: "skip" }
     | { kind: "reject"; reason: string }
-    | { kind: "ready"; grounding: LessonGroundingShape; facet: string | undefined; siblings: { label: string; snippet: string }[] };
+    | { kind: "ready"; lesson: ConceptLesson; grounding: LessonGroundingShape; facet: string | undefined; siblings: { label: string; snippet: string }[] };
   const nodeItemContext = (node: DerivedGraphNode, itemType: StudyItemType, label: string): NodeItemContext => {
     const typePlan = typePlanFor(blueprintByNode, node, itemType);
     if (!typePlan.generate) return { kind: "skip" };
@@ -379,6 +379,7 @@ export async function generateStudyItemBank(input: {
     if (!grounding) return { kind: "reject", reason: `no ${label} item: the lesson yields no grounding passages to anchor an item` };
     return {
       kind: "ready",
+      lesson,
       grounding,
       facet: typePlan.facet || undefined,
       siblings: siblingsByNode.get(node.derivedNodeId) ?? []
@@ -483,11 +484,18 @@ export async function generateStudyItemBank(input: {
     attempts: number,
     initialFeedback?: string
   ): Promise<VerificationRegeneration<AnswerKeyVerificationSubject<OptionSelectItem>>> => {
+    const correctAnswer = lessonOptionSelectAnswer(context.lesson);
+    if (!correctAnswer) {
+      return { ok: false, reason: "no option-select item: the lesson yields no substantive teaching unit for a code-owned correct answer" };
+    }
     let failureReason: string | null = null;
     let retryFeedback = initialFeedback;
     for (let attempt = 0; attempt < attempts; attempt += 1) {
       try {
-        const draft = await input.studyItemGeneration.generateOptionSelect(generationInputFor(node, context, retryFeedback));
+        const draft = await input.studyItemGeneration.generateOptionSelect({
+          ...generationInputFor(node, context, retryFeedback),
+          correctAnswer
+        });
         const guarded = validateOptionSelectItem(draft, guardGroundingFor(node, context), newOptionId);
         if (guarded.ok) return { ok: true, subject: optionSelectSubject(node, context, guarded.item, guarded.citationRung) };
         failureReason = guarded.reason;

@@ -50,6 +50,10 @@ type StudyItemGenerationInput = {
   retryFeedback?: string;
 };
 
+type OptionSelectGenerationInput = StudyItemGenerationInput & {
+  correctAnswer: { text: string; citation: { passageId: string; evidenceQuote: string } };
+};
+
 type StudyItemBlueprintInput = {
   declaredDomain: string;
   node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
@@ -78,7 +82,7 @@ type AnswerKeyVerificationArgs = z.infer<typeof answerKeyVerificationValidator>;
 type MatchingAssignmentVerificationArgs = z.infer<typeof matchingAssignmentVerificationValidator>;
 
 export const studyOptionSelectGenerationDescriptor: NeuralStageDescriptor<
-  StudyItemGenerationInput,
+  OptionSelectGenerationInput,
   OptionSelectArgs,
   OptionSelectItemDraft
 > = {
@@ -86,16 +90,35 @@ export const studyOptionSelectGenerationDescriptor: NeuralStageDescriptor<
   stageTag: STAGE_TAGS.studyItemGeneration,
   schema: optionSelectSchema,
   validator: optionSelectValidator,
-  sentinelInput: sentinelStudyItemInput(),
+  sentinelInput: {
+    ...sentinelStudyItemInput(),
+    correctAnswer: { text: "A sentinel passage.", citation: { passageId: "sentinel_passage", evidenceQuote: "A sentinel passage." } }
+  },
   maxRetries: 4,
-  templateData: studyItemTemplateData,
+  templateData: (input) => ({
+    ...studyItemTemplateData(input),
+    correctAnswerText: input.correctAnswer.text,
+    correctAnswerPassageId: input.correctAnswer.citation.passageId,
+    correctAnswerEvidenceQuote: input.correctAnswer.citation.evidenceQuote
+  }),
   mapResult: (args, input) => {
     const correctProvenance: StudyItemOptionDraft["provenance"] = input.groundingProvenance === "generated" ? "generated" : "source";
     const options: StudyItemOptionDraft[] = [
-      { text: args.correctAnswer.text, isCorrect: true, provenance: correctProvenance, citation: args.correctAnswer.citation },
+      {
+        text: input.correctAnswer.text,
+        isCorrect: true,
+        provenance: correctProvenance,
+        citation: input.correctAnswer.citation
+      },
       ...args.distractors.map((text) => ({ text, isCorrect: false, provenance: "generated" as const }))
     ];
-    return { itemType: "option_select", question: args.question, explanation: args.explanation, options, explorableTerms: args.explorableTerms };
+    return {
+      itemType: "option_select",
+      question: `Which statement accurately describes ${input.node.canonicalLabel}?`,
+      explanation: input.correctAnswer.text,
+      options,
+      explorableTerms: []
+    };
   }
 };
 

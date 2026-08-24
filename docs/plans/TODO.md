@@ -4,12 +4,13 @@
 
 ## TODO
 
-- **Pause Synthetic Topic Generation and diagnose source-backed generation — in progress; U0–U4
-  complete, U5 learner assets are `FIX_FIRST`, U6 next.** Follow
+- **Pause Synthetic Topic Generation and diagnose source-backed generation — in progress; U0–U6
+  complete, U7 next, learner assets remain `FIX_FIRST`.** Follow
   [the execution-order plan](./2026-08-24-002-pause-synthetic-topic-and-diagnose-source-backed-generation.md).
-  The repaired graph is safe, but its first Study Item gate dropped “for owned values” from
-  Variable Binding and the verifier silently restored that condition while accepting the answer.
-  Repair literal scope fidelity and rerun the same immutable enrichment.
+  The repaired graph and exact lesson-to-key projection pass, but fresh full-bank inspection found
+  independent matching, impostor, lesson-context, and distractor-verifier failures. Consolidate the
+  bounded repair and the owner choice in `BLOCKERS.md`; do not adopt the current bank or repeat the
+  failed model/schema probes.
 
 - **Same-call Grounding identity-scope audit — blocked; U0–U2 and U4 complete, candidate rejected,
   U3 skipped.** Follow

@@ -530,12 +530,12 @@ export const nodeMergeAdjudicationValidator = z.object({
 export const nodeMergeAdjudicationSchema: JsonSchema = toForcedToolSchema(nodeMergeAdjudicationValidator);
 
 // --- Option-select generation: submit_option_select_item (U3, R9/R10) -----
-// One four-option auto-graded item per node: a grounded correct answer (cited by
-// passage id + quote, verified verbatim by the application boundary) plus THREE
-// sibling-conditioned distractors that read like real domain answers but are wrong.
-// Domain-neutral rubric language only (AGENTS rule 17): the schema names no fixture and
-// lists no exemplars. The deterministic guard (U2) enforces structure; this schema only
-// enforces SHAPE fail-closed (rule 6) — distractor quality is judged by the rule-14 pass.
+// One four-option auto-graded item per node: the application copies one learner-visible lesson
+// teaching unit into the key and explanation, while this schema admits only THREE model-written
+// sibling-conditioned distractors. Domain-neutral rubric language only (AGENTS rule 17): the
+// schema names no fixture and lists no exemplars. The deterministic guard enforces structure;
+// this schema only enforces SHAPE fail-closed (rule 6) — distractor quality is judged by the
+// rule-14 pass.
 
 // --- Explorable Terms: shared affordance metadata (plan 2026-07-12-002 U1, R1-R3) ------
 // A learner may turn an unfamiliar specialized term in the current block into an optional
@@ -563,14 +563,7 @@ const lessonExplorableTerms = z
   .describe("Zero to five specialized terms across the whole lesson that a learner might need to explore, each anchored to the section kind whose text contains it verbatim. Prefer fewer; an empty array is expected when the lesson introduces no unfamiliar term.");
 
 export const optionSelectValidator = z.object({
-  question: z.string().min(1).describe("One self-contained multiple-choice question about the learning node with a single correct answer. Do not reference 'the passage' or 'the source'."),
-  explanation: z.string().min(1).describe("Short learner-facing rationale explaining why the correct answer follows from the provided grounding. Stay domain-neutral and do not mention tool or source mechanics."),
-  correctAnswer: z.object({
-    text: z.string().min(1).describe("The single correct option, grounded strictly in the provided passages."),
-    citation: passageCitation
-  }).strict(),
-  distractors: z.array(z.string().min(1).describe("A plausible but INCORRECT option in the same domain register as the provided neighboring topics. It must be clearly wrong for this question, never a paraphrase of the correct answer.")).length(3),
-  explorableTerms: itemExplorableTerms
+  distractors: z.array(z.string().min(1).describe("A plausible but INCORRECT description of the learning node, in the same grammatical form, domain register, specificity, and approximate length as the code-owned correct description. It must be clearly wrong, never a paraphrase of the correct description or any grounding passage.")).length(3)
 }).strict();
 
 export const optionSelectSchema: JsonSchema = toForcedToolSchema(optionSelectValidator);
