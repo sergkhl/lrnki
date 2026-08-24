@@ -359,8 +359,9 @@ baseline and soak.
 ### Open findings
 
 - **NEXT:** execute the
-  [operation-neutral DeepSeek Grounding plan](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md)
-  at README order 1. Do not resume this plan's superseded U2 matrix.
+  [same-call audit experiment](./2026-08-24-001-test-grounding-identity-scope-audit.md) at README
+  order 1. Plan 003 remains the final qualification owner after that experiment; do not resume this
+  plan's superseded U2 matrix.
 - Revision `61da45e` failed its first qualifying shared-MiMo observation with malformed tool JSON.
   That result remains valid for the old candidate but does not prove persistent MiMo incapability or
   identity-context causation. The owner-approved topology retires MiMo Grounding rather than

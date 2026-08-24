@@ -4,16 +4,22 @@
 
 ## TODO
 
-- **Operation-neutral DeepSeek Grounding — blocked; U0–U3 and U5 complete, U4 remains `FIX_FIRST`.**
-  Follow [the execution-order plan](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md).
-  Exact routes and the repository gate pass, but the first required Topic consumer exposed
-  context-narrowed Grounding that independent verification correctly rejected. The owner-gated
-  repair is in [BLOCKERS](./BLOCKERS.md); do not spend on the remaining matrix before it is resolved.
+- **Same-call Grounding identity-scope audit — in progress; U0 complete, U1 next.** Follow
+  [the execution-order experiment](./2026-08-24-001-test-grounding-identity-scope-audit.md). Change
+  only the Grounding Generation forced-tool contract; preserve one bundle/call, every admission and
+  persistence invariant, and every current Model Assignment. A material scope defect ends the
+  candidate and reopens the Grounding Generation assignment decision.
+
+- **Operation-neutral DeepSeek Grounding — on hold; U0–U3 and U5 complete, U4 remains
+  `FIX_FIRST`.** Follow [Plan 003](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md) only
+  after the execution-order experiment passes its multi-draw direct matrix and first production-
+  composed Topic operation. Then resume the remaining affected-consumer matrix; do not repeat the
+  qualifying first Topic run.
 
 - **Source-less Grounding context and answer correlation — on hold; U0–U1 complete.** The
   [predecessor plan](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md) retains
-  its committed interface evidence. Plan 003 supersedes its old assignment matrix and owns route,
-  activation, affected-consumer, and consolidation work; do not resume the shared-MiMo preflight.
+  its committed interface evidence. Plan 003 still owns final affected-consumer qualification and
+  consolidation after the execution-order experiment; do not resume the shared-MiMo preflight.
 
 - **Topic Expedition generation latency — blocked; U3 remains `FIX_FIRST`.** Follow
   [the active plan](./2026-08-22-001-repair-topic-expedition-generation-latency.md) in U0–U4 order.

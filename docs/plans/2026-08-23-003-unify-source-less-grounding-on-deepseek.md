@@ -7,7 +7,7 @@ execution: code
 
 # Unify Source-less Node Generation and Grounding on DeepSeek
 
-**Status:** Blocked — U0–U3 and U5 complete; U4 remains `FIX_FIRST`
+**Status:** On hold — U0–U3 and U5 complete; U4 repair delegated to plan 2026-08-24-001
 
 **Decision state:** Locked by owner decision on 2026-08-23. DeepSeek V4 Flash 0731 owns Grounding
 Generation for every Source-less Grounding Admission consumer. Preserving ADR-0023 makes the paired
@@ -15,6 +15,9 @@ topology part of that decision: DeepSeek also produces the source-less graph nod
 judges them, and GPT-OSS plans verification, challenges factuality, and orders prerequisites. This
 replaces the Topic-only Grounding assignment and the preserved-assignment constraint in the
 [context-and-correlation plan](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md).
+The assignments remain frozen while the owner-authorized
+[same-call audit experiment](./2026-08-24-001-test-grounding-identity-scope-audit.md) runs. A
+material scope defect reopens Grounding Generation assignment; a pass returns this plan to U4.
 
 ## Goal capsule
 
@@ -594,10 +597,12 @@ direct preflight, successful retry, or HTTP 200 does not substitute for real-use
 
 ### Open findings
 
-- **NEXT:** no implementation unit is actionable. [BLOCKERS](./BLOCKERS.md#source-less-grounding-identity-scope-repair)
-  owns the owner-only authorization and drain criterion; do not rerun U4 before the repair exists.
-- The technical finding remains the U4 context-narrowed identity documented above. Any repair must
-  preserve the independent answer/judge veto that caught it, then repeat direct qualification and
-  the complete affected-consumer matrix.
+- **NEXT:** execute the
+  [same-call audit experiment](./2026-08-24-001-test-grounding-identity-scope-audit.md) at README
+  order 1. No unit here is actionable until its direct matrix and first Topic operation pass.
+- On a pass, count the successor's Topic evidence as the first U4 fixture and resume the remaining
+  Topic, worker, Graph, and Support Step cases. Do not repeat it merely to move evidence.
+- One material scope defect reopens Grounding Generation assignment and keeps this plan on hold; do
+  not tune or rerun that candidate for luck.
 - Latency remains blocked until a repaired candidate has one fully inspected successful baseline;
   this plan does not claim or tune 420 seconds.
