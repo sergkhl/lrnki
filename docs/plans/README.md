@@ -12,10 +12,10 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-24-001 — Test a Same-Call Grounding Identity-Scope Audit](./2026-08-24-001-test-grounding-identity-scope-audit.md)
-   — **In progress; U0–U1 complete, U2 next.** The same-call audit contract is implemented without
-   activation and every frozen interface/config boundary passes deterministic checks. The fixed
-   three-by-three direct matrix is next; one material scope defect ends the candidate and reopens the
-   Grounding Generation Model Assignment decision.
+   — **In progress; U0–U2 complete, candidate rejected, U3 skipped, U4 next.** The first fixed
+   Pyruvate draw passed its strict DeepInfra FP8 contract but narrowed identity to the PDH/NAD+
+   mechanism, excluding established PFOR/ferredoxin oxidation. The matrix stopped immediately; run
+   repository handback only while the Model Assignment decision is owner-gated.
 
 2. [2026-08-23-003 — Unify Source-less Grounding on DeepSeek](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md)
    — **On hold; U0–U3 and U5 complete, U4 remains `FIX_FIRST`.** Exact routes and the repository gate

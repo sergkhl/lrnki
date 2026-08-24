@@ -7,7 +7,7 @@ execution: code
 
 # Test a Same-Call Grounding Identity-Scope Audit
 
-**Status:** In progress — U0–U1 complete; U2 next
+**Status:** In progress — U0–U2 complete; candidate rejected, U3 skipped, U4 next
 
 **Decision state:** Authorized by the owner on 2026-08-24 as one contract-only experiment ahead of
 [Plan 003](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md). The candidate may change
@@ -420,15 +420,57 @@ Implementation units are exclusive and must run in order. This plan declares no 
 - **Safe to continue downstream:** yes to U2's fixed direct experiment only; no to activation,
   consumer qualification, latency work, deployment, or release claims.
 
+### U2 — fixed direct matrix — 2026-08-24 — complete; candidate rejected
+
+- Candidate `5ce34a23ca8588a030c270271b5781ff9da714d5` entered the fixed matrix without
+  activation. Current endpoint metadata attributed `deepseek/deepseek-v4-flash-0731` to DeepInfra at
+  declared `deepinfra/fp8` and advertised reasoning, temperature, seed, tools, and forced tool-choice
+  support. The request pinned only that FP8 route, disabled provider fallback and reasoning, used
+  temperature zero / seed seven, and retained the complete request, raw response, parsed audit, and
+  mapped bundle in one gitignored disposable report.
+- Declared invocation 1, Pyruvate Oxidation draw 1, returned HTTP 200 in one attempt after 8,545 ms
+  as request `gen-1787545955-hvKSdve7Uhx8KDbTbXBB`. Model, provider, forced tool, strict schema,
+  stage tag, sampling, and no-reasoning checks all matched. It used 1,966 prompt and 402 completion
+  tokens with zero reasoning tokens; raw recorded and catalog-estimated cost both resolve to USD
+  0.00022964. This is a direct-contract pass only.
+- Semantic inspection rejected the candidate. The audit made the pyruvate dehydrogenase complex and
+  NAD+ reduction part of the identity invariant, and the Definition Passage repeated both as
+  universally necessary. The audit noticed only the eukaryotic-mitochondrial versus prokaryotic-
+  cytosolic location counterexample; it omitted the material enzyme/electron-acceptor variation.
+  Established anaerobic pyruvate:ferredoxin oxidoreductase instead catalyzes oxidative
+  decarboxylation of pyruvate to acetyl-CoA and CO2 with ferredoxin, as directly observed in a
+  [primary metabolic-flux study](https://pmc.ncbi.nlm.nih.gov/articles/PMC2937365/). The selected
+  sense and identity invariant therefore exclude a relevant valid case: a material mechanism-scope
+  defect under KTD4.
+- The kill rule ended the candidate immediately. Pyruvate draws 2–3 and all six Transaction
+  Isolation / Labor Productivity draws were intentionally not run; no replacement draw, prompt
+  tuning, route switch, semantic retry, activation, database change, or later consumer call
+  occurred. U3 is permanently skipped for this candidate. The owner-only Grounding Generation Model
+  Assignment decision is reopened in `BLOCKERS.md`; verifier assignments remain frozen.
+
+#### Real-use quality evaluation
+
+- **Milestone:** fixed multi-draw direct experiment, stopped at its first material defect.
+- **Fixture and source type:** the frozen production-shaped Pyruvate Oxidation input; direct
+  production-model call rather than a curated-source or composed learner operation.
+- **Real model calls used:** yes; one declared draw and one HTTP attempt.
+- **Result:** `FIX_FIRST` for semantic scope despite a strict contract/route pass.
+- **Useful output observed:** the audit correctly separated cellular location from identity and the
+  adapter retained one well-formed bundle without exposing the audit through its mapped result.
+- **Defects observed:** the audit and bundle jointly narrowed identity to the PDH/NAD+ mechanism and
+  excluded established PFOR/ferredoxin oxidation.
+- **Changes made after inspection:** none; this experiment forbids tuning or replacing a failed draw.
+- **Remaining caveats:** the other eight direct draws, admission, persistence, and every consumer
+  remain unqualified for this candidate.
+- **Safe to continue downstream:** yes to U4 repository handback only; no to U3, Plan 003 consumer
+  spending, latency work, deployment, or release claims.
+
 ### Open findings
 
-- **NEXT:** execute U2 only: reverify the exact DeepInfra FP8 Grounding route and response retention,
-  then run the fixed three-by-three direct matrix sequentially. Stop at the first material semantic,
-  terminal schema, route, quantization, attribution, or retention failure; do not replace a failed
-  draw or tune the contract.
-- Reverify successful raw Grounding response retention before U3. If the production-composed audit
-  cannot be inspected through existing transport/log data, stop rather than adding observability or
-  persistence outside this authorization.
-- Plan 003 remains on hold until this candidate passes the complete direct matrix and first Topic
-  kill gate. The latency plan remains blocked until Plan 003 later completes its full affected-
-  consumer quality matrix and supplies the baseline that plan requires.
+- **NEXT:** execute U4 only: run the smallest complete repository gate, record the failed-candidate
+  handback at all three status altitudes, and commit it. Do not activate, run U3, delete this plan, or
+  change any Model Assignment while the owner action remains open.
+- The candidate is terminally rejected; do not resume its remaining eight direct draws or use its
+  strict-contract success as semantic, admission, persistence, or consumer evidence.
+- Plan 003 and the latency plan remain on hold behind the owner Model Assignment decision and a new
+  successful, fully inspected Grounding baseline respectively.

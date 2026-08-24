@@ -4,12 +4,12 @@
 
 ## TODO
 
-- **Same-call Grounding identity-scope audit — in progress; U0–U1 complete, U2 next.** Follow
-  [the execution-order experiment](./2026-08-24-001-test-grounding-identity-scope-audit.md). The
-  strict same-call audit-plus-bundle contract is implemented without activation; run its fixed
-  three-by-three direct matrix next. Preserve one bundle/call and every assignment/admission
-  invariant; a material scope defect ends the candidate and reopens the Grounding Generation
-  assignment decision.
+- **Same-call Grounding identity-scope audit — in progress; U0–U2 complete, candidate rejected, U3
+  skipped, U4 next.** Follow
+  [the execution-order experiment](./2026-08-24-001-test-grounding-identity-scope-audit.md). Its first
+  fixed Pyruvate draw narrowed identity to the PDH/NAD+ mechanism despite a strict DeepInfra FP8
+  contract pass, so the kill rule stopped all later draws and activation. Run repository handback
+  only; the Grounding Generation assignment decision is owner-gated.
 
 - **Operation-neutral DeepSeek Grounding — on hold; U0–U3 and U5 complete, U4 remains
   `FIX_FIRST`.** Follow [Plan 003](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md) only
