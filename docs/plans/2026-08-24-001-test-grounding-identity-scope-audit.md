@@ -7,7 +7,7 @@ execution: code
 
 # Test a Same-Call Grounding Identity-Scope Audit
 
-**Status:** In progress — U0–U2 complete; candidate rejected, U3 skipped, U4 next
+**Status:** Blocked — U0–U2 and U4 complete; candidate rejected; U3 skipped; owner decision required
 
 **Decision state:** Authorized by the owner on 2026-08-24 as one contract-only experiment ahead of
 [Plan 003](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md). The candidate may change
@@ -465,11 +465,32 @@ Implementation units are exclusive and must run in order. This plan declares no 
 - **Safe to continue downstream:** yes to U4 repository handback only; no to U3, Plan 003 consumer
   spending, latency work, deployment, or release claims.
 
+### U4 — repository handback and lifecycle — 2026-08-24 — complete
+
+- Handback revision `75373c19eee505dc2b7da817bfd9da0d25336837` passed the complete affected
+  dependency-graph gate: `pnpm db:check` verified the single 58-table Drizzle baseline; all eleven
+  workspace typechecks passed; full workspace `pnpm test` exited successfully; and `pnpm lint`
+  reported zero errors and eleven warnings, none in the changed files.
+- The affected production build, `pnpm --filter @lrnki/admin-lab build`, passed with every static and
+  dynamic route compiled. Learner API compilation was already exercised by its identical passing
+  TypeScript build/typecheck command, and KG Worker has no production-build script. No changed
+  dependency reaches the learner-web export, so no unrelated client artifact was built.
+- The green workspace test command retained its non-failing mocked Better Auth query diagnostics and
+  existing learner-app post-test Expo logger warning; the zero exit is local automated evidence, not
+  a claim that those diagnostics were repaired by this candidate.
+- U2's semantic `FIX_FIRST` remains controlling. No new model call, database-backed suite,
+  development-data reset, Compose process, browser, deployment, production-data, native,
+  emulator/simulator, physical-device, latency, or release action occurred in U4. No predecessor
+  validation was upgraded, and this rejected plan is retained rather than consolidated or deleted.
+- The README, TODO, predecessor handoffs, and owner blocker now agree: there is no executable unit
+  in this plan chain until the owner chooses a new Grounding Generation Model Assignment or abandons
+  the affected Source-less Grounding consumer work.
+
 ### Open findings
 
-- **NEXT:** execute U4 only: run the smallest complete repository gate, record the failed-candidate
-  handback at all three status altitudes, and commit it. Do not activate, run U3, delete this plan, or
-  change any Model Assignment while the owner action remains open.
+- **BLOCKED:** the owner must choose the next Grounding Generation Model Assignment or explicitly
+  abandon the affected Source-less Grounding consumer work, as recorded in
+  [BLOCKERS.md](./BLOCKERS.md). No unit in this plan is actionable before that decision.
 - The candidate is terminally rejected; do not resume its remaining eight direct draws or use its
   strict-contract success as semantic, admission, persistence, or consumer evidence.
 - Plan 003 and the latency plan remain on hold behind the owner Model Assignment decision and a new

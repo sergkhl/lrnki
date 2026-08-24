@@ -4,23 +4,24 @@
 
 ## TODO
 
-- **Same-call Grounding identity-scope audit — in progress; U0–U2 complete, candidate rejected, U3
-  skipped, U4 next.** Follow
+- **Same-call Grounding identity-scope audit — blocked; U0–U2 and U4 complete, candidate rejected,
+  U3 skipped.** Follow
   [the execution-order experiment](./2026-08-24-001-test-grounding-identity-scope-audit.md). Its first
   fixed Pyruvate draw narrowed identity to the PDH/NAD+ mechanism despite a strict DeepInfra FP8
-  contract pass, so the kill rule stopped all later draws and activation. Run repository handback
-  only; the Grounding Generation assignment decision is owner-gated.
+  contract pass, so the kill rule stopped all later draws and activation. Repository handback is
+  green; the Grounding Generation assignment decision is owner-gated.
 
 - **Operation-neutral DeepSeek Grounding — on hold; U0–U3 and U5 complete, U4 remains
-  `FIX_FIRST`.** Follow [Plan 003](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md) only
-  after the execution-order experiment passes its multi-draw direct matrix and first production-
-  composed Topic operation. Then resume the remaining affected-consumer matrix; do not repeat the
-  qualifying first Topic run.
+  `FIX_FIRST`.** [Plan 003](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md) remains the
+  affected-consumer qualification owner, but its same-call successor failed the first direct kill
+  gate. Resume only after the owner selects and a successor qualifies a new Grounding assignment;
+  do not repeat already qualifying evidence merely to move status.
 
 - **Source-less Grounding context and answer correlation — on hold; U0–U1 complete.** The
   [predecessor plan](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md) retains
   its committed interface evidence. Plan 003 still owns final affected-consumer qualification and
-  consolidation after the execution-order experiment; do not resume the shared-MiMo preflight.
+  consolidation after the owner-gated Grounding assignment decision; do not resume the shared-MiMo
+  preflight.
 
 - **Topic Expedition generation latency — blocked; U3 remains `FIX_FIRST`.** Follow
   [the active plan](./2026-08-22-001-repair-topic-expedition-generation-latency.md) in U0–U4 order.

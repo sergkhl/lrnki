@@ -460,9 +460,10 @@ seven-minute threshold does not apply to this contention soak.
   contention soak or consolidate this plan as completed without a qualifying single-run pass.
 - The problem class is now researched, but the conventional repair changes Grounding Generation,
   which this locked plan excludes, and the bounded prompt/schema and pre-draft trials did not clear
-  the current admission contract. The concrete next action is the ready
-  [operation-neutral DeepSeek Grounding plan](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md);
-  do not retry the rejected variants or hide
+  the current admission contract. The
+  [operation-neutral DeepSeek Grounding plan](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md)
+  is itself on hold behind the owner-gated Grounding assignment decision in
+  [BLOCKERS.md](./BLOCKERS.md); no latency unit is actionable. Do not retry the rejected variants or hide
   the defect with a weaker judge, lower quorum, unqualified model swap, lexical veto, or regenerated
   draft.
 - A future passing run must provide both the successful end-to-end latency baseline and direct

@@ -7,7 +7,7 @@ execution: code
 
 # Unify Source-less Node Generation and Grounding on DeepSeek
 
-**Status:** On hold — U0–U3 and U5 complete; U4 repair delegated to plan 2026-08-24-001
+**Status:** On hold — U0–U3 and U5 complete; U4 `FIX_FIRST`; Grounding assignment owner-gated
 
 **Decision state:** Locked by owner decision on 2026-08-23. DeepSeek V4 Flash 0731 owns Grounding
 Generation for every Source-less Grounding Admission consumer. Preserving ADR-0023 makes the paired
@@ -15,9 +15,10 @@ topology part of that decision: DeepSeek also produces the source-less graph nod
 judges them, and GPT-OSS plans verification, challenges factuality, and orders prerequisites. This
 replaces the Topic-only Grounding assignment and the preserved-assignment constraint in the
 [context-and-correlation plan](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md).
-The assignments remain frozen while the owner-authorized
-[same-call audit experiment](./2026-08-24-001-test-grounding-identity-scope-audit.md) runs. A
-material scope defect reopens Grounding Generation assignment; a pass returns this plan to U4.
+The owner-authorized
+[same-call audit experiment](./2026-08-24-001-test-grounding-identity-scope-audit.md) was rejected on
+its first direct semantic kill gate. The committed assignments are unchanged, but the result
+reopens Grounding Generation assignment while leaving every verifier assignment frozen.
 
 ## Goal capsule
 
@@ -586,23 +587,20 @@ direct preflight, successful retry, or HTTP 200 does not substitute for real-use
 
 ### U5 — repository gate and failed handback — 2026-08-23 — complete
 
-- Focused automation passed: 194 infrastructure, eight worker, and 21/24 learner-API tests; three
-  database-opt-in cases skipped as designed. Eleven workspace typechecks, 58-table Drizzle parity,
-  ESLint with zero errors / eleven warnings, and the unchanged API health endpoint passed.
-- Both production builds passed: Next.js Admin Lab and Expo learner-web export. `git diff --check`
-  passed. Root `pnpm check` was decomposed because Playwright, native/device, deployment,
-  production-data, and release execution were outside this plan's authority.
-- U4 did not pass, so no predecessor validation upgrade, consolidation, plan deletion, or latency
-  unblock occurred. This repository health evidence does not supersede the real-use `FIX_FIRST`.
+- Repository gates passed: 194 infrastructure, eight worker, and 21/24 learner-API tests with three
+  database-opt-in skips; eleven workspace typechecks; 58-table Drizzle parity; ESLint with zero
+  errors / eleven warnings; unchanged API health; both production builds; and `git diff --check`.
+- Root `pnpm check` was decomposed because Playwright, native/device, deployment, production-data,
+  and release execution were outside this plan's authority. U4 did not pass, so no predecessor
+  validation upgrade, consolidation, plan deletion, or latency unblock occurred; repository health
+  does not supersede the real-use `FIX_FIRST`.
 
 ### Open findings
 
-- **NEXT:** execute the
-  [same-call audit experiment](./2026-08-24-001-test-grounding-identity-scope-audit.md) at README
-  order 1. No unit here is actionable until its direct matrix and first Topic operation pass.
-- On a pass, count the successor's Topic evidence as the first U4 fixture and resume the remaining
-  Topic, worker, Graph, and Support Step cases. Do not repeat it merely to move evidence.
-- One material scope defect reopens Grounding Generation assignment and keeps this plan on hold; do
-  not tune or rerun that candidate for luck.
+- **ON HOLD:** the same-call successor was rejected before activation. Under
+  [BLOCKERS.md](./BLOCKERS.md), the owner must select a new Grounding Generation Model Assignment or
+  abandon the work; no unit here is actionable before that decision and a qualified successor.
+- A future passing successor may count its first Topic evidence as this plan's first U4 fixture,
+  then resume remaining cases without repeating evidence. Do not tune or rerun the rejected candidate.
 - Latency remains blocked until a repaired candidate has one fully inspected successful baseline;
   this plan does not claim or tune 420 seconds.
