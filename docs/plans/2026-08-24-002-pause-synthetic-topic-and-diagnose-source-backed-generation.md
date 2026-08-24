@@ -7,7 +7,7 @@ execution: code
 
 # Pause Synthetic Topic Generation and Diagnose Source-backed Generation
 
-**Status:** In progress — U0–U1 complete; U2 is next
+**Status:** In progress — U0–U2 complete; U3 is next
 
 **Decision state:** The owner decided on 2026-08-24 to pause fully anchor-less Synthetic Topic
 Generation and to diagnose the existing curated-source generation path before choosing another
@@ -236,9 +236,27 @@ Implementation units are exclusive and run in order. This plan declares no paral
   emulator/simulator, physical-device, or release action occurred. The authenticated no-write route
   test is present but remains unqualified until U2 runs it through `pnpm test:db`.
 
+### U2 — authenticated no-write and repository handback — 2026-08-24 — complete
+
+- `pnpm test:db` reset and targeted only `lrnki_test`. The signed-in pause case observed the Journal's
+  `paused` capability, 409 from both start and retry, zero matching `learner_expeditions`, and zero
+  injected supervisor wakes. All database-opt-in API cases, the migration state matrix, and the full
+  workspace test graph then passed; the learner app contributed 57 suites / 320 tests.
+- The first full run found test-only rate-limit interference: the new sign-up spent the anonymous
+  default-IP bucket and a later independent naming test received 429. Assigning the new case its own
+  RFC 5737 address (`192.0.2.41`) isolated the fixtures; the complete reset-and-test route passed on
+  rerun. No production rate-limit policy changed.
+- Eleven workspace package typechecks, 58-table Drizzle/schema parity, ESLint with zero errors and
+  eleven existing warnings, Admin Lab production build, Learner App web export, tracked/untracked
+  whitespace checks, and `git diff --check` passed. Playwright and native/device gates were not
+  required for the policy/refusal contract and were not run.
+- This is local automated and isolated-test-database evidence. It proves the pause mechanics and
+  preserves compile/build reachability of source-backed commands; it does not prove current
+  development data, provider reachability, model quality, deployment, browser behavior, native
+  behavior, simulator/emulator behavior, or physical-device behavior.
+
 ### Open findings
 
-- U2 is next: run the authenticated database no-write gate and the proportionate affected repository
-  handback before committing deterministic completion.
-- U3 must reverify the current development environment and source inventory before choosing exact
-  run/version identities; prior Rust quality evidence is fixture-selection context only.
+- U3 is next: reverify the current development environment, provider route, and source inventory;
+  then choose exact Rust-first run/version identities and execute the real source-backed gate.
+- Prior Rust quality evidence remains fixture-selection context only, not current evidence.

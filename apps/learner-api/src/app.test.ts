@@ -117,7 +117,9 @@ maybeDb("paused Synthetic Topic routes expose one capability and perform no writ
     );
     const signUp = await app.request("/auth/sign-up/email", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      // Own rate-limit bucket: this database test must not spend the anonymous default-IP budget
+      // that the later naming round-trip asserts independently.
+      headers: { "content-type": "application/json", "x-forwarded-for": "192.0.2.41" },
       body: JSON.stringify({
         email: `topic-pause-${randomUUID()}@test.invalid`,
         password: `pw-${randomUUID()}`,
