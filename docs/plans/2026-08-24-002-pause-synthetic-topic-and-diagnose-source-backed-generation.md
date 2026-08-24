@@ -7,7 +7,7 @@ execution: code
 
 # Pause Synthetic Topic Generation and Diagnose Source-backed Generation
 
-**Status:** In progress — U0–U4 complete; repaired source-backed Grounding passed and U5 is next
+**Status:** In progress — U0–U4 complete; U5 learner assets are `FIX_FIRST` and U6 is next
 
 **Decision state:** The owner decided on 2026-08-24 to pause fully anchor-less Synthetic Topic
 Generation and to diagnose the existing curated-source generation path before choosing another
@@ -174,7 +174,24 @@ output unless that output is independently useful and represented honestly.
 3. Append evidence, unresolved findings, and exact next action; synchronize status and commit one
    repair batch. Do not expand into unrelated quality or latency work.
 
-### U5 — Consolidate and close
+### U5 — Run the repaired learner-asset gate
+
+1. Generate the Study Item Bank and Concept Lessons from the repaired immutable enrichment.
+2. Inspect each generated learner payload beside the exact grounding passages it received. Stop at
+   and record the first invalid learner layer rather than treating mechanical settlement as quality.
+3. If the learner layer passes, proceed to U7. If it exposes a reproducible in-scope defect, proceed
+   to U6. If only the owner can clear it, record the exact action in `BLOCKERS.md` and proceed to U7.
+
+### U6 — Repair one grounded learner-claim defect
+
+1. Record the problem class and recognized practice, then implement the smallest domain-neutral
+   repair behind the existing generation and Answer-Key Verification interfaces.
+2. Preserve forced named tools, key hiding, grounding provenance, model/provider assignments, and
+   deterministic-veto boundaries. Do not add fixture terms or a heuristic lexical veto.
+3. Run focused deterministic checks and a fresh real-use draw from the same repaired enrichment;
+   inspect the learner payload beside its grounding and record any remaining invalid layer.
+
+### U7 — Consolidate and close
 
 1. Run the proportionate final repository gate and qualify every evidence layer exactly.
 2. Re-home any durable decision, language, or runbook mechanics to its canonical owner. Consolidate
@@ -344,10 +361,43 @@ Implementation units are exclusive and run in order. This plan declares no paral
   evidence. No learner asset, deployment, production write, browser/native, simulator/emulator,
   physical-device, or release claim has yet been made.
 
+### U5 — repaired learner-asset gate — 2026-08-24 — `FIX_FIRST`
+
+- Study Item operation run `ac3e9068-2dc1-48f5-ba98-2c81344b42dd` completed over repaired enrichment
+  `ef5f3a7b-cb71-45f5-aec6-9abe7b4221cb` in 709 seconds. It atomically persisted 33 Concept Lessons,
+  one lesson-absent node, 86 Study Items across 33 nodes, and 16 explicit item rejections. This is a
+  mechanical positive control only; settlement did not establish learner usefulness.
+- Joined inspection stopped at the first invalid learner layer. The admitted Variable Binding
+  grounding and its Concept Lesson both say that a binding makes the name the owner **for owned
+  values**. The option-select explanation retains that condition, but its keyed answer broadens the
+  claim to “It associates a name with a value and makes that name the owner of the value.” The
+  persisted citation points to the correctly qualified generated passage, so the learner payload is
+  not entailed by its own grounding and reintroduces the reference/referent defect U4 removed.
+- The exact Answer-Key Verification call returned `claim_true`. Its reason quoted the grounding's
+  missing “for owned values” condition while silently inserting that condition into the candidate
+  it judged. This localizes the established problem class to scope/qualifier loss during grounded
+  question generation plus verifier-side premise repair, rather than Graph Grounding, lesson
+  transport, key correlation, citation identity, or persistence.
+- Recognized practice treats factual consistency as directional source-to-output alignment rather
+  than approximate topical agreement. [FENICE](https://aclanthology.org/2024.findings-acl.841/)
+  decomposes generated text into claims and aligns them to source context with natural-language
+  inference; [AlignScore](https://arxiv.org/abs/2305.16739) likewise evaluates information alignment
+  between generated and source text. The repair should require each candidate's literal scope to
+  stand on its own and forbid a verdict rationale from supplying a missing condition, while
+  retaining the existing domain-truth check for unsupported distractors.
+- The operation made 290 successful and zero non-success LiteLLM calls, consumed 633,117 tokens,
+  and recorded USD 0.018284 provider spend; normalized stage pricing estimated USD 0.064726. Four
+  independent-judge calls used the declared DeepSeek Parasail FP8 fallback and all other calls used
+  declared routes. No further learner model calls ran after the invalid payload was identified.
+  Raw outputs remain in their database artifact/SpendLog owners; no tracked file contains them.
+- This is local production-model, joined-development-database, and manual semantic-inspection
+  evidence. It does not qualify any of the other 85 items, learner usefulness, deployed behavior,
+  production data, browser/native, simulator/emulator, physical-device, or release behavior.
+
 ### Open findings
 
-- U5 is next: generate the Study Item Bank and Concept Lessons from repaired enrichment
-  `ef5f3a7b-cb71-45f5-aec6-9abe7b4221cb`, then inspect each generated learner payload beside the
-  exact grounding passages it received. Stop and record the first invalid learner layer if found;
-  otherwise run the final repository gate and consolidate the plan without reviving paused
-  anchor-less generation.
+- U6 is next: make option-select generation preserve every material condition and make Answer-Key
+  Verification judge the literal candidate without importing a missing condition from grounding or
+  its own rationale. Add a domain-neutral qualifier-loss regression, keep the existing key-hidden
+  domain-truth contract, and run a fresh immutable Study Item Bank over enrichment
+  `ef5f3a7b-cb71-45f5-aec6-9abe7b4221cb` before inspecting any broader learner surface.

@@ -12,10 +12,10 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-24-002 — Pause Synthetic Topic Generation and Diagnose Source-backed Generation](./2026-08-24-002-pause-synthetic-topic-and-diagnose-source-backed-generation.md)
-   — **In progress; U0–U4 complete and U5 is next.** A domain-neutral carrier/referent audit made
-   replicated challengers reject the reproduced unsafe Variable Binding claim, and the fresh Rust
-   enrichment persisted six safe generated definitions. Generate and inspect learner assets from
-   that exact repaired enrichment, then run the final repository gate and consolidate.
+   — **In progress; U0–U4 complete, U5 learner assets are `FIX_FIRST`, and U6 is next.** The repaired
+   graph is safe, but the first Study Item gate dropped “for owned values” from Variable Binding and
+   its verifier silently restored that missing condition while accepting the answer. Repair literal
+   scope fidelity at generation and Answer-Key Verification, then rerun the same enrichment.
 
 2. [2026-08-24-001 — Test a Same-Call Grounding Identity-Scope Audit](./2026-08-24-001-test-grounding-identity-scope-audit.md)
    — **Blocked; U0–U2 and U4 complete, candidate rejected, U3 skipped.** The first fixed

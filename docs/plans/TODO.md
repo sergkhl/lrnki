@@ -5,10 +5,11 @@
 ## TODO
 
 - **Pause Synthetic Topic Generation and diagnose source-backed generation — in progress; U0–U4
-  complete, U5 next.** Follow [the execution-order plan](./2026-08-24-002-pause-synthetic-topic-and-diagnose-source-backed-generation.md).
-  The repaired Rust enrichment rejected the reproduced carrier/referent conflation and persisted
-  six safe generated definitions. Generate and inspect learner assets from that exact enrichment,
-  then run the final repository gate and consolidate without reviving anchor-less generation.
+  complete, U5 learner assets are `FIX_FIRST`, U6 next.** Follow
+  [the execution-order plan](./2026-08-24-002-pause-synthetic-topic-and-diagnose-source-backed-generation.md).
+  The repaired graph is safe, but its first Study Item gate dropped “for owned values” from
+  Variable Binding and the verifier silently restored that condition while accepting the answer.
+  Repair literal scope fidelity and rerun the same immutable enrichment.
 
 - **Same-call Grounding identity-scope audit — blocked; U0–U2 and U4 complete, candidate rejected,
   U3 skipped.** Follow
