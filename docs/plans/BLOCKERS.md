@@ -1,10 +1,7 @@
 # Blockers
 
-## Reopen the Grounding Generation Model Assignment
-
-- **Owner action:** choose the next Grounding Generation Model Assignment, or explicitly abandon the
-  affected Source-less Grounding consumer work. The authorized same-call audit candidate was
-  rejected on its first fixed Pyruvate draw because it made the PDH/NAD+ mechanism universally
-  necessary and excluded established PFOR/ferredoxin oxidation. Do not tune or rerun that candidate
-  for luck, change verifier assignments without separate evidence, resume Plan 003 consumer spending,
-  or unblock latency work until the owner supplies the new assignment decision.
+No owner-only action is currently open. The 2026-08-24 owner decision paused anchor-less Synthetic
+Topic Generation and authorized the source-backed diagnostic in
+[plan 2026-08-24-002](./2026-08-24-002-pause-synthetic-topic-and-diagnose-source-backed-generation.md).
+If that diagnostic proves only a new Model Assignment can clear a material source-backed defect, add
+the exact choice here rather than silently selecting one.

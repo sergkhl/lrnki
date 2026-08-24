@@ -11,25 +11,30 @@ lifecycle, retention, and validation rules live in
 
 ## Active implementation plans (execution order)
 
-1. [2026-08-24-001 — Test a Same-Call Grounding Identity-Scope Audit](./2026-08-24-001-test-grounding-identity-scope-audit.md)
+1. [2026-08-24-002 — Pause Synthetic Topic Generation and Diagnose Source-backed Generation](./2026-08-24-002-pause-synthetic-topic-and-diagnose-source-backed-generation.md)
+   — **In progress; U0 complete, U1 is next.** The owner paused fully anchor-less Synthetic Topic
+   Generation and authorized a curated-source diagnostic. First enforce one pause policy across the
+   worker, API, supervisor, and learner Journal; then run and inspect the smallest real source-backed
+   Graph Enrichment and Study Item Bank gate.
+
+2. [2026-08-24-001 — Test a Same-Call Grounding Identity-Scope Audit](./2026-08-24-001-test-grounding-identity-scope-audit.md)
    — **Blocked; U0–U2 and U4 complete, candidate rejected, U3 skipped.** The first fixed
    Pyruvate draw passed its strict DeepInfra FP8 contract but narrowed identity to the PDH/NAD+
-   mechanism, excluding established PFOR/ferredoxin oxidation. Repository handback is green; no
-   unit is actionable until the owner chooses a new Grounding Generation Model Assignment or
-   abandons the affected work.
+   mechanism, excluding established PFOR/ferredoxin oxidation. Do not rerun it; the new execution-
+   order plan owns the authorized pause and source-backed diagnosis before any assignment decision.
 
-2. [2026-08-23-003 — Unify Source-less Grounding on DeepSeek](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md)
+3. [2026-08-23-003 — Unify Source-less Grounding on DeepSeek](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md)
    — **On hold; U0–U3 and U5 complete, U4 remains `FIX_FIRST`.** Exact routes and the repository gate
    pass, but the first required Topic consumer exposed context-narrowed Grounding that independent
    verification correctly rejected. The same-call successor also failed its first direct kill gate;
    resume only after the owner selects and a successor qualifies a new Grounding assignment.
 
-3. [2026-08-23-002 — Deepen Source-less Grounding Context and Answer Correlation](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md)
+4. [2026-08-23-002 — Deepen Source-less Grounding Context and Answer Correlation](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md)
    — **On hold; U0–U1 complete.** Identity context and exact-key answer correlation are committed.
    Plan 003 supersedes the preserved-assignment matrix and owns all remaining qualification and
    consolidation handback after the owner-gated Grounding assignment decision.
 
-4. [2026-08-22-001 — Restore Topic Expedition Generation to Seven Minutes](./2026-08-22-001-repair-topic-expedition-generation-latency.md)
+5. [2026-08-22-001 — Restore Topic Expedition Generation to Seven Minutes](./2026-08-22-001-repair-topic-expedition-generation-latency.md)
    — **Blocked in U3 (`FIX_FIRST`).** The bounded pipeline and shared stage profile are complete,
    but widths 8, 12, and 16 missed the latency/quality contract. Resume only after the deepening
    successor supplies a successful, fully inspected quality baseline.

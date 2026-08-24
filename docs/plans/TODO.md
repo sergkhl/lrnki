@@ -4,12 +4,18 @@
 
 ## TODO
 
+- **Pause Synthetic Topic Generation and diagnose source-backed generation — in progress; U0
+  complete, U1 next.** Follow [the execution-order plan](./2026-08-24-002-pause-synthetic-topic-and-diagnose-source-backed-generation.md).
+  Enforce one application-owned pause policy at the worker, API, supervisor, and learner Journal
+  seams; then run and inspect the smallest real curated-source Graph Enrichment and Study Item Bank
+  gate. Existing ready and catalog expeditions remain usable.
+
 - **Same-call Grounding identity-scope audit — blocked; U0–U2 and U4 complete, candidate rejected,
   U3 skipped.** Follow
   [the execution-order experiment](./2026-08-24-001-test-grounding-identity-scope-audit.md). Its first
   fixed Pyruvate draw narrowed identity to the PDH/NAD+ mechanism despite a strict DeepInfra FP8
-  contract pass, so the kill rule stopped all later draws and activation. Repository handback is
-  green; the Grounding Generation assignment decision is owner-gated.
+  contract pass, so the kill rule stopped all later draws and activation. Do not rerun it; the new
+  execution-order plan owns the pause and source-backed diagnosis before another assignment choice.
 
 - **Operation-neutral DeepSeek Grounding — on hold; U0–U3 and U5 complete, U4 remains
   `FIX_FIRST`.** [Plan 003](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md) remains the
