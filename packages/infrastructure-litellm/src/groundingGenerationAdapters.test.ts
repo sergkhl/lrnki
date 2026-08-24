@@ -103,6 +103,8 @@ test("generates an owner-neutral bundle conditioned on one closed scaffolded anc
   assert.ok(call.messages.some((message) => message.content.includes("state only a cross-system invariant without qualification")));
   assert.ok(call.messages.some((message) => message.content.includes("minimal functional or membership criterion shared by all of them")));
   assert.ok(call.messages.some((message) => message.content.includes("Never turn a common or textbook case into a universal definition")));
+  assert.ok(call.messages.some((message) => message.content.includes("keep the carrier and referent distinct")));
+  assert.ok(call.messages.some((message) => message.content.includes("A property of the carrier does not automatically apply to the referent")));
   assert.ok(call.messages.some((message) => message.content.includes("component operation from a total outcome")));
   assert.ok(call.messages.some((message) => message.content.includes("absolute or exact language")));
   assert.ok(call.messages.some((message) => message.content.includes("Preserve exact identifier spelling and casing")));
@@ -250,6 +252,7 @@ test("planning sees owner-neutral targets while the external answer model receiv
   assert.ok(calls[0].messages.some((message) => message.content.includes("passage through a boundary, rotation around a reference")));
   assert.ok(calls[0].messages.some((message) => message.content.includes("bulk path, initiation, completion, maintenance, repair, and alternative paths")));
   assert.ok(calls[0].messages.some((message) => message.content.includes("member form, constituent or participant role, holder or container")));
+  assert.ok(calls[0].messages.some((message) => message.content.includes("which entity is the carrier, which is the referent")));
   assert.match(questions[0].question, /necessary defining features/);
   assert.match(questions[0].question, /Independent code-owned concept-identity check/);
   assert.match(questions[1].question, /originating topic "A broad topic"/);
@@ -266,8 +269,14 @@ test("planning sees owner-neutral targets while the external answer model receiv
   assert.match(questions[5].question, /passage, rotation, sliding, transfer, deformation, association, or dissociation/);
   assert.match(questions[5].question, /bulk path from initiation, completion, maintenance, repair, and alternatives/);
   assert.match(questions[5].question, /prominent auxiliary or boundary-case mechanism/);
+  assert.match(questions[7].question, /Independent code-owned carrier-and-referent check/);
+  assert.match(questions[7].question, /name the carrier and referent separately/);
+  assert.match(questions[7].question, /owns, stores, copies, moves, transfers, mutates, or expires/);
+  assert.match(questions[7].question, /one established case where those roles differ/);
   assert.deepEqual(questions.map((question) => question.targetKey), [
     "definition:0",
+    "definition:0",
+    "mention:0",
     "definition:0",
     "mention:0",
     "definition:0",
@@ -298,6 +307,8 @@ test("planning sees owner-neutral targets while the external answer model receiv
   assert.ok(calls[1].messages.some((message) => message.content.includes("not interchangeable merely because they can contribute to a similar outcome")));
   assert.ok(calls[1].messages.some((message) => message.content.includes("distinguish the bulk path from initiation, completion, maintenance, repair, and alternative paths")));
   assert.ok(calls[1].messages.some((message) => message.content.includes("instead of inventing one")));
+  assert.ok(calls[1].messages.some((message) => message.content.includes("name the carrier and referent separately")));
+  assert.ok(calls[1].messages.some((message) => message.content.includes("without owning or sharing every property of its referent")));
   assert.equal(calls[1].messages.some((message) => message.content.includes("Draft-only marker")), false);
   assert.equal(calls[1].messages.some((message) => message.content.includes("definition:0")), false);
   for (const fixtureTerm of ["binary search", "pivot", "linked list", "logarithmic", "half-open interval", "topoisomerase", "telomerase", "primase", "origin of replication", "owner variable", "associated type", "rust trait"]) {
@@ -456,8 +467,8 @@ test("code-owned verification checks preserve the shared six-question cap per ta
       MAX_CLAIM_VERIFICATION_QUESTIONS_PER_TARGET
     );
   }
-  assert.equal(questions.filter((question) => question.question.startsWith("Model-planned definition:0")).length, 2);
-  assert.equal(questions.filter((question) => question.question.startsWith("Model-planned mention:0")).length, 3);
+  assert.equal(questions.filter((question) => question.question.startsWith("Model-planned definition:0")).length, 1);
+  assert.equal(questions.filter((question) => question.question.startsWith("Model-planned mention:0")).length, 2);
 });
 
 test("the factuality adapter returns judgments only and cannot settle or rewrite an artifact", async () => {
@@ -532,6 +543,8 @@ test("the factuality adapter returns judgments only and cannot settle or rewrite
   assert.ok(call.messages.some((message) => message.content.includes("do not demand universality from a target that explicitly carries the exact limiting scope")));
   assert.ok(call.messages.some((message) => message.content.includes("different subject, sense, implementation, version")));
   assert.ok(call.messages.some((message) => message.content.includes("Resolve coordinated subjects and predicates distributively")));
+  assert.ok(call.messages.some((message) => message.content.includes("audit the carrier and referent separately")));
+  assert.ok(call.messages.some((message) => message.content.includes("do not exclude a carrier from the candidate category")));
   assert.ok(call.messages.some((message) => message.content.includes("component behavior from total outcome")));
   assert.ok(call.messages.some((message) => message.content.includes("boundary and counterexample cases")));
   assert.ok(call.messages.some((message) => message.content.includes("Evidence is not a vote")));
@@ -576,6 +589,8 @@ test("the factuality adapter returns judgments only and cannot settle or rewrite
   assert.ok(challengeCall.messages.some((message) => message.content.includes("Do not invent a spatial, structural, temporal, or representational granularity")));
   assert.ok(challengeCall.messages.some((message) => message.content.includes("does not become point-like, discrete, sequence-defined")));
   assert.ok(challengeCall.messages.some((message) => message.content.includes("factually true comparison")));
+  assert.ok(challengeCall.messages.some((message) => message.content.includes("audit the carrier and referent separately")));
+  assert.ok(challengeCall.messages.some((message) => message.content.includes("do not exclude a carrier from the candidate category")));
   assert.ok(challengeCall.messages.some((message) => message.content.includes("If your reasoning finds such an objection, the disposition must be `rejected`")));
   assert.ok(challengeCall.messages.some((message) => message.content.includes("standard, textbook, typical, commonly taught")));
   assert.ok(challengeCall.messages.some((message) => message.content.includes("questions labeled `Independent code-owned`")));

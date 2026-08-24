@@ -143,11 +143,17 @@ export const claimVerificationQuestionPlanningDescriptor: NeuralStageDescriptor<
       input.declaredDomain,
       input.context
     );
+    const carrierReferentQuestion = carrierReferentAuditQuestion(
+      input.canonicalLabel,
+      input.declaredDomain,
+      input.context
+    );
     const required = [
       { targetKey: firstTarget.targetKey, question: identityQuestion },
       ...input.targets.map((target) => ({ targetKey: target.targetKey, question: applicationQuestion })),
       ...input.targets.map((target) => ({ targetKey: target.targetKey, question: categoryQuestion })),
-      ...input.targets.map((target) => ({ targetKey: target.targetKey, question: relationAndProcessQuestion }))
+      ...input.targets.map((target) => ({ targetKey: target.targetKey, question: relationAndProcessQuestion })),
+      ...input.targets.map((target) => ({ targetKey: target.targetKey, question: carrierReferentQuestion }))
     ];
     return appendPlannerQuestionsWithinTargetCap(required, result.questions);
   }
@@ -354,6 +360,17 @@ function relationAndProcessAuditQuestion(
     ? `the originating topic "${context.topic}"`
     : `the exact scaffolded anchor "${context.anchor.canonicalLabel}"`;
   return `Independent code-owned relation-and-process check: If "${canonicalLabel}" has a material mechanism or process role relevant to ${owningContext} in ${declaredDomain}, compare its actual variants by actor, object acted on or moved, reference object, direction, path, and resulting change; do not collapse passage, rotation, sliding, transfer, deformation, association, or dissociation under one umbrella relation. Separate the bulk path from initiation, completion, maintenance, repair, and alternatives, and state what owns each. Name any prominent auxiliary or boundary-case mechanism that must not be described as the whole process. Say that no such mechanism or process decomposition is established rather than inventing one.`;
+}
+
+function carrierReferentAuditQuestion(
+  canonicalLabel: string,
+  declaredDomain: string,
+  context: GroundingAdmissionContext
+): string {
+  const owningContext = context.kind === "originating_topic"
+    ? `the originating topic "${context.topic}"`
+    : `the exact scaffolded anchor "${context.anchor.canonicalLabel}"`;
+  return `Independent code-owned carrier-and-referent check: Where "${canonicalLabel}" relevant to ${owningContext} in ${declaredDomain} involves one entity denoting, representing, indexing, containing, or granting access to another, name the carrier and referent separately. State which entity owns, stores, copies, moves, transfers, mutates, or expires, whether the other changes, and one established case where those roles differ. Say that no such distinction is established rather than inventing one.`;
 }
 
 function appendPlannerQuestionsWithinTargetCap(

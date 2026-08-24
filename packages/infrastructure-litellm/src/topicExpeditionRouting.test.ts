@@ -298,7 +298,7 @@ test("only affected operation hashes change and Topic remains nineteen stages", 
   assert.notEqual(studyItemBankConfigHash(resolvableRouting), studyItemBankConfigHash());
   assert.equal(
     syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG, routing),
-    "synthetic-topic-generation-c12fb231e16d"
+    "synthetic-topic-generation-22b2ad29ef5e"
   );
   assert.notEqual(
     syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG, routing),
@@ -308,7 +308,7 @@ test("only affected operation hashes change and Topic remains nineteen stages", 
   assert.equal(studyItemBankConfigHash(routing), "study-item-bank-02d755d9fae1");
   assert.equal(
     syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG),
-    "synthetic-topic-generation-888dbb88fa4e"
+    "synthetic-topic-generation-3286a5adf7a3"
   );
   assert.notEqual(
     syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG),
@@ -316,7 +316,7 @@ test("only affected operation hashes change and Topic remains nineteen stages", 
     "default Synthetic changes with the Grounding audit contract"
   );
   assert.equal(studyItemBankConfigHash(), "study-item-bank-d574e02753f9");
-  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-a0e6b35234de");
+  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-928893987225");
   assert.notEqual(
     graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG),
     "graph-enrichment-2af0ada6d7e6",
@@ -324,7 +324,7 @@ test("only affected operation hashes change and Topic remains nineteen stages", 
   );
   assert.equal(
     scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG),
-    "learner-scaffold-generation-8f3a4b62eaf4"
+    "learner-scaffold-generation-19af7c93091f"
   );
   assert.notEqual(
     scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG),

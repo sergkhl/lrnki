@@ -7,7 +7,7 @@ execution: code
 
 # Pause Synthetic Topic Generation and Diagnose Source-backed Generation
 
-**Status:** In progress — U0–U3 complete; U3 is `FIX_FIRST` and U4 is next
+**Status:** In progress — U0–U4 complete; repaired source-backed Grounding passed and U5 is next
 
 **Decision state:** The owner decided on 2026-08-24 to pause fully anchor-less Synthetic Topic
 Generation and to diagnose the existing curated-source generation path before choosing another
@@ -297,11 +297,57 @@ Implementation units are exclusive and run in order. This plan declares no paral
   ignored under `tmp/`. No production write, deployment, browser/native, simulator/emulator,
   physical-device, or release action occurred.
 
+### U4 — carrier/referent admission repair — 2026-08-24 — complete
+
+- The established problem class is reference-versus-referent (carrier-versus-referent) role
+  conflation, with a non-monotonic counterexample lost by replicated-rejection aggregation. The
+  [Rust Reference](https://doc.rust-lang.org/stable/reference/patterns.html) confirms that identifier
+  patterns can bind by move, copy, or reference, while the
+  [Rust Book](https://doc.rust-lang.org/stable/book/ch04-02-references-and-borrowing.html) separates a
+  reference parameter from ownership of its referent. The conventional repair follows independent
+  verification in [Chain-of-Verification](https://arxiv.org/abs/2309.11495): ask a draft-blind
+  question that makes the two roles explicit before judging the draft, instead of adding a lexical
+  veto or weakening the admission quorum.
+- Grounding generation, verification planning/answering, and both factuality judges now carry one
+  domain-neutral carrier/referent invariant. The planner composition adds one code-owned
+  carrier-and-referent question per positive claim target under the existing six-question cap,
+  displacing one model-planned question rather than expanding the call budget. Forced named-tool
+  schemas, the one-pass admission contract, three-sample panel, same-model 2-of-3 rejection quorum,
+  Model Assignments, provider policy, and execution widths are unchanged. Operation identities
+  moved to `graph-enrichment-928893987225`, `learner-scaffold-generation-19af7c93091f`, and
+  `synthetic-topic-generation-3286a5adf7a3` as required by the changed shared prompt contract.
+- Fresh immutable Graph Enrichment `ef5f3a7b-cb71-45f5-aec6-9abe7b4221cb` over the same Graph Version
+  `01225b12-cbf3-4be5-9e29-3fdcb2059eb1` succeeded with nine document anchors, 19 source-mentioned
+  prerequisites, six admitted LLM-grounded prerequisites, 37 edges, and 34 difficulties. The exact
+  reproduced `Ownership and Functions` draft again claimed that passing any bound variable moves or
+  copies its value. This time its persisted admission disposition rejected the mention after two of
+  three GPT-OSS challenger samples independently named reference binding as the counterexample; the
+  candidate's definition was also rejected, so duplicate resolution did not merely conceal it.
+- Joined inspection found the six surviving generated bundles — Assignment Semantics, Memory
+  Address, Runtime Memory, Scope (Lexical), Trait (Rust), and Variable Binding — each with one
+  materially safe learner-facing definition and no optional mention. The surviving Variable Binding
+  definition limits ownership to owned values and does not repeat the unsafe function-call claim.
+  Its terse operator rationale ambiguously says reference bindings sit outside the defining
+  condition; that text is not treated as factual evidence. Source inspection confirms Study Item
+  generation selects only admitted definition/mention passages and never supplies bundle rationale
+  to learner generation, so U5 may proceed while judging the actual learner payload beside those
+  passages.
+- LiteLLM recorded 323 successful and zero non-success calls, 1,028,020 tokens, no cache hits, and
+  USD 0.066385 provider spend; the normalized stage report estimated USD 0.132413 after pricing
+  zero-reported Xiaomi calls. Every reached route was declared: five planner/challenger calls used
+  the config-owned qualified GPT-OSS Parasail FP4 fallback and eight boundary-probe calls used its
+  declared Qwen fallback; DeepSeek Grounding stayed on its primary-only assignment. No undeclared
+  route or schema fallback appeared.
+- The full infrastructure-litellm suite passed 195 tests and the full application suite passed 807;
+  both package typechecks, targeted ESLint, prompt/config identity assertions, and `git diff --check`
+  passed. These are local automated plus local production-model and joined-development-database
+  evidence. No learner asset, deployment, production write, browser/native, simulator/emulator,
+  physical-device, or release claim has yet been made.
+
 ### Open findings
 
-- U4 is next: treat the defect as reference-versus-referent role conflation plus non-monotonic
-  counterexample handling. Research and implement the smallest domain-neutral question, prompt,
-  composition, or evidence-selection repair that preserves the locked independent-verification
-  quorum and Model Assignments, then run a fresh immutable enrichment over the same published graph.
-  If no such repair survives the focused gate, record the exact owner-gated Model Assignment choice
-  in `BLOCKERS.md`; do not spend on learner assets or hide the failure with unqualified output.
+- U5 is next: generate the Study Item Bank and Concept Lessons from repaired enrichment
+  `ef5f3a7b-cb71-45f5-aec6-9abe7b4221cb`, then inspect each generated learner payload beside the
+  exact grounding passages it received. Stop and record the first invalid learner layer if found;
+  otherwise run the final repository gate and consolidate the plan without reviving paused
+  anchor-less generation.

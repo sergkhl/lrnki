@@ -4,11 +4,11 @@
 
 ## TODO
 
-- **Pause Synthetic Topic Generation and diagnose source-backed generation — in progress; U0–U3
-  complete, U3 is `FIX_FIRST`, U4 next.** Follow [the execution-order plan](./2026-08-24-002-pause-synthetic-topic-and-diagnose-source-backed-generation.md).
-  The real Rust gate proved the source substrate and rejection path, then stopped before learner
-  assets because admitted Variable Binding conflated reference ownership with referent ownership.
-  Repair the domain-neutral evidence seam and rerun the same published graph.
+- **Pause Synthetic Topic Generation and diagnose source-backed generation — in progress; U0–U4
+  complete, U5 next.** Follow [the execution-order plan](./2026-08-24-002-pause-synthetic-topic-and-diagnose-source-backed-generation.md).
+  The repaired Rust enrichment rejected the reproduced carrier/referent conflation and persisted
+  six safe generated definitions. Generate and inspect learner assets from that exact enrichment,
+  then run the final repository gate and consolidate without reviving anchor-less generation.
 
 - **Same-call Grounding identity-scope audit — blocked; U0–U2 and U4 complete, candidate rejected,
   U3 skipped.** Follow

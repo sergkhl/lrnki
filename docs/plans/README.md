@@ -12,10 +12,10 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-24-002 — Pause Synthetic Topic Generation and Diagnose Source-backed Generation](./2026-08-24-002-pause-synthetic-topic-and-diagnose-source-backed-generation.md)
-   — **In progress; U0–U3 complete, U3 is `FIX_FIRST`, and U4 is next.** The real Rust gate proved
-   the source substrate and rejection path, but an admitted Variable Binding passage conflated
-   ownership of a reference with ownership of its referent after a valid challenger counterexample
-   was not replicated. Repair that domain-neutral evidence seam before generating learner assets.
+   — **In progress; U0–U4 complete and U5 is next.** A domain-neutral carrier/referent audit made
+   replicated challengers reject the reproduced unsafe Variable Binding claim, and the fresh Rust
+   enrichment persisted six safe generated definitions. Generate and inspect learner assets from
+   that exact repaired enrichment, then run the final repository gate and consolidate.
 
 2. [2026-08-24-001 — Test a Same-Call Grounding Identity-Scope Audit](./2026-08-24-001-test-grounding-identity-scope-audit.md)
    — **Blocked; U0–U2 and U4 complete, candidate rejected, U3 skipped.** The first fixed
