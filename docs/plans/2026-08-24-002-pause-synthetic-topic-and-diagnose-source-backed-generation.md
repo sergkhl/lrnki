@@ -7,8 +7,8 @@ execution: code
 
 # Pause Synthetic Topic Generation and Diagnose Source-backed Generation
 
-**Status:** In progress — U0–U6 complete; U7 is next and the source-backed learner bank remains
-`FIX_FIRST` behind an owner decision
+**Status:** Complete — U0–U7 closed; source-backed graph generation is repaired and learner-asset
+generation remains `FIX_FIRST` behind an owner decision
 
 **Decision state:** The owner decided on 2026-08-24 to pause fully anchor-less Synthetic Topic
 Generation and to diagnose the existing curated-source generation path before choosing another
@@ -461,11 +461,28 @@ bank remains `FIX_FIRST`
   not deployment, production-data, browser/native, simulator/emulator, physical-device, or release
   evidence.
 
+### U7 — consolidation and owner-gated handback — 2026-08-24 — complete
+
+- Post-commit reruns passed 38 focused application tests and 34 focused infrastructure/config tests;
+  the committed diff has no whitespace error. The broader U6 gate already passed 810 application,
+  194 infrastructure-litellm, and eight worker tests, four affected typechecks, targeted ESLint with
+  zero errors, documentation links/caps, and the exact prompt/config identity assertions.
+- The reversible pause policy remains source-owned in
+  `packages/application/src/syntheticTopicGenerationAvailability.ts`; the exact lesson-to-key
+  projection remains source-owned behind the Study Item generation port. Neither exact interface
+  warrants a new ADR. Current outcome and qualified evidence moved to TODO, while the unresolved
+  learner-visible scope/spend choice moved to BLOCKERS with an explicit drain criterion.
+- The live execution index now contains only four later plans. The same-call candidate and latency
+  plan are blocked; both Source-less Grounding plans are on hold pending an owner-selected successor.
+  Repeating any of their failed calls cannot add evidence, so none is actionable in this session.
+- This plan closes on the handback allowed by its goal capsule: anchor-less generation is paused,
+  the curated-source graph path is repaired and inspected, one exact learner-layer projection defect
+  is repaired, and the newly exposed systemic learner-asset limitation is recorded rather than
+  hidden. Plan deletion follows in its own commit after this retained-state consolidation.
+
 ### Open findings
 
-- U7 is next: consolidate the bounded repair and close this diagnostic with the owner decision in
-  [BLOCKERS.md](./BLOCKERS.md). Do not qualify or adopt the current learner bank, spend more calls on
-  the same verifier/model combinations, replace forced tools with JSON Schema, or silently publish
-  extractive fragments. The source-backed graph remains the positive handback; learner-asset
-  generation remains owner-gated until the owner chooses a pause or a separately planned
-  deterministic/product or Model Assignment successor.
+- The owner decision in [BLOCKERS.md](./BLOCKERS.md) is the sole remaining finding. Do not qualify or
+  adopt the current learner bank, spend more calls on the same verifier/model combinations, replace
+  forced tools with JSON Schema, or silently publish extractive fragments. Resume only through the
+  bounded successor selected by that blocker.

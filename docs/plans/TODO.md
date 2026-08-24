@@ -4,20 +4,12 @@
 
 ## TODO
 
-- **Pause Synthetic Topic Generation and diagnose source-backed generation — in progress; U0–U6
-  complete, U7 next, learner assets remain `FIX_FIRST`.** Follow
-  [the execution-order plan](./2026-08-24-002-pause-synthetic-topic-and-diagnose-source-backed-generation.md).
-  The repaired graph and exact lesson-to-key projection pass, but fresh full-bank inspection found
-  independent matching, impostor, lesson-context, and distractor-verifier failures. Consolidate the
-  bounded repair and the owner choice in `BLOCKERS.md`; do not adopt the current bank or repeat the
-  failed model/schema probes.
-
 - **Same-call Grounding identity-scope audit — blocked; U0–U2 and U4 complete, candidate rejected,
   U3 skipped.** Follow
   [the execution-order experiment](./2026-08-24-001-test-grounding-identity-scope-audit.md). Its first
   fixed Pyruvate draw narrowed identity to the PDH/NAD+ mechanism despite a strict DeepInfra FP8
-  contract pass, so the kill rule stopped all later draws and activation. Do not rerun it; the new
-  execution-order plan owns the pause and source-backed diagnosis before another assignment choice.
+  contract pass, so the kill rule stopped all later draws and activation. Do not rerun it; new
+  assignment and learner-asset policy work is owner-gated in [BLOCKERS](./BLOCKERS.md).
 
 - **Operation-neutral DeepSeek Grounding — on hold; U0–U3 and U5 complete, U4 remains
   `FIX_FIRST`.** [Plan 003](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md) remains the
@@ -40,6 +32,14 @@
   deepening plan supplies a successful, fully inspected quality baseline.
 
 ## COMPLETED
+
+- **Anchor-less generation is paused and the source-backed diagnostic is handed back honestly
+  (2026-08-24).** One application policy refuses every production-shaped Synthetic Topic entry while
+  preserving ready curated-source expeditions. Rust source-backed Graph Enrichment was repaired and
+  inspected; option-select now copies its keyed claim losslessly from the Concept Lesson. The full
+  learner bank remains unqualified after independent lesson, distractor, matching, and impostor
+  counterexamples, so the next product/spend choice lives in [BLOCKERS](./BLOCKERS.md). Detailed
+  record: commits `a19baa0`, `60bb3f5`, `ccd3512`, `08de20d`, `8249d1d`, `02798fe`, and `e5e147c`.
 
 - **Topic Expedition generation is scoped to DeepSeek and its stage decisions are frozen
   (2026-08-23).** One composition-owned routing value moves the nine direct generators without
@@ -92,30 +92,27 @@
   OAuth-refusal gate passed; evidence:
   [Pages run 31327027343](https://github.com/sergkhl/lrnki/actions/runs/31327027343).
 
-- **Self-hosted Better Auth and Google return legs (2026-08-08–09).** The shared API and learner app
-  use Better Auth, and the user confirmed real Google round trips on Android and web. Local
-  real-backend journeys cover persistence and refusal paths. Durable policy:
-  [ADR-0041](../adr/0041-own-learner-identity-with-self-hosted-better-auth.md); gate commits 03cdc32,
-  d949177, and 3361bfc.
-
 ## VALIDATION
 
-### Concept Canonicalization and ADR audit — 2026-08-23
+### Synthetic Topic pause and source-backed diagnostic — 2026-08-24
 
-- Local real-use: semantic artifact `bc33525e-77ce-455a-8e6f-72022192daaa` preserved the selected
-  PDF → Markdown → HTML Extraction Run order and inspected 15 core Concepts across machine learning
-  systems and molecular biology. Its two proposals were correctly `distinct`; no unsupported merge,
-  cross-domain merge, quarantine, or unavailable result appeared.
-- Replay and attribution: graph versions `227f8bab-7697-44f7-8321-5789335b5f28` and
-  `9efc7a9e-89c2-40b9-9d73-294e534907d1` matched after excluding version identity/timestamps. The
-  canonicalization operation joined four production-assignment SpendLogs and 2,663 tokens; each
-  Graph-Version Build had a same-query positive control and zero model calls.
-- Database and automation: a timestamp-hydration defect found by artifact inspection was fixed at the
-  PostgreSQL boundary. `pnpm test:db` passed against reset-only `lrnki_test`; `pnpm db:check`, full
-  workspace typechecks/tests, lint with zero errors, both production builds, link checks, and
-  `git diff --check` passed. Root `pnpm check` was decomposed because its Playwright browser step was
-  explicitly out of scope; no browser was launched.
-- Protected diff: ADR-0006, Model Assignments, cross-family policy/enforcement, and one-pass Source-less
-  Grounding Admission behavior are unchanged from `ab15107`. This is local automated, local database,
-  local production-model, and documentation evidence—not deployed, production-data, browser, native,
-  simulator/emulator, or physical-device evidence.
+- Local automated: authenticated test-database coverage proves both topic mutations return 409 with
+  no expedition row or supervisor wake, while every production-shaped worker/supervisor seam reads
+  the same paused policy. The final repair passed 810 application, 194 infrastructure-litellm, and
+  eight worker tests, four affected typechecks, targeted ESLint with zero errors, prompt/config
+  identity checks, documentation links/caps, and whitespace checks.
+- Local real-use: repaired enrichment `ef5f3a7b-cb71-45f5-aec6-9abe7b4221cb` rejected the reproduced
+  unsafe ownership/function claim and retained a qualified Variable Binding definition. The final
+  351.038-second Study Item run made 268 successful calls / 554,153 tokens and persisted 33 lessons,
+  one lesson absence, 89 items, and 13 rejections. All 31 option keys projected exactly from their
+  lesson unit, including “for owned values.”
+- Quality boundary: the bank remains `FIX_FIRST`. Inspection found independently invalid Move lesson
+  context, String Capacity and `drop` distractor verdicts, a qualifier-dropping Variable Binding
+  matching prompt, and a true Pointer impostor. DeepSeek and GPT-OSS accepted explicit semantic
+  counterexamples; GLM 5.3 rejected forced named-tool choice and ignored a direct JSON Schema shape
+  while also accepting the bad claim. No Model Assignment changed.
+- Authority: the pause, repository mechanics, repaired source-backed graph, and exact projection are
+  qualified only at their exercised local layers. The learner bank is not useful/adoptable evidence;
+  no deployment, production write, browser/native, simulator/emulator, physical-device, or release
+  claim was made. The exact next owner action and drain criterion are in
+  [BLOCKERS](./BLOCKERS.md).
