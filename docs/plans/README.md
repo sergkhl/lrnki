@@ -12,10 +12,10 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-24-002 — Pause Synthetic Topic Generation and Diagnose Source-backed Generation](./2026-08-24-002-pause-synthetic-topic-and-diagnose-source-backed-generation.md)
-   — **In progress; U0–U2 complete, U3 is next.** One policy refuses anchor-less work at every
-   production-shaped seam; authenticated zero-write/wake evidence and the affected repository gate
-   pass while ready/catalog expeditions remain usable. Reverify the current environment, then run
-   and inspect the smallest real source-backed Graph Enrichment and Study Item Bank gate.
+   — **In progress; U0–U3 complete, U3 is `FIX_FIRST`, and U4 is next.** The real Rust gate proved
+   the source substrate and rejection path, but an admitted Variable Binding passage conflated
+   ownership of a reference with ownership of its referent after a valid challenger counterexample
+   was not replicated. Repair that domain-neutral evidence seam before generating learner assets.
 
 2. [2026-08-24-001 — Test a Same-Call Grounding Identity-Scope Audit](./2026-08-24-001-test-grounding-identity-scope-audit.md)
    — **Blocked; U0–U2 and U4 complete, candidate rejected, U3 skipped.** The first fixed

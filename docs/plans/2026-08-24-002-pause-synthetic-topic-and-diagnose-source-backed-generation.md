@@ -7,7 +7,7 @@ execution: code
 
 # Pause Synthetic Topic Generation and Diagnose Source-backed Generation
 
-**Status:** In progress — U0–U2 complete; U3 is next
+**Status:** In progress — U0–U3 complete; U3 is `FIX_FIRST` and U4 is next
 
 **Decision state:** The owner decided on 2026-08-24 to pause fully anchor-less Synthetic Topic
 Generation and to diagnose the existing curated-source generation path before choosing another
@@ -255,8 +255,53 @@ Implementation units are exclusive and run in order. This plan declares no paral
   development data, provider reachability, model quality, deployment, browser behavior, native
   behavior, simulator/emulator behavior, or physical-device behavior.
 
+### U3 — real curated-source gate — 2026-08-24 — `FIX_FIRST`
+
+- The development environment was reverified without mutating Compose: database `lrnki` was the
+  target, PostgreSQL and LiteLLM were healthy, the loaded aliases matched the committed production
+  assignments, and the database initially contained no reusable Source. The canonical Rust Book
+  fixture was registered as Source `8da70567-74c0-4ea4-a82d-3617317d3f6d`; Extraction Run
+  `04482bbf-47db-4d4e-9c70-18b979b2b839` succeeded with 125 blocks, 29 candidates, nine core
+  concepts, 25 complete CEPs, 59 definitions, 118 mentions, and 11 assertions. Exact-label-only
+  canonicalization artifact `74f6abbe-908a-47b1-9052-0a9654a4b14b` published Graph Version
+  `01225b12-cbf3-4be5-9e29-3fdcb2059eb1` with nine concepts and 76 CEP passages.
+- Graph Enrichment `a157ae39-71cb-405e-a9b2-ccfa6326aed3` succeeded under config
+  `graph-enrichment-a0e6b35234de`. It persisted nine document anchors, 19 source-mentioned
+  prerequisites, five LLM-grounded prerequisites, 41 edges, and 33 difficulties. The source-backed
+  definitions for Ownership, Move, Variable Scope, and the other anchors were materially coherent;
+  generated admission also rejected `Block Structure` and `Runtime Memory Management` for concrete
+  overgeneralizations. This is positive control evidence that the source substrate and rejection
+  path were both exercised, not a learner-quality pass.
+- The enrichment made 250 successful and zero non-success LiteLLM calls across six exact Model
+  Assignments, consuming 755,782 tokens. LiteLLM recorded USD 0.051229 provider spend; the worker's
+  normalized stage report estimated USD 0.095817 because it prices zero-reported Xiaomi calls.
+  Extraction separately made 77 successful and zero non-success calls, consumed 224,884 tokens,
+  and recorded USD 0.003752. DeepSeek/DeepInfra generated Grounding; Xiaomi MiMo answered and served
+  the primary judge; GPT-OSS/Novita planned and challenged. No fallback or undeclared route was
+  observed.
+- The gate found a learner-safety defect in admitted `Variable Binding`. Its passage says every Rust
+  variable binding makes the variable owner of the bound value and transfers or duplicates that
+  ownership on a function call. One GPT-OSS challenger sample correctly rejected the universal
+  ownership claim with the concrete reference-binding counterexample `let r = &x`; the other panel
+  sample and the bounded disagreement sample accepted after Xiaomi answers incorrectly treated
+  references and borrows as outside variable binding. The current same-model replicated-rejection
+  rule therefore reduced the valid counterexample to one outlier and admitted the whole original
+  passage. Rust's Reference instead defines move, copy, and reference binding modes, and the Rust
+  Book states that a reference parameter does not own the value it refers to. The accepted rationale
+  conflates ownership of a reference value with ownership of its referent and cannot qualify the
+  learner-facing passage.
+- KTD4 stopped the gate at the first invalid layer: no Concept Lessons or Study Items were generated,
+  and the same-query Study Item positive control is zero for this enrichment. The source-backed path
+  is not transport- or substrate-broken, but its generated-prerequisite admission is `FIX_FIRST`;
+  downstream usefulness remains unqualified. Raw provider payloads and the fixture manifest remain
+  ignored under `tmp/`. No production write, deployment, browser/native, simulator/emulator,
+  physical-device, or release action occurred.
+
 ### Open findings
 
-- U3 is next: reverify the current development environment, provider route, and source inventory;
-  then choose exact Rust-first run/version identities and execute the real source-backed gate.
-- Prior Rust quality evidence remains fixture-selection context only, not current evidence.
+- U4 is next: treat the defect as reference-versus-referent role conflation plus non-monotonic
+  counterexample handling. Research and implement the smallest domain-neutral question, prompt,
+  composition, or evidence-selection repair that preserves the locked independent-verification
+  quorum and Model Assignments, then run a fresh immutable enrichment over the same published graph.
+  If no such repair survives the focused gate, record the exact owner-gated Model Assignment choice
+  in `BLOCKERS.md`; do not spend on learner assets or hide the failure with unqualified output.

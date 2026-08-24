@@ -4,11 +4,11 @@
 
 ## TODO
 
-- **Pause Synthetic Topic Generation and diagnose source-backed generation — in progress; U0–U2
-  complete, U3 next.** Follow [the execution-order plan](./2026-08-24-002-pause-synthetic-topic-and-diagnose-source-backed-generation.md).
-  One application-owned policy now refuses anchor-less work everywhere; signed-in zero-write/wake,
-  isolated DB, workspace test/typecheck/lint, schema, and production-build gates pass while
-  ready/catalog expeditions remain usable. Reverify and inspect the smallest real curated-source gate.
+- **Pause Synthetic Topic Generation and diagnose source-backed generation — in progress; U0–U3
+  complete, U3 is `FIX_FIRST`, U4 next.** Follow [the execution-order plan](./2026-08-24-002-pause-synthetic-topic-and-diagnose-source-backed-generation.md).
+  The real Rust gate proved the source substrate and rejection path, then stopped before learner
+  assets because admitted Variable Binding conflated reference ownership with referent ownership.
+  Repair the domain-neutral evidence seam and rerun the same published graph.
 
 - **Same-call Grounding identity-scope audit — blocked; U0–U2 and U4 complete, candidate rejected,
   U3 skipped.** Follow
