@@ -69,6 +69,12 @@ export const signedIn = (): MockState["handlers"] => ({ "GET /auth/get-session":
 export const signedOut = (): MockState["handlers"] => ({ "GET /auth/get-session": () => ok(null) });
 
 export const journalPopulated = {
+  capabilities: {
+    syntheticTopicGeneration: {
+      status: "paused" as const,
+      message: "New topic scouting is paused while source-backed generation is checked. Choose a ready expedition in Explore."
+    }
+  },
   started: [
     {
       status: "ready" as const,

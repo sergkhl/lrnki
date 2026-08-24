@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { View } from "react-native";
 import { useRouter } from "expo-router";
+import type { SyntheticTopicGenerationAvailability } from "@lrnki/application";
 import { ArrowRight, Compass, Map as MapIcon } from "lucide-react-native";
 import { Badge, Button, Card, Progress, Text, buttonIconColor, colors } from "@/ui";
 import { expeditionStatusLabel, learnerTerm } from "@/learn/vocabulary";
@@ -41,7 +42,8 @@ export function ExpeditionEntry({
 }: Readonly<{ learnerStateRef: string; entry: JournalView }>) {
   const router = useRouter();
   const exampleTopics = pickExampleTopics(EXAMPLE_TOPICS, 4);
-  const { started, yours, shared } = entry;
+  const { started, yours, shared, capabilities } = entry;
+  const topicGenerationAvailability = capabilities.syntheticTopicGeneration;
   return (
     <View className="gap-7">
       <View className="gap-2">
@@ -55,20 +57,35 @@ export function ExpeditionEntry({
       {started.length > 0 ? (
         <JournalSection title="Continue" description="Pick up where you left off.">
           {started.map((expedition) => (
-            <LearnerExpeditionRow key={expedition.learnerExpeditionId} expedition={expedition} />
+            <LearnerExpeditionRow
+              key={expedition.learnerExpeditionId}
+              expedition={expedition}
+              topicGenerationAvailability={topicGenerationAvailability}
+            />
           ))}
         </JournalSection>
       ) : null}
 
       <JournalSection title="Your expeditions" description="Ready and scouting journals for this explorer.">
-        <PlanExpeditionSheet
-          exampleTopics={exampleTopics}
-          onCreate={(topic) => startTopicExpedition({ topic })}
-        />
+        {topicGenerationAvailability.status === "available" ? (
+          <PlanExpeditionSheet
+            exampleTopics={exampleTopics}
+            onCreate={(topic) => startTopicExpedition({ topic })}
+          />
+        ) : (
+          <Card className="gap-2">
+            <Text variant="title">{learnerTerm("topicGenerationPausedTitle")}</Text>
+            <Text variant="caption" color="muted">{topicGenerationAvailability.message}</Text>
+          </Card>
+        )}
         {yours.length === 0 ? (
           <Text variant="label" color="muted">No expeditions yet.</Text>
         ) : yours.map((expedition) => (
-          <LearnerExpeditionRow key={expedition.learnerExpeditionId} expedition={expedition} />
+          <LearnerExpeditionRow
+            key={expedition.learnerExpeditionId}
+            expedition={expedition}
+            topicGenerationAvailability={topicGenerationAvailability}
+          />
         ))}
       </JournalSection>
 
@@ -105,11 +122,20 @@ function JournalSection({
   );
 }
 
-function LearnerExpeditionRow({ expedition }: Readonly<{ expedition: JournalRow }>) {
+function LearnerExpeditionRow({
+  expedition,
+  topicGenerationAvailability
+}: Readonly<{
+  expedition: JournalRow;
+  topicGenerationAvailability: SyntheticTopicGenerationAvailability;
+}>) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   if (expedition.status !== "ready") {
-    return <GenerationProgressCard expedition={expedition} />;
+    return <GenerationProgressCard
+      expedition={expedition}
+      topicGenerationAvailability={topicGenerationAvailability}
+    />;
   }
   const open = () => {
     if (pending) return;

@@ -231,6 +231,12 @@ export {
 } from "./expeditionJournal";
 
 export {
+  CURRENT_SYNTHETIC_TOPIC_GENERATION_AVAILABILITY,
+  syntheticTopicGenerationIsAvailable,
+  type SyntheticTopicGenerationAvailability
+} from "./syntheticTopicGenerationAvailability";
+
+export {
   labelFor,
   type ConceptLessonSectionView,
   type ConceptLessonView,

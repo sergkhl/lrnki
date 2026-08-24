@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { CURRENT_SYNTHETIC_TOPIC_GENERATION_AVAILABILITY } from "@lrnki/application";
 import { answerGuardianSelection, applyGuardianLifecycle, guardianView } from "./guardianFixture";
 import { E2E_FIXTURE_EMAIL, E2E_FIXTURE_PASSWORD } from "../src/lib/e2eFixture";
 
@@ -28,7 +29,12 @@ const here = dirname(fileURLToPath(import.meta.url));
 const scenario = (name: string): unknown => JSON.parse(readFileSync(join(here, "scenario", `${name}.json`), "utf8"));
 
 const SESSION = scenario("session");
-const JOURNAL = scenario("journal");
+// The capture predates the reversible topic-generation capability. Compose the one current
+// application-owned policy into the wire fixture instead of freezing a duplicate client flag.
+const JOURNAL = {
+  ...(scenario("journal") as Record<string, unknown>),
+  capabilities: { syntheticTopicGeneration: CURRENT_SYNTHETIC_TOPIC_GENERATION_AVAILABILITY }
+};
 const CATALOG = scenario("catalog");
 const EXPEDITION = scenario("expedition");
 const LEADERBOARD = scenario("leaderboard");

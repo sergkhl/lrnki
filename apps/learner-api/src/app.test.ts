@@ -102,6 +102,64 @@ test("challenge routes refuse a request with no session cookie", async () => {
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const maybeDb = databaseUrl ? test : test.skip;
 
+maybeDb("paused Synthetic Topic routes expose one capability and perform no write or wake", async () => {
+  const { createDatabaseClient } = await import("@lrnki/infrastructure-postgres");
+  const { deleteLearner } = await import("@lrnki/infrastructure-postgres/test-support");
+  const sql = createDatabaseClient(databaseUrl as string);
+  const authClientSql = createDatabaseClient(databaseUrl as string);
+  let learner = "";
+  let wakes = 0;
+  try {
+    const app = createLearnerApp(
+      sql as unknown as DatabaseClient,
+      authClientSql as unknown as DatabaseClient,
+      { wakeTopicGeneration: () => { wakes += 1; } }
+    );
+    const signUp = await app.request("/auth/sign-up/email", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: `topic-pause-${randomUUID()}@test.invalid`,
+        password: `pw-${randomUUID()}`,
+        name: "Source-backed Tester"
+      })
+    });
+    assert.equal(signUp.status, 200);
+    learner = ((await signUp.json()) as { user: { id: string } }).user.id;
+    const cookie = signUp.headers.getSetCookie().map((value) => value.split(";")[0]).join("; ");
+    const authed = (path: string, body?: unknown) => app.request(path, {
+      method: body === undefined ? "GET" : "POST",
+      headers: { cookie, "content-type": "application/json" },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) })
+    });
+
+    const journal = await authed("/journal");
+    assert.equal(journal.status, 200);
+    const journalBody = (await journal.json()) as {
+      capabilities: { syntheticTopicGeneration: { status: string; message?: string } };
+    };
+    assert.equal(journalBody.capabilities.syntheticTopicGeneration.status, "paused");
+    assert.match(journalBody.capabilities.syntheticTopicGeneration.message ?? "", /source-backed generation/i);
+
+    const start = await authed("/expedition/start", { topic: "Tides" });
+    assert.equal(start.status, 409);
+    assert.equal((await start.json() as { error: string }).error, "synthetic_topic_generation_paused");
+    const retry = await authed("/expedition/retry", { learnerExpeditionId: randomUUID() });
+    assert.equal(retry.status, 409);
+    assert.equal((await retry.json() as { error: string }).error, "synthetic_topic_generation_paused");
+
+    const [count] = await sql<{ count: number }[]>`
+      SELECT count(*)::int AS count
+      FROM learner_expeditions
+      WHERE learner_state_ref = ${learner}`;
+    assert.equal(count.count, 0, "paused requests create or reset no expedition rows");
+    assert.equal(wakes, 0, "paused requests never wake the supervisor");
+  } finally {
+    if (learner) await deleteLearner(sql, learner);
+    await Promise.all([sql.end(), authClientSql.end()]);
+  }
+});
+
 maybeDb("recall challenge end-to-end: create, Last Stand, recovery win, idempotent replay, response_log untouched", async () => {
   const { createDatabaseClient, PostgresResponseLogStore, PostgresStudyItemBankStore } = await import("@lrnki/infrastructure-postgres");
   const { deleteLearner } = await import("@lrnki/infrastructure-postgres/test-support");

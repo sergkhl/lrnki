@@ -7,7 +7,7 @@ execution: code
 
 # Pause Synthetic Topic Generation and Diagnose Source-backed Generation
 
-**Status:** In progress — U0 complete; U1 is next
+**Status:** In progress — U0–U1 complete; U2 is next
 
 **Decision state:** The owner decided on 2026-08-24 to pause fully anchor-less Synthetic Topic
 Generation and to diagnose the existing curated-source generation path before choosing another
@@ -218,8 +218,27 @@ Implementation units are exclusive and run in order. This plan declares no paral
   No source implementation, database, process, provider, model call, deployment, browser/native,
   physical-device, latency, or release action occurred. This is repository planning evidence only.
 
+### U1 — production-shaped pause enforcement — 2026-08-24 — complete
+
+- One application-owned `available | paused` policy now guards the worker before DB/neural context
+  construction, both authenticated topic mutation routes before persistence/wake, and supervisor
+  start, wake, and one-shot execution before queue access. The Journal transports that exact policy;
+  the learner surface replaces planning/retry with paused copy while preserving ready rows, Explore,
+  Browse All, and the latent policy-driven planning component.
+- The full application suite, learner API suite (22 passed, four database-opt-in skips), seven focused
+  learner component tests, and application/worker/API/learner-app typechecks passed. Targeted ESLint
+  reported no error, and source plus untracked whitespace checks passed.
+- A worker invocation with an explicitly unreachable `DATABASE_URL` refused
+  `generate-synthetic-layer Tides oceanography` with the canonical paused message in 1.29 seconds and
+  exit 1, rather than surfacing a database or provider error. This is execution-seam evidence, not a
+  model-quality claim.
+- No development/production database write, model call, provider route, deployment, browser/native,
+  emulator/simulator, physical-device, or release action occurred. The authenticated no-write route
+  test is present but remains unqualified until U2 runs it through `pnpm test:db`.
+
 ### Open findings
 
-- U1 is next: implement the single pause policy and its API/supervisor/worker/learner consumers.
+- U2 is next: run the authenticated database no-write gate and the proportionate affected repository
+  handback before committing deterministic completion.
 - U3 must reverify the current development environment and source inventory before choosing exact
   run/version identities; prior Rust quality evidence is fixture-selection context only.

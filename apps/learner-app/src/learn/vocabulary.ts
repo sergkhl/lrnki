@@ -22,6 +22,8 @@ export const LEARNER_VOCABULARY = {
   unskipKnown: "Un-mark known",
   groundedBadge: "Grounded in your source",
   topicDoor: "Plan expedition",
+  topicGenerationPausedTitle: "New topic scouting is paused",
+  topicGenerationPausedBadge: "Scouting paused",
   generating: "Scouting",
   queued: "Waiting for a scout",
   queuedDescription: "Your expedition is in line. Scouting starts as soon as a scout is free.",

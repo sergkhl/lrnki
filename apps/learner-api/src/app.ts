@@ -4,6 +4,7 @@ import { cors } from "hono/cors";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import {
+  CURRENT_SYNTHETIC_TOPIC_GENERATION_AVAILABILITY,
   checkMatchingAttempt,
   getExpeditionCatalog,
   getExpeditionJournal,
@@ -17,7 +18,9 @@ import {
   recordScaffoldLessonRead,
   requestLearnerScaffold,
   retryLearnerScaffold,
-  type GradeRefusalReason
+  syntheticTopicGenerationIsAvailable,
+  type GradeRefusalReason,
+  type SyntheticTopicGenerationAvailability
 } from "@lrnki/application";
 import {
   PostgresCalibrationVerdictStore,
@@ -96,10 +99,18 @@ function challengeRefusalStatus(refused: string): 404 | 409 | 422 {
 // adapter rewrites its client's type codecs in place and would strip `sql.json()` from every
 // store on the shared pool (see `createAuthDatabase`). It is a separate parameter precisely so
 // the constraint is visible at every call site rather than buried in a composition root.
-export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient) {
+export type LearnerAppOptions = Readonly<{
+  syntheticTopicGenerationAvailability?: SyntheticTopicGenerationAvailability;
+  wakeTopicGeneration?: () => void;
+}>;
+
+export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, options: LearnerAppOptions = {}) {
   const expeditionStore = new PostgresLearnerExpeditionStore(sql);
   const learnerAuth = createLearnerAuth(authSql);
   const auth = requireSession(learnerAuth);
+  const syntheticTopicGenerationAvailability = options.syntheticTopicGenerationAvailability
+    ?? CURRENT_SYNTHETIC_TOPIC_GENERATION_AVAILABILITY;
+  const wakeTopicGeneration = options.wakeTopicGeneration ?? wakeTopicGenerationSupervisor;
   // The Recall Challenge deep module, bound once at the composition root (KTD1).
   const recallChallenges = createLearnerRecallChallenge(sql);
 
@@ -155,7 +166,7 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient) {
     .on(["GET", "POST"], "/auth/*", (c) => learnerAuth.handler(c.req.raw))
 
     .get("/journal", auth, async (c) => {
-      return c.json(await getExpeditionJournal(
+      const journal = await getExpeditionJournal(
         { learnerStateRef: c.get("learnerStateRef") },
         {
           enrichmentRead: new PostgresEnrichmentInspectionRead(sql),
@@ -166,7 +177,11 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient) {
           layerPurposeStore: new PostgresEnrichmentLayerPurposeStore(sql),
           timelineRead: new PostgresOperationTimelineRead(sql)
         }
-      ));
+      );
+      return c.json({
+        ...journal,
+        capabilities: { syntheticTopicGeneration: syntheticTopicGenerationAvailability }
+      });
     })
 
     // Browse all is intentionally independent from the polled journal payload: it has no
@@ -238,6 +253,12 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient) {
     })
 
     .post("/expedition/start", auth, zValidator("json", z.object({ topic: z.string().trim().min(1) })), async (c) => {
+      if (!syntheticTopicGenerationIsAvailable(syntheticTopicGenerationAvailability)) {
+        return c.json({
+          error: "synthetic_topic_generation_paused" as const,
+          availability: syntheticTopicGenerationAvailability
+        }, 409);
+      }
       await expeditionStore.upsert({
         learnerExpeditionId: randomUUID(),
         learnerStateRef: c.get("learnerStateRef"),
@@ -247,16 +268,22 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient) {
         status: "generating",
         active: true
       });
-      wakeTopicGenerationSupervisor();
+      wakeTopicGeneration();
       return c.json({ ok: true as const });
     })
 
     .post("/expedition/retry", auth, zValidator("json", z.object({ learnerExpeditionId: z.string() })), async (c) => {
+      if (!syntheticTopicGenerationIsAvailable(syntheticTopicGenerationAvailability)) {
+        return c.json({
+          error: "synthetic_topic_generation_paused" as const,
+          availability: syntheticTopicGenerationAvailability
+        }, 409);
+      }
       await expeditionStore.resetGeneration({
         learnerStateRef: c.get("learnerStateRef"),
         learnerExpeditionId: c.req.valid("json").learnerExpeditionId
       });
-      wakeTopicGenerationSupervisor();
+      wakeTopicGeneration();
       return c.json({ ok: true as const });
     })
 

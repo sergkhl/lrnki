@@ -158,9 +158,15 @@ test.describe("route states", () => {
 
 test.describe("web planning sheet layer", () => {
   async function openPopulatedJournal(page: import("@playwright/test").Page, mock: { handlers: Record<string, unknown> }) {
+    const journalWithTopicPlanning = {
+      ...journalPopulated,
+      capabilities: { syntheticTopicGeneration: { status: "available" as const } }
+    };
     mock.handlers = {
       ...signedIn(),
-      "GET /journal": () => ok(journalPopulated),
+      // This suite retains coverage of the latent planning sheet while the production policy is
+      // paused. The capability comes from the intercepted server projection, never a client flag.
+      "GET /journal": () => ok(journalWithTopicPlanning),
       "GET /leaderboard": () => ok(leaderboardFixture),
       "POST /expedition/start": async () => {
         await delay(1500);

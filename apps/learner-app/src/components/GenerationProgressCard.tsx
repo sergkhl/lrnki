@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { View } from "react-native";
+import type { SyntheticTopicGenerationAvailability } from "@lrnki/application";
 import { retryTopicExpedition } from "@/lib/actions";
 import type { JournalView } from "@/lib/queries";
 import { Badge, Button, Card, Progress, Text } from "@/ui";
@@ -11,9 +12,24 @@ type GeneratingRow = Exclude<JournalView["yours"][number], { status: "ready" }>;
 // Pure progress card: queued/stalled/stage facts arrive finished from the Expedition
 // Journal projection (plan 2026-07-12-001 KTD3), so this component only maps plain
 // stage tags through themed copy, renders, and retries.
-export function GenerationProgressCard({ expedition }: Readonly<{ expedition: GeneratingRow }>) {
+export function GenerationProgressCard({
+  expedition,
+  topicGenerationAvailability
+}: Readonly<{
+  expedition: GeneratingRow;
+  topicGenerationAvailability: SyntheticTopicGenerationAvailability;
+}>) {
   const [pending, setPending] = useState(false);
   const { generation } = expedition;
+  if (topicGenerationAvailability.status === "paused") {
+    return (
+      <Card className="gap-3">
+        <Text variant="title">{expedition.title}</Text>
+        <Text variant="caption" color="muted">{topicGenerationAvailability.message}</Text>
+        <Badge>{learnerTerm("topicGenerationPausedBadge")}</Badge>
+      </Card>
+    );
+  }
   if (generation.queued) {
     return (
       <Card className="gap-3">

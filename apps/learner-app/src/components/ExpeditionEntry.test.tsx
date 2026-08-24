@@ -37,6 +37,12 @@ function renderEntry(entry: JournalView) {
 
 function journal(overrides: Partial<JournalView> = {}): JournalView {
   return {
+    capabilities: {
+      syntheticTopicGeneration: {
+        status: "paused",
+        message: "New topic scouting is paused while source-backed generation is checked. Choose a ready expedition in Explore."
+      }
+    },
     started: [
       {
         status: "ready",
@@ -72,6 +78,45 @@ test("journal sections render Continue, Your expeditions, Explore in order", asy
   // The started expedition surfaces its purpose teaser and progress.
   expect(screen.getAllByText("Rust ownership").length).toBeGreaterThan(0);
   expect(screen.getAllByText("Reason about moves and borrows.").length).toBeGreaterThan(0);
+});
+
+test("a paused capability hides topic planning while preserving source-backed Explore", async () => {
+  await renderEntry(journal());
+  expect(screen.queryByLabelText("Plan a new expedition")).toBeNull();
+  expect(screen.getByText("New topic scouting is paused")).toBeTruthy();
+  expect(screen.getByText(/Choose a ready expedition in Explore/)).toBeTruthy();
+  expect(screen.getByLabelText("Begin")).toBeTruthy();
+});
+
+test("the retained available capability still exposes the topic planning sheet", async () => {
+  await renderEntry(journal({
+    capabilities: { syntheticTopicGeneration: { status: "available" } }
+  }));
+  expect(screen.getByLabelText("Plan a new expedition")).toBeTruthy();
+  expect(screen.queryByText("New topic scouting is paused")).toBeNull();
+});
+
+test("paused generated rows expose no stale retry affordance", async () => {
+  await renderEntry(journal({
+    yours: [{
+      status: "failed",
+      learnerExpeditionId: "le-failed",
+      title: "Ocean currents",
+      declaredDomain: null,
+      failureMessage: "Scouting failed.",
+      generation: {
+        queued: false,
+        stalled: false,
+        completed: 4,
+        total: 19,
+        fraction: 4 / 19,
+        indeterminate: false,
+        currentStage: "grounding-generation"
+      }
+    }]
+  }));
+  expect(screen.getByText("Scouting paused")).toBeTruthy();
+  expect(screen.queryByLabelText("Retry")).toBeNull();
 });
 
 test("beginning a candidate fires one action even under rapid presses", async () => {

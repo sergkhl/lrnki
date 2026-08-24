@@ -12,8 +12,11 @@ serve({ fetch: app.fetch, port }, (info) => {
 });
 
 // The relocated topic-generation supervisor (R4): same claim/fencing/staleness semantics,
-// now living in the one long-lived learner process.
-startTopicGenerationSupervisor();
+// now living in the one long-lived learner process. The application-owned availability policy
+// makes this a no-op while fully anchor-less Synthetic Topic Generation is paused.
+if (!startTopicGenerationSupervisor()) {
+  console.log("learner topic generation is paused");
+}
 
 // The scaffold-detour generation supervisor (plan 2026-07-12-002 U3): drains requested Scaffold
 // Detours through the same process-level scheduler.

@@ -4,11 +4,11 @@
 
 ## TODO
 
-- **Pause Synthetic Topic Generation and diagnose source-backed generation — in progress; U0
-  complete, U1 next.** Follow [the execution-order plan](./2026-08-24-002-pause-synthetic-topic-and-diagnose-source-backed-generation.md).
-  Enforce one application-owned pause policy at the worker, API, supervisor, and learner Journal
-  seams; then run and inspect the smallest real curated-source Graph Enrichment and Study Item Bank
-  gate. Existing ready and catalog expeditions remain usable.
+- **Pause Synthetic Topic Generation and diagnose source-backed generation — in progress; U0–U1
+  complete, U2 next.** Follow [the execution-order plan](./2026-08-24-002-pause-synthetic-topic-and-diagnose-source-backed-generation.md).
+  One application-owned policy now refuses anchor-less worker/API/supervisor work and makes the
+  learner Journal honest while ready/catalog expeditions remain usable. Run the authenticated
+  no-write and repository handback, then inspect the smallest real curated-source gate.
 
 - **Same-call Grounding identity-scope audit — blocked; U0–U2 and U4 complete, candidate rejected,
   U3 skipped.** Follow

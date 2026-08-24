@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import {
+  CURRENT_SYNTHETIC_TOPIC_GENERATION_AVAILABILITY,
   buildGraphVersion,
   canonicalizeConcepts,
   loadConceptCanonicalizationArtifact,
@@ -18,6 +19,7 @@ import {
   synthesizeResponses,
   runGraphEnrichment,
   runSyntheticGeneration,
+  syntheticTopicGenerationIsAvailable,
   costTimingReport,
   rankBottleneckTargets,
   type CostTimingReport,
@@ -1124,6 +1126,14 @@ function slugify(value: string): string {
 
 async function main() {
   const [command, arg, ...rest] = process.argv.slice(2);
+  // Refuse the paused anchor-less arm before database or neural-client construction. Curated-source
+  // commands continue through the normal context below.
+  if (command === "generate-synthetic-layer" &&
+      !syntheticTopicGenerationIsAvailable(CURRENT_SYNTHETIC_TOPIC_GENERATION_AVAILABILITY)) {
+    console.error(`! ${CURRENT_SYNTHETIC_TOPIC_GENERATION_AVAILABILITY.message}`);
+    process.exitCode = 1;
+    return;
+  }
   const ctx = buildContext();
   try {
     // Per-stage wall-clock now lives in the durable operation_run_stages timeline,
