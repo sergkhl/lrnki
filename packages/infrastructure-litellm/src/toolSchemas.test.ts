@@ -18,8 +18,8 @@ import {
   CONCEPT_LESSON_SECTION_TEXT_MAX_LENGTH,
   conceptLessonSchema,
   conceptLessonValidator,
-  generatedGroundingBundleSchema,
-  generatedGroundingBundleValidator,
+  groundingGenerationToolResultSchema,
+  groundingGenerationToolResultValidator,
   answerKeyVerificationSchema,
   answerKeyVerificationValidator,
   impostorSchema,
@@ -40,27 +40,73 @@ test("concept-set synthesis enforces the operation's at-most-16 concept budget",
   assert.doesNotThrow(() => conceptSetSynthesisValidator.parse({ concepts: concepts.slice(0, 16) }));
 });
 
-test("generated grounding bounds the factual surface while retaining one optional distinct definition", () => {
-  const properties = generatedGroundingBundleSchema.properties as Record<string, { maxItems?: number }>;
-  assert.equal(properties.definitions.maxItems, 2);
-  assert.equal(properties.mentions.maxItems, 1);
+test("Grounding Generation requires one strict identity-scope audit beside one bounded nested bundle", () => {
+  const properties = groundingGenerationToolResultSchema.properties as Record<string, {
+    additionalProperties?: boolean;
+    properties?: Record<string, { maxItems?: number }>;
+    required?: string[];
+  }>;
+  const auditSchema = properties.identityScopeAudit;
+  const bundleSchema = properties.bundle;
+  assert.deepEqual(groundingGenerationToolResultSchema.required, ["identityScopeAudit", "bundle"]);
+  assert.equal(auditSchema.additionalProperties, false);
+  assert.deepEqual(auditSchema.required, [
+    "selectedSense",
+    "identityInvariant",
+    "contextSpecificQualifiers",
+    "materialNarrowingCounterexample"
+  ]);
+  assert.equal(bundleSchema.additionalProperties, false);
+  assert.equal(bundleSchema.properties?.definitions?.maxItems, 2);
+  assert.equal(bundleSchema.properties?.mentions?.maxItems, 1);
 
   const passage = (text: string) => ({ text });
-  assert.doesNotThrow(() => generatedGroundingBundleValidator.parse({
-    definitions: [passage("The candidate has one defining criterion."), passage("A distinct necessary sense has another criterion.")],
-    mentions: [passage("One necessary context relation.")],
-    rationale: "The bundle supports the grounding context."
+  const valid = {
+    identityScopeAudit: {
+      selectedSense: "The established sense selected for this context.",
+      identityInvariant: "The shared condition that preserves the concept identity.",
+      contextSpecificQualifiers: [],
+      materialNarrowingCounterexample: null
+    },
+    bundle: {
+      definitions: [passage("The candidate has one defining criterion."), passage("A distinct necessary sense has another criterion.")],
+      mentions: [passage("One necessary context relation.")],
+      rationale: "The bundle supports the grounding context."
+    }
+  };
+  assert.doesNotThrow(() => groundingGenerationToolResultValidator.parse(valid));
+  assert.doesNotThrow(() => groundingGenerationToolResultValidator.parse({
+    ...valid,
+    identityScopeAudit: {
+      ...valid.identityScopeAudit,
+      contextSpecificQualifiers: ["One implementation detail is context-specific."],
+      materialNarrowingCounterexample: "One relevant case lacks that implementation detail."
+    }
   }));
-  assert.throws(() => generatedGroundingBundleValidator.parse({
-    definitions: [passage("One."), passage("Two."), passage("Three.")],
-    mentions: [],
-    rationale: "Too many definitions."
-  }));
-  assert.throws(() => generatedGroundingBundleValidator.parse({
-    definitions: [passage("One definition.")],
-    mentions: [passage("One mention."), passage("Two mentions.")],
-    rationale: "Too many mentions."
-  }));
+
+  const { identityScopeAudit: _audit, ...withoutAudit } = valid;
+  const { bundle: _bundle, ...withoutBundle } = valid;
+  const { selectedSense: _sense, ...auditWithoutSense } = valid.identityScopeAudit;
+  void _audit;
+  void _bundle;
+  void _sense;
+  for (const invalid of [
+    withoutAudit,
+    withoutBundle,
+    { ...valid, unexpected: true },
+    { ...valid, identityScopeAudit: auditWithoutSense },
+    { ...valid, identityScopeAudit: { ...valid.identityScopeAudit, unexpected: true } },
+    { ...valid, identityScopeAudit: { ...valid.identityScopeAudit, selectedSense: "" } },
+    { ...valid, identityScopeAudit: { ...valid.identityScopeAudit, identityInvariant: "" } },
+    { ...valid, identityScopeAudit: { ...valid.identityScopeAudit, contextSpecificQualifiers: [""] } },
+    { ...valid, identityScopeAudit: { ...valid.identityScopeAudit, materialNarrowingCounterexample: "" } },
+    { ...valid, bundle: { ...valid.bundle, unexpected: true } },
+    { ...valid, bundle: { ...valid.bundle, definitions: [] } },
+    { ...valid, bundle: { ...valid.bundle, definitions: [passage("One."), passage("Two."), passage("Three.")] } },
+    { ...valid, bundle: { ...valid.bundle, mentions: [passage("One mention."), passage("Two mentions.")] } }
+  ]) {
+    assert.throws(() => groundingGenerationToolResultValidator.parse(invalid));
+  }
 });
 
 test("all forced-tool schemas satisfy strict object invariants", () => {
@@ -84,7 +130,7 @@ test("all generated schema descriptions remain domain-neutral", () => {
     .join("\n")
     .toLowerCase();
 
-  for (const fixtureTerm of ["ownership", "rust", "market", "economics", "instructkg", "meselson", "aira", "heap allocation", "string memory representation"]) {
+  for (const fixtureTerm of ["ownership", "rust", "market", "economics", "instructkg", "meselson", "aira", "heap allocation", "string memory representation", "pyruvate oxidation", "transaction isolation", "labor productivity", "mitochondrial", "bacterial cytoplasmic", "anaerobic", "hidden-until-commit", "time-only"]) {
     assert.equal(modelFacingText.includes(fixtureTerm), false, `fixture-derived term leaked: ${fixtureTerm}`);
   }
 });

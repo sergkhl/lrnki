@@ -307,9 +307,9 @@ test("dropping any shared admission descriptor changes Graph Enrichment identity
 // same DeepSeek Provider Route, so an intentional route change re-baselines them together even
 // when their Model Assignment is preserved. Non-behavioral refactors must not perturb them.
 test("default operation config hashes are stable across the registry derivation", () => {
-  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-2af0ada6d7e6");
-  assert.equal(scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG), "learner-scaffold-generation-7930b34c0fdb");
-  assert.equal(syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG), "synthetic-topic-generation-9f81ce84488e");
+  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-a0e6b35234de");
+  assert.equal(scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG), "learner-scaffold-generation-8f3a4b62eaf4");
+  assert.equal(syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG), "synthetic-topic-generation-888dbb88fa4e");
 });
 
 test("synthetic execution widths do not change identity while probe behavior still does", () => {

@@ -16,5 +16,5 @@ Candidate concept: "{{canonicalLabel}}".
 {{identityLines}}
 {{contextLines}}
 
-Call submit_generated_grounding_bundle with at least one generated definition passage, optional mention-like passages, and a rationale.
+Call submit_generated_grounding_bundle with one complete identity-scope audit and one nested bundle containing at least one generated definition passage, optional mention-like passages, and a rationale.
 {{/user}}

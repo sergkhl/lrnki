@@ -4,11 +4,12 @@
 
 ## TODO
 
-- **Same-call Grounding identity-scope audit — in progress; U0 complete, U1 next.** Follow
-  [the execution-order experiment](./2026-08-24-001-test-grounding-identity-scope-audit.md). Change
-  only the Grounding Generation forced-tool contract; preserve one bundle/call, every admission and
-  persistence invariant, and every current Model Assignment. A material scope defect ends the
-  candidate and reopens the Grounding Generation assignment decision.
+- **Same-call Grounding identity-scope audit — in progress; U0–U1 complete, U2 next.** Follow
+  [the execution-order experiment](./2026-08-24-001-test-grounding-identity-scope-audit.md). The
+  strict same-call audit-plus-bundle contract is implemented without activation; run its fixed
+  three-by-three direct matrix next. Preserve one bundle/call and every assignment/admission
+  invariant; a material scope defect ends the candidate and reopens the Grounding Generation
+  assignment decision.
 
 - **Operation-neutral DeepSeek Grounding — on hold; U0–U3 and U5 complete, U4 remains
   `FIX_FIRST`.** Follow [Plan 003](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md) only

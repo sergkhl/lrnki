@@ -225,13 +225,25 @@ const generatedGroundingPassage = z.object({
   text: z.string().min(1).describe("Source-less generated passage for the candidate concept. This is not a source quote.")
 }).strict();
 
-export const generatedGroundingBundleValidator = z.object({
+const generatedGroundingBundlePayloadValidator = z.object({
   definitions: z.array(generatedGroundingPassage).min(1).max(2).describe("Generated meaning-bearing definition passages for the candidate concept. Every passage stands alone, identifies the candidate, and states its defining condition or mechanism before secondary consequences or costs. Default to exactly one precise passage; use a second only for a distinct necessary sense that cannot be stated safely in the first."),
   mentions: z.array(generatedGroundingPassage).max(1).describe("Optional generated mention-like passage that adds one necessary context relation. Default to none; never add broad curriculum analogies to fill the cap."),
   rationale: z.string().min(1).describe("One terse sentence explaining why the bundle makes the candidate useful in the provided Grounding Admission Context.")
 }).strict();
 
-export const generatedGroundingBundleSchema: JsonSchema = toForcedToolSchema(generatedGroundingBundleValidator);
+export const groundingGenerationToolResultValidator = z.object({
+  identityScopeAudit: z.object({
+    selectedSense: z.string().min(1).describe("The one established sense selected for the candidate in the Declared Domain and provided context."),
+    identityInvariant: z.string().min(1).describe("The minimal functional, membership, or causal condition shared by the relevant valid cases, without importing a merely common realization."),
+    contextSpecificQualifiers: z.array(z.string().min(1)).describe("Topic, peer, anchor, implementation, population, location, timing, type, version, mechanism, or other context details that may be relevant but are not part of the shared identity. Use an empty array when none is material."),
+    materialNarrowingCounterexample: z.string().min(1).nullable().describe("One established relevant case that a tempting narrower definition would wrongly exclude, or null only when no such case is established.")
+  }).strict(),
+  bundle: generatedGroundingBundlePayloadValidator
+}).strict();
+
+export const groundingGenerationToolResultSchema: JsonSchema = toForcedToolSchema(
+  groundingGenerationToolResultValidator
+);
 
 // --- Positive-claim verification questions: submit_claim_verification_questions ---
 // The planner sees code-owned positive claim targets and turns each into one or more
@@ -805,7 +817,7 @@ export const toolValidators = [
   buildRescuedNodeLabelingValidator(3),
   conceptSetSynthesisValidator,
   knowledgeBoundaryProbeValidator,
-  generatedGroundingBundleValidator,
+  groundingGenerationToolResultValidator,
   claimVerificationQuestionPlanningValidator,
   claimVerificationAnsweringValidator,
   claimFactualityJudgmentValidator,

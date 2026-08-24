@@ -7,7 +7,7 @@ execution: code
 
 # Test a Same-Call Grounding Identity-Scope Audit
 
-**Status:** In progress — U0 complete; U1 next
+**Status:** In progress — U0–U1 complete; U2 next
 
 **Decision state:** Authorized by the owner on 2026-08-24 as one contract-only experiment ahead of
 [Plan 003](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md). The candidate may change
@@ -374,11 +374,58 @@ Implementation units are exclusive and must run in order. This plan declares no 
   model call, deployment, browser/native/device, latency, or release action occurred. This is
   repository planning evidence only.
 
+### U1 — same-call contract without activation — 2026-08-24 — complete
+
+- `submit_generated_grounding_bundle` now requires one strict `identityScopeAudit` beside one
+  nested existing-shape `bundle`. All four audit fields are required; required strings and qualifier
+  entries are non-empty; the qualifier list may be empty; and the narrowing counterexample may be
+  null. The forced-tool normalizer preserves `minLength` beside the nullable scalar type union, so
+  the Zod validator remains the one source for both the provider schema and boundary validation.
+- The Grounding adapter still makes exactly one client call and maps only the nested bundle to the
+  unchanged owner-neutral `GeneratedGroundingBundle`. No audit field reaches the application port,
+  admission outcome, claim targets, persistence, or learner payload. The prompt asks for the audit
+  and bundle in the same response, requires their agreement and a stand-alone Definition Passage,
+  retains the exact model/tool frontmatter, and contains none of the three fixed-case terms or their
+  named narrowing examples.
+- Exact affected identities are Graph Enrichment `a0e6b35234de`, generated Scaffold
+  `8f3a4b62eaf4`, default Synthetic `888dbb88fa4e`, and Topic Synthetic `c12fb231e16d`. Unaffected
+  identities remain default/Topic Study Item Bank `d574e02753f9` / `02d755d9fae1`, Concept
+  Canonicalization `ce3969a22bea`, and Extraction `114ec9e8ddf5`; the Topic profile remains nineteen
+  stages.
+- `pnpm --filter @lrnki/infrastructure-litellm test`, the focused application
+  `sourceLessGroundingAdmission.test.ts`, both affected-package typechecks, and targeted ESLint all
+  passed. Those checks retain one-draft generation, two independently planned packets, draft-blind
+  answers, both judge families, replicated-rejection quorum, stable ordering, failure drain, and
+  all-or-nothing settlement. `git diff --check` and the source/config audit found no port, domain,
+  application, Model Assignment, Provider Route, sampling, fallback, retry, persistence, migration,
+  operation-stage, or prompt-frontmatter change.
+- Excluded pre-fix attempt: the first focused schema run correctly rejected nullable `anyOf` carrying
+  `minLength`; it was not counted as evidence. The mechanical forced-tool normalization was fixed,
+  its constrained-nullable regression was added, and the focused plus full suites passed afterward.
+
+#### Real-use quality evaluation
+
+- **Milestone:** committed-candidate source contract before provider activation.
+- **Fixture and source type:** no real-use fixture was permitted in U1; deterministic sentinel and
+  mixed-domain structural cases only.
+- **Real model calls used:** no.
+- **Result:** `BLOCKED` at U1's ordered no-provider boundary; usefulness remains `INCONCLUSIVE`
+  until U2 and U3.
+- **Useful output observed:** none; no neural output was produced.
+- **Defects observed:** none at the deterministic contract layer.
+- **Changes made after inspection:** preserved non-empty validation in the strict nullable wire
+  schema after the excluded pre-fix dialect failure.
+- **Remaining caveats:** audit truthfulness, bundle scope, larger-schema reliability, exact route
+  attribution, response retention, and consumer usefulness are unqualified.
+- **Safe to continue downstream:** yes to U2's fixed direct experiment only; no to activation,
+  consumer qualification, latency work, deployment, or release claims.
+
 ### Open findings
 
-- **NEXT:** execute U1 only: implement the exact nested audit-plus-bundle Grounding forced-tool
-  contract, preserve the external port and every frozen invariant, run deterministic gates, append
-  evidence, and commit. Do not call a provider or activate a process in U1.
+- **NEXT:** execute U2 only: reverify the exact DeepInfra FP8 Grounding route and response retention,
+  then run the fixed three-by-three direct matrix sequentially. Stop at the first material semantic,
+  terminal schema, route, quantization, attribution, or retention failure; do not replace a failed
+  draw or tune the contract.
 - Reverify successful raw Grounding response retention before U3. If the production-composed audit
   cannot be inspected through existing transport/log data, stop rather than adding observability or
   persistence outside this authorization.

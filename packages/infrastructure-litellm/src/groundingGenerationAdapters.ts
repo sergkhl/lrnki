@@ -10,8 +10,8 @@ import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import { executeForcedToolStage, withModelOverride, type NeuralStageDescriptor } from "./forcedToolStage";
 import { readPromptFile } from "./promptFile";
 import {
-  generatedGroundingBundleSchema,
-  generatedGroundingBundleValidator,
+  groundingGenerationToolResultSchema,
+  groundingGenerationToolResultValidator,
   buildClaimFactualityJudgmentSchema,
   buildClaimFactualityJudgmentValidator,
   buildClaimVerificationAnsweringSchema,
@@ -23,9 +23,17 @@ import {
 
 type GroundingGenerationInput = Parameters<GroundingGenerationPort["generate"]>[0];
 type GroundingGenerationArgs = {
-  definitions: { text: string }[];
-  mentions: { text: string }[];
-  rationale: string;
+  identityScopeAudit: {
+    selectedSense: string;
+    identityInvariant: string;
+    contextSpecificQualifiers: string[];
+    materialNarrowingCounterexample: string | null;
+  };
+  bundle: {
+    definitions: { text: string }[];
+    mentions: { text: string }[];
+    rationale: string;
+  };
 };
 type ClaimQuestionPlanningInput = Parameters<ClaimVerificationQuestionPlanningPort["plan"]>[0];
 type ClaimQuestionPlanningArgs = { questions: ClaimVerificationQuestion[] };
@@ -53,8 +61,8 @@ export const groundingGenerationDescriptor: NeuralStageDescriptor<
 > = {
   promptPath: "grounding-generation.prompt",
   stageTag: STAGE_TAGS.groundingGeneration,
-  schema: generatedGroundingBundleSchema,
-  validator: generatedGroundingBundleValidator,
+  schema: groundingGenerationToolResultSchema,
+  validator: groundingGenerationToolResultValidator,
   sentinelInput: {
     declaredDomain: "sentinel domain",
     canonicalLabel: "Sentinel concept",
@@ -78,7 +86,7 @@ export const groundingGenerationDescriptor: NeuralStageDescriptor<
     contextLines: formatGroundingAdmissionContext(input.context)
   }),
   mapResult: (result, input, model) => generatedBundleFromResult(
-    result,
+    result.bundle,
     input.context,
     model
   )
@@ -377,7 +385,7 @@ function appendPlannerQuestionsWithinTargetCap(
 }
 
 function generatedBundleFromResult(
-  result: GroundingGenerationArgs,
+  result: GroundingGenerationArgs["bundle"],
   context: GroundingAdmissionContext,
   generatingModel: string
 ): GeneratedGroundingBundle {

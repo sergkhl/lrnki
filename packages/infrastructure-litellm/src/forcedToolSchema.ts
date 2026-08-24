@@ -31,10 +31,12 @@ function foldScalarNullableAnyOf(schema: Record<string, unknown>): void {
   const nullable = anyOf.find((option) => isRecord(option) && option.type === "null");
   if (!isRecord(scalar) || !nullable) return;
 
-  const scalarKeys = Object.keys(scalar);
-  if (scalarKeys.length !== 1 || scalarKeys[0] !== "type") return;
-
-  // The forced-tool dialect accepts nullable scalar types as a `type` union.
+  // Scalar-only constraints remain valid beside a nullable type union: JSON Schema ignores
+  // string/number keywords when the instance is null. Keeping them here lets the owning Zod
+  // validator drive both provider-side constraints and application-boundary validation.
+  for (const [key, value] of Object.entries(scalar)) {
+    if (key !== "type") schema[key] = value;
+  }
   schema.type = [scalar.type, "null"];
   delete schema.anyOf;
 }

@@ -12,10 +12,10 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-24-001 — Test a Same-Call Grounding Identity-Scope Audit](./2026-08-24-001-test-grounding-identity-scope-audit.md)
-   — **In progress; U0 complete, U1 next.** The authorized first candidate may change only the
-   Grounding Generation forced-tool contract, adding one inspectable domain-neutral audit beside the
-   same initial bundle in the same call. One material scope defect ends it and reopens the Grounding
-   Generation Model Assignment decision.
+   — **In progress; U0–U1 complete, U2 next.** The same-call audit contract is implemented without
+   activation and every frozen interface/config boundary passes deterministic checks. The fixed
+   three-by-three direct matrix is next; one material scope defect ends the candidate and reopens the
+   Grounding Generation Model Assignment decision.
 
 2. [2026-08-23-003 — Unify Source-less Grounding on DeepSeek](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md)
    — **On hold; U0–U3 and U5 complete, U4 remains `FIX_FIRST`.** Exact routes and the repository gate

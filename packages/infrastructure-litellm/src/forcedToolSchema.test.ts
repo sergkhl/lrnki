@@ -15,6 +15,19 @@ test("folds nullable scalar anyOf to a type union and preserves description", ()
   assert.equal(JSON.stringify(schema).includes("anyOf"), false);
 });
 
+test("folds nullable scalar constraints without weakening the non-null value", () => {
+  const schema = toForcedToolSchema(z.object({
+    counterexample: z.string().min(1).nullable().describe("One material counterexample, or null.")
+  }).strict());
+
+  assert.deepEqual((schema.properties as Record<string, unknown>).counterexample, {
+    description: "One material counterexample, or null.",
+    minLength: 1,
+    type: ["string", "null"]
+  });
+  assert.equal(JSON.stringify(schema).includes("anyOf"), false);
+});
+
 test("drops zod's unbounded integer maximum sentinel but keeps real maximum bounds", () => {
   const schema = toForcedToolSchema(z.object({
     unbounded: z.number().int().min(0),

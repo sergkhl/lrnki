@@ -18,9 +18,17 @@ afterEach(() => {
 });
 
 function groundingAdapterReturning(canned: {
-  definitions: { text: string }[];
-  mentions: { text: string }[];
-  rationale: string;
+  identityScopeAudit: {
+    selectedSense: string;
+    identityInvariant: string;
+    contextSpecificQualifiers: string[];
+    materialNarrowingCounterexample: string | null;
+  };
+  bundle: {
+    definitions: { text: string }[];
+    mentions: { text: string }[];
+    rationale: string;
+  };
 }, modelOverride?: string) {
   const calls: unknown[] = [];
   const client = {
@@ -34,9 +42,17 @@ function groundingAdapterReturning(canned: {
 
 test("generates an owner-neutral bundle conditioned on one closed scaffolded anchor", async () => {
   const { adapter, calls } = groundingAdapterReturning({
-    definitions: [{ text: "Stack allocation places short-lived values in stack memory." }],
-    mentions: [{ text: "Understanding stack allocation helps explain inexpensive value copying." }],
-    rationale: "Stack allocation scaffolds the anchor behavior."
+    identityScopeAudit: {
+      selectedSense: "Automatic storage for the scoped value-copying context.",
+      identityInvariant: "The allocation lifetime is bounded by the owning execution scope.",
+      contextSpecificQualifiers: ["A stack is one common implementation."],
+      materialNarrowingCounterexample: "Automatic storage need not use a contiguous call stack."
+    },
+    bundle: {
+      definitions: [{ text: "Stack allocation places short-lived values in stack memory." }],
+      mentions: [{ text: "Understanding stack allocation helps explain inexpensive value copying." }],
+      rationale: "Stack allocation scaffolds the anchor behavior."
+    }
   });
 
   const bundle = await adapter.generate({
@@ -57,15 +73,19 @@ test("generates an owner-neutral bundle conditioned on one closed scaffolded anc
   });
 
   assert.equal("derivedNodeId" in bundle, false);
+  assert.equal("identityScopeAudit" in bundle, false);
+  assert.equal("bundle" in bundle, false);
   assert.equal(bundle.groundingOrigin, "llm_grounded");
   assert.equal(bundle.generatingModel, "kg-grounding-generation");
   assert.deepEqual(bundle.groundingAnchorReferences, ["copy"]);
   assert.equal(bundle.definitions[0].verbatimCheck.disposition, "not_applicable_by_grounding");
   assert.equal(bundle.mentions[0].passageType, "mention");
 
-  const call = calls[0] as { model: string; toolName: string; messages: { content: string }[] };
+  assert.equal(calls.length, 1, "the adapter makes exactly one generation call");
+  const call = calls[0] as { model: string; toolName: string; toolDescription: string; messages: { content: string }[] };
   assert.equal(call.model, "kg-grounding-generation");
   assert.equal(call.toolName, "submit_generated_grounding_bundle");
+  assert.equal(call.toolDescription, "Submit source-less generated grounding passages for one candidate concept.");
   assert.ok(call.messages.some((message) => message.content.includes("Candidate concept: \"Stack allocation\"")));
   assert.ok(call.messages.some((message) => message.content.includes("same identity: \"Automatic storage duration\"")));
   assert.ok(call.messages.some((message) => message.content.includes("nearby but distinct identities")));
@@ -87,17 +107,31 @@ test("generates an owner-neutral bundle conditioned on one closed scaffolded anc
   assert.ok(call.messages.some((message) => message.content.includes("absolute or exact language")));
   assert.ok(call.messages.some((message) => message.content.includes("Preserve exact identifier spelling and casing")));
   assert.ok(call.messages.some((message) => message.content.includes("Never write an unqualified broader-category claim")));
+  assert.ok(call.messages.some((message) => message.content.includes("complete the identity-scope audit in the same tool response")));
+  assert.ok(call.messages.some((message) => message.content.includes("minimal functional, membership, or causal identity invariant")));
+  assert.ok(call.messages.some((message) => message.content.includes("context-specific qualifiers")));
+  assert.ok(call.messages.some((message) => message.content.includes("tempting narrower definition would wrongly exclude")));
+  assert.ok(call.messages.some((message) => message.content.includes("write the bundle so it agrees with the audit")));
+  assert.ok(call.messages.some((message) => message.content.includes("must not refer to the audit, an invariant above, or hidden surrounding context")));
   const modelFacing = call.messages.map((message) => message.content).join("\n").toLowerCase();
-  for (const fixtureTerm of ["binary search", "pivot", "linked list", "logarithmic", "half-open interval", "topoisomerase", "telomerase", "primase", "origin of replication", "owner variable", "associated type", "rust trait", "heap allocation", "string memory representation", "rust string", "allocating scope", "producer and consumer"]) {
+  for (const fixtureTerm of ["binary search", "pivot", "linked list", "logarithmic", "half-open interval", "topoisomerase", "telomerase", "primase", "origin of replication", "owner variable", "associated type", "rust trait", "heap allocation", "string memory representation", "rust string", "allocating scope", "producer and consumer", "pyruvate oxidation", "transaction isolation", "labor productivity", "mitochondrial", "bacterial cytoplasmic", "anaerobic", "hidden-until-commit", "time-only"]) {
     assert.equal(modelFacing.includes(fixtureTerm), false, `fixture-derived term leaked: ${fixtureTerm}`);
   }
 });
 
 test("originating-topic grounding produces no anchor references", async () => {
   const { adapter, calls } = groundingAdapterReturning({
-    definitions: [{ text: "A feedback loop routes an output signal back into a system input." }],
-    mentions: [],
-    rationale: "First-class topic concept."
+    identityScopeAudit: {
+      selectedSense: "A system-level feedback relation.",
+      identityInvariant: "An output influences a later input to the same system process.",
+      contextSpecificQualifiers: [],
+      materialNarrowingCounterexample: null
+    },
+    bundle: {
+      definitions: [{ text: "A feedback loop routes an output signal back into a system input." }],
+      mentions: [],
+      rationale: "First-class topic concept."
+    }
   });
   const bundle = await adapter.generate({
     declaredDomain: "systems science",
@@ -115,9 +149,17 @@ test("originating-topic grounding produces no anchor references", async () => {
 test("a scoped generation override drives both the provider call and Grounding Bundle provenance", async () => {
   const model = "kg-topic-expedition-generation";
   const { adapter, calls } = groundingAdapterReturning({
-    definitions: [{ text: "A feedback loop routes an output signal back into a system input." }],
-    mentions: [],
-    rationale: "First-class topic concept."
+    identityScopeAudit: {
+      selectedSense: "A system-level feedback relation.",
+      identityInvariant: "An output influences a later input to the same system process.",
+      contextSpecificQualifiers: [],
+      materialNarrowingCounterexample: null
+    },
+    bundle: {
+      definitions: [{ text: "A feedback loop routes an output signal back into a system input." }],
+      mentions: [],
+      rationale: "First-class topic concept."
+    }
   }, model);
 
   const bundle = await adapter.generate({

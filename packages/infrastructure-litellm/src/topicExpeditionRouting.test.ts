@@ -298,38 +298,38 @@ test("only affected operation hashes change and Topic remains nineteen stages", 
   assert.notEqual(studyItemBankConfigHash(resolvableRouting), studyItemBankConfigHash());
   assert.equal(
     syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG, routing),
-    "synthetic-topic-generation-d78aba900512"
+    "synthetic-topic-generation-c12fb231e16d"
   );
   assert.notEqual(
     syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG, routing),
-    "synthetic-topic-generation-9a8f4f1cb34b",
-    "Topic Synthetic changes from the U0 topology"
+    "synthetic-topic-generation-d78aba900512",
+    "Topic Synthetic changes with the Grounding audit contract"
   );
   assert.equal(studyItemBankConfigHash(routing), "study-item-bank-02d755d9fae1");
   assert.equal(
     syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG),
-    "synthetic-topic-generation-9f81ce84488e"
+    "synthetic-topic-generation-888dbb88fa4e"
   );
   assert.notEqual(
     syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG),
-    "synthetic-topic-generation-901788bb7bd4",
-    "default Synthetic changes from the U0 topology"
+    "synthetic-topic-generation-9f81ce84488e",
+    "default Synthetic changes with the Grounding audit contract"
   );
   assert.equal(studyItemBankConfigHash(), "study-item-bank-d574e02753f9");
-  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-2af0ada6d7e6");
+  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-a0e6b35234de");
   assert.notEqual(
     graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG),
-    "graph-enrichment-3cd73a12f2f2",
-    "Graph Enrichment changes from the U0 topology"
+    "graph-enrichment-2af0ada6d7e6",
+    "Graph Enrichment changes with the Grounding audit contract"
   );
   assert.equal(
     scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG),
-    "learner-scaffold-generation-7930b34c0fdb"
+    "learner-scaffold-generation-8f3a4b62eaf4"
   );
   assert.notEqual(
     scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG),
-    "learner-scaffold-generation-be49ba010024",
-    "Scaffold changes from the U0 topology"
+    "learner-scaffold-generation-7930b34c0fdb",
+    "Scaffold changes with the Grounding audit contract"
   );
   assert.equal(extractionConfigHash(), "source-extraction-114ec9e8ddf5");
   assert.equal(
