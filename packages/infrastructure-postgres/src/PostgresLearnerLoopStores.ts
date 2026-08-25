@@ -404,7 +404,7 @@ type ImpostorStatementRow = {
 };
 
 const CONCEPT_LESSON_PRODUCER = "@lrnki/infrastructure-postgres";
-const CONCEPT_LESSON_PRODUCER_VERSION = "0.1.0";
+const CONCEPT_LESSON_PRODUCER_VERSION = "0.2.0";
 
 // Concept Lesson persistence (ADR-0031, R1/R3/R9). Normalized `concept_lessons` +
 // `concept_lesson_sections` + `concept_lesson_section_citations` are the query surface;
@@ -436,8 +436,8 @@ export class PostgresEnrichmentLayerPurposeStore implements EnrichmentLayerPurpo
 export class PostgresConceptLessonStore implements ConceptLessonStorePort {
   constructor(private readonly sql: Sql) {}
 
-  async persist(input: { graphVersionId: string | null; enrichmentId: string; configHash: string; lessons: ConceptLesson[]; absent: LessonAbsentNode[] }): Promise<void> {
-    const { graphVersionId, enrichmentId, configHash, lessons, absent } = input;
+  async persist(input: { graphVersionId: string | null; enrichmentId: string; configHash: string; lessons: ConceptLesson[]; candidateLessons?: ConceptLesson[]; absent: LessonAbsentNode[] }): Promise<void> {
+    const { graphVersionId, enrichmentId, configHash, lessons, candidateLessons, absent } = input;
     await this.sql.begin(async (tx) => {
       // Regeneration is replay, not mutation: retain prior lessons and their child rows as
       // pinned history, retire only the current generation, and replace unreferenced absences.
@@ -461,7 +461,13 @@ export class PostgresConceptLessonStore implements ConceptLessonStorePort {
         }
       }
 
-      const artifact: ArtifactEnvelope<{ graphVersionId: string | null; enrichmentId: string; lessons: ConceptLesson[]; absent: LessonAbsentNode[] }> = {
+      const artifact: ArtifactEnvelope<{
+        graphVersionId: string | null;
+        enrichmentId: string;
+        lessons: ConceptLesson[];
+        candidateLessons?: ConceptLesson[];
+        absent: LessonAbsentNode[];
+      }> = {
         artifactId: randomUUID(),
         artifactType: "concept_lesson_bank",
         ...(graphVersionId ? { graphVersionId } : {}),
@@ -469,7 +475,13 @@ export class PostgresConceptLessonStore implements ConceptLessonStorePort {
         producerVersion: CONCEPT_LESSON_PRODUCER_VERSION,
         configHash,
         createdAt: new Date().toISOString(),
-        payload: { graphVersionId, enrichmentId, lessons, absent }
+        payload: {
+          graphVersionId,
+          enrichmentId,
+          lessons,
+          ...(candidateLessons ? { candidateLessons } : {}),
+          absent
+        }
       };
       await writeArtifactEnvelope(tx, artifact);
     });

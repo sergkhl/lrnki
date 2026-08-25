@@ -37,6 +37,7 @@ import {
   PostgresEnrichmentLayerPurposeStore,
   PostgresEnrichmentRunStore,
   PostgresGraphVersionStore,
+  PostgresInspectionRead,
   PostgresLearnerExpeditionStore,
   PostgresRunProgressReporter,
   PostgresStudyItemBankStore
@@ -109,6 +110,9 @@ export function createLearnerTopicExpeditionGeneration(sql: DatabaseClient): Top
           deterministicClient,
           routing.independentJudge
         ),
+        sourceAssetQualification: {
+          sourceEvidenceRead: new PostgresInspectionRead(sql)
+        },
         layerPurposeGeneration: createLayerPurposeGenerationPort(deterministicClient, routing.generation),
         layerPurposeStore: new PostgresEnrichmentLayerPurposeStore(sql),
         studyItemBlueprint: createStudyItemBlueprintPort(deterministicClient, routing.generation),

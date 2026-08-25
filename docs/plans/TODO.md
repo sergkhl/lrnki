@@ -2,11 +2,11 @@
 
 ## TODO
 
-- **Curated-source learner workflow — in progress; U0–U4 complete, U5 next.** Follow
-  [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md). The one
-  pinned local source-support candidate was rejected without activation after one material false
-  acceptance and broken gateway success logging. Wire the existing claim settlement into lesson
-  and option-select admission next; absent verification remains explicit unavailability.
+- **Curated-source learner workflow — in progress; U0–U4 and U5 lesson admission complete.** Follow
+  [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md). Raw lesson
+  candidates now survive as inspection artifacts while absent support verification admits no lesson
+  or downstream item. Complete option-select support/truth settlement and the matching/impostor
+  Source Expedition holdout next.
 
 ## COMPLETED
 

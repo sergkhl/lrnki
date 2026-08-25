@@ -145,7 +145,7 @@ test("no-activation report joins payload, evidence, decisions, identity, and pos
     generatedAt: "2026-08-25T12:00:00.000Z"
   });
 
-  assert.equal(report.schemaVersion, 1);
+  assert.equal(report.schemaVersion, 2);
   assert.deepEqual(report.activation, {
     sourceSupportVerifierModel: null,
     answerKeyVerifierModel: null

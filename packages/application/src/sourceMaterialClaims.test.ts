@@ -101,12 +101,14 @@ test("projects every material source-asset field without losing qualifiers or ci
     sectionText: "Authorization is valid only until 17:00 UTC, unless the issuer renews it."
   });
   assert.match(section?.statement ?? "", /only until 17:00 UTC, unless the issuer renews it/);
+  assert.deepEqual(section?.location, { kind: "lesson_section_text", sectionIndex: 0 });
   assert.deepEqual(section?.directEvidenceKeys, [result.evidence[0]?.evidenceKey]);
 
   const bullet = result.claims.find((claim) => claim.claimKey.endsWith("item:0"));
   assert.equal(bullet?.subject.kind, "lesson_section_item");
   assert.deepEqual(bullet?.evidenceKeys, [result.evidence[0]?.evidenceKey]);
   assert.deepEqual(bullet?.directEvidenceKeys, [], "generated section items do not masquerade as direct quotes");
+  assert.deepEqual(bullet?.location, { kind: "lesson_section_item", sectionIndex: 0, itemIndex: 0 });
 
   const questionKey = result.claims.find((claim) => claim.subject.kind === "option_select_question_key");
   assert.deepEqual(questionKey?.subject, {
@@ -115,6 +117,7 @@ test("projects every material source-asset field without losing qualifiers or ci
     keyedAnswer: "Before 17:00 UTC"
   });
   assert.deepEqual(questionKey?.directEvidenceKeys, [result.evidence[0]?.evidenceKey]);
+  assert.deepEqual(questionKey?.location, { kind: "option_select_question_key" });
 
   const distractors = result.claims
     .filter((claim) => claim.subject.kind === "option_select_distractor")
@@ -145,4 +148,3 @@ test("projection is deterministic across asset input order and renders only exac
   assert.match(rendered, /Only while the stated exception is absent/);
   assert.match(rendered, /Both the condition and exception are material/);
 });
-

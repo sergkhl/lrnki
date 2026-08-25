@@ -874,7 +874,16 @@ export interface StudyItemBankStorePort {
 // powers the Study Session ride-down and the operator visibility surface. A learner-NEUTRAL
 // derived asset: this port imports no graph/enrichment write port (R9).
 export interface ConceptLessonStorePort {
-  persist(input: { graphVersionId: string | null; enrichmentId: string; configHash: string; lessons: ConceptLesson[]; absent: LessonAbsentNode[] }): Promise<void>;
+  persist(input: {
+    graphVersionId: string | null;
+    enrichmentId: string;
+    configHash: string;
+    // Current admitted query assets. Source-backed generation may additionally retain its exact
+    // pre-settlement payloads in the immutable artifact without exposing them as learner lessons.
+    lessons: ConceptLesson[];
+    candidateLessons?: ConceptLesson[];
+    absent: LessonAbsentNode[];
+  }): Promise<void>;
   getLesson(derivedNodeId: string): Promise<ConceptLesson | undefined>;
   listLessonsForEnrichment(enrichmentId: string): Promise<ConceptLesson[]>;
   listAbsentForEnrichment(enrichmentId: string): Promise<LessonAbsentNode[]>;

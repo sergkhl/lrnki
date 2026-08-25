@@ -125,8 +125,21 @@ export type SourceMaterialClaimSubject =
       proposedAnswer: string;
     };
 
+// A source-owned structural locator for the exact payload field represented by a claim. Admission
+// consumes this instead of parsing `claimKey` or correlating repeated text. Adding a new projected
+// field therefore requires both a typed locator here and an explicit settlement decision.
+export type SourceMaterialClaimLocation =
+  | { kind: "lesson_section_text"; sectionIndex: number }
+  | { kind: "lesson_section_item"; sectionIndex: number; itemIndex: number }
+  | { kind: "lesson_diagram_caption"; sectionIndex: number }
+  | { kind: "lesson_diagram_spec"; sectionIndex: number }
+  | { kind: "option_select_question_key" }
+  | { kind: "option_select_explanation" }
+  | { kind: "option_select_distractor"; optionIndex: number };
+
 export type SourceMaterialClaim = {
   claimKey: string;
+  location: SourceMaterialClaimLocation;
   purpose: "source_support" | "distractor_invalidity";
   assetKind: "concept_lesson" | "option_select";
   assetId: string;
@@ -265,6 +278,7 @@ export function projectSourceMaterialClaims(input: {
       addClaim({
         ...base,
         claimKey: `lesson:${lesson.conceptLessonId}:section:${sectionIndex}:text`,
+        location: { kind: "lesson_section_text", sectionIndex },
         subject: {
           kind: "lesson_section",
           sectionKind: section.kind,
@@ -274,6 +288,7 @@ export function projectSourceMaterialClaims(input: {
       section.items?.forEach((itemText, itemIndex) => addClaim({
         ...base,
         claimKey: `lesson:${lesson.conceptLessonId}:section:${sectionIndex}:item:${itemIndex}`,
+        location: { kind: "lesson_section_item", sectionIndex, itemIndex },
         directEvidenceKeys: [],
         subject: {
           kind: "lesson_section_item",
@@ -286,6 +301,7 @@ export function projectSourceMaterialClaims(input: {
         addClaim({
           ...base,
           claimKey: `lesson:${lesson.conceptLessonId}:section:${sectionIndex}:diagram:caption`,
+          location: { kind: "lesson_diagram_caption", sectionIndex },
           directEvidenceKeys: [],
           subject: {
             kind: "lesson_diagram_caption",
@@ -297,6 +313,7 @@ export function projectSourceMaterialClaims(input: {
         addClaim({
           ...base,
           claimKey: `lesson:${lesson.conceptLessonId}:section:${sectionIndex}:diagram:spec`,
+          location: { kind: "lesson_diagram_spec", sectionIndex },
           directEvidenceKeys: [],
           subject: {
             kind: "lesson_diagram_spec",
@@ -336,6 +353,7 @@ export function projectSourceMaterialClaims(input: {
       ...base,
       purpose: "source_support",
       claimKey: `option-select:${item.studyItemId}:question-key`,
+      location: { kind: "option_select_question_key" },
       directEvidenceKeys: directEvidenceKeys(item.derivedNodeId, keyedOption.citation),
       subject: {
         kind: "option_select_question_key",
@@ -347,6 +365,7 @@ export function projectSourceMaterialClaims(input: {
       ...base,
       purpose: "source_support",
       claimKey: `option-select:${item.studyItemId}:explanation`,
+      location: { kind: "option_select_explanation" },
       directEvidenceKeys: [],
       subject: {
         kind: "option_select_explanation",
@@ -361,6 +380,7 @@ export function projectSourceMaterialClaims(input: {
         ...base,
         purpose: "distractor_invalidity",
         claimKey: `option-select:${item.studyItemId}:distractor:${optionIndex}`,
+        location: { kind: "option_select_distractor", optionIndex },
         directEvidenceKeys: [],
         subject: {
           kind: "option_select_distractor",

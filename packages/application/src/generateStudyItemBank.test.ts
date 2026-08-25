@@ -17,8 +17,12 @@ import type {
 import { currentOperationContext } from "@lrnki/domain-core/operation-context";
 import { installNodeOperationContext } from "@lrnki/domain-core/operation-context-node";
 import type { ConceptLessonGenerationPort, ConceptLessonRedundancyJudgmentPort, ConceptLessonStorePort, EnrichmentRunStorePort, GraphVersionStorePort, MatchingAssignmentVerificationPort, RunProgressReporterPort, StageErrorDetail, StudyItemBankStorePort, StudyItemGenerationPort, AnswerKeyVerificationPort } from "@lrnki/ports";
-import { generateStudyItemBank, OPTION_SELECT_GENERATION_ATTEMPTS } from "./generateStudyItemBank";
+import {
+  generateStudyItemBank as generateStudyItemBankApplication,
+  OPTION_SELECT_GENERATION_ATTEMPTS
+} from "./generateStudyItemBank";
 import { NON_LLM_STAGES } from "./runProgressReporter";
+import { qualifiedSourceExpeditionAssetConfigHash } from "./sourceExpedition";
 import { STUDY_ITEM_BANK_STAGE_GROUP } from "./topicExpeditionStageProfile";
 
 installNodeOperationContext();
@@ -328,6 +332,50 @@ function matchingVerifierPassing(): MatchingAssignmentVerificationPort {
   };
 }
 
+type GenerateStudyItemBankInput = Parameters<typeof generateStudyItemBankApplication>[0];
+type GenerateStudyItemBankTestInput = Omit<
+  GenerateStudyItemBankInput,
+  "conceptLessonRedundancyJudge" | "sourceAssetQualification"
+> & Partial<Pick<
+  GenerateStudyItemBankInput,
+  "conceptLessonRedundancyJudge" | "sourceAssetQualification"
+>>;
+
+function sourceAssetQualificationPassing(): GenerateStudyItemBankInput["sourceAssetQualification"] {
+  return {
+    sourceEvidenceRead: {
+      async readSourceEvidence(references) {
+        return references.map((reference) => ({
+          ...reference,
+          sourceTitle: "Generated test source",
+          blockType: "paragraph",
+          headingPath: [],
+          text: "The generated test source resolves this exact immutable block reference."
+        }));
+      }
+    },
+    sourceSupportVerifier: {
+      model: "mock-source-support",
+      async verify() {
+        return { disposition: "supported", reason: "stub source-support verdict" };
+      }
+    }
+  };
+}
+
+// Production composition requires both semantic dependencies. Most deterministic tests are about
+// later bank mechanics, so this local constructor supplies explicit pass-through doubles while
+// allowing focused tests to override either dependency.
+function generateStudyItemBank(input: GenerateStudyItemBankTestInput) {
+  return generateStudyItemBankApplication({
+    ...input,
+    conceptLessonRedundancyJudge:
+      input.conceptLessonRedundancyJudge ?? redundancyJudgeReturning([]),
+    sourceAssetQualification:
+      input.sourceAssetQualification ?? sourceAssetQualificationPassing()
+  });
+}
+
 function lessonGenerationReturning(opts: {
   lessons?: Record<string, ConceptLessonDraft | "throw">;
 }): ConceptLessonGenerationPort {
@@ -349,16 +397,29 @@ function redundancyJudgeReturning(verdicts: ConceptLessonRedundancyJudgment[]): 
   };
 }
 
-function capturingLessonStore(): { store: ConceptLessonStorePort; lessons: ConceptLesson[]; absent: LessonAbsentNode[] } {
+function capturingLessonStore(): {
+  store: ConceptLessonStorePort;
+  lessons: ConceptLesson[];
+  candidateLessons: ConceptLesson[];
+  absent: LessonAbsentNode[];
+  configHashes: string[];
+} {
   const lessons: ConceptLesson[] = [];
+  const candidateLessons: ConceptLesson[] = [];
   const absent: LessonAbsentNode[] = [];
+  const configHashes: string[] = [];
   const store: ConceptLessonStorePort = {
-    async persist(input) { lessons.push(...input.lessons); absent.push(...input.absent); },
+    async persist(input) {
+      configHashes.push(input.configHash);
+      lessons.push(...input.lessons);
+      candidateLessons.push(...(input.candidateLessons ?? []));
+      absent.push(...input.absent);
+    },
     async getLesson(id) { return lessons.find((l) => l.derivedNodeId === id); },
     async listLessonsForEnrichment() { return lessons; },
     async listAbsentForEnrichment() { return absent; }
   };
-  return { store, lessons, absent };
+  return { store, lessons, candidateLessons, absent, configHashes };
 }
 
 function capturingStore(): { store: StudyItemBankStorePort; persisted: StudyItem[]; persistedRejected: RejectedStudyItem[] } {
@@ -426,6 +487,75 @@ test("a node whose lesson grounds an option-select that passes the guard persist
       evidenceQuote: ownershipDef
     }
   }, "option generation receives an exact learner-visible lesson claim with that unit's resolved evidence");
+});
+
+test("a source graph with no activated support verifier persists its candidate and calls no item generator", async () => {
+  const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
+  const lessonStore = capturingLessonStore();
+  const itemStore = capturingStore();
+  let sourceReads = 0;
+  let itemGenerationCalls = 0;
+  const forbiddenItemGeneration: StudyItemGenerationPort = {
+    model: "must-not-run",
+    async generateOptionSelect() {
+      itemGenerationCalls += 1;
+      throw new Error("option-select generation must not run");
+    },
+    async generateMatching() {
+      itemGenerationCalls += 1;
+      throw new Error("matching generation must not run");
+    },
+    async generateImpostor() {
+      itemGenerationCalls += 1;
+      throw new Error("impostor generation must not run");
+    }
+  };
+
+  const result = await generateStudyItemBank({
+    enrichmentId: "enr-1",
+    configHash: "cfg-1",
+    graphStore: graphStoreReturning(snapshot),
+    enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
+    conceptLessonGeneration: lessonGenerationReturning({
+      lessons: { "node-c1": goodLessonDraft("b1", ownershipDef) }
+    }),
+    sourceAssetQualification: {
+      sourceEvidenceRead: {
+        async readSourceEvidence(references) {
+          sourceReads += 1;
+          return references.map((reference) => ({
+            ...reference,
+            sourceTitle: "Generated ownership source",
+            blockType: "paragraph",
+            headingPath: [],
+            text: ownershipDef
+          }));
+        }
+      }
+    },
+    answerKeyVerification: keyVerifierPassing(),
+    matchingAssignmentVerification: matchingVerifierPassing(),
+    conceptLessonStore: lessonStore.store,
+    studyItemGeneration: forbiddenItemGeneration,
+    studyItemBankStore: itemStore.store,
+    newConceptLessonId: () => "candidate-lesson"
+  });
+
+  assert.equal(sourceReads, 1);
+  assert.equal(itemGenerationCalls, 0);
+  assert.deepEqual(result.lessons, []);
+  assert.deepEqual(result.studyItems, []);
+  assert.equal(result.lessonAbsent[0]?.reason,
+    "source-support verifier is not activated; the candidate remains inspection-only");
+  assert.equal(lessonStore.candidateLessons.length, 1);
+  assert.equal(lessonStore.candidateLessons[0]?.conceptLessonId, "candidate-lesson");
+  assert.equal(lessonStore.candidateLessons[0]?.configHash, "cfg-1");
+  assert.deepEqual(lessonStore.configHashes, [qualifiedSourceExpeditionAssetConfigHash("cfg-1")]);
+  assert.deepEqual(itemStore.persistedRejected.map((row) => row.itemType).sort(), [
+    "impostor",
+    "matching",
+    "option_select"
+  ]);
 });
 
 test("structural blueprint pre-gate rejects matching and impostor when the lesson is too sparse", async () => {
@@ -504,7 +634,7 @@ test("redundant non-substantive lesson sections are retried once then dropped", 
   assert.ok(lessonEnter < redundancyEnter && redundancyEnter < redundancyComplete && redundancyComplete < lessonComplete);
 });
 
-test("the conditional lesson-redundancy stage is absent when no judge work occurs", async () => {
+test("the required lesson-redundancy dependency opens its aggregate stage for an assembled lesson", async () => {
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
   const { reporter, calls } = recordingReporter();
   await generateStudyItemBank({
@@ -522,7 +652,7 @@ test("the conditional lesson-redundancy stage is absent when no judge work occur
   });
   assert.equal(
     calls.some((call) => call.method === "enterStage" && call.stage === STUDY_ITEM_BANK_STAGE_GROUP.lessonRedundancyJudgment.stage),
-    false
+    true
   );
 });
 
@@ -871,9 +1001,10 @@ test("an option-select guard miss gets one INFORMED retry carrying the first att
   assert.match(retryFeedbacks[1] ?? "", /citation does not verify against grounding/);
 });
 
-test("Covers R10: an uncited lesson still grounds generated-labeled items from its substantive prose and its bullets", async () => {
+test("an uncited candidate on a source graph remains inspectable but cannot ground learner items", async () => {
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
   const { store, persisted, persistedRejected } = capturingStore();
+  const lessonStore = capturingLessonStore();
   // A lesson that meets the minimum but whose substantive section is uncited (all synthesized).
   // Its `applications` bullets are grounding of their own (D10), so the option-select's quote —
   // which the examples body does not carry — still verifies verbatim against a bullet passage.
@@ -893,7 +1024,7 @@ test("Covers R10: an uncited lesson still grounds generated-labeled items from i
       }
     ]
   };
-  await generateStudyItemBank({
+  const result = await generateStudyItemBank({
     enrichmentId: "enr-1",
     configHash: "cfg-1",
     graphStore: graphStoreReturning(snapshot),
@@ -901,14 +1032,20 @@ test("Covers R10: an uncited lesson still grounds generated-labeled items from i
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": synthesizedLesson } }),
     answerKeyVerification: keyVerifierPassing(),
     matchingAssignmentVerification: matchingVerifierPassing(),
-    conceptLessonStore: capturingLessonStore().store,
+    conceptLessonStore: lessonStore.store,
     studyItemGeneration: generationReturning({ optionSelect: { "node-c1": osDraft("rules that govern memory") } }),
     studyItemBankStore: store
   });
 
-  assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor", "matching", "option_select"]);
-  assert.ok(persisted.every((item) => item.groundingProvenance === "generated"));
-  assert.deepEqual(persistedRejected, []);
+  assert.deepEqual(persisted, []);
+  assert.equal(result.lessons.length, 0);
+  assert.equal(lessonStore.lessons.length, 0);
+  assert.equal(lessonStore.candidateLessons.length, 1);
+  assert.ok(lessonStore.candidateLessons[0]?.sections.every((section) =>
+    section.groundingProvenance === "generated"
+  ));
+  assert.equal(lessonStore.absent.length, 1);
+  assert.deepEqual(persistedRejected.map((row) => row.itemType).sort(), ["impostor", "matching", "option_select"]);
 });
 
 test("a rescued node with a verified DEFINITION passage yields source_mentioned study items (R5/U4)", async () => {
@@ -953,7 +1090,7 @@ test("a rescued mention-only node still yields source_mentioned items (no regres
   assert.ok(persisted.every((item) => item.groundingProvenance === "source_mentioned"));
 });
 
-test("Covers AE5: a minted llm_grounded node yields a generated lesson and generated-provenance items (U4/U7)", async () => {
+test("a minted llm_grounded node on a source graph remains an inspection-only candidate", async () => {
   const generatedDef = "Pointer arithmetic computes addresses.";
   const cite = "computes addresses";
   const { store, persisted } = capturingStore();
@@ -974,9 +1111,13 @@ test("Covers AE5: a minted llm_grounded node yields a generated lesson and gener
     studyItemBankStore: store
   });
 
-  assert.ok(lessonStore.lessons.length === 1 && lessonStore.lessons[0].sections.every((s) => s.groundingProvenance === "generated"), "the minted node's whole lesson is generated-labeled");
-  assert.ok(persisted.length >= 1);
-  assert.ok(persisted.every((item) => item.groundingProvenance === "generated"), "minted nodes stay generated provenance");
+  assert.equal(lessonStore.lessons.length, 0);
+  assert.equal(lessonStore.candidateLessons.length, 1);
+  assert.ok(lessonStore.candidateLessons[0]?.sections.every((section) =>
+    section.groundingProvenance === "generated"
+  ), "the preserved candidate remains honestly generated-labeled");
+  assert.equal(lessonStore.absent.length, 1);
+  assert.deepEqual(persisted, []);
 });
 
 function impDraftCiting(passageId: string, quote: string, opts: { lieSource?: "sibling" | "generated"; siblingLabel?: string } = {}): ImpostorItemDraft {
@@ -1360,7 +1501,7 @@ test("rule 18: both stages derive grounding from the same lesson passages for a 
   assert.ok(impostorPassages.length > 0);
 });
 
-test("a minted lesson with no surviving citation can still anchor generated option-select from substantive lesson prose", async () => {
+test("a minted uncited lesson on a source graph is preserved without reaching option-select", async () => {
   const generatedDef = "Pointer arithmetic calculates target memory addresses from a base address and an offset.";
   const cite = "target memory addresses";
   const { store, persisted } = capturingStore();
@@ -1386,8 +1527,11 @@ test("a minted lesson with no surviving citation can still anchor generated opti
     studyItemBankStore: store
   });
 
-  assert.ok(persisted.length >= 1);
-  assert.ok(persisted.every((item) => item.groundingProvenance === "generated"));
+  assert.deepEqual(persisted, []);
+  assert.equal(lessonStore.lessons.length, 0);
+  assert.equal(lessonStore.candidateLessons.length, 1);
+  assert.equal(lessonStore.candidateLessons[0]?.sections[1]?.text, generatedDef);
+  assert.equal(lessonStore.absent.length, 1);
 });
 
 // --- U7: study assets over a synthetic (source-less) layer ---------------------

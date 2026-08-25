@@ -28,7 +28,7 @@ import {
   claimVerdictFor
 } from "./verifyStudyItemKeys";
 
-export const SOURCE_ASSET_EVALUATION_REPORT_SCHEMA_VERSION = 1 as const;
+export const SOURCE_ASSET_EVALUATION_REPORT_SCHEMA_VERSION = 2 as const;
 
 export type EvaluationDisposition = "accepted" | "rejected" | "not_evaluated";
 
@@ -38,6 +38,7 @@ export type SourceSupportDecisionReason =
   | "source_support_unclear"
   | "source_support_verifier_not_activated"
   | "source_support_verifier_unavailable"
+  | "source_evidence_read_unavailable"
   | "missing_source_evidence"
   | "unresolved_source_evidence";
 
@@ -96,6 +97,151 @@ export type JoinedSourceMaterialEvidence = SourceMaterialEvidenceReference & {
   headingPath: string[] | null;
   blockText: string | null;
 };
+
+export type SourceSupportNodeContext = {
+  derivedNodeId: string;
+  label: string;
+  aliases: readonly string[];
+  declaredDomain: string;
+};
+
+export type ProjectedSourceSupportEvaluation = {
+  evidence: JoinedSourceMaterialEvidence[];
+  decisions: SourceSupportDecision[];
+  calls: number;
+};
+
+// One evaluator owns evidence resolution and claim-versus-source settlement for both the read-only
+// U3 report and U5 learner admission. It never decides whether an asset is sufficient: consumers
+// interpret only the typed decisions for the exact fields they own.
+export async function evaluateProjectedSourceSupport(input: {
+  projection: SourceMaterialClaimSet;
+  nodes: readonly SourceSupportNodeContext[];
+  sourceEvidenceRead: SourceEvidenceReadPort;
+  sourceSupportVerifier?: SourceMaterialClaimSupportVerificationPort;
+}): Promise<ProjectedSourceSupportEvaluation> {
+  const blockReferences = input.projection.evidence.map((reference) => ({
+    sourceResourceId: reference.sourceResourceId,
+    sourceBlockId: reference.sourceBlockId
+  }));
+  let readError: string | null = null;
+  let resolvedBlocks: Awaited<ReturnType<SourceEvidenceReadPort["readSourceEvidence"]>> = [];
+  try {
+    resolvedBlocks = await input.sourceEvidenceRead.readSourceEvidence(blockReferences);
+  } catch (error) {
+    readError = errorMessage(error);
+  }
+  const blockByPair = new Map(resolvedBlocks.map((block) => [
+    sourcePairKey(block.sourceResourceId, block.sourceBlockId),
+    block
+  ] as const));
+  const evidence = input.projection.evidence.map((reference): JoinedSourceMaterialEvidence => {
+    const block = blockByPair.get(sourcePairKey(reference.sourceResourceId, reference.sourceBlockId));
+    return {
+      ...reference,
+      resolved: block !== undefined,
+      sourceTitle: block?.sourceTitle ?? null,
+      blockType: block?.blockType ?? null,
+      headingPath: block?.headingPath ?? null,
+      blockText: block?.text ?? null
+    };
+  });
+  const evidenceByKey = new Map(evidence.map((row) => [row.evidenceKey, row] as const));
+  const nodeById = new Map(input.nodes.map((node) => [node.derivedNodeId, node] as const));
+  let calls = 0;
+  const decisions: SourceSupportDecision[] = [];
+
+  for (const claim of input.projection.claims.filter((candidate) => candidate.purpose === "source_support")) {
+    const evidenceRows = claim.evidenceKeys.flatMap((evidenceKey) => {
+      const row = evidenceByKey.get(evidenceKey);
+      return row ? [row] : [];
+    });
+    if (claim.evidenceKeys.length === 0) {
+      decisions.push(sourceSupportDecision(
+        claim,
+        "rejected",
+        "missing_source_evidence",
+        "The projected material claim has no admitted source evidence reference.",
+        input.sourceSupportVerifier?.model ?? null
+      ));
+      continue;
+    }
+    if (readError !== null) {
+      decisions.push(sourceSupportDecision(
+        claim,
+        "not_evaluated",
+        "source_evidence_read_unavailable",
+        readError,
+        input.sourceSupportVerifier?.model ?? null
+      ));
+      continue;
+    }
+    if (evidenceRows.length !== claim.evidenceKeys.length || evidenceRows.some((row) => !row.resolved)) {
+      decisions.push(sourceSupportDecision(
+        claim,
+        "rejected",
+        "unresolved_source_evidence",
+        "At least one admitted source evidence reference did not resolve to its exact resource/block pair.",
+        input.sourceSupportVerifier?.model ?? null
+      ));
+      continue;
+    }
+    if (!input.sourceSupportVerifier) {
+      decisions.push(sourceSupportDecision(
+        claim,
+        "not_evaluated",
+        "source_support_verifier_not_activated",
+        "No source-support verifier was activated for this operation.",
+        null
+      ));
+      continue;
+    }
+    const node = nodeById.get(claim.derivedNodeId);
+    if (!node) {
+      throw new Error(`Material claim references unknown derived node ${JSON.stringify(claim.derivedNodeId)}.`);
+    }
+    try {
+      calls += 1;
+      const verdict = await input.sourceSupportVerifier.verify({
+        declaredDomain: node.declaredDomain,
+        subject: { canonicalLabel: node.label, aliases: [...node.aliases] },
+        claim: { claimKey: claim.claimKey, statement: claim.statement },
+        evidence: evidenceRows.map((row) => ({
+          evidenceKey: row.evidenceKey,
+          passageKind: row.passageKind,
+          blockText: row.blockText!,
+          citedQuote: row.evidenceQuote,
+          direct: claim.directEvidenceKeys.includes(row.evidenceKey)
+        }))
+      });
+      decisions.push(sourceSupportDecision(
+        claim,
+        verdict.disposition === "supported"
+          ? "accepted"
+          : verdict.disposition === "unsupported"
+            ? "rejected"
+            : "not_evaluated",
+        verdict.disposition === "supported"
+          ? "source_support_verified"
+          : verdict.disposition === "unsupported"
+            ? "source_support_rejected"
+            : "source_support_unclear",
+        nonEmptyReason(verdict.reason),
+        input.sourceSupportVerifier.model
+      ));
+    } catch (error) {
+      decisions.push(sourceSupportDecision(
+        claim,
+        "not_evaluated",
+        "source_support_verifier_unavailable",
+        errorMessage(error),
+        input.sourceSupportVerifier.model
+      ));
+    }
+  }
+
+  return { evidence, decisions, calls };
+}
 
 export type SourceAssetEvaluationReport = {
   schemaVersion: typeof SOURCE_ASSET_EVALUATION_REPORT_SCHEMA_VERSION;
@@ -179,108 +325,17 @@ export async function evaluateQualifiedSourceExpedition(input: {
     lessons: qualification.assets.lessons,
     optionSelectItems: qualification.assets.studyItems
   });
-  const blockReferences = projection.evidence.map((reference) => ({
-    sourceResourceId: reference.sourceResourceId,
-    sourceBlockId: reference.sourceBlockId
-  }));
-  const resolvedBlocks = await input.sourceEvidenceRead.readSourceEvidence(blockReferences);
-  const blockByPair = new Map(resolvedBlocks.map((block) => [
-    sourcePairKey(block.sourceResourceId, block.sourceBlockId),
-    block
-  ] as const));
-  const joinedEvidence = projection.evidence.map((reference): JoinedSourceMaterialEvidence => {
-    const block = blockByPair.get(sourcePairKey(reference.sourceResourceId, reference.sourceBlockId));
-    return {
-      ...reference,
-      resolved: block !== undefined,
-      sourceTitle: block?.sourceTitle ?? null,
-      blockType: block?.blockType ?? null,
-      headingPath: block?.headingPath ?? null,
-      blockText: block?.text ?? null
-    };
+  const sourceSupportEvaluation = await evaluateProjectedSourceSupport({
+    projection,
+    nodes: qualification.assets.detail.nodes,
+    sourceEvidenceRead: input.sourceEvidenceRead,
+    sourceSupportVerifier: input.sourceSupportVerifier
   });
+  const joinedEvidence = sourceSupportEvaluation.evidence;
   const joinedEvidenceByKey = new Map(joinedEvidence.map((row) => [row.evidenceKey, row] as const));
   const nodeById = new Map(qualification.assets.detail.nodes.map((node) => [node.derivedNodeId, node] as const));
-  let sourceSupportCalls = 0;
   let answerKeyCalls = 0;
-
-  const sourceSupport: SourceSupportDecision[] = [];
-  for (const claim of projection.claims.filter((candidate) => candidate.purpose === "source_support")) {
-    const evidenceRows = claim.evidenceKeys.flatMap((evidenceKey) => {
-      const row = joinedEvidenceByKey.get(evidenceKey);
-      return row ? [row] : [];
-    });
-    if (claim.evidenceKeys.length === 0) {
-      sourceSupport.push(sourceSupportDecision(
-        claim,
-        "rejected",
-        "missing_source_evidence",
-        "The projected material claim has no admitted source evidence reference.",
-        input.sourceSupportVerifier?.model ?? null
-      ));
-      continue;
-    }
-    if (evidenceRows.length !== claim.evidenceKeys.length || evidenceRows.some((row) => !row.resolved)) {
-      sourceSupport.push(sourceSupportDecision(
-        claim,
-        "rejected",
-        "unresolved_source_evidence",
-        "At least one admitted source evidence reference did not resolve to its exact resource/block pair.",
-        input.sourceSupportVerifier?.model ?? null
-      ));
-      continue;
-    }
-    if (!input.sourceSupportVerifier) {
-      sourceSupport.push(sourceSupportDecision(
-        claim,
-        "not_evaluated",
-        "source_support_verifier_not_activated",
-        "No source-support verifier was activated for this diagnostic run.",
-        null
-      ));
-      continue;
-    }
-    const node = nodeById.get(claim.derivedNodeId);
-    if (!node) throw new Error(`Material claim references unknown derived node ${JSON.stringify(claim.derivedNodeId)}.`);
-    try {
-      sourceSupportCalls += 1;
-      const verdict = await input.sourceSupportVerifier.verify({
-        declaredDomain: node.declaredDomain,
-        subject: { canonicalLabel: node.label, aliases: [...node.aliases] },
-        claim: { claimKey: claim.claimKey, statement: claim.statement },
-        evidence: evidenceRows.map((row) => ({
-          evidenceKey: row.evidenceKey,
-          passageKind: row.passageKind,
-          blockText: row.blockText!,
-          citedQuote: row.evidenceQuote,
-          direct: claim.directEvidenceKeys.includes(row.evidenceKey)
-        }))
-      });
-      sourceSupport.push(sourceSupportDecision(
-        claim,
-        verdict.disposition === "supported"
-          ? "accepted"
-          : verdict.disposition === "unsupported"
-            ? "rejected"
-            : "not_evaluated",
-        verdict.disposition === "supported"
-          ? "source_support_verified"
-          : verdict.disposition === "unsupported"
-            ? "source_support_rejected"
-            : "source_support_unclear",
-        nonEmptyReason(verdict.reason),
-        input.sourceSupportVerifier.model
-      ));
-    } catch (error) {
-      sourceSupport.push(sourceSupportDecision(
-        claim,
-        "not_evaluated",
-        "source_support_verifier_unavailable",
-        errorMessage(error),
-        input.sourceSupportVerifier.model
-      ));
-    }
-  }
+  const sourceSupport = sourceSupportEvaluation.decisions;
 
   const distractorInvalidity: DistractorInvalidityDecision[] = [];
   const keyUniqueness: KeyUniquenessDecision[] = [];
@@ -452,9 +507,9 @@ export async function evaluateQualifiedSourceExpedition(input: {
     decisions: { sourceSupport, distractorInvalidity, keyUniqueness },
     operationEvidence,
     evaluationCalls: {
-      sourceSupport: sourceSupportCalls,
+      sourceSupport: sourceSupportEvaluation.calls,
       answerKey: answerKeyCalls,
-      total: sourceSupportCalls + answerKeyCalls
+      total: sourceSupportEvaluation.calls + answerKeyCalls
     },
     positiveControls: {
       qualifiedCandidateRows: 1,

@@ -398,9 +398,7 @@ function lessonQualifies(
     lesson.configHash === qualifiedAssetConfigHash &&
     lesson.sections.some((section) =>
       substantiveLessonKinds.has(section.kind) &&
-      section.text.trim().length > 0 &&
-      section.groundingProvenance !== "generated" &&
-      section.citation?.provenance === "source"
+      section.text.trim().length > 0
     );
 }
 

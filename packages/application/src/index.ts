@@ -261,6 +261,7 @@ export {
   projectSourceMaterialClaims,
   renderSourceMaterialClaim,
   type SourceMaterialClaim,
+  type SourceMaterialClaimLocation,
   type SourceMaterialClaimProjection,
   type SourceMaterialClaimSet,
   type SourceMaterialClaimSubject,
@@ -268,18 +269,25 @@ export {
 } from "./sourceMaterialClaims";
 export {
   SOURCE_ASSET_EVALUATION_REPORT_SCHEMA_VERSION,
+  evaluateProjectedSourceSupport,
   evaluateQualifiedSourceExpedition,
   settleOptionSelectTruth,
   type DistractorInvalidityDecision,
   type DistractorInvalidityDecisionReason,
   type EvaluationDisposition,
   type JoinedSourceMaterialEvidence,
+  type ProjectedSourceSupportEvaluation,
   type KeyUniquenessDecision,
   type KeyUniquenessDecisionReason,
   type SourceAssetEvaluationReport,
   type SourceSupportDecision,
-  type SourceSupportDecisionReason
+  type SourceSupportDecisionReason,
+  type SourceSupportNodeContext
 } from "./sourceAssetEvaluation";
+export {
+  admitSourceConceptLessons,
+  type SourceLessonAdmissionResult
+} from "./sourceLessonAdmission";
 
 export {
   labelFor,

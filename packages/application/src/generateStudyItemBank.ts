@@ -24,6 +24,8 @@ import type {
   MatchingAssignmentVerificationPort,
   RunProgressReporterPort,
   AnswerKeyVerificationPort,
+  SourceEvidenceReadPort,
+  SourceMaterialClaimSupportVerificationPort,
   StudyItemBlueprintPort,
   StudyItemBankStorePort,
   StudyItemGenerationPort
@@ -60,6 +62,8 @@ import { selectNodeGrounding } from "./selectNodeGrounding";
 import { selectLessonNeighborhood } from "./selectLessonNeighborhood";
 import { lessonGroundingShape, lessonOptionSelectAnswer, type LessonGroundingShape } from "./lessonGroundingShape";
 import { assembleConceptLesson, SUBSTANTIVE_KINDS } from "./assembleConceptLesson";
+import { admitSourceConceptLessons } from "./sourceLessonAdmission";
+import { qualifiedSourceExpeditionAssetConfigHash } from "./sourceExpedition";
 import { STUDY_ITEM_BANK_STAGE_GROUP } from "./topicExpeditionStageProfile";
 
 // Lessons and blueprints are the sequential front half and can use wider per-node
@@ -103,7 +107,16 @@ export async function generateStudyItemBank(input: {
   graphStore: GraphVersionStorePort;
   enrichmentStore: EnrichmentRunStorePort;
   conceptLessonGeneration: ConceptLessonGenerationPort;
-  conceptLessonRedundancyJudge?: ConceptLessonRedundancyJudgmentPort;
+  // Required at every production composition so source-backed lesson semantics cannot diverge by
+  // entry point. Transport failure remains a fail-open omission decision inside the judge seam.
+  conceptLessonRedundancyJudge: ConceptLessonRedundancyJudgmentPort;
+  // Required even though source-support verification is deliberately absent today. A source graph
+  // cannot bypass settlement: exact source evidence is always resolvable, while the optional
+  // verifier's absence deterministically produces inspection-only candidates and lesson absence.
+  sourceAssetQualification: {
+    sourceEvidenceRead: SourceEvidenceReadPort;
+    sourceSupportVerifier?: SourceMaterialClaimSupportVerificationPort;
+  };
   // Layer-purpose generation (plan 2026-07-10-001 U1): one call per bank producing the
   // enrichment's plain-register capability statement. Both optional so existing callers
   // compose an unchanged bank; absent either, the stage is skipped and surfaces fall back
@@ -287,15 +300,35 @@ export async function generateStudyItemBank(input: {
     layer.derivedNodes.length
   );
 
-  const lessons: ConceptLesson[] = [];
-  const lessonAbsent: LessonAbsentNode[] = [];
+  const candidateLessons: ConceptLesson[] = [];
+  const assemblyAbsent: LessonAbsentNode[] = [];
+  for (const result of perNodeLessons) {
+    if (result.lesson) candidateLessons.push(result.lesson);
+    if (result.absent) assemblyAbsent.push(result.absent);
+  }
+  const sourceLessonAdmission = graphVersionId === null
+    ? null
+    : await admitSourceConceptLessons({
+        candidates: candidateLessons,
+        nodes: layer.derivedNodes.map((node) => ({
+          derivedNodeId: node.derivedNodeId,
+          label: node.canonicalLabel,
+          aliases: node.aliases,
+          declaredDomain: node.declaredDomain
+        })),
+        baseConfigHash: input.configHash,
+        sourceEvidenceRead: input.sourceAssetQualification.sourceEvidenceRead,
+        sourceSupportVerifier: input.sourceAssetQualification.sourceSupportVerifier
+      });
+  const lessons = sourceLessonAdmission?.lessons ?? candidateLessons;
+  const lessonAbsent = [
+    ...assemblyAbsent,
+    ...(sourceLessonAdmission?.absent ?? [])
+  ];
   // Lessons keyed by node so the option-select stage derives its grounding from the in-memory
   // lesson rather than re-reading raw passages (U7, rule 18).
   const lessonByNode = new Map<string, ConceptLesson>();
-  for (const result of perNodeLessons) {
-    if (result.lesson) { lessons.push(result.lesson); lessonByNode.set(result.lesson.derivedNodeId, result.lesson); }
-    if (result.absent) lessonAbsent.push(result.absent);
-  }
+  for (const lesson of lessons) lessonByNode.set(lesson.derivedNodeId, lesson);
   // One sibling-context computation per node, shared by every downstream stage (blueprint,
   // option-select, matching, impostor) instead of each stage re-scanning the full layer.
   const siblingsByNode = new Map<string, { label: string; snippet: string }[]>(
@@ -309,8 +342,11 @@ export async function generateStudyItemBank(input: {
     input.conceptLessonStore.persist({
       graphVersionId: graphVersionId,
       enrichmentId: layer.enrichmentId,
-      configHash: input.configHash,
+      configHash: graphVersionId === null
+        ? input.configHash
+        : qualifiedSourceExpeditionAssetConfigHash(input.configHash),
       lessons,
+      ...(sourceLessonAdmission ? { candidateLessons: sourceLessonAdmission.candidates } : {}),
       absent: lessonAbsent
     })
   );
@@ -831,12 +867,11 @@ function shouldRetryLesson(node: DerivedGraphNode, lesson: ConceptLesson | undef
 const REDUNDANCY_DROPPABLE_KINDS: ReadonlySet<ConceptLessonSectionKind> = new Set(["gist", "intuition", "applications"]);
 
 async function judgeLessonRedundancy(
-  judge: ConceptLessonRedundancyJudgmentPort | undefined,
+  judge: ConceptLessonRedundancyJudgmentPort,
   node: DerivedGraphNode,
   lesson: ConceptLesson,
   stage: ConditionalAggregateStage
 ): Promise<ConceptLessonRedundancyJudgment[]> {
-  if (!judge) return [];
   try {
     return await stage.run(() =>
       judge.judge({

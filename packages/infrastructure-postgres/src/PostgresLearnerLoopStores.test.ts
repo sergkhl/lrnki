@@ -671,6 +671,52 @@ maybe("Covers R3: a lesson_absent_nodes row round-trips with its reason and is n
   }
 });
 
+maybe("a rejected source lesson remains in the immutable artifact without becoming a current lesson", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const s = await seedSubstrate(sql);
+    const store = new PostgresConceptLessonStore(sql);
+    const candidate = { ...lessonFor(s), configHash: "base-candidate-config" };
+    await store.persist({
+      graphVersionId: s.graphVersionId,
+      enrichmentId: s.enrichmentId,
+      configHash: "qualified-admission-config",
+      lessons: [],
+      candidateLessons: [candidate],
+      absent: [{
+        derivedNodeId: s.derivedNodeId,
+        canonicalLabel: candidate.canonicalLabel,
+        reason: "source-support verifier is not activated; the candidate remains inspection-only"
+      }]
+    });
+
+    assert.equal(await store.getLesson(s.derivedNodeId), undefined);
+    assert.equal((await store.listAbsentForEnrichment(s.enrichmentId)).length, 1);
+    const rows = await sql<{
+      producer_version: string;
+      config_hash: string;
+      payload: {
+        lessons: ConceptLesson[];
+        candidateLessons: ConceptLesson[];
+      };
+    }[]>`
+      SELECT producer_version, config_hash, payload
+      FROM artifact_versions
+      WHERE artifact_type = 'concept_lesson_bank'
+        AND payload->>'enrichmentId' = ${s.enrichmentId}
+      ORDER BY created_at DESC
+      LIMIT 1`;
+    assert.equal(rows[0]?.producer_version, "0.2.0");
+    assert.equal(rows[0]?.config_hash, "qualified-admission-config");
+    assert.deepEqual(rows[0]?.payload.lessons, []);
+    assert.equal(rows[0]?.payload.candidateLessons[0]?.conceptLessonId, candidate.conceptLessonId);
+    assert.equal(rows[0]?.payload.candidateLessons[0]?.configHash, "base-candidate-config");
+    assert.equal(rows[0]?.payload.candidateLessons[0]?.sections[1]?.text, candidate.sections[1]?.text);
+  } finally {
+    await sql.end();
+  }
+});
+
 maybe("the artifact_concept_lessons view flattens one row per persisted lesson", async () => {
   const sql = createDatabaseClient(databaseUrl);
   try {

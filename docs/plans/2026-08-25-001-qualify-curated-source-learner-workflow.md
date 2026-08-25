@@ -7,12 +7,12 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0–U4 complete; U5 is next
+**Status:** In progress — U0–U4 complete; U5 lesson admission complete, option-select next
 
-**NEXT:** Implement U5's first coherent batch: make Concept Lesson assembly consume the U3 material-
-claim settlement and fail closed when no source-support verifier is activated, while preserving
-candidate inspection and every held-out implementation. Then validate before deciding whether the
-option-select admission half remains coupled enough for the same unit or needs its own batch.
+**NEXT:** Complete U5's option-select batch: consume source-support, distractor-invalidity, and key-
+uniqueness decisions before persistence; retain rejected candidates for inspection; and make
+matching/impostor preservation plus Source Expedition holdout structural. Run the diagnostic kill
+gate and one fresh external Curated Source operation before closing U5.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
 Curated Sources and automatically admits only source-backed learner assets. Anchor-less Synthetic
@@ -599,20 +599,64 @@ The plan is complete only when all of the following are true:
   example controls, checksum, endpoint refusal, isolated gateway probe, and fixed matrix answer U4's
   bounded questions. Documentation whitespace and cap checks passed before commit.
 
+### U5 — source-backed lesson and option-select admission — 2026-08-25 — in progress
+
+- **Lesson-admission batch:** the U3 claim projection now carries typed payload-field locations, and
+  one shared evaluator owns exact block resolution, source-reader failure, verifier absence/failure,
+  and per-claim decisions for both diagnostic reporting and admission. The report schema is version
+  2. A pure lesson owner retains a section body only after accepted support, filters each optional
+  list item independently, treats a diagram as an indivisible caption/spec pair, revalidates
+  Explorable Terms against retained bodies, and emits explicit absence when no substantive section
+  survives. It never rewrites model text or manufactures a citation.
+- Source-backed Study Item Bank generation now persists only settled lessons as current query
+  assets under the qualification wrapper. Exact pre-settlement lessons retain their base identity in
+  the immutable `concept_lesson_bank` artifact as `candidateLessons`, including when no lesson is
+  admitted. An absent verifier therefore produces current absences, zero downstream item-generation
+  calls, and inspection-only candidates. Null-version synthetic generation remains mechanically
+  unchanged and production-held by U1.
+- Both production roots must now supply exact source evidence and the Concept Lesson redundancy
+  judge; the kg-worker's previously omitted judge is wired. The support verifier stays deliberately
+  absent after U4's rejection, so no Model Assignment or route changed. A qualification wrapper,
+  rather than citation styling, proves semantic admission; an accepted supported paraphrase may
+  remain honestly `generated` and uncited.
+- Automated evidence passed: 839 application tests; eight kg-worker tests; 26 learner-API tests in
+  the reset-backed run; the complete `CI=1 pnpm test:db` repository gate, including transactional
+  candidate-artifact/absence coverage and all 57 learner-app suites / 320 tests; four affected
+  production/package typechecks; targeted ESLint; and whitespace checks. The application gate first
+  exposed four obsolete expectations that uncited or LLM-grounded content on a non-null source graph
+  remained playable; they were corrected to the accepted U1/U5 inspection-only boundary. That
+  excluded run is not evidence.
+
+#### Real-use quality evaluation
+
+- **Milestone:** fail-closed material-claim settlement for source-backed Concept Lessons.
+- **Fixture and source type:** 33 existing raw lessons from the registered external Rust Book
+  Curated Source, read with their current derived graph and immutable source blocks.
+- **Real model calls used:** no; verifier non-activation and candidate preservation were the changed
+  behavior under inspection.
+- **Result:** PASS for safe refusal and inspection retention, not learner-content usefulness.
+- **Useful output observed:** all 35 referenced evidence rows resolved; 275 projected claims split
+  into 61 missing-evidence rejections and 214 explicit verifier-not-activated outcomes; all 33
+  candidates were byte-for-byte preserved, all 33 settled as absent, and zero lessons/verifier calls
+  were admitted. Direct samples retained exact lesson prose beside source quotes without upgrading
+  either to qualified knowledge.
+- **Defects observed:** none in the refusal boundary. The first scratch runner location could not
+  resolve workspace package exports and was excluded; the package-relative read-only rerun passed.
+- **Changes made after inspection:** none.
+- **Remaining caveats:** option-select admission is not yet connected, no support verifier is
+  qualified, and this reused prior artifact set rather than a fresh generation. U5 still requires
+  its diagnostic kill gate and one fresh external Curated Source operation before completion.
+- **Safe to continue downstream:** yes, to U5 option-select admission only.
+
 ### Open findings
 
 - No local source-support verifier is activated. U4 rejected its only permitted candidate for both
   one material false acceptance and broken LiteLLM success logging; do not rerun it for luck or pick
-  a second candidate in this plan. U5 must implement and validate the admitted-source settlement with
-  the verifier absent, leaving unsupported learner assets explicit and unavailable while preserving
-  candidate inspection.
+  a second candidate in this plan. Lesson settlement now preserves raw candidates and emits explicit
+  absence; option-select must apply the same fail-closed boundary next.
 - U3 proves lossless projection, exact evidence resolution, independent settlement, and report
-  mechanics only. Its project-authored no-call sample is not source-support or distractor-quality
-  evidence. U5 must consume actual accepted decisions before replacing U2's structural legacy
-  wrapper, and external Curated Sources remain mandatory for learner-usefulness acceptance.
+  mechanics only. Lesson admission now consumes its accepted decisions in deterministic positive
+  controls, but production has no activated support verifier. Option-select still needs complete
+  support/truth settlement, and external Curated Sources remain mandatory for usefulness acceptance.
 - Matching and impostor remain preserved but unqualified. They do not satisfy readiness in this plan;
   a future plan may qualify them independently after the option-select Source Expedition works.
-- U5 must make Concept Lesson redundancy policy structural across both production roots. The
-  kg-worker currently constructs but does not pass `conceptLessonRedundancyJudge`, while learner
-  generation passes it and `generateStudyItemBank` makes it optional; source-backed qualification
-  cannot permit those compositions to diverge.

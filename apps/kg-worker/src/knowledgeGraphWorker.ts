@@ -974,6 +974,10 @@ async function generateStudyItemsCommand(ctx: Context, enrichmentId: string | un
     graphStore: ctx.graphStore,
     enrichmentStore: ctx.enrichmentStore,
     conceptLessonGeneration: ctx.conceptLessonGeneration,
+    conceptLessonRedundancyJudge: ctx.conceptLessonRedundancyJudge,
+    sourceAssetQualification: {
+      sourceEvidenceRead: ctx.inspectionRead
+    },
     studyItemBlueprint: ctx.studyItemBlueprint,
     answerKeyVerification: ctx.answerKeyVerification,
     matchingAssignmentVerification: ctx.matchingAssignmentVerification,

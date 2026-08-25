@@ -356,6 +356,22 @@ test("a legacy asset contract fails closed before any adoption write", async () 
   assert.equal(state.adoptionCalls.length, 0);
 });
 
+test("a qualified supported paraphrase need not masquerade as a verbatim source citation", async () => {
+  const supportedParaphrase = {
+    ...lesson("node-prerequisite"),
+    sections: [{
+      kind: "definition" as const,
+      text: "A materially equivalent paraphrase retained by source-support settlement.",
+      groundingProvenance: "generated" as const
+    }]
+  };
+  const state = harness({
+    lessons: [supportedParaphrase, lesson("node-summit")]
+  });
+
+  assert.equal((await state.sourceExpedition.qualify(ENRICHMENT_ID)).status, "available");
+});
+
 test("LLM-grounded and unverified source-mentioned prerequisites make the whole candidate unavailable", async () => {
   const llm = harness({ graph: detail({ firstOrigin: "llm_grounded" }) });
   assert.deepEqual(await llm.sourceExpedition.qualify(ENRICHMENT_ID), {
