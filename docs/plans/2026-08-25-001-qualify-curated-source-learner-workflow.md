@@ -7,11 +7,12 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0–U3 complete; U4 is next
+**Status:** In progress — U0–U4 complete; U5 is next
 
-**NEXT:** Implement U4 only: research at most one current official local factual-consistency model
-artifact, run the metadata/architecture preflight and bounded source-support kill matrix without
-activation, then either activate only the qualified harm class or retain fail-closed absence.
+**NEXT:** Implement U5's first coherent batch: make Concept Lesson assembly consume the U3 material-
+claim settlement and fail closed when no source-support verifier is activated, while preserving
+candidate inspection and every held-out implementation. Then validate before deciding whether the
+option-select admission half remains coupled enough for the same unit or needs its own batch.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
 Curated Sources and automatically admits only source-backed learner assets. Anchor-less Synthetic
@@ -317,7 +318,7 @@ Units are exclusive and run in order. This plan declares no parallel-safe implem
 4. Validate deterministic projection/non-leakage and inspect a no-activation diagnostic sample;
    update statuses/log/findings and commit once.
 
-### U4 — Bounded local factual-consistency verifier experiment
+### U4 — Bounded local factual-consistency verifier experiment — complete
 
 1. Research current official model artifacts and select at most one bounded candidate whose native
    contract can answer claim-versus-source support. Record exact revision/license/size/runtime before
@@ -561,12 +562,50 @@ The plan is complete only when all of the following are true:
   apply accepted decisions to persistence/readiness and run real external-source quality gates.
 - **Safe to continue downstream:** yes, to U4's bounded non-authoritative experiment only.
 
+### U4 — bounded local factual-consistency verifier experiment — 2026-08-25 — complete
+
+- The one permitted candidate was
+  [`lytang/MiniCheck-DeBERTa-v3-Large` at immutable revision
+  `60c4e0825ae044a6193ba811c5712c37548636a0`](https://huggingface.co/lytang/MiniCheck-DeBERTa-v3-Large/tree/60c4e0825ae044a6193ba811c5712c37548636a0).
+  The metadata preflight found a public, ungated MIT artifact with native
+  `document + claim -> {unsupported, supported}` semantics,
+  `DebertaV2ForSequenceClassification`, two labels, a 512-token maximum, and one
+  1,740,304,440-byte safetensors file whose downloaded SHA-256 matched
+  `8528d6a1399182054c3d2918f58bb67785de50ffde97f5ecdb215eabfb73297d`. No second
+  candidate was selected or downloaded.
+- The exact local runtime was Text Embeddings Inference 1.9.3 using Candle, float32, no
+  quantization, and automatic truncation disabled. Its native `/predict` pair contract reproduced
+  the model card's two controls at supported probabilities 0.97864676 and 0.011379601. TEI's
+  `/rerank` correctly returned HTTP 424 because the artifact is a two-label classifier, not the
+  one-score reranker that endpoint requires.
+- An isolated LiteLLM 1.88.1 custom pass-through transported the classifier payload and response and
+  returned `x-litellm-call-id` plus the selected upstream endpoint. It did not qualify attribution:
+  after every HTTP 200, LiteLLM's asynchronous pass-through success logger misclassified the native
+  `/predict` list as Vertex prediction output and raised `TypeError: list indices must be integers or
+  slices, not str`. Therefore no successful spend/usage logging claim is available for this route.
+- The fixed pre-activation matrix exercised 43 source/claim pairs: 19 supported controls and 24
+  unsupported controls spanning the four project-authored diagnostic sources plus held-out Rust
+  Book and OpenStax Biology evidence. It required zero material false acceptance and allowed at most
+  25% false rejection under the sparse-coverage policy. The classifier made three false rejections
+  (15.789%) but falsely accepted one carrier/referent swap with supported probability 0.8887313: a
+  claim assigned the one-parental/one-new-strand property to conservative replication even though
+  the supplied passage assigned it to semi-conservative replication. The semantic kill gate failed.
+- The candidate was not activated for any harm class. No source-support adapter, LiteLLM route,
+  config identity, Model Assignment, application behavior, or persisted learner asset changed. The
+  isolated services were stopped and disposable runtime/model state was removed; complete generated
+  request, response, score, timing, call-id, and transport evidence remains in gitignored evaluation
+  output. This is local measured-module rejection evidence only, not deployed or production proof.
+- No application code changed, so no behavior suite was promoted as evidence. The direct official-
+  example controls, checksum, endpoint refusal, isolated gateway probe, and fixed matrix answer U4's
+  bounded questions. Documentation whitespace and cap checks passed before commit.
+
 ### Open findings
 
-- No local verifier is selected, downloaded, or activated. U4 must reject candidates that cannot be
-  routed and attributed within the architecture or that fail the bounded material-qualifier kill
-  matrix, even if their public benchmark is strong. Failure leaves every source-support decision
-  unqualified and does not block later exact-source deterministic work.
+- No local source-support verifier is activated. U4 rejected its only permitted candidate for both
+  one material false acceptance and broken LiteLLM success logging; do not rerun it for luck or pick
+  a second candidate in this plan. U5 must implement and validate the admitted-source settlement with
+  the verifier absent, leaving unsupported learner assets explicit and unavailable while preserving
+  candidate inspection.
 - U3 proves lossless projection, exact evidence resolution, independent settlement, and report
   mechanics only. Its project-authored no-call sample is not source-support or distractor-quality
   evidence. U5 must consume actual accepted decisions before replacing U2's structural legacy

@@ -1,15 +1,12 @@
-<!-- Hygiene and retention rules: AGENTS.md → Documentation workflow. -->
-
 # TODO
 
 ## TODO
 
-- **Curated-source learner workflow — in progress; U0–U3 complete, U4 next.** Follow
-  [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md). One
-  deterministic harness now projects exact source-asset claims, resolves immutable evidence, keeps
-  source support/distractor invalidity/key uniqueness separate, and reports candidate plus
-  operation evidence without activation. Run only the bounded local factual-consistency verifier
-  experiment next.
+- **Curated-source learner workflow — in progress; U0–U4 complete, U5 next.** Follow
+  [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md). The one
+  pinned local source-support candidate was rejected without activation after one material false
+  acceptance and broken gateway success logging. Wire the existing claim settlement into lesson
+  and option-select admission next; absent verification remains explicit unavailability.
 
 ## COMPLETED
 

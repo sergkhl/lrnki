@@ -12,9 +12,9 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-25-001 — Qualify the Curated-Source Learner Workflow](./2026-08-25-001-qualify-curated-source-learner-workflow.md)
-   — **In progress; U0–U3 complete, U4 next.** Exact domain-neutral material claims, admitted
-   resource/block evidence, three independent decision families, operation cost/timing evidence,
-   and a zero-call no-activation report now share one harness. Run the bounded local
-   factual-consistency verifier experiment next.
+   — **In progress; U0–U4 complete, U5 next.** The one pinned local factual-consistency candidate
+   was rejected without activation after a material carrier/referent false acceptance and broken
+   LiteLLM success logging. Apply the existing source-asset settlement to lesson and option-select
+   admission next, retaining explicit fail-closed absence while no verifier is qualified.
 
 <!-- Hygiene and retention rules: AGENTS.md → Documentation workflow. -->
