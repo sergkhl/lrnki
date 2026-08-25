@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { test } from "node:test";
-import { assembleIdentityDecisions, assembleProfiles, toRunSummary } from "./PostgresInspectionRead";
+import { createDatabaseClient } from "./db";
+import { assembleIdentityDecisions, assembleProfiles, PostgresInspectionRead, toRunSummary } from "./PostgresInspectionRead";
+
+const databaseUrl = process.env.TEST_DATABASE_URL;
+const maybe = databaseUrl ? test : test.skip;
 
 // U6 test scenario 3: run summaries report profile completeness and evidence
 // counts rather than verified/rejected claim counts. The summary mapper is pure.
@@ -100,4 +105,69 @@ test("assembleIdentityDecisions maps merge, distinct, and quarantine rows", () =
 
 test("assembleIdentityDecisions returns an empty list for no rows (not an error)", () => {
   assert.deepEqual(assembleIdentityDecisions([]), []);
+});
+
+maybe("readSourceEvidence resolves exact immutable resource/block pairs in request order", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  const firstResourceId = randomUUID();
+  const secondResourceId = randomUUID();
+  const firstDocumentId = randomUUID();
+  const secondDocumentId = randomUUID();
+  const firstBlockId = randomUUID();
+  const secondBlockId = randomUUID();
+  try {
+    await sql`
+      INSERT INTO source_resources
+        (source_resource_id, content_hash, content_type, object_key, declared_domain, title)
+      VALUES
+        (${firstResourceId}, ${`inspection-${firstResourceId}`}, 'text/plain', ${`test/${firstResourceId}`}, 'test domain', 'Generated source one'),
+        (${secondResourceId}, ${`inspection-${secondResourceId}`}, 'text/plain', ${`test/${secondResourceId}`}, 'test domain', 'Generated source two')`;
+    await sql`
+      INSERT INTO source_documents
+        (source_document_id, source_resource_id, parser_name, parser_version, parser_config_hash)
+      VALUES
+        (${firstDocumentId}, ${firstResourceId}, 'test', '1', 'test'),
+        (${secondDocumentId}, ${secondResourceId}, 'test', '1', 'test')`;
+    await sql`
+      INSERT INTO source_blocks
+        (source_block_id, source_document_id, block_id, block_type, text, heading_path, locator)
+      VALUES
+        (${firstBlockId}, ${firstDocumentId}, 'first', 'paragraph', 'The first generated source preserves its condition.', ${sql.json(["First"])}, ${sql.json({})}),
+        (${secondBlockId}, ${secondDocumentId}, 'second', 'paragraph', 'The second generated source preserves its exception.', ${sql.json(["Second"])}, ${sql.json({})})`;
+
+    const rows = await new PostgresInspectionRead(sql).readSourceEvidence([
+      { sourceResourceId: secondResourceId, sourceBlockId: secondBlockId },
+      { sourceResourceId: firstResourceId, sourceBlockId: secondBlockId },
+      { sourceResourceId: firstResourceId, sourceBlockId: firstBlockId },
+      { sourceResourceId: firstResourceId, sourceBlockId: firstBlockId }
+    ]);
+
+    assert.deepEqual(rows.map((row) => ({
+      sourceResourceId: row.sourceResourceId,
+      sourceBlockId: row.sourceBlockId,
+      sourceTitle: row.sourceTitle,
+      headingPath: row.headingPath,
+      text: row.text
+    })), [
+      {
+        sourceResourceId: secondResourceId,
+        sourceBlockId: secondBlockId,
+        sourceTitle: "Generated source two",
+        headingPath: ["Second"],
+        text: "The second generated source preserves its exception."
+      },
+      {
+        sourceResourceId: firstResourceId,
+        sourceBlockId: firstBlockId,
+        sourceTitle: "Generated source one",
+        headingPath: ["First"],
+        text: "The first generated source preserves its condition."
+      }
+    ]);
+  } finally {
+    await sql`DELETE FROM source_blocks WHERE source_block_id IN (${firstBlockId}, ${secondBlockId})`;
+    await sql`DELETE FROM source_documents WHERE source_document_id IN (${firstDocumentId}, ${secondDocumentId})`;
+    await sql`DELETE FROM source_resources WHERE source_resource_id IN (${firstResourceId}, ${secondResourceId})`;
+    await sql.end();
+  }
 });

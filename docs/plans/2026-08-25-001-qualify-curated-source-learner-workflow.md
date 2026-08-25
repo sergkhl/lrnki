@@ -7,11 +7,11 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0–U2 complete; U3 is next
+**Status:** In progress — U0–U3 complete; U4 is next
 
-**NEXT:** Implement U3 only: define the domain-neutral material-claim projection and the separate
-source-support, distractor-invalidity, and key-uniqueness outcomes, then add a gitignored evaluation
-report over joined candidate/evidence/decision/operation data and inspect a no-activation sample.
+**NEXT:** Implement U4 only: research at most one current official local factual-consistency model
+artifact, run the metadata/architecture preflight and bounded source-support kill matrix without
+activation, then either activate only the qualified harm class or retain fail-closed absence.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
 Curated Sources and automatically admits only source-backed learner assets. Anchor-less Synthetic
@@ -303,7 +303,7 @@ Units are exclusive and run in order. This plan declares no parallel-safe implem
    change refusal, current/superseded assets, and no partial write. Run the real-use route only after
    the behavior milestone is complete; commit once.
 
-### U3 — Domain-neutral material-claim projection and evaluation harness
+### U3 — Domain-neutral material-claim projection and evaluation harness — complete
 
 1. Define one source-owned material-claim projection for Concept Lesson sections and option-select
    stem/key/explanation/distractors. Preserve exact qualifiers and evidence references; do not put
@@ -512,18 +512,65 @@ The plan is complete only when all of the following are true:
   The first inline inspection also failed before database access because root evaluation could not
   resolve workspace aliases; only the successful package-bound rerun is evidence.
 
+### U3 — domain-neutral material-claim projection and evaluation harness — 2026-08-25 — complete
+
+- Added one versioned, source-owned projection over every learner-visible Concept Lesson section
+  field and option-select question/key, explanation, and distractor. Compile-time owner maps force a
+  decision for every payload field. Exact strings and qualifiers remain typed in each claim; a
+  mechanical rendering is the only verifier statement. All admitted source citations for the node
+  form its evidence pool, while `directEvidenceKeys` prevents generated bullets, diagrams, and
+  explanations from masquerading as directly cited prose.
+- Added an exact immutable resource/block read and a narrow claim-versus-source verification port.
+  Source support, each distractor's invalidity, and key uniqueness have separate disposition and
+  reason types. The answer-key path reuses one existing cross-family call per item, orders candidates
+  by text alone, and sends no key bit, option id, Derived Node id, or generator position. Missing or
+  unresolved evidence, abstention, non-activation, and transport failure remain distinguishable.
+- Added a schema-versioned report joining raw candidate payloads, projected claims, cited quotes,
+  resolved full blocks, asset/config/model identity, independent decisions, operation timelines,
+  calls, tokens, cost, and same-row positive controls. The production CLI is read-only, binds no
+  verifier or learner mutation port, accepts only a qualified U2 candidate, and refuses output
+  outside gitignored `tmp/`. Deterministic tests use project-authored expiring-authority examples;
+  no diagnostic-fixture term entered production code or a prompt.
+- Automated evidence passed: the application package's 833 tests; the reset-backed `CI=1 pnpm
+  test:db` repository gate, including the exact resource/block-pair read and all learner surfaces;
+  all 11 workspace typechecks; and ESLint with zero errors and the same 13 retained warnings. The
+  operation-evidence test proves calls/tokens/cost roll up when rows exist; unavailable cost remains
+  explicit `null`, never zero. Whitespace checks passed.
+- The first CLI attempt was rejected before database access because pnpm forwarded a conventional
+  literal `--`; the parser now ignores that separator. The successful rerun is the evidence below.
+  That inspection made no neural call, source registration, learner adoption/activation,
+  learner-state write, Compose action, browser/native/device action, deployment, or release action.
+
+#### Real-use quality evaluation
+
+- **Milestone:** U3 evaluation mechanics over a structurally qualified Source Expedition.
+- **Fixture and source type:** a project-authored two-stop, text-source candidate retained in the
+  disposable `lrnki_test` database after the reset-backed gate.
+- **Real model calls used:** no; non-activation is the behavior under inspection.
+- **Result:** PASS for projection/report mechanics, not semantic learner-asset usefulness.
+- **Useful output observed:** the gitignored report joined two current lessons, two current
+  option-select items, 12 exact claims, one resolved source block/quote, six source-support
+  decisions, six distractor-invalidity decisions, two key-uniqueness decisions, and exact asset/
+  graph/config/model identity. Both verifier identities were null, every decision said
+  `not_evaluated` for non-activation, and the evaluation call positive control was exactly zero.
+- **Defects observed:** the disposable fixture retained no operation timeline/spend rows, so actual
+  calls/tokens/cost were correctly null; it is project-authored structural evidence and cannot
+  establish semantic support, distractor quality, external-source usefulness, or model fitness.
+- **Changes made after inspection:** only the CLI separator repair described above.
+- **Remaining caveats:** U4 must qualify or reject one real source-support verifier; U5 must then
+  apply accepted decisions to persistence/readiness and run real external-source quality gates.
+- **Safe to continue downstream:** yes, to U4's bounded non-authoritative experiment only.
+
 ### Open findings
 
-- U2's qualification wrapper is deliberately a structural legacy boundary, not proof that its
-  project-authored fixture claims are supported. U3 must project exact material claims and evidence
-  references without weakening this fail-closed boundary; U5 replaces structural qualification
-  with the named admission outcomes.
-- U3's report must join the same candidate rows to their admitted passages, separate decision
-  outcomes, asset/config identity, operation identity, calls/tokens/cost, and a positive control over
-  the same rows. Generated reports stay in `tmp/`; durable report mechanics stay in source.
-- No local verifier is selected or downloaded. U4 must reject candidates that cannot be routed and
-  attributed within the architecture, even if their public benchmark is strong. Failure leaves
-  unsupported assets absent and does not block exact-source deterministic work.
+- No local verifier is selected, downloaded, or activated. U4 must reject candidates that cannot be
+  routed and attributed within the architecture or that fail the bounded material-qualifier kill
+  matrix, even if their public benchmark is strong. Failure leaves every source-support decision
+  unqualified and does not block later exact-source deterministic work.
+- U3 proves lossless projection, exact evidence resolution, independent settlement, and report
+  mechanics only. Its project-authored no-call sample is not source-support or distractor-quality
+  evidence. U5 must consume actual accepted decisions before replacing U2's structural legacy
+  wrapper, and external Curated Sources remain mandatory for learner-usefulness acceptance.
 - Matching and impostor remain preserved but unqualified. They do not satisfy readiness in this plan;
   a future plan may qualify them independently after the option-select Source Expedition works.
 - U5 must make Concept Lesson redundancy policy structural across both production roots. The

@@ -8,6 +8,7 @@
     "./rival-simulation": "./src/rivalSimulation.ts"
   },
   "scripts": {
+    "evaluate:source-assets": "tsx src/sourceAssetEvaluationCli.ts",
     "realuse-server": "tsx src/realuseServer.ts",
     "build": "tsc -p tsconfig.json --noEmit",
     "test": "tsx --test src/*.test.ts",

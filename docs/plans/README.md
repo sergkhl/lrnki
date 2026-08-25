@@ -12,9 +12,9 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-25-001 — Qualify the Curated-Source Learner Workflow](./2026-08-25-001-qualify-curated-source-learner-workflow.md)
-   — **In progress; U0–U2 complete, U3 next.** One deep Source Expedition authority now owns
-   trusted-trail qualification, exact current-asset identity, adoption, activation, learner reads,
-   writes, Support Path, and Recall Challenges. Implement material-claim projection and the joined
-   no-activation evaluation harness next.
+   — **In progress; U0–U3 complete, U4 next.** Exact domain-neutral material claims, admitted
+   resource/block evidence, three independent decision families, operation cost/timing evidence,
+   and a zero-call no-activation report now share one harness. Run the bounded local
+   factual-consistency verifier experiment next.
 
 <!-- Hygiene and retention rules: AGENTS.md → Documentation workflow. -->

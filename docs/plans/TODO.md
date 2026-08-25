@@ -4,12 +4,12 @@
 
 ## TODO
 
-- **Curated-source learner workflow — in progress; U0–U2 complete, U3 next.** Follow
+- **Curated-source learner workflow — in progress; U0–U3 complete, U4 next.** Follow
   [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md). One
-  authoritative Source Expedition boundary now owns trusted-trail/current-asset qualification and
-  every learner read/write path without deleting held-out implementations. Implement only the
-  domain-neutral material-claim projection, separate admission outcomes, and joined no-activation
-  evaluation report next.
+  deterministic harness now projects exact source-asset claims, resolves immutable evidence, keeps
+  source support/distractor invalidity/key uniqueness separate, and reports candidate plus
+  operation evidence without activation. Run only the bounded local factual-consistency verifier
+  experiment next.
 
 ## COMPLETED
 

@@ -281,6 +281,31 @@ export interface AnswerKeyVerificationPort {
   }): Promise<StudyItemCandidateVerdict[]>;
 }
 
+// Source-backed learner-asset support verification. This seam asks only whether one exact,
+// application-projected material claim is supported by its admitted source evidence. It does not
+// decide answer-key truth, distractor invalidity, assignment uniqueness, citation honesty, or
+// readiness. Those remain separate application-owned questions. The application supplies full
+// source blocks beside the exact admitted quote so a verifier can retain material scope while the
+// report can still distinguish direct citation from broader subject evidence.
+export interface SourceMaterialClaimSupportVerificationPort {
+  readonly model: string;
+  verify(input: {
+    declaredDomain: string;
+    subject: { canonicalLabel: string; aliases: string[] };
+    claim: { claimKey: string; statement: string };
+    evidence: {
+      evidenceKey: string;
+      passageKind: "definition" | "mention";
+      blockText: string;
+      citedQuote: string;
+      direct: boolean;
+    }[];
+  }): Promise<{
+    disposition: "supported" | "unsupported" | "unclear";
+    reason: string;
+  }>;
+}
+
 // Matching Assignment Verification judge (ADR-0026, amended by plan 2026-08-07-001). One
 // bounded cross-family judgment over ONE deterministically guarded matching item: every
 // (prompt, match) cell of the N×N grid is classified fits / does_not_fit / unclear.
@@ -1381,6 +1406,24 @@ export interface RunInspectionReadPort {
 export interface SourceInspectionReadPort {
   listSourceSummaries(): Promise<SourceSummary[]>;
   getSourceInspection(sourceResourceId: string): Promise<SourceInspection | undefined>;
+}
+
+// Exact source-block read for evidence-bearing application evaluations. Unlike Source Explorer's
+// latest-document view, this read resolves the immutable block ids already carried by admitted
+// citations and verifies the resource/block pair. Callers retain unresolved references explicitly.
+export type SourceEvidenceRecord = {
+  sourceResourceId: string;
+  sourceTitle: string;
+  sourceBlockId: string;
+  blockType: string;
+  headingPath: string[];
+  text: string;
+};
+
+export interface SourceEvidenceReadPort {
+  readSourceEvidence(
+    references: readonly { sourceResourceId: string; sourceBlockId: string }[]
+  ): Promise<SourceEvidenceRecord[]>;
 }
 
 // One recorded published-Concept identity decision, flattened for the Admin Lab (plan

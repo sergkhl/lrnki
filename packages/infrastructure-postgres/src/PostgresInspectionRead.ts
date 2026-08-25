@@ -10,6 +10,8 @@ import type {
   RunProfile,
   RunSummary,
   SourceInspection,
+  SourceEvidenceReadPort,
+  SourceEvidenceRecord,
   SourceInspectionReadPort,
   SourceSummary
 } from "@lrnki/ports";
@@ -45,7 +47,7 @@ type RunSummaryRow = {
   definition_count: number; mention_count: number; assertion_count: number;
 };
 
-export class PostgresInspectionRead implements RunInspectionReadPort, SourceInspectionReadPort, GraphVersionInspectionReadPort {
+export class PostgresInspectionRead implements RunInspectionReadPort, SourceInspectionReadPort, SourceEvidenceReadPort, GraphVersionInspectionReadPort {
   constructor(private readonly sql: Sql) {}
 
   // Identity-resolution decisions persisted with a published version (plan U4, R10).
@@ -223,6 +225,55 @@ export class PostgresInspectionRead implements RunInspectionReadPort, SourceInsp
         startedAt: new Date(row.started_at).toISOString()
       }))
     };
+  }
+
+  async readSourceEvidence(
+    references: readonly { sourceResourceId: string; sourceBlockId: string }[]
+  ): Promise<SourceEvidenceRecord[]> {
+    if (references.length === 0) return [];
+    const uniqueReferences = [...new Map(
+      references.map((reference) => [
+        `${reference.sourceResourceId}\u0000${reference.sourceBlockId}`,
+        reference
+      ] as const)
+    ).values()];
+    const requestedPairs = new Set(uniqueReferences.map((reference) =>
+      `${reference.sourceResourceId}\u0000${reference.sourceBlockId}`
+    ));
+    const blockIds = [...new Set(uniqueReferences.map((reference) => reference.sourceBlockId))];
+    const rows = await this.sql<{
+      source_resource_id: string;
+      source_title: string;
+      source_block_id: string;
+      block_type: string;
+      heading_path: string[];
+      text: string;
+    }[]>`
+      SELECT sr.source_resource_id, sr.title AS source_title, sb.source_block_id,
+             sb.block_type, sb.heading_path, sb.text
+      FROM source_blocks sb
+      JOIN source_documents sd ON sd.source_document_id = sb.source_document_id
+      JOIN source_resources sr ON sr.source_resource_id = sd.source_resource_id
+      WHERE sb.source_block_id::text = ANY(${blockIds})`;
+    const byPair = new Map(
+      rows
+        .filter((row) => requestedPairs.has(`${row.source_resource_id}\u0000${row.source_block_id}`))
+        .map((row) => [
+          `${row.source_resource_id}\u0000${row.source_block_id}`,
+          {
+            sourceResourceId: row.source_resource_id,
+            sourceTitle: row.source_title,
+            sourceBlockId: row.source_block_id,
+            blockType: row.block_type,
+            headingPath: row.heading_path,
+            text: row.text
+          } satisfies SourceEvidenceRecord
+        ] as const)
+    );
+    return uniqueReferences.flatMap((reference) => {
+      const row = byPair.get(`${reference.sourceResourceId}\u0000${reference.sourceBlockId}`);
+      return row ? [row] : [];
+    });
   }
 }
 

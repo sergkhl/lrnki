@@ -256,6 +256,30 @@ export {
   type SourceExpeditionUnavailable,
   type SourceExpeditionUnavailableReason
 } from "./sourceExpedition";
+export {
+  SOURCE_MATERIAL_CLAIM_PROJECTION,
+  projectSourceMaterialClaims,
+  renderSourceMaterialClaim,
+  type SourceMaterialClaim,
+  type SourceMaterialClaimProjection,
+  type SourceMaterialClaimSet,
+  type SourceMaterialClaimSubject,
+  type SourceMaterialEvidenceReference
+} from "./sourceMaterialClaims";
+export {
+  SOURCE_ASSET_EVALUATION_REPORT_SCHEMA_VERSION,
+  evaluateQualifiedSourceExpedition,
+  settleOptionSelectTruth,
+  type DistractorInvalidityDecision,
+  type DistractorInvalidityDecisionReason,
+  type EvaluationDisposition,
+  type JoinedSourceMaterialEvidence,
+  type KeyUniquenessDecision,
+  type KeyUniquenessDecisionReason,
+  type SourceAssetEvaluationReport,
+  type SourceSupportDecision,
+  type SourceSupportDecisionReason
+} from "./sourceAssetEvaluation";
 
 export {
   labelFor,
