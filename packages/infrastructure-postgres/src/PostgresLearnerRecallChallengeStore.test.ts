@@ -28,6 +28,7 @@ after(async () => {
 });
 
 const seededLearners: string[] = [];
+const ASSET_SET = "qualified-source-assets-v1";
 
 type Sql = ReturnType<typeof createDatabaseClient>;
 
@@ -101,7 +102,7 @@ maybe("create persists an immutable lineup; a second create for the same active 
 
     const challengeId = randomUUID();
     const lineup = itemIds.map((studyItemId, index) => ({ studyItemId, derivedNodeId: nodeIds[index] }));
-    const scope = { learnerStateRef: learner, enrichmentId, scopeKind: "section" as const, scopeAnchorDerivedNodeId: nodeIds[0] };
+    const scope = { learnerStateRef: learner, enrichmentId, assetSetIdentity: ASSET_SET, scopeKind: "section" as const, scopeAnchorDerivedNodeId: nodeIds[0] };
     assert.deepEqual(await store.create({ challengeId, ...scope, lineup }), { created: true });
     assert.deepEqual(await store.create({ challengeId: randomUUID(), ...scope, lineup }), { created: false });
 
@@ -112,6 +113,51 @@ maybe("create persists an immutable lineup; a second create for the same active 
     // A different learner cannot read it.
     const stranger = await seedChallengeLearner(sql);
     assert.equal(await store.getForLearner({ challengeId, learnerStateRef: stranger }), undefined);
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("a new qualified asset set atomically retires the stale active challenge for the same scope", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const { enrichmentId, nodeIds, itemIds } = await seedSubstrate(sql);
+    const learner = await seedChallengeLearner(sql);
+    const store = new PostgresLearnerRecallChallengeStore(sql);
+    const scope = {
+      learnerStateRef: learner,
+      enrichmentId,
+      scopeKind: "section" as const,
+      scopeAnchorDerivedNodeId: nodeIds[0]
+    };
+    const lineup = [{ studyItemId: itemIds[0], derivedNodeId: nodeIds[0] }];
+    const staleId = randomUUID();
+    const currentId = randomUUID();
+    assert.deepEqual(await store.create({
+      challengeId: staleId,
+      ...scope,
+      assetSetIdentity: "qualified-source-assets-old",
+      lineup
+    }), { created: true });
+    assert.deepEqual(await store.create({
+      challengeId: currentId,
+      ...scope,
+      assetSetIdentity: "qualified-source-assets-current",
+      lineup
+    }), { created: true });
+
+    assert.equal((await store.getForLearner({ challengeId: staleId, learnerStateRef: learner }))?.challenge.status, "abandoned");
+    assert.equal((await store.getForLearner({ challengeId: currentId, learnerStateRef: learner }))?.challenge.status, "active");
+    assert.deepEqual(await store.listForLearnerEnrichment({
+      learnerStateRef: learner,
+      enrichmentId,
+      assetSetIdentity: "qualified-source-assets-old"
+    }).then((rows) => rows.map((row) => row.challengeId)), [staleId]);
+    assert.deepEqual(await store.listForLearnerEnrichment({
+      learnerStateRef: learner,
+      enrichmentId,
+      assetSetIdentity: "qualified-source-assets-current"
+    }).then((rows) => rows.map((row) => row.challengeId)), [currentId]);
   } finally {
     await sql.end();
   }
@@ -128,6 +174,7 @@ maybe("appendEvent serializes on expectedSeq, dedupes attemptRef, and materializ
       challengeId,
       learnerStateRef: learner,
       enrichmentId,
+      assetSetIdentity: ASSET_SET,
       scopeKind: "section",
       scopeAnchorDerivedNodeId: nodeIds[0],
       lineup: [{ studyItemId: itemIds[0], derivedNodeId: nodeIds[0] }]
@@ -165,6 +212,7 @@ maybe("a stale expectedSeq is rejected without writing (concurrent answer race)"
       challengeId,
       learnerStateRef: learner,
       enrichmentId,
+      assetSetIdentity: ASSET_SET,
       scopeKind: "section",
       scopeAnchorDerivedNodeId: nodeIds[0],
       lineup: itemIds.map((studyItemId, index) => ({ studyItemId, derivedNodeId: nodeIds[index] }))
@@ -189,7 +237,7 @@ maybe("lifecycle events dedupe on operationRef; abandon frees the scope for a fr
     const learner = await seedChallengeLearner(sql);
     const store = new PostgresLearnerRecallChallengeStore(sql);
     const challengeId = randomUUID();
-    const scope = { learnerStateRef: learner, enrichmentId, scopeKind: "section" as const, scopeAnchorDerivedNodeId: nodeIds[0] };
+    const scope = { learnerStateRef: learner, enrichmentId, assetSetIdentity: ASSET_SET, scopeKind: "section" as const, scopeAnchorDerivedNodeId: nodeIds[0] };
     const lineup = [{ studyItemId: itemIds[0], derivedNodeId: nodeIds[0] }];
     await store.create({ challengeId, ...scope, lineup });
 
@@ -222,6 +270,7 @@ maybe("an active lineup survives Study Item supersession and hydrates by identit
       challengeId,
       learnerStateRef: learner,
       enrichmentId,
+      assetSetIdentity: ASSET_SET,
       scopeKind: "enrichment",
       scopeAnchorDerivedNodeId: nodeIds[1],
       lineup: itemIds.map((studyItemId, index) => ({ studyItemId, derivedNodeId: nodeIds[index] }))
@@ -253,7 +302,7 @@ maybe("prior exposure counts lineup memberships; won scopes report the FIRST vic
     const { enrichmentId, nodeIds, itemIds } = await seedSubstrate(sql);
     const learner = await seedChallengeLearner(sql);
     const store = new PostgresLearnerRecallChallengeStore(sql);
-    const scope = { learnerStateRef: learner, enrichmentId, scopeKind: "section" as const, scopeAnchorDerivedNodeId: nodeIds[0] };
+    const scope = { learnerStateRef: learner, enrichmentId, assetSetIdentity: ASSET_SET, scopeKind: "section" as const, scopeAnchorDerivedNodeId: nodeIds[0] };
     const lineup = [{ studyItemId: itemIds[0], derivedNodeId: nodeIds[0] }];
 
     const firstWin = randomUUID();
@@ -264,8 +313,8 @@ maybe("prior exposure counts lineup memberships; won scopes report the FIRST vic
     await store.appendEvent({ challengeId: rematch, learnerStateRef: learner, expectedSeq: 1, event: answerEvent(randomUUID(), itemIds[0], false) });
     await store.appendEvent({ challengeId: rematch, learnerStateRef: learner, expectedSeq: 2, event: answerEvent(randomUUID(), itemIds[0], true), materializeStatus: "won" });
 
-    assert.deepEqual(await store.priorExposure({ learnerStateRef: learner, enrichmentId }), { [itemIds[0]]: 2 });
-    const won = await store.listWonScopes({ learnerStateRef: learner, enrichmentId });
+    assert.deepEqual(await store.priorExposure({ learnerStateRef: learner, enrichmentId, assetSetIdentity: ASSET_SET }), { [itemIds[0]]: 2 });
+    const won = await store.listWonScopes({ learnerStateRef: learner, enrichmentId, assetSetIdentity: ASSET_SET });
     assert.deepEqual(won, [{ scopeKind: "section", scopeAnchorDerivedNodeId: nodeIds[0], challengeId: firstWin }]);
 
     // A brand-new store instance replays the identical record (exact resume, KTD2).
@@ -294,6 +343,7 @@ maybe("recall challenge writes leave response_log untouched (KTD4)", async () =>
       challengeId,
       learnerStateRef: learner,
       enrichmentId,
+      assetSetIdentity: ASSET_SET,
       scopeKind: "section",
       scopeAnchorDerivedNodeId: nodeIds[0],
       lineup: [{ studyItemId: itemIds[0], derivedNodeId: nodeIds[0] }]

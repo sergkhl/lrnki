@@ -177,6 +177,7 @@ maybeDb("paused Synthetic Topic routes expose one capability and perform no writ
     // enrichment id directly. The held-out detail is inspectable in Postgres, but choose and
     // activation both refuse before making it learner-active.
     const heldEnrichmentId = randomUUID();
+    const heldNodeId = randomUUID();
     await sql`
       INSERT INTO graph_enrichments (
         enrichment_id, graph_version_id, enrichment_config_hash, status,
@@ -187,16 +188,14 @@ maybeDb("paused Synthetic Topic routes expose one capability and perform no writ
         derived_node_id, enrichment_id, node_kind, concept_id, grounding_origin,
         role, canonical_label, normalized_label, declared_domain, aliases
       ) VALUES (
-        ${randomUUID()}, ${heldEnrichmentId}, 'enrichment', NULL, 'llm_grounded',
+        ${heldNodeId}, ${heldEnrichmentId}, 'enrichment', NULL, 'llm_grounded',
         'prerequisite', 'Held prerequisite', 'held prerequisite', 'test', '[]'::jsonb
       )`;
     const chooseHeld = await authed("/expedition/choose", {
-      enrichmentId: heldEnrichmentId,
-      title: "Client-supplied title",
-      declaredDomain: "client-supplied domain"
+      enrichmentId: heldEnrichmentId
     });
     assert.equal(chooseHeld.status, 409);
-    assert.equal((await chooseHeld.json() as { capability: string }).capability, "llmGroundedPrerequisites");
+    assert.equal((await chooseHeld.json() as { error: string }).error, "registered_source_required");
     const [afterChoose] = await sql<{ count: number }[]>`
       SELECT count(*)::int AS count
       FROM learner_expeditions
@@ -213,13 +212,31 @@ maybeDb("paused Synthetic Topic routes expose one capability and perform no writ
         'ready', ${heldEnrichmentId}, false
       )`;
     const activateHeld = await authed("/expedition/activate", {
-      learnerExpeditionId: historicalExpeditionId,
-      enrichmentId: heldEnrichmentId
+      learnerExpeditionId: historicalExpeditionId
     });
     assert.equal(activateHeld.status, 409);
     const [heldRow] = await sql<{ active: boolean }[]>`
       SELECT active FROM learner_expeditions WHERE learner_expedition_id = ${historicalExpeditionId}`;
     assert.equal(heldRow.active, false, "held historical row remains inactive");
+
+    const heldVerdict = await authed("/study/verdict", {
+      enrichmentId: heldEnrichmentId,
+      derivedNodeId: heldNodeId,
+      verdict: "known"
+    });
+    assert.equal(heldVerdict.status, 409);
+    assert.deepEqual(await heldVerdict.json(), { ok: false, error: "expedition_inactive" });
+    const heldLessonRead = await authed("/study/lesson-read", {
+      enrichmentId: heldEnrichmentId,
+      derivedNodeId: heldNodeId
+    });
+    assert.equal(heldLessonRead.status, 409);
+    assert.deepEqual(await heldLessonRead.json(), { ok: false, error: "expedition_inactive" });
+    const [heldWrites] = await sql<{ verdicts: number; reads: number }[]>`
+      SELECT
+        (SELECT count(*)::int FROM calibration_verdicts WHERE learner_state_ref = ${learner}) AS verdicts,
+        (SELECT count(*)::int FROM lesson_reads WHERE learner_state_ref = ${learner}) AS reads`;
+    assert.deepEqual(heldWrites, { verdicts: 0, reads: 0 }, "held routes report refusal and write nothing");
   } finally {
     if (learner) await deleteLearner(sql, learner);
     await Promise.all([sql.end(), authClientSql.end()]);
@@ -227,7 +244,14 @@ maybeDb("paused Synthetic Topic routes expose one capability and perform no writ
 });
 
 maybeDb("recall challenge end-to-end: create, Last Stand, recovery win, idempotent replay, response_log untouched", async () => {
-  const { createDatabaseClient, PostgresResponseLogStore, PostgresStudyItemBankStore } = await import("@lrnki/infrastructure-postgres");
+  const {
+    createDatabaseClient,
+    PostgresConceptLessonStore,
+    PostgresResponseLogStore,
+    PostgresStudyItemBankStore
+  } = await import("@lrnki/infrastructure-postgres");
+  const { qualifiedSourceExpeditionAssetConfigHash } = await import("@lrnki/application");
+  const { studyItemBankConfigHash } = await import("@lrnki/infrastructure-litellm");
   const { deleteLearner } = await import("@lrnki/infrastructure-postgres/test-support");
   const sql = createDatabaseClient(databaseUrl as string);
   // Better Auth gets its own client. Sharing one here does not merely couple the two — Drizzle
@@ -258,8 +282,25 @@ maybeDb("recall challenge end-to-end: create, Last Stand, recovery win, idempote
         ...(body === undefined ? {} : { body: JSON.stringify(body) })
       });
 
-    // Seed a minimal enrichment: one isolated node with one current option-select item the
-    // learner has answered latest-correct (the eligibility rule).
+    // Seed a minimal fully qualified Source Expedition: a two-stop source-backed trail with
+    // one current source-cited lesson and option-select activity per stop. The learner has
+    // answered the prerequisite item latest-correct (the challenge eligibility rule).
+    const sourceResourceId = randomUUID();
+    const sourceDocumentId = randomUUID();
+    const sourceBlockId = randomUUID();
+    const sourceText = "A source-backed definition establishes the tested concept.";
+    await sql`
+      INSERT INTO source_resources
+        (source_resource_id, content_hash, content_type, object_key, declared_domain, title)
+      VALUES (${sourceResourceId}, ${randomUUID()}, 'text/plain', ${randomUUID()}, 'software engineering', 'Challenge source')`;
+    await sql`
+      INSERT INTO source_documents
+        (source_document_id, source_resource_id, parser_name, parser_version, parser_config_hash)
+      VALUES (${sourceDocumentId}, ${sourceResourceId}, 'test', '1', 'test')`;
+    await sql`
+      INSERT INTO source_blocks
+        (source_block_id, source_document_id, block_id, block_type, text, heading_path, locator)
+      VALUES (${sourceBlockId}, ${sourceDocumentId}, 'block-1', 'paragraph', ${sourceText}, ${sql.json(["Challenge source"])}, ${sql.json({ lineStart: 1, lineEnd: 1 })})`;
     const graphVersionId = randomUUID();
     await sql`
       INSERT INTO graph_versions (graph_version_id, base_graph_version_id, status, refinement_config_hash, published_at)
@@ -268,48 +309,103 @@ maybeDb("recall challenge end-to-end: create, Last Stand, recovery win, idempote
     await sql`
       INSERT INTO graph_enrichments (enrichment_id, graph_version_id, enrichment_config_hash, status, judge_model, difficulty_method, completed_at)
       VALUES (${enrichmentId}, ${graphVersionId}, 'test', 'succeeded', 'j', 'd', now())`;
-    const conceptId = randomUUID();
+    const nodeIds = [randomUUID(), randomUUID()];
+    for (const [index, nodeId] of nodeIds.entries()) {
+      const conceptId = randomUUID();
+      const label = index === 0 ? "Source prerequisite" : "Source summit";
+      await sql`
+        INSERT INTO concepts (concept_id, iri, normalized_label, declared_domain)
+        VALUES (${conceptId}, ${`urn:lrnki:concept:${conceptId}`}, ${`node-${conceptId}`}, 'software engineering')`;
+      await sql`
+        INSERT INTO derived_graph_nodes (derived_node_id, enrichment_id, node_kind, concept_id, grounding_origin, role, canonical_label, normalized_label, declared_domain, aliases)
+        VALUES (${nodeId}, ${enrichmentId}, 'anchor', ${conceptId}, 'document_anchored', 'anchor', ${label}, ${`node-${conceptId}`}, 'software engineering', '[]'::jsonb)`;
+    }
     await sql`
-      INSERT INTO concepts (concept_id, iri, normalized_label, declared_domain)
-      VALUES (${conceptId}, ${`urn:lrnki:concept:${conceptId}`}, ${`node-${conceptId}`}, 'software engineering')`;
-    const nodeId = randomUUID();
-    await sql`
-      INSERT INTO derived_graph_nodes (derived_node_id, enrichment_id, node_kind, concept_id, grounding_origin, role, canonical_label, normalized_label, declared_domain, aliases)
-      VALUES (${nodeId}, ${enrichmentId}, 'anchor', ${conceptId}, 'document_anchored', 'anchor', 'Node', ${`node-${conceptId}`}, 'software engineering', '[]'::jsonb)`;
+      INSERT INTO inferred_prerequisite_edges (
+        inferred_prerequisite_edge_id, enrichment_id, prerequisite_derived_node_id,
+        dependent_derived_node_id, confidence, uncertain, judge_model, provenance
+      ) VALUES (
+        ${randomUUID()}, ${enrichmentId}, ${nodeIds[0]}, ${nodeIds[1]},
+        0.95, false, 'test-judge', ${sql.json({ source: "test" })}
+      )`;
+    const qualifiedConfigHash = qualifiedSourceExpeditionAssetConfigHash(studyItemBankConfigHash());
+    const citation = {
+      provenance: "source" as const,
+      sourceResourceId,
+      sourceBlockId,
+      evidenceQuote: sourceText,
+      matchKind: "exact" as const
+    };
+    await new PostgresConceptLessonStore(sql).persist({
+      graphVersionId,
+      enrichmentId,
+      configHash: qualifiedConfigHash,
+      lessons: nodeIds.map((derivedNodeId, index) => ({
+        conceptLessonId: randomUUID(),
+        graphVersionId,
+        enrichmentId,
+        derivedNodeId,
+        generatingModel: "test-model",
+        configHash: qualifiedConfigHash,
+        canonicalLabel: index === 0 ? "Source prerequisite" : "Source summit",
+        sections: [{
+          kind: "definition" as const,
+          text: sourceText,
+          groundingProvenance: "source_cep" as const,
+          citation
+        }],
+        explorableTerms: []
+      })),
+      absent: []
+    });
     const correctOptionId = randomUUID();
     const wrongOptionId = randomUUID();
-    const studyItemId = randomUUID();
+    const studyItemIds = [randomUUID(), randomUUID()];
+    const studyItemId = studyItemIds[0];
     await new PostgresStudyItemBankStore(sql).persist({
-      graphVersionId: null,
+      graphVersionId,
       enrichmentId,
-      configHash: "test",
-      studyItems: [{
-        studyItemId,
-        graphVersionId: null,
+      configHash: qualifiedConfigHash,
+      studyItems: nodeIds.map((derivedNodeId, index) => ({
+        studyItemId: studyItemIds[index],
+        graphVersionId,
         enrichmentId,
-        derivedNodeId: nodeId,
-        groundingProvenance: "generated",
-        generatingModel: "test",
-        configHash: "test",
+        derivedNodeId,
+        groundingProvenance: "source_cep" as const,
+        generatingModel: "test-model",
+        configHash: qualifiedConfigHash,
         explorableTerms: [],
-        itemType: "option_select",
-        question: "Which is right?",
-        explanation: "Because.",
+        itemType: "option_select" as const,
+        question: "Which claim follows the source?",
+        explanation: "The cited answer follows the source.",
         options: [
-          { optionId: correctOptionId, text: "right", isCorrect: true, provenance: "source", citation: { provenance: "generated", derivedNodeId: nodeId, passageText: "grounding" } },
-          { optionId: wrongOptionId, text: "wrong-a", isCorrect: false, provenance: "generated" },
-          { optionId: randomUUID(), text: "wrong-b", isCorrect: false, provenance: "generated" },
-          { optionId: randomUUID(), text: "wrong-c", isCorrect: false, provenance: "generated" }
+          {
+            optionId: index === 0 ? correctOptionId : randomUUID(),
+            text: sourceText,
+            isCorrect: true,
+            provenance: "source" as const,
+            citation
+          },
+          {
+            optionId: index === 0 ? wrongOptionId : randomUUID(),
+            text: "Wrong A",
+            isCorrect: false,
+            provenance: "generated" as const
+          },
+          { optionId: randomUUID(), text: "Wrong B", isCorrect: false, provenance: "generated" as const },
+          { optionId: randomUUID(), text: "Wrong C", isCorrect: false, provenance: "generated" as const }
         ]
-      }],
+      })),
       rejected: []
     });
+    const adoption = await authed("/expedition/choose", { enrichmentId });
+    assert.equal(adoption.status, 200);
     await new PostgresResponseLogStore(sql).append([{
       responseId: randomUUID(),
       learnerStateRef: learner,
       scope: "neutral",
       studyItemId,
-      derivedNodeId: nodeId,
+      derivedNodeId: nodeIds[0],
       signalType: "graded",
       judgedOutcome: "correct",
       gradedScore: 1,
@@ -331,14 +427,14 @@ maybeDb("recall challenge end-to-end: create, Last Stand, recovery win, idempote
     // Fresh-start over an active challenge conflicts; invalid anchors are 422.
     const badAnchor = await authed("/challenge/create", { enrichmentId, scopeKind: "section", anchorDerivedNodeId: randomUUID() });
     assert.equal(badAnchor.status, 422);
-    const createRes = await authed("/challenge/create", { enrichmentId, scopeKind: "section", anchorDerivedNodeId: nodeId });
+    const createRes = await authed("/challenge/create", { enrichmentId, scopeKind: "section", anchorDerivedNodeId: nodeIds[1] });
     assert.equal(createRes.status, 200);
     const created = (await createRes.json()) as { created: true; view: { challengeId: string; state: string; remainingMissBuffer: number; currentItem: { kind: string; item: { studyItemId: string } } } };
     const challengeId = created.view.challengeId;
     assert.equal(created.view.state, "active");
     // No pre-answer key anywhere in the wire view.
     assert.ok(!JSON.stringify(created.view).includes("isCorrect"));
-    const conflict = await authed("/challenge/create", { enrichmentId, scopeKind: "section", anchorDerivedNodeId: nodeId });
+    const conflict = await authed("/challenge/create", { enrichmentId, scopeKind: "section", anchorDerivedNodeId: nodeIds[1] });
     assert.equal(conflict.status, 409);
     assert.equal(((await conflict.json()) as { activeChallengeId: string }).activeChallengeId, challengeId);
 
@@ -384,7 +480,7 @@ maybeDb("recall challenge end-to-end: create, Last Stand, recovery win, idempote
     assert.equal(await responseLogBaseline(), logBefore);
 
     // A rematch creates a fresh challenge; abandoning it frees the scope again.
-    const rematch = (await (await authed("/challenge/create", { enrichmentId, scopeKind: "section", anchorDerivedNodeId: nodeId })).json()) as { created: true; view: { challengeId: string } };
+    const rematch = (await (await authed("/challenge/create", { enrichmentId, scopeKind: "section", anchorDerivedNodeId: nodeIds[1] })).json()) as { created: true; view: { challengeId: string } };
     assert.notEqual(rematch.view.challengeId, challengeId);
     assert.equal((await authed("/challenge/abandon", { challengeId: rematch.view.challengeId, operationRef: randomUUID() })).status, 200);
     assert.equal((await authed(`/challenge/${rematch.view.challengeId}`)).status, 404);

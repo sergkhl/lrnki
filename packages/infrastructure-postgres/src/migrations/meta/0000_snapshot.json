@@ -1,5 +1,5 @@
 {
-  "id": "8b5183a8-0cfd-4103-8c8b-2355f251a6e5",
+  "id": "a5280e8f-90ae-4aca-b113-058b25708b50",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -4845,6 +4845,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "asset_set_identity": {
+          "name": "asset_set_identity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "active": {
           "name": "active",
           "type": "boolean",
@@ -4996,7 +5002,7 @@
       "checkConstraints": {
         "learner_expeditions_kind_check": {
           "name": "learner_expeditions_kind_check",
-          "value": "kind IN ('topic')"
+          "value": "kind IN ('topic', 'source')"
         },
         "learner_expeditions_status_check": {
           "name": "learner_expeditions_status_check",
@@ -5013,6 +5019,10 @@
         "learner_expeditions_check1": {
           "name": "learner_expeditions_check1",
           "value": "(status = 'ready' AND enrichment_id IS NOT NULL AND declared_domain IS NOT NULL)\n        OR status <> 'ready'"
+        },
+        "learner_expeditions_source_asset_identity_check": {
+          "name": "learner_expeditions_source_asset_identity_check",
+          "value": "(kind = 'source' AND status = 'ready' AND asset_set_identity IS NOT NULL\n        AND current_operation_id IS NULL AND current_operation_type IS NULL)\n        OR (kind = 'topic' AND asset_set_identity IS NULL)"
         }
       },
       "isRLSEnabled": false
@@ -5729,6 +5739,12 @@
         "enrichment_id": {
           "name": "enrichment_id",
           "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "asset_set_identity": {
+          "name": "asset_set_identity",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },

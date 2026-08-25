@@ -4,12 +4,12 @@
 
 ## TODO
 
-- **Curated-source learner workflow — in progress; U0–U1 complete, U2 next.** Follow
-  [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md). The
-  accepted availability policy is now enforced across production-shaped entry points without
-  deleting held-out implementations. Implement only the deep Source Expedition qualification and
-  adoption unit next: one authoritative trusted-trail/current-asset outcome must govern every
-  catalog, adoption, activation, direct-session, and supervisor path.
+- **Curated-source learner workflow — in progress; U0–U2 complete, U3 next.** Follow
+  [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md). One
+  authoritative Source Expedition boundary now owns trusted-trail/current-asset qualification and
+  every learner read/write path without deleting held-out implementations. Implement only the
+  domain-neutral material-claim projection, separate admission outcomes, and joined no-activation
+  evaluation report next.
 
 ## COMPLETED
 

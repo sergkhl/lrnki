@@ -654,7 +654,7 @@ export interface EnrichmentRunStorePort {
 // routing state only: it remembers which expedition rows belong to a learner and
 // which generation operation is in flight. Study readiness, mastery, and rewards
 // remain derived from existing learner-neutral projections.
-export type LearnerExpeditionKind = "topic";
+export type LearnerExpeditionKind = "topic" | "source";
 export type LearnerExpeditionStatus = "generating" | "ready" | "failed";
 
 export interface LearnerExpedition {
@@ -667,6 +667,9 @@ export interface LearnerExpedition {
   currentOperationId: string | null;
   currentOperationType: OperationType | null;
   enrichmentId: string | null;
+  // Opaque identity of the exact current learner-asset set qualified at adoption. Present only
+  // for ready Source Expeditions; application policy owns its contents and comparison meaning.
+  assetSetIdentity: string | null;
   active: boolean;
   failureMessage: string | null;
   generationAttempts: number;
@@ -693,6 +696,7 @@ export interface NewLearnerExpedition {
   currentOperationId?: string | null;
   currentOperationType?: OperationType | null;
   enrichmentId?: string | null;
+  assetSetIdentity?: string | null;
   active?: boolean;
   failureMessage?: string | null;
 }
@@ -721,6 +725,38 @@ export interface LearnerExpeditionStorePort {
     declaredDomain?: string | null;
     failureMessage?: string | null;
   }): Promise<number>;
+}
+
+// The race-safe persistence seam for Source Expedition adoption. Application qualification
+// supplies authoritative presentation facts plus the exact current asset ids it inspected.
+// The adapter locks and compares those rows before writing; it never decides qualification.
+export type SourceExpeditionAssetExpectation = {
+  assetSetIdentity: string;
+  currentConceptLessonIds: string[];
+  currentStudyItemIds: string[];
+};
+
+export interface SourceExpeditionStorePort {
+  adoptSourceExpedition(input: {
+    learnerExpeditionId: string;
+    learnerStateRef: string;
+    enrichmentId: string;
+    title: string;
+    declaredDomain: string;
+    expectedAssets: SourceExpeditionAssetExpectation;
+  }): Promise<
+    | { adopted: true; learnerExpeditionId: string }
+    | { adopted: false; refused: "asset_set_changed" }
+  >;
+  activateSourceExpedition(input: {
+    learnerStateRef: string;
+    learnerExpeditionId: string;
+    enrichmentId: string;
+    expectedAssets: SourceExpeditionAssetExpectation;
+  }): Promise<
+    | { activated: true }
+    | { activated: false; refused: "not_found" | "asset_set_changed" }
+  >;
 }
 
 // ---------------------------------------------------------------------------
@@ -1099,6 +1135,10 @@ export type RecallChallenge = {
   challengeId: string;
   learnerStateRef: string;
   enrichmentId: string;
+  // Opaque identity of the exact qualified Source Expedition asset set from which this
+  // immutable lineup was selected. Learner reads and writes fail closed once the active
+  // expedition moves to a different asset set.
+  assetSetIdentity: string;
   scopeKind: RecallChallengeScopeKind;
   // Stable scope identity: the section milestone node or the enrichment summit node — never a
   // mutable section ordinal (KTD2).
@@ -1160,6 +1200,7 @@ export interface RecallChallengeStorePort {
     challengeId: string;
     learnerStateRef: string;
     enrichmentId: string;
+    assetSetIdentity: string;
     scopeKind: RecallChallengeScopeKind;
     scopeAnchorDerivedNodeId: string;
     lineup: { studyItemId: string; derivedNodeId: string }[];
@@ -1169,11 +1210,16 @@ export interface RecallChallengeStorePort {
   getActiveForScope(input: {
     learnerStateRef: string;
     enrichmentId: string;
+    assetSetIdentity: string;
     scopeKind: RecallChallengeScopeKind;
     scopeAnchorDerivedNodeId: string;
   }): Promise<RecallChallengeRecord | undefined>;
   // Thin challenge rows for scope-status projection (active + won per enrichment).
-  listForLearnerEnrichment(input: { learnerStateRef: string; enrichmentId: string }): Promise<RecallChallenge[]>;
+  listForLearnerEnrichment(input: {
+    learnerStateRef: string;
+    enrichmentId: string;
+    assetSetIdentity: string;
+  }): Promise<RecallChallenge[]>;
   // Serialized event append (KTD2): lock the challenge row, verify ownership + `active` status
   // and that `expectedSeq` is exactly the next sequence, insert the event, and materialize an
   // optional terminal status in the SAME transaction. `duplicate` = this attemptRef/operationRef
@@ -1188,18 +1234,25 @@ export interface RecallChallengeStorePort {
   }): Promise<AppendRecallEventResult>;
   // Prior lineup-membership count per study item across ALL of this learner's challenges for
   // the enrichment — the KTD5 least-exposure selection rank input.
-  priorExposure(input: { learnerStateRef: string; enrichmentId: string }): Promise<Record<string, number>>;
+  priorExposure(input: {
+    learnerStateRef: string;
+    enrichmentId: string;
+    assetSetIdentity: string;
+  }): Promise<Record<string, number>>;
   // First-victory scope facts for reward projection (KTD3): the won challenge IS the formation
   // record; projection collapses any repeat win to the one permanent formation.
-  listWonScopes(input: { learnerStateRef: string; enrichmentId: string }): Promise<{
+  listWonScopes(input: {
+    learnerStateRef: string;
+    enrichmentId: string;
+    assetSetIdentity: string;
+  }): Promise<{
     scopeKind: RecallChallengeScopeKind;
     scopeAnchorDerivedNodeId: string;
     challengeId: string;
   }[]>;
-  // Hydrate the lineup's referenced Study Items INCLUDING superseded generations (KTD4): a
-  // durable lineup stays resumable across bank regeneration because the FK identity survives.
-  // Restricted to items this challenge's lineup references — normal session projections still
-  // select only current bank items.
+  // Hydrate the lineup's referenced Study Items INCLUDING superseded generations (KTD4).
+  // The application admits the result only while the challenge's asset-set identity is active;
+  // old rows remain inspectable but cannot cross a learner boundary after regeneration.
   hydrateLineupItems(input: { challengeId: string }): Promise<StudyItem[]>;
 }
 

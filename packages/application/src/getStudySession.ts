@@ -1,22 +1,19 @@
 import type {
   CalibrationVerdictStorePort,
-  ConceptLessonStorePort,
-  EnrichmentInspectionReadPort,
   EnrichmentLayerPurposeStorePort,
   LessonReadStorePort,
   RecallChallengeStorePort,
   ResponseLogStorePort,
   ScaffoldReferenceActivityReadPort,
-  ScaffoldDetourStorePort,
-  StudyItemBankStorePort
+  ScaffoldDetourStorePort
 } from "@lrnki/ports";
 import { deriveFlooredExpedition } from "./expeditionSections";
 import {
-  derivedGraphLearnerKnowledgeAvailability,
   learnerKnowledgeCapabilityIsAvailable,
   type LearnerKnowledgeAvailability
 } from "./learnerKnowledgeAvailability";
 import { eligibleRecallItems, projectRecallScopeStatuses } from "./recallChallenge";
+import type { SourceExpeditionModule } from "./sourceExpedition";
 import { composeStudySession, type StudySession } from "./studySessionProjection";
 
 // The reading use-case for the Study Session (ADR-0027, KTD1/KTD3). It loads through injected
@@ -30,9 +27,7 @@ import { composeStudySession, type StudySession } from "./studySessionProjection
 export async function getStudySession(input: {
   enrichmentId: string;
   learnerStateRef: string;
-  enrichmentRead: EnrichmentInspectionReadPort;
-  studyItemStore: StudyItemBankStorePort;
-  conceptLessonStore: ConceptLessonStorePort;
+  sourceExpeditions: Pick<SourceExpeditionModule, "openOwned">;
   lessonReadStore?: LessonReadStorePort;
   layerPurposeStore?: EnrichmentLayerPurposeStorePort;
   responseLog: ResponseLogStorePort;
@@ -52,17 +47,19 @@ export async function getStudySession(input: {
   // pure functions the challenge routes use, so the two surfaces cannot drift.
   challengeStore?: RecallChallengeStorePort;
 }): Promise<StudySession | undefined> {
-  const detail = await input.enrichmentRead.getDerivedGraphDetail(input.enrichmentId);
-  if (!detail) return undefined;
-  if (derivedGraphLearnerKnowledgeAvailability(input.learnerKnowledgeAvailability, detail).status !== "available") {
-    return undefined;
-  }
+  const opened = await input.sourceExpeditions.openOwned({
+    learnerStateRef: input.learnerStateRef,
+    enrichmentId: input.enrichmentId
+  });
+  if (opened.status !== "available") return undefined;
+  const { detail, studyItems, lessons, lessonAbsent } = opened.assets;
   const challengeScope = { learnerStateRef: input.learnerStateRef, enrichmentId: input.enrichmentId };
+  const qualifiedChallengeScope = {
+    ...challengeScope,
+    assetSetIdentity: opened.assets.expectedAssets.assetSetIdentity
+  };
 
-  const [studyItems, lessons, lessonAbsent, lessonReads, rows, verdicts, layerPurpose, detours, referenceActivities, challenges, wonScopes, exposure] = await Promise.all([
-    input.studyItemStore.listStudyItemsForEnrichment(input.enrichmentId),
-    input.conceptLessonStore.listLessonsForEnrichment(input.enrichmentId),
-    input.conceptLessonStore.listAbsentForEnrichment(input.enrichmentId),
+  const [lessonReads, rows, verdicts, layerPurpose, detours, referenceActivities, challenges, wonScopes, exposure] = await Promise.all([
     input.lessonReadStore ? input.lessonReadStore.listForLearner(input.learnerStateRef) : Promise.resolve([]),
     input.responseLog.listForLearner(input.learnerStateRef),
     input.verdictStore.listForLearner(input.learnerStateRef),
@@ -72,9 +69,9 @@ export async function getStudySession(input: {
           .then((rows) => rows.filter((detour) => scaffoldDetourIsLearnerAvailable(detour, input.learnerKnowledgeAvailability)))
       : Promise.resolve([]),
     input.scaffoldReferenceRead ? input.scaffoldReferenceRead.listForLearnerEnrichment(challengeScope) : Promise.resolve([]),
-    input.challengeStore ? input.challengeStore.listForLearnerEnrichment(challengeScope) : Promise.resolve([]),
-    input.challengeStore ? input.challengeStore.listWonScopes(challengeScope) : Promise.resolve([]),
-    input.challengeStore ? input.challengeStore.priorExposure(challengeScope) : Promise.resolve({})
+    input.challengeStore ? input.challengeStore.listForLearnerEnrichment(qualifiedChallengeScope) : Promise.resolve([]),
+    input.challengeStore ? input.challengeStore.listWonScopes(qualifiedChallengeScope) : Promise.resolve([]),
+    input.challengeStore ? input.challengeStore.priorExposure(qualifiedChallengeScope) : Promise.resolve({})
   ]);
 
   let recallScopes: StudySession["recallScopes"] = [];

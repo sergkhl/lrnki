@@ -26,13 +26,13 @@ export async function refreshJournal(): Promise<void> {
   await queryClient.invalidateQueries({ queryKey: journalQuery.queryKey });
 }
 
-export async function chooseCandidateExpedition(input: { enrichmentId: string; title: string; declaredDomain: string }): Promise<void> {
+export async function chooseCandidateExpedition(input: { enrichmentId: string }): Promise<void> {
   await api.expedition.choose.$post({ json: input });
   await refreshJournal();
 }
 
-export async function setActiveExpedition(input: { learnerExpeditionId: string; enrichmentId?: string | null }): Promise<void> {
-  await api.expedition.activate.$post({ json: { learnerExpeditionId: input.learnerExpeditionId, enrichmentId: input.enrichmentId } });
+export async function setActiveExpedition(input: { learnerExpeditionId: string }): Promise<void> {
+  await api.expedition.activate.$post({ json: input });
   await refreshJournal();
 }
 

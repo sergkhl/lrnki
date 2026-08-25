@@ -1,9 +1,6 @@
 import type { StudyItem, Verdict } from "@lrnki/domain-core";
 import type {
   CalibrationVerdictStorePort,
-  EnrichmentInspectionReadPort,
-  LearnerExpedition,
-  LearnerExpeditionStorePort,
   LessonReadStorePort,
   ResponseLogStorePort,
   ScaffoldDetourStorePort,
@@ -11,6 +8,7 @@ import type {
   StudyItemBankStorePort
 } from "@lrnki/ports";
 import { appendGradedMatchingOutcome, appendGradedScaffoldOutcome, appendGradedSelectionOutcome, keyedCorrectIdFor, keyedMatchIdFor, type MatchingAttemptTrace } from "./gradedSelectionOutcome";
+import type { SourceExpeditionModule } from "./sourceExpedition";
 
 // The learner-grading use-case (Candidate 2, ADR-0027). It owns the whole load-guard-resolve-grade
 // -append composition the Admin Lab server actions used to hand-write in raw SQL, so the grading
@@ -50,29 +48,33 @@ export type NodeWriteResult =
   | { recorded: false; refused: NodeWriteRefusalReason };
 
 type StudyResponsePorts = {
-  expeditionStore: LearnerExpeditionStorePort;
+  sourceExpeditions: Pick<SourceExpeditionModule, "authorizeActive">;
   studyItemStore: StudyItemBankStorePort;
   responseLog: ResponseLogStorePort;
 };
 
-// The one guard fact every learner-surface write shares: a `ready` + `active` expedition for this
-// enrichment. Two existing-shaped reads (getByEnrichment, then the item/node read) replace the
-// former single join; the lost atomicity is benign against an append-only log (R2, KTD1).
-async function loadActiveExpedition(
+// One deep Source Expedition authority guards every learner write. It re-qualifies the current
+// asset identity and returns only the exact trail and option-select ids admitted by that snapshot.
+async function loadActiveSourceExpedition(
   input: { learnerStateRef: string; enrichmentId: string },
-  expeditionStore: LearnerExpeditionStorePort
-): Promise<LearnerExpedition | undefined> {
-  const expedition = await expeditionStore.getByEnrichment(input);
-  if (!expedition || expedition.status !== "ready" || !expedition.active) return undefined;
-  return expedition;
+  sourceExpeditions: Pick<SourceExpeditionModule, "authorizeActive">
+) {
+  const authorization = await sourceExpeditions.authorizeActive(input);
+  return authorization.status === "available" ? authorization : undefined;
 }
 
 // Load the current-generation item and confirm it belongs to the guarded expedition and matches the
 // submitted type. Mirrors the WHERE clauses of the deleted per-type SQL (R3).
 async function loadGradableItem(
-  input: { enrichmentId: string; studyItemId: string; itemType: StudyItem["itemType"] },
+  input: {
+    enrichmentId: string;
+    studyItemId: string;
+    itemType: StudyItem["itemType"];
+    qualifiedStudyItemIds: ReadonlySet<string>;
+  },
   studyItemStore: StudyItemBankStorePort
 ): Promise<StudyItem | GradeRefusalReason> {
+  if (!input.qualifiedStudyItemIds.has(input.studyItemId)) return "item_not_found";
   const item = await studyItemStore.getStudyItemById(input.studyItemId);
   if (!item || item.enrichmentId !== input.enrichmentId) return "item_not_found";
   if (item.itemType !== input.itemType) return "item_type_mismatch";
@@ -96,10 +98,18 @@ export async function gradeStudyResponse(
   if (submission.itemType === "option_select" && !submission.chosenOptionId) return { graded: false, refused: "invalid_input" };
   if (submission.itemType === "impostor" && !submission.chosenStatementId) return { graded: false, refused: "invalid_input" };
 
-  const expedition = await loadActiveExpedition({ learnerStateRef, enrichmentId }, ports.expeditionStore);
-  if (!expedition) return { graded: false, refused: "expedition_inactive" };
+  const source = await loadActiveSourceExpedition(
+    { learnerStateRef, enrichmentId },
+    ports.sourceExpeditions
+  );
+  if (!source) return { graded: false, refused: "expedition_inactive" };
 
-  const loaded = await loadGradableItem({ enrichmentId, studyItemId, itemType: submission.itemType }, ports.studyItemStore);
+  const loaded = await loadGradableItem({
+    enrichmentId,
+    studyItemId,
+    itemType: submission.itemType,
+    qualifiedStudyItemIds: source.qualifiedStudyItemIds
+  }, ports.studyItemStore);
   if (typeof loaded === "string") return { graded: false, refused: loaded };
   const item = loaded;
 
@@ -170,7 +180,11 @@ export async function gradeScaffoldOptionSelect(
 // No broad "read superseded item" capability and no answer key crosses the application boundary.
 export async function gradeScaffoldReferenceOptionSelect(
   input: { learnerStateRef: string; scaffoldStepId: string; chosenOptionId: string },
-  ports: { referenceActivityRead: ScaffoldReferenceActivityReadPort; responseLog: ResponseLogStorePort }
+  ports: {
+    referenceActivityRead: ScaffoldReferenceActivityReadPort;
+    responseLog: ResponseLogStorePort;
+    sourceExpeditions: Pick<SourceExpeditionModule, "authorizeActive">;
+  }
 ): Promise<GradeScaffoldOptionSelectResult> {
   if (!input.learnerStateRef || !input.scaffoldStepId || !input.chosenOptionId) {
     return { graded: false, refused: "invalid_input" };
@@ -180,6 +194,15 @@ export async function gradeScaffoldReferenceOptionSelect(
     scaffoldStepId: input.scaffoldStepId
   });
   if (!activity) return { graded: false, refused: "step_not_found" };
+  const authorization = await ports.sourceExpeditions.authorizeActive({
+    learnerStateRef: input.learnerStateRef,
+    enrichmentId: activity.item.enrichmentId
+  });
+  if (authorization.status !== "available" ||
+      !authorization.qualifiedConceptLessonIds.has(activity.lesson.conceptLessonId) ||
+      !authorization.qualifiedStudyItemIds.has(activity.item.studyItemId)) {
+    return { graded: false, refused: "step_not_gradable" };
+  }
   if (
     activity.item.itemType !== "option_select"
     || activity.item.derivedNodeId !== activity.referencedDerivedNodeId
@@ -224,15 +247,26 @@ export async function recordScaffoldLessonRead(
 // write to the Response Log.
 export async function checkMatchingAttempt(
   input: { learnerStateRef: string; enrichmentId: string; studyItemId: string; promptId: string; matchId: string },
-  ports: { expeditionStore: LearnerExpeditionStorePort; studyItemStore: StudyItemBankStorePort }
+  ports: {
+    sourceExpeditions: Pick<SourceExpeditionModule, "authorizeActive">;
+    studyItemStore: StudyItemBankStorePort;
+  }
 ): Promise<MatchingAttemptCheckResult> {
   const { learnerStateRef, enrichmentId, studyItemId, promptId, matchId } = input;
   if (!learnerStateRef || !enrichmentId || !studyItemId || !promptId || !matchId) return { checked: false, refused: "invalid_input" };
 
-  const expedition = await loadActiveExpedition({ learnerStateRef, enrichmentId }, ports.expeditionStore);
-  if (!expedition) return { checked: false, refused: "expedition_inactive" };
+  const source = await loadActiveSourceExpedition(
+    { learnerStateRef, enrichmentId },
+    ports.sourceExpeditions
+  );
+  if (!source) return { checked: false, refused: "expedition_inactive" };
 
-  const loaded = await loadGradableItem({ enrichmentId, studyItemId, itemType: "matching" }, ports.studyItemStore);
+  const loaded = await loadGradableItem({
+    enrichmentId,
+    studyItemId,
+    itemType: "matching",
+    qualifiedStudyItemIds: source.qualifiedStudyItemIds
+  }, ports.studyItemStore);
   if (typeof loaded === "string") return { checked: false, refused: loaded };
   if (loaded.itemType !== "matching") return { checked: false, refused: "item_type_mismatch" };
   const keyedMatchId = keyedMatchIdFor(loaded, promptId);
@@ -246,13 +280,15 @@ export async function checkMatchingAttempt(
 // are not active, bypassing completion gating in other Study Sessions.
 async function guardNodeWrite(
   input: { learnerStateRef: string; enrichmentId: string; derivedNodeId: string },
-  ports: { expeditionStore: LearnerExpeditionStorePort; enrichmentRead: EnrichmentInspectionReadPort }
+  ports: { sourceExpeditions: Pick<SourceExpeditionModule, "authorizeActive"> }
 ): Promise<NodeWriteRefusalReason | undefined> {
   if (!input.learnerStateRef || !input.enrichmentId || !input.derivedNodeId) return "invalid_input";
-  const expedition = await loadActiveExpedition({ learnerStateRef: input.learnerStateRef, enrichmentId: input.enrichmentId }, ports.expeditionStore);
-  if (!expedition) return "expedition_inactive";
-  const belongs = await ports.enrichmentRead.derivedNodeBelongsToEnrichment(input.enrichmentId, input.derivedNodeId);
-  if (!belongs) return "node_not_in_enrichment";
+  const source = await loadActiveSourceExpedition({
+    learnerStateRef: input.learnerStateRef,
+    enrichmentId: input.enrichmentId
+  }, ports.sourceExpeditions);
+  if (!source) return "expedition_inactive";
+  if (!source.trailNodeIds.has(input.derivedNodeId)) return "node_not_in_enrichment";
   return undefined;
 }
 
@@ -260,7 +296,10 @@ async function guardNodeWrite(
 // the caller passes the target verdict, so one path covers set and clear.
 export async function recordLearnerVerdict(
   input: { learnerStateRef: string; enrichmentId: string; derivedNodeId: string; verdict: Verdict },
-  ports: { expeditionStore: LearnerExpeditionStorePort; enrichmentRead: EnrichmentInspectionReadPort; verdictStore: CalibrationVerdictStorePort }
+  ports: {
+    sourceExpeditions: Pick<SourceExpeditionModule, "authorizeActive">;
+    verdictStore: CalibrationVerdictStorePort;
+  }
 ): Promise<NodeWriteResult> {
   const refused = await guardNodeWrite(input, ports);
   if (refused) return { recorded: false, refused };
@@ -270,7 +309,10 @@ export async function recordLearnerVerdict(
 
 export async function recordLessonRead(
   input: { learnerStateRef: string; enrichmentId: string; derivedNodeId: string },
-  ports: { expeditionStore: LearnerExpeditionStorePort; enrichmentRead: EnrichmentInspectionReadPort; lessonReadStore: LessonReadStorePort }
+  ports: {
+    sourceExpeditions: Pick<SourceExpeditionModule, "authorizeActive">;
+    lessonReadStore: LessonReadStorePort;
+  }
 ): Promise<NodeWriteResult> {
   const refused = await guardNodeWrite(input, ports);
   if (refused) return { recorded: false, refused };

@@ -1,9 +1,7 @@
 import { neutralResponses } from "@lrnki/domain-core";
 import type {
-  DerivedGraphDetail,
   EnrichmentInspectionReadPort,
   EnrichmentLayerPurposeStorePort,
-  EnrichmentSummary,
   LearnerExpedition,
   LearnerExpeditionStorePort,
   LessonReadStorePort,
@@ -14,11 +12,11 @@ import type {
 } from "@lrnki/ports";
 import { deriveFlooredExpedition } from "./expeditionSections";
 import {
-  derivedGraphLearnerKnowledgeAvailability,
   learnerKnowledgeCapabilityIsAvailable,
   type LearnerKnowledgeAvailability
 } from "./learnerKnowledgeAvailability";
 import { isStaleOperation } from "./operationRunLiveness";
+import type { SourceExpeditionCandidate, SourceExpeditionModule } from "./sourceExpedition";
 import {
   TOPIC_EXPEDITION_STAGE_PROFILE,
   TOPIC_EXPEDITION_STAGE_TOTAL,
@@ -33,16 +31,7 @@ import {
 
 // The shared, beginnable candidate as surfaces render and act on it. Readiness rank,
 // adoption linkage, and summit identity are module-internal.
-export type ExpeditionCandidateCard = {
-  enrichmentId: string;
-  title: string;
-  declaredDomain: string;
-  totalStopCount: number;
-  // Search-only trail vocabulary keeps Browse all discoverable when a learner's broad
-  // topic word differs from the derived summit title (for example, photosynthesis →
-  // carbon fixation). It is sourced from the already-visible trail, never inferred.
-  searchTerms: string[];
-};
+export type ExpeditionCandidateCard = SourceExpeditionCandidate;
 
 export type ExpeditionProgress = {
   itemsPassed: number;
@@ -104,14 +93,16 @@ export type ExpeditionCatalog = {
 };
 
 export type ExpeditionCatalogDeps = {
-  enrichmentRead: EnrichmentInspectionReadPort;
-  expeditionStore: LearnerExpeditionStorePort;
-  learnerKnowledgeAvailability: LearnerKnowledgeAvailability;
+  sourceExpeditions: Pick<SourceExpeditionModule, "listCandidates">;
 };
 
 // Every dependency is required (KTD7): the interface no longer encodes the
 // implementation's data flow, so `progress` is always present on ready rows.
-export type ExpeditionJournalDeps = ExpeditionCatalogDeps & {
+export type ExpeditionJournalDeps = {
+  sourceExpeditions: Pick<SourceExpeditionModule, "listCandidates" | "openOwned">;
+  enrichmentRead: EnrichmentInspectionReadPort;
+  expeditionStore: LearnerExpeditionStorePort;
+  learnerKnowledgeAvailability: LearnerKnowledgeAvailability;
   studyItemStore: StudyItemBankStorePort;
   responseLog: ResponseLogStorePort;
   lessonReadStore: LessonReadStorePort;
@@ -133,16 +124,21 @@ export async function getExpeditionJournal(
   deps: ExpeditionJournalDeps
 ): Promise<ExpeditionJournal> {
   const [candidates, expeditions, responseRows, lessonReads] = await Promise.all([
-    deriveSharedCandidates(deps.enrichmentRead, deps.learnerKnowledgeAvailability),
+    deps.sourceExpeditions.listCandidates(input),
     deps.expeditionStore.listForLearner(input.learnerStateRef),
     deps.responseLog.listForLearner(input.learnerStateRef),
     deps.lessonReadStore.listForLearner(input.learnerStateRef)
   ]);
 
   const attempts = foldGradedAttempts(responseRows);
+  const syntheticAvailable = learnerKnowledgeCapabilityIsAvailable(
+    deps.learnerKnowledgeAvailability,
+    "syntheticTopicGeneration"
+  );
   const ownedExpeditions = expeditions.filter((expedition) =>
-    expedition.status === "ready" ||
-    learnerKnowledgeCapabilityIsAvailable(deps.learnerKnowledgeAvailability, "syntheticTopicGeneration")
+    expedition.kind === "source"
+      ? expedition.status === "ready"
+      : syntheticAvailable
   );
   const rows = (await Promise.all(
     ownedExpeditions.map((expedition) =>
@@ -168,9 +164,8 @@ export async function getExpeditionJournal(
   return {
     started,
     yours,
-    // Curation (KTD8): filter adopted candidates first, then take the top five — an
-    // adopted expedition surfaces as an owned row and consumes no Explore slot.
-    shared: filterAdopted(candidates, expeditions).slice(0, EXPLORE_CANDIDATE_LIMIT).map(candidateCard)
+    // Candidate qualification and valid-adoption filtering are owned by Source Expeditions.
+    shared: candidates.slice(0, EXPLORE_CANDIDATE_LIMIT)
   };
 }
 
@@ -180,88 +175,7 @@ export async function getExpeditionCatalog(
   input: { learnerStateRef: string },
   deps: ExpeditionCatalogDeps
 ): Promise<ExpeditionCatalog> {
-  const [candidates, expeditions] = await Promise.all([
-    deriveSharedCandidates(deps.enrichmentRead, deps.learnerKnowledgeAvailability),
-    deps.expeditionStore.listForLearner(input.learnerStateRef)
-  ]);
-  return { candidates: filterAdopted(candidates, expeditions).map(candidateCard) };
-}
-
-// One Begin candidate per enrichment: the whole layer is the trail, so an enrichment
-// offers a single expedition titled with its DERIVED summit. Readiness and counts are
-// trail-scoped — they read only non-floored nodes, the same scope the projection walks.
-type InternalCandidate = ExpeditionCandidateCard & {
-  startedAt: string;
-  readyStopCount: number;
-};
-
-async function deriveSharedCandidates(
-  enrichmentRead: EnrichmentInspectionReadPort,
-  availability: LearnerKnowledgeAvailability
-): Promise<InternalCandidate[]> {
-  if (!learnerKnowledgeCapabilityIsAvailable(availability, "sourceExpeditionAdoption")) return [];
-  const summaries = await enrichmentRead.listEnrichmentSummaries();
-  const details = await Promise.all(
-    summaries
-      .filter((summary) => summary.status === "succeeded" && summary.studyItemCount > 0)
-      .map(async (summary) => ({ summary, detail: await enrichmentRead.getDerivedGraphDetail(summary.enrichmentId) }))
-  );
-  const candidates = details.flatMap(({ summary, detail }) =>
-    detail && derivedGraphLearnerKnowledgeAvailability(availability, detail).status === "available"
-      ? candidateForSummary(summary, detail)
-      : []
-  );
-  candidates.sort(compareExpeditionCandidates);
-  return candidates;
-}
-
-function filterAdopted(candidates: InternalCandidate[], expeditions: LearnerExpedition[]): InternalCandidate[] {
-  const adopted = new Set(expeditions.flatMap((expedition) => (expedition.enrichmentId ? [expedition.enrichmentId] : [])));
-  return candidates.filter((candidate) => !adopted.has(candidate.enrichmentId));
-}
-
-function candidateCard(candidate: InternalCandidate): ExpeditionCandidateCard {
-  return {
-    enrichmentId: candidate.enrichmentId,
-    title: candidate.title,
-    declaredDomain: candidate.declaredDomain,
-    totalStopCount: candidate.totalStopCount,
-    searchTerms: candidate.searchTerms
-  };
-}
-
-function candidateForSummary(summary: EnrichmentSummary, detail: DerivedGraphDetail): InternalCandidate[] {
-  const { summit, trailNodeIds } = deriveFlooredExpedition(detail);
-  if (!summit) return [];
-  const trailNodes = detail.nodes.filter((node) => trailNodeIds.has(node.derivedNodeId));
-  // A one-node layer is a summit without a trail. This is a structural property of an
-  // expedition, shared by Explore and Browse all, rather than a heuristic content gate.
-  if (trailNodes.length < 2) return [];
-  const declaredDomain = detail.nodes.find((node) => node.derivedNodeId === summit.derivedNodeId)?.declaredDomain ?? detail.nodes[0]?.declaredDomain ?? "";
-  return [{
-    enrichmentId: summary.enrichmentId,
-    title: summit.label,
-    declaredDomain,
-    searchTerms: [...new Set(trailNodes.flatMap((node) => [node.label, ...node.aliases]))],
-    startedAt: summary.startedAt,
-    readyStopCount: trailNodes.filter((node) => node.hasStudyItem).length,
-    totalStopCount: trailNodes.length
-  }];
-}
-
-function readyFraction(candidate: InternalCandidate): number {
-  return candidate.totalStopCount === 0 ? 0 : candidate.readyStopCount / candidate.totalStopCount;
-}
-
-function compareExpeditionCandidates(a: InternalCandidate, b: InternalCandidate): number {
-  const aFullyReady = a.readyStopCount === a.totalStopCount && a.totalStopCount > 0;
-  const bFullyReady = b.readyStopCount === b.totalStopCount && b.totalStopCount > 0;
-  return Number(bFullyReady) - Number(aFullyReady) ||
-    readyFraction(b) - readyFraction(a) ||
-    b.totalStopCount - a.totalStopCount ||
-    Date.parse(b.startedAt) - Date.parse(a.startedAt) ||
-    a.title.localeCompare(b.title) ||
-    a.enrichmentId.localeCompare(b.enrichmentId);
+  return { candidates: await deps.sourceExpeditions.listCandidates(input) };
 }
 
 type GradedAttempts = {
@@ -290,25 +204,31 @@ async function readyRow(
   lessonReads: Awaited<ReturnType<LessonReadStorePort["listForLearner"]>>,
   deps: ExpeditionJournalDeps
 ): Promise<ReadyExpeditionRow | undefined> {
+  const opened = expedition.kind === "source" && expedition.enrichmentId
+    ? await deps.sourceExpeditions.openOwned({
+        learnerStateRef: expedition.learnerStateRef,
+        enrichmentId: expedition.enrichmentId
+      })
+    : undefined;
+  if (opened?.status === "unavailable") return undefined;
   const base = {
     status: "ready" as const,
     learnerExpeditionId: expedition.learnerExpeditionId,
-    title: expedition.title,
-    declaredDomain: expedition.declaredDomain,
+    title: opened?.candidate.title ?? expedition.title,
+    declaredDomain: opened?.candidate.declaredDomain ?? expedition.declaredDomain,
     enrichmentId: expedition.enrichmentId,
     active: expedition.active
   };
   if (!expedition.enrichmentId) {
     return { ...base, progress: { itemsPassed: 0, itemsAttempted: 0, lessonsRead: 0, itemsTotal: 0 }, layerPurpose: null };
   }
-  const detail = await deps.enrichmentRead.getDerivedGraphDetail(expedition.enrichmentId);
-  if (detail && derivedGraphLearnerKnowledgeAvailability(deps.learnerKnowledgeAvailability, detail).status !== "available") {
-    return undefined;
-  }
-  const [items, layerPurpose] = await Promise.all([
-    deps.studyItemStore.listStudyItemsForEnrichment(expedition.enrichmentId),
-    deps.layerPurposeStore.get(expedition.enrichmentId)
-  ]);
+  const [detail, items, layerPurpose] = opened
+    ? [opened.assets.detail, opened.assets.studyItems, await deps.layerPurposeStore.get(expedition.enrichmentId)]
+    : await Promise.all([
+        deps.enrichmentRead.getDerivedGraphDetail(expedition.enrichmentId),
+        deps.studyItemStore.listStudyItemsForEnrichment(expedition.enrichmentId),
+        deps.layerPurposeStore.get(expedition.enrichmentId)
+      ]);
   // Count only items on TRAIL-reachable (non-floored) nodes, so the total matches the
   // stop math the trail walks. A missing detail falls back to the whole bank.
   const trailNodeIds = detail ? deriveFlooredExpedition(detail).trailNodeIds : null;

@@ -23,8 +23,10 @@ import {
 import { OPERATION_HEARTBEAT_STALE_AFTER_MS } from "./operationRunLiveness";
 import {
   CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY,
+  derivedGraphLearnerKnowledgeAvailability,
   type LearnerKnowledgeAvailability
 } from "./learnerKnowledgeAvailability";
+import { deriveFlooredExpedition } from "./expeditionSections";
 
 const TOTAL = 19;
 const ALL_LEARNER_KNOWLEDGE_AVAILABLE = {
@@ -371,15 +373,64 @@ function deps(input: {
   timelines?: Record<string, OperationTimelineDetail>;
   learnerKnowledgeAvailability?: LearnerKnowledgeAvailability;
 }): ExpeditionJournalDeps {
+  const learnerKnowledgeAvailability = input.learnerKnowledgeAvailability ??
+    ALL_LEARNER_KNOWLEDGE_AVAILABLE;
+  const expeditions = input.expeditions ?? [];
   return {
+    sourceExpeditions: fakeSourceExpeditions({
+      summaries: input.summaries ?? [],
+      details: input.details ?? {},
+      expeditions,
+      learnerKnowledgeAvailability
+    }),
     enrichmentRead: fakeRead(input.summaries ?? [], input.details ?? {}),
-    expeditionStore: fakeStore(input.expeditions ?? []),
+    expeditionStore: fakeStore(expeditions),
     studyItemStore: fakeStudyItemStore(input.items ?? []),
     responseLog: fakeResponseLog(input.responses ?? []),
     lessonReadStore: fakeLessonReadStore(input.lessonReadNodeIds ?? []),
     layerPurposeStore: fakeLayerPurposeStore(),
     timelineRead: fakeTimelineRead(input.timelines ?? {}),
-    learnerKnowledgeAvailability: input.learnerKnowledgeAvailability ?? ALL_LEARNER_KNOWLEDGE_AVAILABLE
+    learnerKnowledgeAvailability
+  };
+}
+
+function fakeSourceExpeditions(input: {
+  summaries: EnrichmentSummary[];
+  details: Record<string, DerivedGraphDetail>;
+  expeditions: LearnerExpedition[];
+  learnerKnowledgeAvailability: LearnerKnowledgeAvailability;
+}): ExpeditionJournalDeps["sourceExpeditions"] {
+  return {
+    async listCandidates() {
+      const adopted = new Set(input.expeditions.flatMap((row) => row.enrichmentId ? [row.enrichmentId] : []));
+      return input.summaries.flatMap((summary) => {
+        const detail = input.details[summary.enrichmentId];
+        if (!detail || adopted.has(summary.enrichmentId) ||
+            derivedGraphLearnerKnowledgeAvailability(
+              input.learnerKnowledgeAvailability,
+              detail
+            ).status !== "available") return [];
+        const { summit, trailNodeIds } = deriveFlooredExpedition(detail);
+        if (!summit || trailNodeIds.size < 2) return [];
+        const trailNodes = detail.nodes.filter((node) => trailNodeIds.has(node.derivedNodeId));
+        const summitNode = detail.nodes.find((node) => node.derivedNodeId === summit.derivedNodeId);
+        return [{
+          enrichmentId: summary.enrichmentId,
+          title: summit.label,
+          declaredDomain: summitNode?.declaredDomain ?? "",
+          totalStopCount: trailNodeIds.size,
+          searchTerms: [...new Set(trailNodes.flatMap((node) => [node.label, ...node.aliases]))],
+          startedAt: summary.startedAt,
+          ready: trailNodes.every((node) => node.hasStudyItem)
+        }];
+      }).sort((left, right) =>
+        Number(right.ready) - Number(left.ready) ||
+        Date.parse(right.startedAt) - Date.parse(left.startedAt)
+      ).map(({ startedAt: _startedAt, ready: _ready, ...candidate }) => candidate);
+    },
+    async openOwned() {
+      return { status: "unavailable" as const, reason: "expedition_not_owned" as const };
+    }
   };
 }
 
@@ -528,6 +579,7 @@ function expedition(learnerStateRef: string, learnerExpeditionId: string): Learn
     currentOperationId: null,
     currentOperationType: null,
     enrichmentId: null,
+    assetSetIdentity: null,
     active: false,
     failureMessage: null,
     generationAttempts: 0,

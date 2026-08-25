@@ -6,11 +6,13 @@ import type {
   LearnerExpeditionStatus,
   LearnerExpeditionStorePort,
   NewLearnerExpedition,
-  OperationType
+  OperationType,
+  SourceExpeditionAssetExpectation,
+  SourceExpeditionStorePort
 } from "@lrnki/ports";
-import type { Sql } from "postgres";
+import type { Sql, TransactionSql } from "postgres";
 
-export class PostgresLearnerExpeditionStore implements LearnerExpeditionStorePort {
+export class PostgresLearnerExpeditionStore implements LearnerExpeditionStorePort, SourceExpeditionStorePort {
   constructor(private readonly sql: Sql) {}
 
   async upsert(expedition: NewLearnerExpedition): Promise<void> {
@@ -23,14 +25,15 @@ export class PostgresLearnerExpeditionStore implements LearnerExpeditionStorePor
           INSERT INTO learner_expeditions (
             learner_expedition_id, learner_state_ref, kind, title, declared_domain, status,
             current_operation_id, current_operation_type, enrichment_id,
-            active, failure_message
+            asset_set_identity, active, failure_message
           )
           VALUES (
             ${expedition.learnerExpeditionId}, ${expedition.learnerStateRef}, ${expedition.kind},
             ${expedition.title}, ${expedition.declaredDomain}, ${expedition.status},
             ${expedition.currentOperationId ?? null}, ${expedition.currentOperationType ?? null},
             ${expedition.enrichmentId},
-            ${expedition.active ?? false}, ${expedition.failureMessage ?? null}
+            ${expedition.assetSetIdentity ?? null}, ${expedition.active ?? false},
+            ${expedition.failureMessage ?? null}
           )
           ON CONFLICT (learner_state_ref, enrichment_id) WHERE enrichment_id IS NOT NULL DO UPDATE SET
             kind = EXCLUDED.kind,
@@ -39,6 +42,7 @@ export class PostgresLearnerExpeditionStore implements LearnerExpeditionStorePor
             status = EXCLUDED.status,
             current_operation_id = EXCLUDED.current_operation_id,
             current_operation_type = EXCLUDED.current_operation_type,
+            asset_set_identity = EXCLUDED.asset_set_identity,
             active = EXCLUDED.active,
             failure_message = EXCLUDED.failure_message,
             updated_at = now()`;
@@ -47,14 +51,15 @@ export class PostgresLearnerExpeditionStore implements LearnerExpeditionStorePor
           INSERT INTO learner_expeditions (
             learner_expedition_id, learner_state_ref, kind, title, declared_domain, status,
             current_operation_id, current_operation_type, enrichment_id,
-            active, failure_message
+            asset_set_identity, active, failure_message
           )
           VALUES (
             ${expedition.learnerExpeditionId}, ${expedition.learnerStateRef}, ${expedition.kind},
             ${expedition.title}, ${expedition.declaredDomain}, ${expedition.status},
             ${expedition.currentOperationId ?? null}, ${expedition.currentOperationType ?? null},
             null,
-            ${expedition.active ?? false}, ${expedition.failureMessage ?? null}
+            ${expedition.assetSetIdentity ?? null}, ${expedition.active ?? false},
+            ${expedition.failureMessage ?? null}
           )
           ON CONFLICT (learner_expedition_id) DO UPDATE SET
             learner_state_ref = EXCLUDED.learner_state_ref,
@@ -64,6 +69,7 @@ export class PostgresLearnerExpeditionStore implements LearnerExpeditionStorePor
             status = EXCLUDED.status,
             current_operation_id = EXCLUDED.current_operation_id,
             current_operation_type = EXCLUDED.current_operation_type,
+            asset_set_identity = EXCLUDED.asset_set_identity,
             active = EXCLUDED.active,
             failure_message = EXCLUDED.failure_message,
             updated_at = now()`;
@@ -118,6 +124,126 @@ export class PostgresLearnerExpeditionStore implements LearnerExpeditionStorePor
     });
   }
 
+  async adoptSourceExpedition(input: {
+    learnerExpeditionId: string;
+    learnerStateRef: string;
+    enrichmentId: string;
+    title: string;
+    declaredDomain: string;
+    expectedAssets: SourceExpeditionAssetExpectation;
+  }): Promise<
+    | { adopted: true; learnerExpeditionId: string }
+    | { adopted: false; refused: "asset_set_changed" }
+  > {
+    return this.sql.begin(async (tx) => {
+      if (!await this.currentAssetsMatch(tx, input.enrichmentId, input.expectedAssets)) {
+        return { adopted: false as const, refused: "asset_set_changed" as const };
+      }
+      await tx`
+        UPDATE learner_expeditions
+        SET active = false, updated_at = now()
+        WHERE learner_state_ref = ${input.learnerStateRef}`;
+      const rows = await tx<{ learner_expedition_id: string }[]>`
+        INSERT INTO learner_expeditions (
+          learner_expedition_id, learner_state_ref, kind, title, declared_domain, status,
+          current_operation_id, current_operation_type, enrichment_id, asset_set_identity,
+          active, failure_message, generation_attempts, claimed_at
+        ) VALUES (
+          ${input.learnerExpeditionId}, ${input.learnerStateRef}, 'source', ${input.title},
+          ${input.declaredDomain}, 'ready', null, null, ${input.enrichmentId},
+          ${input.expectedAssets.assetSetIdentity}, true, null, 0, null
+        )
+        ON CONFLICT (learner_state_ref, enrichment_id) WHERE enrichment_id IS NOT NULL DO UPDATE SET
+          kind = 'source',
+          title = EXCLUDED.title,
+          declared_domain = EXCLUDED.declared_domain,
+          status = 'ready',
+          current_operation_id = null,
+          current_operation_type = null,
+          asset_set_identity = EXCLUDED.asset_set_identity,
+          active = true,
+          failure_message = null,
+          generation_attempts = 0,
+          claimed_at = null,
+          updated_at = now()
+        RETURNING learner_expedition_id`;
+      return { adopted: true as const, learnerExpeditionId: rows[0].learner_expedition_id };
+    });
+  }
+
+  async activateSourceExpedition(input: {
+    learnerStateRef: string;
+    learnerExpeditionId: string;
+    enrichmentId: string;
+    expectedAssets: SourceExpeditionAssetExpectation;
+  }): Promise<
+    | { activated: true }
+    | { activated: false; refused: "not_found" | "asset_set_changed" }
+  > {
+    return this.sql.begin(async (tx) => {
+      const targets = await tx<{ asset_set_identity: string | null }[]>`
+        SELECT asset_set_identity
+        FROM learner_expeditions
+        WHERE learner_state_ref = ${input.learnerStateRef}
+          AND learner_expedition_id = ${input.learnerExpeditionId}
+          AND enrichment_id = ${input.enrichmentId}
+          AND kind = 'source'
+          AND status = 'ready'
+        FOR UPDATE`;
+      if (!targets[0]) return { activated: false as const, refused: "not_found" as const };
+      if (targets[0].asset_set_identity !== input.expectedAssets.assetSetIdentity ||
+          !await this.currentAssetsMatch(tx, input.enrichmentId, input.expectedAssets)) {
+        return { activated: false as const, refused: "asset_set_changed" as const };
+      }
+      await tx`
+        UPDATE learner_expeditions
+        SET active = false, updated_at = now()
+        WHERE learner_state_ref = ${input.learnerStateRef}
+          AND learner_expedition_id <> ${input.learnerExpeditionId}`;
+      await tx`
+        UPDATE learner_expeditions
+        SET active = true, updated_at = now()
+        WHERE learner_state_ref = ${input.learnerStateRef}
+          AND learner_expedition_id = ${input.learnerExpeditionId}`;
+      return { activated: true as const };
+    });
+  }
+
+  private async currentAssetsMatch(
+    tx: Sql | TransactionSql,
+    enrichmentId: string,
+    expected: SourceExpeditionAssetExpectation
+  ): Promise<boolean> {
+    const enrichments = await tx<{ enrichment_id: string }[]>`
+      SELECT enrichment_id
+      FROM graph_enrichments
+      WHERE enrichment_id = ${enrichmentId}
+        AND graph_version_id IS NOT NULL
+        AND status = 'succeeded'
+      FOR SHARE`;
+    if (!enrichments[0]) return false;
+
+    const lessonRows = await tx<{ concept_lesson_id: string }[]>`
+      SELECT concept_lesson_id
+      FROM concept_lessons
+      WHERE enrichment_id = ${enrichmentId} AND superseded_at IS NULL
+      ORDER BY concept_lesson_id
+      FOR SHARE`;
+    const itemRows = await tx<{ study_item_id: string }[]>`
+      SELECT study_item_id
+      FROM study_items
+      WHERE enrichment_id = ${enrichmentId} AND superseded_at IS NULL
+      ORDER BY study_item_id
+      FOR SHARE`;
+    return sameIds(
+      lessonRows.map((row) => row.concept_lesson_id),
+      expected.currentConceptLessonIds
+    ) && sameIds(
+      itemRows.map((row) => row.study_item_id),
+      expected.currentStudyItemIds
+    );
+  }
+
   // ONE staleness predicate, shared verbatim by claim and fail-exhausted (only the
   // attempts comparison differs). A row is dead — reclaimable or failable — when it
   // was never claimed, or its claim aged past the stale window AND its operation
@@ -129,7 +255,8 @@ export class PostgresLearnerExpeditionStore implements LearnerExpeditionStorePor
   // row clears it but keeps claimed_at as natural backoff.
   private generatingStaleness(staleBefore: Date) {
     return this.sql`
-      le.status = 'generating'
+      le.kind = 'topic'
+      AND le.status = 'generating'
       AND (
         le.claimed_at IS NULL
         OR (
@@ -266,12 +393,13 @@ function toClaimedLearnerExpedition(row: LearnerExpeditionRow): ClaimedLearnerEx
 const learnerExpeditionColumns = (sql: Sql) => sql`
   learner_expedition_id, learner_state_ref, kind, title, declared_domain, status,
   current_operation_id, current_operation_type, enrichment_id,
-  active, failure_message, generation_attempts, claimed_at, created_at, updated_at`;
+  asset_set_identity, active, failure_message, generation_attempts, claimed_at, created_at, updated_at`;
 
 const learnerExpeditionColumnsFromAlias = (sql: Sql, alias: ReturnType<Sql>) => sql`
   ${alias}.learner_expedition_id, ${alias}.learner_state_ref, ${alias}.kind, ${alias}.title,
   ${alias}.declared_domain, ${alias}.status, ${alias}.current_operation_id, ${alias}.current_operation_type,
-  ${alias}.enrichment_id, ${alias}.active, ${alias}.failure_message, ${alias}.generation_attempts,
+  ${alias}.enrichment_id, ${alias}.asset_set_identity, ${alias}.active, ${alias}.failure_message,
+  ${alias}.generation_attempts,
   ${alias}.claimed_at, ${alias}.created_at, ${alias}.updated_at`;
 
 function toLearnerExpedition(row: LearnerExpeditionRow): LearnerExpedition {
@@ -285,6 +413,7 @@ function toLearnerExpedition(row: LearnerExpeditionRow): LearnerExpedition {
     currentOperationId: row.current_operation_id,
     currentOperationType: row.current_operation_type as OperationType | null,
     enrichmentId: row.enrichment_id,
+    assetSetIdentity: row.asset_set_identity,
     active: row.active,
     failureMessage: row.failure_message,
     generationAttempts: row.generation_attempts,
@@ -304,6 +433,7 @@ type LearnerExpeditionRow = {
   current_operation_id: string | null;
   current_operation_type: string | null;
   enrichment_id: string | null;
+  asset_set_identity: string | null;
   active: boolean;
   failure_message: string | null;
   generation_attempts: number;
@@ -311,3 +441,9 @@ type LearnerExpeditionRow = {
   created_at: string;
   updated_at: string;
 };
+
+function sameIds(actual: string[], expected: string[]): boolean {
+  const sortedExpected = [...expected].sort((left, right) => left.localeCompare(right));
+  return actual.length === sortedExpected.length &&
+    actual.every((value, index) => value === sortedExpected[index]);
+}

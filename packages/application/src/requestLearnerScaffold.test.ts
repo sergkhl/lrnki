@@ -81,10 +81,25 @@ function makePorts(over: {
   const upserted: { parentDerivedNodeId: string; term: string; normalizedTerm: string }[] = [];
   const state = { sessionReads: 0, restartCalls: 0 };
   const ports = {
-    expeditionStore: { getByEnrichment: async () => (over.expedition === undefined ? readyExpedition : over.expedition) } as never,
+    sourceExpeditions: {
+      async authorizeActive() {
+        const expedition = over.expedition === undefined ? readyExpedition : over.expedition;
+        if (!expedition || (expedition as typeof readyExpedition).status !== "ready" ||
+            !(expedition as typeof readyExpedition).active) {
+          return { status: "unavailable" as const, reason: "expedition_inactive" as const };
+        }
+        return {
+          status: "available" as const,
+          enrichmentId: "e",
+          assetSetIdentity: "qualified",
+          trailNodeIds: new Set(over.belongs === false ? [] : ["parent", "reference"]),
+          qualifiedConceptLessonIds: new Set(over.lesson ? [over.lesson.conceptLessonId] : []),
+          qualifiedStudyItemIds: new Set(["i1", "item-reference"])
+        };
+      }
+    },
     studyItemStore: { getStudyItemById: async () => ("item" in over ? over.item : studyItem()) } as never,
     conceptLessonStore: { getLesson: async () => over.lesson } as never,
-    enrichmentRead: { derivedNodeBelongsToEnrichment: async () => over.belongs ?? true } as never,
     learnerKnowledgeAvailability: over.learnerKnowledgeAvailability ?? ALL_LEARNER_KNOWLEDGE_AVAILABLE,
     readStudySession: async () => { state.sessionReads += 1; return over.session; },
     scaffoldStore: {

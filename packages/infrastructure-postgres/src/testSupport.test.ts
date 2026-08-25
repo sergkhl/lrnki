@@ -90,8 +90,8 @@ maybe("deleteLearner removes every learner-owned FK family and leaves shared gra
 
     const challengeId = randomUUID();
     await sql`INSERT INTO recall_challenges
-                (challenge_id, learner_state_ref, enrichment_id, scope_kind, scope_anchor_derived_node_id, status)
-              VALUES (${challengeId}, ${ref}, ${enrichment_id}, 'enrichment', ${derived_node_id}, 'active')`;
+                (challenge_id, learner_state_ref, enrichment_id, asset_set_identity, scope_kind, scope_anchor_derived_node_id, status)
+              VALUES (${challengeId}, ${ref}, ${enrichment_id}, 'test-qualified-assets', 'enrichment', ${derived_node_id}, 'active')`;
     await sql`INSERT INTO recall_challenge_lineup (challenge_id, lineup_index, study_item_id, derived_node_id)
               VALUES (${challengeId}, 0, ${study_item_id}, ${derived_node_id})`;
     await sql`INSERT INTO recall_challenge_events (event_id, challenge_id, seq, kind, operation_ref)

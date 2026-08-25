@@ -727,19 +727,23 @@ CREATE TABLE "learner_expeditions" (
 	"current_operation_id" uuid,
 	"current_operation_type" text,
 	"enrichment_id" uuid,
+	"asset_set_identity" text,
 	"active" boolean DEFAULT false NOT NULL,
 	"failure_message" text,
 	"generation_attempts" integer DEFAULT 0 NOT NULL,
 	"claimed_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "learner_expeditions_kind_check" CHECK (kind IN ('topic')),
+	CONSTRAINT "learner_expeditions_kind_check" CHECK (kind IN ('topic', 'source')),
 	CONSTRAINT "learner_expeditions_status_check" CHECK (status IN ('generating', 'ready', 'failed')),
 	CONSTRAINT "learner_expeditions_current_operation_type_check" CHECK (current_operation_type IN ('extraction', 'minting', 'enrichment', 'study_items')),
 	CONSTRAINT "learner_expeditions_check" CHECK ((current_operation_id IS NULL AND current_operation_type IS NULL)
         OR (current_operation_id IS NOT NULL AND current_operation_type IS NOT NULL)),
 	CONSTRAINT "learner_expeditions_check1" CHECK ((status = 'ready' AND enrichment_id IS NOT NULL AND declared_domain IS NOT NULL)
-        OR status <> 'ready')
+        OR status <> 'ready'),
+	CONSTRAINT "learner_expeditions_source_asset_identity_check" CHECK ((kind = 'source' AND status = 'ready' AND asset_set_identity IS NOT NULL
+        AND current_operation_id IS NULL AND current_operation_type IS NULL)
+        OR (kind = 'topic' AND asset_set_identity IS NULL))
 );
 --> statement-breakpoint
 CREATE TABLE "learner_scaffold_detours" (
@@ -861,6 +865,7 @@ CREATE TABLE "recall_challenges" (
 	"challenge_id" uuid PRIMARY KEY NOT NULL,
 	"learner_state_ref" text NOT NULL,
 	"enrichment_id" uuid NOT NULL,
+	"asset_set_identity" text NOT NULL,
 	"scope_kind" text NOT NULL,
 	"scope_anchor_derived_node_id" uuid NOT NULL,
 	"status" text NOT NULL,

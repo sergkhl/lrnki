@@ -94,6 +94,12 @@ export async function selectCandidate(opts: {
   }
 
   for (const candidate of candidates.slice(0, MAX_PROBE_CANDIDATES)) {
+    const adoption = await fetch(`${apiBase}/expedition/choose`, {
+      method: "POST",
+      headers: { cookie, origin: apiBase, "content-type": "application/json" },
+      body: JSON.stringify({ enrichmentId: candidate.enrichmentId })
+    });
+    if (!adoption.ok) continue;
     const detail = await authedJson<{ session: StudySession }>(apiBase, `/expedition/${candidate.enrichmentId}`, cookie);
     if (detail.status !== 200 || !detail.body) continue;
     const gradedKind = reachableGradedKind(detail.body.session);

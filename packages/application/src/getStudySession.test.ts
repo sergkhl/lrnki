@@ -1,16 +1,21 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { CalibrationVerdict, ConceptLesson, LessonAbsentNode, ResponseLogRow, ScaffoldDetour, StudyItem } from "@lrnki/domain-core";
+import type {
+  CalibrationVerdict,
+  ConceptLesson,
+  LessonAbsentNode,
+  OptionSelectItem,
+  ResponseLogRow,
+  ScaffoldDetour,
+  StudyItem
+} from "@lrnki/domain-core";
 import type {
   CalibrationVerdictStorePort,
-  ConceptLessonStorePort,
   DerivedGraphDetail,
-  EnrichmentInspectionReadPort,
   RecallChallengeStorePort,
   ResponseLogStorePort,
   ScaffoldDetourStorePort,
-  ScaffoldReferenceActivityReadPort,
-  StudyItemBankStorePort
+  ScaffoldReferenceActivityReadPort
 } from "@lrnki/ports";
 import { getStudySession } from "./getStudySession";
 import { composeStudySession } from "./studySessionProjection";
@@ -50,24 +55,6 @@ const optionItem: StudyItem = {
 
 // --- Port fakes (no DB) -----------------------------------------------------
 
-function enrichmentRead(detailById: Record<string, DerivedGraphDetail>): EnrichmentInspectionReadPort {
-  return {
-    async listEnrichmentSummaries() { throw new Error("not used"); },
-    async getDerivedGraphDetail(id: string) { return detailById[id]; },
-    async derivedNodeBelongsToEnrichment() { return true; }
-  };
-}
-
-function studyItemStore(items: StudyItem[]): StudyItemBankStorePort {
-  return {
-    async persist() { throw new Error("not used"); },
-    async getStudyItem() { throw new Error("not used"); },
-    async getStudyItemById() { throw new Error("not used"); },
-    async listStudyItemsForEnrichment() { return items; },
-    async supportedItemTypes() { throw new Error("not used"); }
-  };
-}
-
 function responseLog(rows: ResponseLogRow[]): ResponseLogStorePort {
   return {
     async append() { throw new Error("not used"); },
@@ -82,15 +69,6 @@ function verdictStore(verdicts: CalibrationVerdict[]): CalibrationVerdictStorePo
     async delete() { throw new Error("not used"); },
     async listForLearner() { return verdicts; },
     async clearLearner() { throw new Error("not used"); }
-  };
-}
-
-function conceptLessonStore(lessons: ConceptLesson[], absent: LessonAbsentNode[] = []): ConceptLessonStorePort {
-  return {
-    async persist() { throw new Error("not used"); },
-    async getLesson() { throw new Error("not used"); },
-    async listLessonsForEnrichment() { return lessons; },
-    async listAbsentForEnrichment() { return absent; }
   };
 }
 
@@ -115,13 +93,73 @@ const scopeLesson: ConceptLesson = {
   explorableTerms: []
 };
 
+function sourceExpeditions(input: {
+  detailById: Record<string, DerivedGraphDetail>;
+  items?: StudyItem[];
+  lessons?: ConceptLesson[];
+  absent?: LessonAbsentNode[];
+}) {
+  return {
+    async openOwned(request: { learnerStateRef: string; enrichmentId: string }) {
+      const graph = input.detailById[request.enrichmentId];
+      if (!graph) return { status: "unavailable" as const, reason: "enrichment_not_found" as const };
+      const items = (input.items ?? []).filter(
+        (item): item is OptionSelectItem => item.itemType === "option_select"
+      );
+      return {
+        status: "available" as const,
+        candidate: {
+          enrichmentId: request.enrichmentId,
+          title: "Ownership",
+          declaredDomain: "rust",
+          totalStopCount: graph.nodes.length,
+          searchTerms: graph.nodes.map((node) => node.label)
+        },
+        assets: {
+          detail: graph,
+          lessons: input.lessons ?? [],
+          lessonAbsent: input.absent ?? [],
+          studyItems: items,
+          trailNodeIds: new Set(graph.nodes.map((node) => node.derivedNodeId)),
+          expectedAssets: {
+            assetSetIdentity: "qualified-assets",
+            currentConceptLessonIds: (input.lessons ?? []).map((lesson) => lesson.conceptLessonId),
+            currentStudyItemIds: items.map((item) => item.studyItemId)
+          }
+        },
+        expedition: {
+          learnerExpeditionId: "source-expedition",
+          learnerStateRef: request.learnerStateRef,
+          kind: "source" as const,
+          title: "Ownership",
+          declaredDomain: "rust",
+          status: "ready" as const,
+          currentOperationId: null,
+          currentOperationType: null,
+          enrichmentId: request.enrichmentId,
+          assetSetIdentity: "qualified-assets",
+          active: true,
+          failureMessage: null,
+          generationAttempts: 0,
+          claimedAt: null,
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z"
+        }
+      };
+    }
+  };
+}
+
 function callGetStudySession(args: { enrichmentId?: string; items?: StudyItem[]; rows?: ResponseLogRow[]; verdicts?: CalibrationVerdict[]; lessons?: ConceptLesson[]; absent?: LessonAbsentNode[] }) {
   return getStudySession({
     enrichmentId: args.enrichmentId ?? "e",
     learnerStateRef: "L1",
-    enrichmentRead: enrichmentRead({ e: detail() }),
-    studyItemStore: studyItemStore(args.items ?? [optionItem]),
-    conceptLessonStore: conceptLessonStore(args.lessons ?? [], args.absent ?? []),
+    sourceExpeditions: sourceExpeditions({
+      detailById: { e: detail() },
+      items: args.items ?? [optionItem],
+      lessons: args.lessons ?? [],
+      absent: args.absent ?? []
+    }),
     lessonReadStore: lessonReadStore(),
     responseLog: responseLog(args.rows ?? []),
     verdictStore: verdictStore(args.verdicts ?? []),
@@ -133,25 +171,25 @@ test("getStudySession returns undefined for an unknown enrichment", async () => 
   assert.equal(await callGetStudySession({ enrichmentId: "missing" }), undefined);
 });
 
-test("the current policy refuses an LLM-grounded Study Session before loading learner assets", async () => {
-  const heldDetail = detail();
-  heldDetail.nodes[0] = { ...heldDetail.nodes[0], groundingOrigin: "llm_grounded" };
-  let assetRead = false;
+test("a refused Source Expedition returns before loading learner evidence", async () => {
+  let learnerEvidenceRead = false;
   const session = await getStudySession({
     enrichmentId: "e",
     learnerStateRef: "L1",
-    enrichmentRead: enrichmentRead({ e: heldDetail }),
-    studyItemStore: {
-      ...studyItemStore([]),
-      async listStudyItemsForEnrichment() { assetRead = true; return []; }
+    sourceExpeditions: {
+      async openOwned() {
+        return { status: "unavailable", reason: "llm_grounded_prerequisite" };
+      }
     },
-    conceptLessonStore: conceptLessonStore([]),
-    responseLog: responseLog([]),
+    responseLog: {
+      ...responseLog([]),
+      async listForLearner() { learnerEvidenceRead = true; return []; }
+    },
     verdictStore: verdictStore([]),
     learnerKnowledgeAvailability: CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY
   });
   assert.equal(session, undefined);
-  assert.equal(assetRead, false);
+  assert.equal(learnerEvidenceRead, false);
 });
 
 test("getStudySession returns exactly what composeStudySession produces for the loaded data", async () => {
@@ -204,7 +242,7 @@ test("getStudySession composes server-owned recall scopes from the challenge sto
     async getForLearner() { throw new Error("not used"); },
     async getActiveForScope() { throw new Error("not used"); },
     async listForLearnerEnrichment() {
-      return [{ challengeId: "ch-live", learnerStateRef: "L1", enrichmentId: "e", scopeKind: "section", scopeAnchorDerivedNodeId: "ownership", status: "active", createdAt: "t", updatedAt: "t" }];
+      return [{ challengeId: "ch-live", learnerStateRef: "L1", enrichmentId: "e", assetSetIdentity: "qualified-assets", scopeKind: "section", scopeAnchorDerivedNodeId: "ownership", status: "active", createdAt: "t", updatedAt: "t" }];
     },
     async appendEvent() { throw new Error("not used"); },
     async priorExposure() { return { "os-scope": 3 }; },
@@ -219,9 +257,7 @@ test("getStudySession composes server-owned recall scopes from the challenge sto
   const session = await getStudySession({
     enrichmentId: "e",
     learnerStateRef: "L1",
-    enrichmentRead: enrichmentRead({ e: detail() }),
-    studyItemStore: studyItemStore([optionItem]),
-    conceptLessonStore: conceptLessonStore([]),
+    sourceExpeditions: sourceExpeditions({ detailById: { e: detail() }, items: [optionItem] }),
     responseLog: responseLog([correctRow]),
     verdictStore: verdictStore([]),
     challengeStore,
@@ -284,9 +320,11 @@ test("getStudySession loads learner-owned pinned reference activities into the f
   const session = await getStudySession({
     enrichmentId: "e",
     learnerStateRef: "L1",
-    enrichmentRead: enrichmentRead({ e: detail() }),
-    studyItemStore: studyItemStore([optionItem]),
-    conceptLessonStore: conceptLessonStore([scopeLesson]),
+    sourceExpeditions: sourceExpeditions({
+      detailById: { e: detail() },
+      items: [optionItem],
+      lessons: [scopeLesson]
+    }),
     lessonReadStore: lessonReadStore(),
     responseLog: responseLog([]),
     verdictStore: verdictStore([]),
@@ -355,9 +393,11 @@ test("the current policy projects reference detours and suppresses stored genera
   const session = await getStudySession({
     enrichmentId: "e",
     learnerStateRef: "L1",
-    enrichmentRead: enrichmentRead({ e: detail() }),
-    studyItemStore: studyItemStore([optionItem]),
-    conceptLessonStore: conceptLessonStore([scopeLesson]),
+    sourceExpeditions: sourceExpeditions({
+      detailById: { e: detail() },
+      items: [optionItem],
+      lessons: [scopeLesson]
+    }),
     responseLog: responseLog([]),
     verdictStore: verdictStore([]),
     scaffoldStore,

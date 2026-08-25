@@ -143,8 +143,7 @@ function LearnerExpeditionRow({
     void (async () => {
       try {
         await setActiveExpedition({
-          learnerExpeditionId: expedition.learnerExpeditionId,
-          enrichmentId: expedition.enrichmentId
+          learnerExpeditionId: expedition.learnerExpeditionId
         });
         if (expedition.enrichmentId) {
           router.push({ pathname: "/expedition/[enrichmentId]", params: { enrichmentId: expedition.enrichmentId } });
@@ -203,9 +202,7 @@ export function CandidateCard({ candidate }: Readonly<{ candidate: CandidateCard
         // enrichment is safe; adopted candidates never reach this card (they surface
         // as owned rows instead).
         await chooseCandidateExpedition({
-          enrichmentId: candidate.enrichmentId,
-          title: candidate.title,
-          declaredDomain: candidate.declaredDomain
+          enrichmentId: candidate.enrichmentId
         });
         router.push({ pathname: "/expedition/[enrichmentId]", params: { enrichmentId: candidate.enrichmentId } });
       } finally {

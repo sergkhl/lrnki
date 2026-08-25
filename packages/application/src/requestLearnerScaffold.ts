@@ -1,8 +1,6 @@
 import { normalizeConceptLabel, type ScaffoldDetourStatus } from "@lrnki/domain-core";
 import type {
   ConceptLessonStorePort,
-  EnrichmentInspectionReadPort,
-  LearnerExpeditionStorePort,
   ScaffoldDetourStorePort,
   StudyItemBankStorePort
 } from "@lrnki/ports";
@@ -14,6 +12,7 @@ import {
   learnerKnowledgeCapabilityIsAvailable,
   type LearnerKnowledgeAvailability
 } from "./learnerKnowledgeAvailability";
+import type { SourceExpeditionModule } from "./sourceExpedition";
 
 // Request-or-restore a learner-scoped Scaffold Detour (plan 2026-07-12-002 U5, F1, R4-R5). The
 // server NEVER trusts a client-sent term: it verifies the active ready expedition, resolves the
@@ -42,10 +41,9 @@ export type RequestLearnerScaffoldResult =
   | { created: false; refused: RequestScaffoldRefusal };
 
 type RequestScaffoldPorts = {
-  expeditionStore: LearnerExpeditionStorePort;
+  sourceExpeditions: Pick<SourceExpeditionModule, "authorizeActive">;
   studyItemStore: StudyItemBankStorePort;
   conceptLessonStore: ConceptLessonStorePort;
-  enrichmentRead: EnrichmentInspectionReadPort;
   scaffoldStore: ScaffoldDetourStorePort;
   learnerKnowledgeAvailability: LearnerKnowledgeAvailability;
   readStudySession: (input: {
@@ -56,16 +54,23 @@ type RequestScaffoldPorts = {
 
 // Resolve the source block to its parent node id + the exact terms it advertised, or a refusal.
 async function resolveSource(
-  input: { enrichmentId: string; source: ScaffoldTermSource },
+  input: {
+    enrichmentId: string;
+    source: ScaffoldTermSource;
+    qualifiedConceptLessonIds: ReadonlySet<string>;
+    qualifiedStudyItemIds: ReadonlySet<string>;
+  },
   ports: RequestScaffoldPorts
 ): Promise<{ parentDerivedNodeId: string; advertisedTerms: string[] } | RequestScaffoldRefusal> {
   if (input.source.kind === "study_item") {
+    if (!input.qualifiedStudyItemIds.has(input.source.studyItemId)) return "source_not_found";
     const item = await ports.studyItemStore.getStudyItemById(input.source.studyItemId);
     if (!item || item.enrichmentId !== input.enrichmentId) return "source_not_found";
     return { parentDerivedNodeId: item.derivedNodeId, advertisedTerms: item.explorableTerms };
   }
   const lesson = await ports.conceptLessonStore.getLesson(input.source.derivedNodeId);
-  if (!lesson || lesson.enrichmentId !== input.enrichmentId) return "source_not_found";
+  if (!lesson || lesson.enrichmentId !== input.enrichmentId ||
+      !input.qualifiedConceptLessonIds.has(lesson.conceptLessonId)) return "source_not_found";
   // A lesson advertises `{ term, sectionKind }`; the detour keys on the term text only.
   return { parentDerivedNodeId: input.source.derivedNodeId, advertisedTerms: lesson.explorableTerms.map((entry) => entry.term) };
 }
@@ -77,17 +82,25 @@ export async function requestLearnerScaffold(
   const term = input.term.trim();
   if (!input.learnerStateRef || !input.enrichmentId || term.length === 0) return { created: false, refused: "invalid_input" };
 
-  // The one guard every learner-surface write shares: a `ready` + `active` expedition (R5).
-  const expedition = await ports.expeditionStore.getByEnrichment({ learnerStateRef: input.learnerStateRef, enrichmentId: input.enrichmentId });
-  if (!expedition || expedition.status !== "ready" || !expedition.active) return { created: false, refused: "expedition_inactive" };
+  const source = await ports.sourceExpeditions.authorizeActive({
+    learnerStateRef: input.learnerStateRef,
+    enrichmentId: input.enrichmentId
+  });
+  if (source.status !== "available") return { created: false, refused: "expedition_inactive" };
 
-  const resolved = await resolveSource({ enrichmentId: input.enrichmentId, source: input.source }, ports);
+  const resolved = await resolveSource({
+    enrichmentId: input.enrichmentId,
+    source: input.source,
+    qualifiedConceptLessonIds: source.qualifiedConceptLessonIds,
+    qualifiedStudyItemIds: source.qualifiedStudyItemIds
+  }, ports);
   if (typeof resolved === "string") return { created: false, refused: resolved };
 
   // Parent membership in the active enrichment (R5). Study-item sources already carry a matching
   // enrichmentId, but a lesson source's node is re-verified so a stale/foreign node cannot attach.
-  const belongs = await ports.enrichmentRead.derivedNodeBelongsToEnrichment(input.enrichmentId, resolved.parentDerivedNodeId);
-  if (!belongs) return { created: false, refused: "node_not_in_enrichment" };
+  if (!source.trailNodeIds.has(resolved.parentDerivedNodeId)) {
+    return { created: false, refused: "node_not_in_enrichment" };
+  }
 
   // The term must be exactly one the current asset advertised — the deterministic validator already
   // proved these are distinct exact rendered substrings, so an exact membership test is sufficient.

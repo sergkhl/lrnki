@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ImpostorItem, MatchingItem, NewResponseLogRow, OptionSelectItem, ResponseLogRow, StudyItem, Verdict } from "@lrnki/domain-core";
-import type { CalibrationVerdictStorePort, EnrichmentInspectionReadPort, LearnerExpedition, LearnerExpeditionStorePort, LessonRead, LessonReadStorePort, ResponseLogStorePort, ScaffoldReferenceActivity, ScaffoldReferenceActivityReadPort, StudyItemBankStorePort } from "@lrnki/ports";
+import type { CalibrationVerdictStorePort, LearnerExpedition, LessonRead, LessonReadStorePort, ResponseLogStorePort, ScaffoldReferenceActivity, ScaffoldReferenceActivityReadPort, StudyItemBankStorePort } from "@lrnki/ports";
 import type { ScaffoldDetourStorePort } from "@lrnki/ports";
 import type { ScaffoldStep } from "@lrnki/domain-core";
 import { checkMatchingAttempt, gradeScaffoldOptionSelect, gradeScaffoldReferenceOptionSelect, gradeStudyResponse, recordLearnerVerdict, recordLessonRead, recordScaffoldLessonRead } from "./gradeStudyResponse";
@@ -26,17 +26,32 @@ function expedition(overrides: Partial<LearnerExpedition> = {}): LearnerExpediti
     claimedAt: null,
     createdAt: "2026-07-07T00:00:00Z",
     updatedAt: "2026-07-07T00:00:00Z",
-    ...overrides
+    ...overrides,
+    assetSetIdentity: overrides.assetSetIdentity ?? null
   };
 }
 
-function fakeExpeditionStore(exp: LearnerExpedition | undefined): LearnerExpeditionStorePort {
-  const notUsed = () => { throw new Error("not used"); };
+function fakeSourceExpeditions(
+  exp: LearnerExpedition | undefined,
+  overrides: { qualifiedStudyItemIds?: string[]; trailNodeIds?: string[] } = {}
+) {
   return {
-    async getByEnrichment() { return exp; },
-    upsert: notUsed, listForLearner: notUsed as never, getForLearner: notUsed as never,
-    setActive: notUsed, claimNextGenerating: notUsed as never, failExhaustedGenerating: notUsed as never,
-    resetGeneration: notUsed, updateProgress: notUsed as never
+    async authorizeActive(input: { learnerStateRef: string; enrichmentId: string }) {
+      if (!exp || !exp.active || exp.status !== "ready" || exp.learnerStateRef !== input.learnerStateRef ||
+          exp.enrichmentId !== input.enrichmentId) {
+        return { status: "unavailable" as const, reason: "expedition_inactive" as const };
+      }
+      return {
+        status: "available" as const,
+        enrichmentId: input.enrichmentId,
+        assetSetIdentity: "qualified",
+        trailNodeIds: new Set(overrides.trailNodeIds ?? ["node-1"]),
+        qualifiedConceptLessonIds: new Set(["lesson-old"]),
+        qualifiedStudyItemIds: new Set(
+          overrides.qualifiedStudyItemIds ?? ["os-1", "imp-1", "mt-1"]
+        )
+      };
+    }
   };
 }
 
@@ -85,15 +100,6 @@ function fakeLessonReadStore(): { store: LessonReadStorePort; reads: string[] } 
   };
 }
 
-function fakeEnrichmentRead(belongs: boolean): EnrichmentInspectionReadPort {
-  const notUsed = () => { throw new Error("not used"); };
-  return {
-    listEnrichmentSummaries: notUsed as never,
-    getDerivedGraphDetail: notUsed as never,
-    async derivedNodeBelongsToEnrichment() { return belongs; }
-  };
-}
-
 const optionItem: OptionSelectItem = {
   itemType: "option_select", studyItemId: "os-1", graphVersionId: null, enrichmentId: EN, derivedNodeId: "node-1",
   explorableTerms: [],
@@ -128,7 +134,7 @@ test("refuses grading when no active/ready expedition exists (no response row wr
   const log = fakeResponseLog();
   const result = await gradeStudyResponse(
     { learnerStateRef: LEARNER, enrichmentId: EN, studyItemId: "os-1", submission: { itemType: "option_select", chosenOptionId: "o-correct" } },
-    { expeditionStore: fakeExpeditionStore(expedition({ active: false })), studyItemStore: fakeStudyItemStore({ "os-1": optionItem }), responseLog: log.store }
+    { sourceExpeditions: fakeSourceExpeditions(expedition({ active: false })), studyItemStore: fakeStudyItemStore({ "os-1": optionItem }), responseLog: log.store }
   );
   assert.deepEqual(result, { graded: false, refused: "expedition_inactive" });
   assert.equal(log.rows.length, 0);
@@ -138,7 +144,7 @@ test("refuses grading when the expedition is missing entirely", async () => {
   const log = fakeResponseLog();
   const result = await gradeStudyResponse(
     { learnerStateRef: LEARNER, enrichmentId: EN, studyItemId: "os-1", submission: { itemType: "option_select", chosenOptionId: "o-correct" } },
-    { expeditionStore: fakeExpeditionStore(undefined), studyItemStore: fakeStudyItemStore({ "os-1": optionItem }), responseLog: log.store }
+    { sourceExpeditions: fakeSourceExpeditions(undefined), studyItemStore: fakeStudyItemStore({ "os-1": optionItem }), responseLog: log.store }
   );
   assert.deepEqual(result, { graded: false, refused: "expedition_inactive" });
 });
@@ -147,7 +153,7 @@ test("refuses an item that belongs to a different enrichment", async () => {
   const foreign: OptionSelectItem = { ...optionItem, enrichmentId: "en-other" };
   const result = await gradeStudyResponse(
     { learnerStateRef: LEARNER, enrichmentId: EN, studyItemId: "os-1", submission: { itemType: "option_select", chosenOptionId: "o-correct" } },
-    { expeditionStore: fakeExpeditionStore(expedition()), studyItemStore: fakeStudyItemStore({ "os-1": foreign }), responseLog: fakeResponseLog().store }
+    { sourceExpeditions: fakeSourceExpeditions(expedition()), studyItemStore: fakeStudyItemStore({ "os-1": foreign }), responseLog: fakeResponseLog().store }
   );
   assert.deepEqual(result, { graded: false, refused: "item_not_found" });
 });
@@ -155,7 +161,7 @@ test("refuses an item that belongs to a different enrichment", async () => {
 test("refuses a superseded / absent item (getStudyItemById returns nothing)", async () => {
   const result = await gradeStudyResponse(
     { learnerStateRef: LEARNER, enrichmentId: EN, studyItemId: "os-1", submission: { itemType: "option_select", chosenOptionId: "o-correct" } },
-    { expeditionStore: fakeExpeditionStore(expedition()), studyItemStore: fakeStudyItemStore({}), responseLog: fakeResponseLog().store }
+    { sourceExpeditions: fakeSourceExpeditions(expedition()), studyItemStore: fakeStudyItemStore({}), responseLog: fakeResponseLog().store }
   );
   assert.deepEqual(result, { graded: false, refused: "item_not_found" });
 });
@@ -163,7 +169,7 @@ test("refuses a superseded / absent item (getStudyItemById returns nothing)", as
 test("refuses an item-type mismatch between submission and stored item", async () => {
   const result = await gradeStudyResponse(
     { learnerStateRef: LEARNER, enrichmentId: EN, studyItemId: "os-1", submission: { itemType: "impostor", chosenStatementId: "s-lie" } },
-    { expeditionStore: fakeExpeditionStore(expedition()), studyItemStore: fakeStudyItemStore({ "os-1": optionItem }), responseLog: fakeResponseLog().store }
+    { sourceExpeditions: fakeSourceExpeditions(expedition()), studyItemStore: fakeStudyItemStore({ "os-1": optionItem }), responseLog: fakeResponseLog().store }
   );
   assert.deepEqual(result, { graded: false, refused: "item_type_mismatch" });
 });
@@ -172,7 +178,7 @@ test("grades a correct option-select, keying the correct option server-side and 
   const log = fakeResponseLog();
   const result = await gradeStudyResponse(
     { learnerStateRef: LEARNER, enrichmentId: EN, studyItemId: "os-1", submission: { itemType: "option_select", chosenOptionId: "o-correct" } },
-    { expeditionStore: fakeExpeditionStore(expedition()), studyItemStore: fakeStudyItemStore({ "os-1": optionItem }), responseLog: log.store }
+    { sourceExpeditions: fakeSourceExpeditions(expedition()), studyItemStore: fakeStudyItemStore({ "os-1": optionItem }), responseLog: log.store }
   );
   assert.deepEqual(result, { graded: true, outcome: { kind: "selection", chosenId: "o-correct", keyedCorrectId: "o-correct", correct: true } });
   assert.equal(log.rows.length, 1);
@@ -182,7 +188,7 @@ test("grades a correct option-select, keying the correct option server-side and 
 test("grades an incorrect option-select without trusting a client-sent key", async () => {
   const result = await gradeStudyResponse(
     { learnerStateRef: LEARNER, enrichmentId: EN, studyItemId: "os-1", submission: { itemType: "option_select", chosenOptionId: "o-wrong" } },
-    { expeditionStore: fakeExpeditionStore(expedition()), studyItemStore: fakeStudyItemStore({ "os-1": optionItem }), responseLog: fakeResponseLog().store }
+    { sourceExpeditions: fakeSourceExpeditions(expedition()), studyItemStore: fakeStudyItemStore({ "os-1": optionItem }), responseLog: fakeResponseLog().store }
   );
   assert.deepEqual(result, { graded: true, outcome: { kind: "selection", chosenId: "o-wrong", keyedCorrectId: "o-correct", correct: false } });
 });
@@ -190,7 +196,7 @@ test("grades an incorrect option-select without trusting a client-sent key", asy
 test("grades impostor selection, keying the planted lie", async () => {
   const result = await gradeStudyResponse(
     { learnerStateRef: LEARNER, enrichmentId: EN, studyItemId: "imp-1", submission: { itemType: "impostor", chosenStatementId: "s-lie" } },
-    { expeditionStore: fakeExpeditionStore(expedition()), studyItemStore: fakeStudyItemStore({ "imp-1": impostorItem }), responseLog: fakeResponseLog().store }
+    { sourceExpeditions: fakeSourceExpeditions(expedition()), studyItemStore: fakeStudyItemStore({ "imp-1": impostorItem }), responseLog: fakeResponseLog().store }
   );
   assert.deepEqual(result, { graded: true, outcome: { kind: "selection", chosenId: "s-lie", keyedCorrectId: "s-lie", correct: true } });
 });
@@ -198,7 +204,7 @@ test("grades impostor selection, keying the planted lie", async () => {
 test("grades matching first-try partial scoring", async () => {
   const result = await gradeStudyResponse(
     { learnerStateRef: LEARNER, enrichmentId: EN, studyItemId: "mt-1", submission: { itemType: "matching", trace: [{ promptId: "p-1", chosenMatchId: "m-1" }, { promptId: "p-2", chosenMatchId: "m-1" }] } },
-    { expeditionStore: fakeExpeditionStore(expedition()), studyItemStore: fakeStudyItemStore({ "mt-1": matchingItem }), responseLog: fakeResponseLog().store }
+    { sourceExpeditions: fakeSourceExpeditions(expedition()), studyItemStore: fakeStudyItemStore({ "mt-1": matchingItem }), responseLog: fakeResponseLog().store }
   );
   assert.equal(result.graded, true);
   assert.deepEqual(result.graded && result.outcome, { kind: "matching", correct: false, correctFirstTry: 1, pairCount: 2 });
@@ -207,12 +213,12 @@ test("grades matching first-try partial scoring", async () => {
 test("checkMatchingAttempt answers a single pair purely and refuses on inactive expedition", async () => {
   const ok = await checkMatchingAttempt(
     { learnerStateRef: LEARNER, enrichmentId: EN, studyItemId: "mt-1", promptId: "p-1", matchId: "m-1" },
-    { expeditionStore: fakeExpeditionStore(expedition()), studyItemStore: fakeStudyItemStore({ "mt-1": matchingItem }) }
+    { sourceExpeditions: fakeSourceExpeditions(expedition()), studyItemStore: fakeStudyItemStore({ "mt-1": matchingItem }) }
   );
   assert.deepEqual(ok, { checked: true, correct: true });
   const refused = await checkMatchingAttempt(
     { learnerStateRef: LEARNER, enrichmentId: EN, studyItemId: "mt-1", promptId: "p-1", matchId: "m-1" },
-    { expeditionStore: fakeExpeditionStore(undefined), studyItemStore: fakeStudyItemStore({ "mt-1": matchingItem }) }
+    { sourceExpeditions: fakeSourceExpeditions(undefined), studyItemStore: fakeStudyItemStore({ "mt-1": matchingItem }) }
   );
   assert.deepEqual(refused, { checked: false, refused: "expedition_inactive" });
 });
@@ -221,7 +227,7 @@ test("refuses a verdict write for a node outside the guarded enrichment", async 
   const verdict = fakeVerdictStore();
   const result = await recordLearnerVerdict(
     { learnerStateRef: LEARNER, enrichmentId: EN, derivedNodeId: "node-foreign", verdict: "known" },
-    { expeditionStore: fakeExpeditionStore(expedition()), enrichmentRead: fakeEnrichmentRead(false), verdictStore: verdict.store }
+    { sourceExpeditions: fakeSourceExpeditions(expedition(), { trailNodeIds: [] }), verdictStore: verdict.store }
   );
   assert.deepEqual(result, { recorded: false, refused: "node_not_in_enrichment" });
   assert.equal(verdict.upserts.length, 0);
@@ -231,12 +237,12 @@ test("records a verdict when the node belongs and the expedition is active (set 
   const verdict = fakeVerdictStore();
   const set = await recordLearnerVerdict(
     { learnerStateRef: LEARNER, enrichmentId: EN, derivedNodeId: "node-1", verdict: "known" },
-    { expeditionStore: fakeExpeditionStore(expedition()), enrichmentRead: fakeEnrichmentRead(true), verdictStore: verdict.store }
+    { sourceExpeditions: fakeSourceExpeditions(expedition()), verdictStore: verdict.store }
   );
   assert.deepEqual(set, { recorded: true });
   await recordLearnerVerdict(
     { learnerStateRef: LEARNER, enrichmentId: EN, derivedNodeId: "node-1", verdict: "learn" },
-    { expeditionStore: fakeExpeditionStore(expedition()), enrichmentRead: fakeEnrichmentRead(true), verdictStore: verdict.store }
+    { sourceExpeditions: fakeSourceExpeditions(expedition()), verdictStore: verdict.store }
   );
   assert.deepEqual(verdict.upserts, [{ derivedNodeId: "node-1", verdict: "known" }, { derivedNodeId: "node-1", verdict: "learn" }]);
 });
@@ -245,7 +251,7 @@ test("refuses a foreign-node lesson read and records a belonging one", async () 
   const foreign = fakeLessonReadStore();
   const refused = await recordLessonRead(
     { learnerStateRef: LEARNER, enrichmentId: EN, derivedNodeId: "node-foreign" },
-    { expeditionStore: fakeExpeditionStore(expedition()), enrichmentRead: fakeEnrichmentRead(false), lessonReadStore: foreign.store }
+    { sourceExpeditions: fakeSourceExpeditions(expedition(), { trailNodeIds: [] }), lessonReadStore: foreign.store }
   );
   assert.deepEqual(refused, { recorded: false, refused: "node_not_in_enrichment" });
   assert.equal(foreign.reads.length, 0);
@@ -253,7 +259,7 @@ test("refuses a foreign-node lesson read and records a belonging one", async () 
   const ok = fakeLessonReadStore();
   const recorded = await recordLessonRead(
     { learnerStateRef: LEARNER, enrichmentId: EN, derivedNodeId: "node-1" },
-    { expeditionStore: fakeExpeditionStore(expedition()), enrichmentRead: fakeEnrichmentRead(true), lessonReadStore: ok.store }
+    { sourceExpeditions: fakeSourceExpeditions(expedition()), lessonReadStore: ok.store }
   );
   assert.deepEqual(recorded, { recorded: true });
   assert.deepEqual(ok.reads, ["node-1"]);
@@ -336,6 +342,7 @@ const referenceLesson = {
 
 test("gradeScaffoldReferenceOptionSelect resolves a pinned key and appends ordinary neutral evidence", async () => {
   const log = fakeResponseLog();
+  const sourceExpeditions = fakeSourceExpeditions(expedition({ learnerStateRef: "owner" }));
   const activity: ScaffoldReferenceActivity = {
     scaffoldStepId: "ref-1",
     detourId: "d-1",
@@ -345,7 +352,7 @@ test("gradeScaffoldReferenceOptionSelect resolves a pinned key and appends ordin
   };
   const result = await gradeScaffoldReferenceOptionSelect(
     { learnerStateRef: "owner", scaffoldStepId: "ref-1", chosenOptionId: "o-correct" },
-    { referenceActivityRead: fakeReferenceRead(activity), responseLog: log.store }
+    { referenceActivityRead: fakeReferenceRead(activity), responseLog: log.store, sourceExpeditions }
   );
   assert.deepEqual(result, { graded: true, chosenId: "o-correct", keyedCorrectId: "o-correct", correct: true });
   assert.equal(log.rows.length, 1);
@@ -356,13 +363,14 @@ test("gradeScaffoldReferenceOptionSelect resolves a pinned key and appends ordin
 
 test("reference grading rejects foreign, generated/non-reference, malformed, and invalid requests without writing", async () => {
   const log = fakeResponseLog();
+  const sourceExpeditions = fakeSourceExpeditions(expedition({ learnerStateRef: "owner" }));
   const missingRead = fakeReferenceRead(undefined); // foreign, generated, and unknown steps are absent from the narrow seam
   assert.deepEqual(
-    await gradeScaffoldReferenceOptionSelect({ learnerStateRef: "intruder", scaffoldStepId: "ref-1", chosenOptionId: "o-correct" }, { referenceActivityRead: missingRead, responseLog: log.store }),
+    await gradeScaffoldReferenceOptionSelect({ learnerStateRef: "intruder", scaffoldStepId: "ref-1", chosenOptionId: "o-correct" }, { referenceActivityRead: missingRead, responseLog: log.store, sourceExpeditions }),
     { graded: false, refused: "step_not_found" }
   );
   assert.deepEqual(
-    await gradeScaffoldReferenceOptionSelect({ learnerStateRef: "owner", scaffoldStepId: "generated-1", chosenOptionId: "o-correct" }, { referenceActivityRead: missingRead, responseLog: log.store }),
+    await gradeScaffoldReferenceOptionSelect({ learnerStateRef: "owner", scaffoldStepId: "generated-1", chosenOptionId: "o-correct" }, { referenceActivityRead: missingRead, responseLog: log.store, sourceExpeditions }),
     { graded: false, refused: "step_not_found" }
   );
   const malformed: ScaffoldReferenceActivity = {
@@ -373,11 +381,11 @@ test("reference grading rejects foreign, generated/non-reference, malformed, and
     item: optionItem
   };
   assert.deepEqual(
-    await gradeScaffoldReferenceOptionSelect({ learnerStateRef: "owner", scaffoldStepId: "ref-bad", chosenOptionId: "o-correct" }, { referenceActivityRead: fakeReferenceRead(malformed), responseLog: log.store }),
+    await gradeScaffoldReferenceOptionSelect({ learnerStateRef: "owner", scaffoldStepId: "ref-bad", chosenOptionId: "o-correct" }, { referenceActivityRead: fakeReferenceRead(malformed), responseLog: log.store, sourceExpeditions }),
     { graded: false, refused: "step_not_gradable" }
   );
   assert.deepEqual(
-    await gradeScaffoldReferenceOptionSelect({ learnerStateRef: "", scaffoldStepId: "", chosenOptionId: "" }, { referenceActivityRead: missingRead, responseLog: log.store }),
+    await gradeScaffoldReferenceOptionSelect({ learnerStateRef: "", scaffoldStepId: "", chosenOptionId: "" }, { referenceActivityRead: missingRead, responseLog: log.store, sourceExpeditions }),
     { graded: false, refused: "invalid_input" }
   );
   assert.equal(log.rows.length, 0);

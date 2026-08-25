@@ -26,15 +26,28 @@ export class PostgresLearnerRecallChallengeStore implements RecallChallengeStore
     challengeId: string;
     learnerStateRef: string;
     enrichmentId: string;
+    assetSetIdentity: string;
     scopeKind: RecallChallengeScopeKind;
     scopeAnchorDerivedNodeId: string;
     lineup: { studyItemId: string; derivedNodeId: string }[];
   }): Promise<{ created: boolean }> {
     try {
       await this.sql.begin(async (tx) => {
+        // A prior active challenge over a superseded qualified asset set is not resumable.
+        // Retire it in the same transaction so the current set can establish the one active
+        // challenge for this scope without weakening the partial-unique invariant.
         await tx`
-          INSERT INTO recall_challenges (challenge_id, learner_state_ref, enrichment_id, scope_kind, scope_anchor_derived_node_id, status)
-          VALUES (${input.challengeId}, ${input.learnerStateRef}, ${input.enrichmentId}, ${input.scopeKind}, ${input.scopeAnchorDerivedNodeId}, 'active')`;
+          UPDATE recall_challenges
+          SET status = 'abandoned', updated_at = now()
+          WHERE learner_state_ref = ${input.learnerStateRef}
+            AND enrichment_id = ${input.enrichmentId}
+            AND scope_kind = ${input.scopeKind}
+            AND scope_anchor_derived_node_id = ${input.scopeAnchorDerivedNodeId}
+            AND status = 'active'
+            AND asset_set_identity <> ${input.assetSetIdentity}`;
+        await tx`
+          INSERT INTO recall_challenges (challenge_id, learner_state_ref, enrichment_id, asset_set_identity, scope_kind, scope_anchor_derived_node_id, status)
+          VALUES (${input.challengeId}, ${input.learnerStateRef}, ${input.enrichmentId}, ${input.assetSetIdentity}, ${input.scopeKind}, ${input.scopeAnchorDerivedNodeId}, 'active')`;
         for (const [lineupIndex, entry] of input.lineup.entries()) {
           await tx`
             INSERT INTO recall_challenge_lineup (challenge_id, lineup_index, study_item_id, derived_node_id)
@@ -52,7 +65,7 @@ export class PostgresLearnerRecallChallengeStore implements RecallChallengeStore
 
   async getForLearner(input: { challengeId: string; learnerStateRef: string }): Promise<RecallChallengeRecord | undefined> {
     const [row] = await this.sql<ChallengeRow[]>`
-      SELECT challenge_id, learner_state_ref, enrichment_id, scope_kind, scope_anchor_derived_node_id, status, created_at, updated_at
+      SELECT challenge_id, learner_state_ref, enrichment_id, asset_set_identity, scope_kind, scope_anchor_derived_node_id, status, created_at, updated_at
       FROM recall_challenges
       WHERE challenge_id = ${input.challengeId} AND learner_state_ref = ${input.learnerStateRef}`;
     if (!row) return undefined;
@@ -62,24 +75,31 @@ export class PostgresLearnerRecallChallengeStore implements RecallChallengeStore
   async getActiveForScope(input: {
     learnerStateRef: string;
     enrichmentId: string;
+    assetSetIdentity: string;
     scopeKind: RecallChallengeScopeKind;
     scopeAnchorDerivedNodeId: string;
   }): Promise<RecallChallengeRecord | undefined> {
     const [row] = await this.sql<ChallengeRow[]>`
-      SELECT challenge_id, learner_state_ref, enrichment_id, scope_kind, scope_anchor_derived_node_id, status, created_at, updated_at
+      SELECT challenge_id, learner_state_ref, enrichment_id, asset_set_identity, scope_kind, scope_anchor_derived_node_id, status, created_at, updated_at
       FROM recall_challenges
       WHERE learner_state_ref = ${input.learnerStateRef} AND enrichment_id = ${input.enrichmentId}
+        AND asset_set_identity = ${input.assetSetIdentity}
         AND scope_kind = ${input.scopeKind} AND scope_anchor_derived_node_id = ${input.scopeAnchorDerivedNodeId}
         AND status = 'active'`;
     if (!row) return undefined;
     return this.loadRecord(row);
   }
 
-  async listForLearnerEnrichment(input: { learnerStateRef: string; enrichmentId: string }): Promise<RecallChallenge[]> {
+  async listForLearnerEnrichment(input: {
+    learnerStateRef: string;
+    enrichmentId: string;
+    assetSetIdentity: string;
+  }): Promise<RecallChallenge[]> {
     const rows = await this.sql<ChallengeRow[]>`
-      SELECT challenge_id, learner_state_ref, enrichment_id, scope_kind, scope_anchor_derived_node_id, status, created_at, updated_at
+      SELECT challenge_id, learner_state_ref, enrichment_id, asset_set_identity, scope_kind, scope_anchor_derived_node_id, status, created_at, updated_at
       FROM recall_challenges
       WHERE learner_state_ref = ${input.learnerStateRef} AND enrichment_id = ${input.enrichmentId}
+        AND asset_set_identity = ${input.assetSetIdentity}
       ORDER BY created_at ASC`;
     return rows.map(toChallenge);
   }
@@ -134,17 +154,26 @@ export class PostgresLearnerRecallChallengeStore implements RecallChallengeStore
     });
   }
 
-  async priorExposure(input: { learnerStateRef: string; enrichmentId: string }): Promise<Record<string, number>> {
+  async priorExposure(input: {
+    learnerStateRef: string;
+    enrichmentId: string;
+    assetSetIdentity: string;
+  }): Promise<Record<string, number>> {
     const rows = await this.sql<{ study_item_id: string; exposure: string }[]>`
       SELECT l.study_item_id, COUNT(*) AS exposure
       FROM recall_challenge_lineup l
       JOIN recall_challenges c ON c.challenge_id = l.challenge_id
       WHERE c.learner_state_ref = ${input.learnerStateRef} AND c.enrichment_id = ${input.enrichmentId}
+        AND c.asset_set_identity = ${input.assetSetIdentity}
       GROUP BY l.study_item_id`;
     return Object.fromEntries(rows.map((row) => [row.study_item_id, Number(row.exposure)]));
   }
 
-  async listWonScopes(input: { learnerStateRef: string; enrichmentId: string }): Promise<{
+  async listWonScopes(input: {
+    learnerStateRef: string;
+    enrichmentId: string;
+    assetSetIdentity: string;
+  }): Promise<{
     scopeKind: RecallChallengeScopeKind;
     scopeAnchorDerivedNodeId: string;
     challengeId: string;
@@ -155,6 +184,7 @@ export class PostgresLearnerRecallChallengeStore implements RecallChallengeStore
       SELECT DISTINCT ON (scope_kind, scope_anchor_derived_node_id) scope_kind, scope_anchor_derived_node_id, challenge_id
       FROM recall_challenges
       WHERE learner_state_ref = ${input.learnerStateRef} AND enrichment_id = ${input.enrichmentId} AND status = 'won'
+        AND asset_set_identity = ${input.assetSetIdentity}
       ORDER BY scope_kind, scope_anchor_derived_node_id, updated_at ASC`;
     return rows.map((row) => ({ scopeKind: row.scope_kind, scopeAnchorDerivedNodeId: row.scope_anchor_derived_node_id, challengeId: row.challenge_id }));
   }
@@ -197,6 +227,7 @@ type ChallengeRow = {
   challenge_id: string;
   learner_state_ref: string;
   enrichment_id: string;
+  asset_set_identity: string;
   scope_kind: RecallChallengeScopeKind;
   scope_anchor_derived_node_id: string;
   status: RecallChallenge["status"];
@@ -224,6 +255,7 @@ function toChallenge(row: ChallengeRow): RecallChallenge {
     challengeId: row.challenge_id,
     learnerStateRef: row.learner_state_ref,
     enrichmentId: row.enrichment_id,
+    assetSetIdentity: row.asset_set_identity,
     scopeKind: row.scope_kind,
     scopeAnchorDerivedNodeId: row.scope_anchor_derived_node_id,
     status: row.status,

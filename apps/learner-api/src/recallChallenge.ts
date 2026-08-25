@@ -1,9 +1,11 @@
-import { createRecallChallenge, type RecallChallengeModule } from "@lrnki/application";
 import {
-  PostgresEnrichmentInspectionRead,
+  createRecallChallenge,
+  type RecallChallengeModule,
+  type SourceExpeditionModule
+} from "@lrnki/application";
+import {
   PostgresLearnerRecallChallengeStore,
-  PostgresResponseLogStore,
-  PostgresStudyItemBankStore
+  PostgresResponseLogStore
 } from "@lrnki/infrastructure-postgres";
 import type { DatabaseClient } from "./db";
 
@@ -11,10 +13,12 @@ import type { DatabaseClient } from "./db";
 // the narrow read/store ports are bound ONCE here at the composition root; the routes in
 // `app.ts` receive one finished module and stay thin transport mappers. The response log is
 // bound READ-ONLY inside the module (eligibility fold) — no challenge operation can write it.
-export function createLearnerRecallChallenge(sql: DatabaseClient): RecallChallengeModule {
+export function createLearnerRecallChallenge(
+  sql: DatabaseClient,
+  sourceExpeditions: Pick<SourceExpeditionModule, "openActive">
+): RecallChallengeModule {
   return createRecallChallenge({
-    enrichmentRead: new PostgresEnrichmentInspectionRead(sql),
-    studyItemStore: new PostgresStudyItemBankStore(sql),
+    sourceExpeditions,
     responseLog: new PostgresResponseLogStore(sql),
     challengeStore: new PostgresLearnerRecallChallengeStore(sql)
   });

@@ -12,9 +12,9 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-25-001 — Qualify the Curated-Source Learner Workflow](./2026-08-25-001-qualify-curated-source-learner-workflow.md)
-   — **In progress; U0–U1 complete, U2 next.** One policy now holds out Synthetic Topic Generation,
-   LLM-grounded learner nodes, and generated Support Steps without deleting their implementations,
-   while source-backed processing, source-mentioned prerequisites, and exact-reference Support
-   Steps stay open. Implement the deep Source Expedition qualification/adoption boundary next.
+   — **In progress; U0–U2 complete, U3 next.** One deep Source Expedition authority now owns
+   trusted-trail qualification, exact current-asset identity, adoption, activation, learner reads,
+   writes, Support Path, and Recall Challenges. Implement material-claim projection and the joined
+   no-activation evaluation harness next.
 
 <!-- Hygiene and retention rules: AGENTS.md → Documentation workflow. -->

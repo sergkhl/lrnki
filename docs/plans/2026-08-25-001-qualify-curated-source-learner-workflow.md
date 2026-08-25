@@ -7,11 +7,11 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0–U1 complete; U2 is next
+**Status:** In progress — U0–U2 complete; U3 is next
 
-**NEXT:** Implement U2 only: add the source-owned Source Expedition kind and one deep qualification/
-adoption boundary, then make catalog, Journal, adoption, activation, direct Study Session entry,
-and supervisor behavior consume its authoritative trusted-trail and current-asset outcome.
+**NEXT:** Implement U3 only: define the domain-neutral material-claim projection and the separate
+source-support, distractor-invalidity, and key-uniqueness outcomes, then add a gitignored evaluation
+report over joined candidate/evidence/decision/operation data and inspect a no-activation sample.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
 Curated Sources and automatically admits only source-backed learner assets. Anchor-less Synthetic
@@ -479,18 +479,48 @@ The plan is complete only when all of the following are true:
   asset was semantically qualified, and no browser/native, simulator/emulator, physical-device,
   deployed, production, or release evidence was produced.
 
+### U2 — deep Source Expedition qualification and adoption — 2026-08-25 — complete
+
+- Added the source-owned expedition kind and one application module that derives authoritative
+  summit title, Declared Domain, trusted prerequisite-closed trail, current qualified assets, and an
+  opaque exact asset-set identity. Client adoption and activation now send identifiers only. Source
+  adoption is idempotent, switches the active expedition atomically, creates no generation operation,
+  and wakes no Topic supervisor.
+- A versioned qualification wrapper makes every legacy lesson/item bank fail closed. The module
+  rejects missing or changed assets, incomplete trails, LLM-grounded nodes, and unverified
+  source-mentioned nodes. Only current qualified option-select items cross learner boundaries;
+  matching and impostor artifacts remain stored and inspectable but neither render nor grade.
+- Catalog, Journal, owned/direct Study Session reads, activation, neutral grading/checking, verdicts,
+  lesson reads, exact-reference Support Path, and Recall Challenges now consume the same Source
+  Expedition authority. Recall lineups carry the exact asset identity and become unreadable after
+  regeneration. Rejected verdict/lesson-read HTTP mutations now report their refusal as well as
+  making no write.
+- Persistence compares the locked current lesson/item identities before adoption or activation and
+  refuses a concurrent generation change without a partial active switch. The regenerated Drizzle
+  baseline passed `pnpm db:check` (58 tables). Seven focused module tests and the reset-backed
+  repository `pnpm test:db` gate passed, including 111 Postgres tests, 26 learner-API tests, and 57
+  learner-app suites / 320 tests. All 11 workspace typechecks passed; ESLint passed with zero errors
+  and 13 retained warnings; whitespace checks passed.
+- A read-only local real-use inspection through the production learner-API composition found two
+  positive-control candidates in the disposable test database. Each resolved to a two-stop
+  document-anchored trail, one source-cited substantive lesson per stop, only four-choice
+  option-select activities, and an exact two-lesson/two-item snapshot. These are project-authored
+  persisted fixtures: they prove composition and qualification behavior only, not neural quality,
+  real external source usefulness, deployed behavior, or release readiness. No model call occurred.
+- The first full database run exposed an invalid anchor-role fixture and was excluded; after the
+  fixture used the schema-owned anchor role, the focused API journey and full database gate passed.
+  The first inline inspection also failed before database access because root evaluation could not
+  resolve workspace aliases; only the successful package-bound rerun is evidence.
+
 ### Open findings
 
-- The readiness snapshot needs a race-safe current-asset identity. U2 must choose the smallest
-  persistence/read seam that prevents a superseded lesson or item bank from being adopted after its
-  qualification read; do not expose that mechanism to Hono or the client.
-- U2 must close every direct learner write/read path over the same adopted Source Expedition
-  authority, including activation, direct Study Session entry, neutral grading, lesson reads, and
-  challenge entry where applicable. A transport route must not reconstruct readiness from row
-  status or an `enrichmentId` alone.
-- U2 must decide where the current learner-asset qualification identity is folded into asset-set
-  identity so an old availability mode or legacy asset generation cannot be mistaken for a current
-  qualified snapshot. Keep this mechanical identity out of transport and UI types.
+- U2's qualification wrapper is deliberately a structural legacy boundary, not proof that its
+  project-authored fixture claims are supported. U3 must project exact material claims and evidence
+  references without weakening this fail-closed boundary; U5 replaces structural qualification
+  with the named admission outcomes.
+- U3's report must join the same candidate rows to their admitted passages, separate decision
+  outcomes, asset/config identity, operation identity, calls/tokens/cost, and a positive control over
+  the same rows. Generated reports stay in `tmp/`; durable report mechanics stay in source.
 - No local verifier is selected or downloaded. U4 must reject candidates that cannot be routed and
   attributed within the architecture, even if their public benchmark is strong. Failure leaves
   unsupported assets absent and does not block exact-source deterministic work.

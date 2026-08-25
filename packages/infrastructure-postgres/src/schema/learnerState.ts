@@ -68,6 +68,7 @@ export const learnerExpeditions = pgTable(
     currentOperationId: uuid("current_operation_id"),
     currentOperationType: text("current_operation_type"),
     enrichmentId: uuid("enrichment_id"),
+    assetSetIdentity: text("asset_set_identity"),
     active: boolean("active").default(false).notNull(),
     failureMessage: text("failure_message"),
     generationAttempts: integer("generation_attempts").default(0).notNull(),
@@ -101,7 +102,7 @@ export const learnerExpeditions = pgTable(
       table.createdAt.desc().nullsFirst(),
     ),
     index("learner_expeditions_enrichment_idx").on(table.enrichmentId),
-    check("learner_expeditions_kind_check", sql`kind IN ('topic')`),
+    check("learner_expeditions_kind_check", sql`kind IN ('topic', 'source')`),
     check(
       "learner_expeditions_status_check",
       sql`status IN ('generating', 'ready', 'failed')`,
@@ -119,6 +120,12 @@ export const learnerExpeditions = pgTable(
       "learner_expeditions_check1",
       sql`(status = 'ready' AND enrichment_id IS NOT NULL AND declared_domain IS NOT NULL)
         OR status <> 'ready'`,
+    ),
+    check(
+      "learner_expeditions_source_asset_identity_check",
+      sql`(kind = 'source' AND status = 'ready' AND asset_set_identity IS NOT NULL
+        AND current_operation_id IS NULL AND current_operation_type IS NULL)
+        OR (kind = 'topic' AND asset_set_identity IS NULL)`,
     ),
   ],
 );
@@ -382,6 +389,7 @@ export const recallChallenges = pgTable(
     challengeId: uuid("challenge_id").primaryKey().notNull(),
     learnerStateRef: text("learner_state_ref").notNull(),
     enrichmentId: uuid("enrichment_id").notNull(),
+    assetSetIdentity: text("asset_set_identity").notNull(),
     scopeKind: text("scope_kind").notNull(),
     scopeAnchorDerivedNodeId: uuid("scope_anchor_derived_node_id").notNull(),
     status: text("status").notNull(),

@@ -241,6 +241,21 @@ export {
   type LearnerKnowledgeHoldoutReason,
   type DerivedGraphLearnerKnowledgeAvailability
 } from "./learnerKnowledgeAvailability";
+export {
+  SOURCE_EXPEDITION_ASSET_QUALIFICATION_CONTRACT,
+  createSourceExpeditionModule,
+  qualifiedSourceExpeditionAssetConfigHash,
+  type OpenedSourceExpedition,
+  type QualifiedSourceExpedition,
+  type QualifiedSourceExpeditionAssets,
+  type SourceExpeditionCandidate,
+  type SourceExpeditionModule,
+  type SourceExpeditionModuleDeps,
+  type SourceExpeditionOpenResult,
+  type SourceExpeditionQualification,
+  type SourceExpeditionUnavailable,
+  type SourceExpeditionUnavailableReason
+} from "./sourceExpedition";
 
 export {
   labelFor,

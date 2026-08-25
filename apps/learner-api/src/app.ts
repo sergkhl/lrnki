@@ -6,7 +6,6 @@ import { z } from "zod";
 import {
   CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY,
   checkMatchingAttempt,
-  derivedGraphLearnerKnowledgeAvailability,
   getExpeditionCatalog,
   getExpeditionJournal,
   getStudySession,
@@ -21,7 +20,8 @@ import {
   retryLearnerScaffold,
   learnerKnowledgeCapabilityIsAvailable,
   type GradeRefusalReason,
-  type LearnerKnowledgeAvailability
+  type LearnerKnowledgeAvailability,
+  type NodeWriteRefusalReason
 } from "@lrnki/application";
 import {
   PostgresCalibrationVerdictStore,
@@ -41,6 +41,7 @@ import { createLearnerAuth, learnerWebOrigins, requireSession, type AuthEnv } fr
 import type { DatabaseClient } from "./db";
 import { loadLeaderboard } from "./leaderboard";
 import { createLearnerRecallChallenge } from "./recallChallenge";
+import { createLearnerSourceExpeditions } from "./sourceExpedition";
 import { wakeScaffoldGenerationSupervisor } from "./scaffoldGenerationSupervisor";
 import { wakeTopicGenerationSupervisor } from "./topicGenerationSupervisor";
 
@@ -64,6 +65,10 @@ function gradingMessage(refused: GradeRefusalReason, invalidCopy: string): strin
   return refused === "invalid_input"
     ? invalidCopy
     : "This expedition is no longer active. Return to the expedition list and reopen it.";
+}
+
+function nodeWriteRefusalStatus(refused: NodeWriteRefusalReason): 409 | 422 {
+  return refused === "expedition_inactive" ? 409 : 422;
 }
 
 const matchingTrace = z.array(z.object({ promptId: z.string(), chosenMatchId: z.string() }));
@@ -112,33 +117,30 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, o
   const learnerKnowledgeAvailability = options.learnerKnowledgeAvailability
     ?? CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY;
   const wakeTopicGeneration = options.wakeTopicGeneration ?? wakeTopicGenerationSupervisor;
+  const sourceExpeditions = createLearnerSourceExpeditions(sql, learnerKnowledgeAvailability);
   // The Recall Challenge deep module, bound once at the composition root (KTD1).
-  const recallChallenges = createLearnerRecallChallenge(sql);
+  const recallChallenges = createLearnerRecallChallenge(sql, sourceExpeditions);
 
   const studyDeps = () => ({
-    expeditionStore,
+    sourceExpeditions,
     studyItemStore: new PostgresStudyItemBankStore(sql),
     responseLog: new PostgresResponseLogStore(sql)
   });
   const verdictDeps = () => ({
-    expeditionStore,
-    enrichmentRead: new PostgresEnrichmentInspectionRead(sql),
+    sourceExpeditions,
     verdictStore: new PostgresCalibrationVerdictStore(sql)
   });
   const scaffoldRequestDeps = () => ({
-    expeditionStore,
+    sourceExpeditions,
     studyItemStore: new PostgresStudyItemBankStore(sql),
     conceptLessonStore: new PostgresConceptLessonStore(sql),
-    enrichmentRead: new PostgresEnrichmentInspectionRead(sql),
     scaffoldStore: new PostgresLearnerScaffoldStore(sql),
     learnerKnowledgeAvailability,
     readStudySession: ({ enrichmentId, learnerStateRef }: { enrichmentId: string; learnerStateRef: string }) =>
       getStudySession({
         enrichmentId,
         learnerStateRef,
-        enrichmentRead: new PostgresEnrichmentInspectionRead(sql),
-        studyItemStore: new PostgresStudyItemBankStore(sql),
-        conceptLessonStore: new PostgresConceptLessonStore(sql),
+        sourceExpeditions,
         responseLog: new PostgresResponseLogStore(sql),
         verdictStore: new PostgresCalibrationVerdictStore(sql),
         learnerKnowledgeAvailability
@@ -150,7 +152,8 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, o
   });
   const scaffoldReferenceGradeDeps = () => ({
     referenceActivityRead: new PostgresScaffoldReferenceActivityRead(sql),
-    responseLog: new PostgresResponseLogStore(sql)
+    responseLog: new PostgresResponseLogStore(sql),
+    sourceExpeditions
   });
 
   const app = new Hono<AuthEnv>()
@@ -182,6 +185,7 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, o
       const journal = await getExpeditionJournal(
         { learnerStateRef: c.get("learnerStateRef") },
         {
+          sourceExpeditions,
           enrichmentRead: new PostgresEnrichmentInspectionRead(sql),
           expeditionStore,
           studyItemStore: new PostgresStudyItemBankStore(sql),
@@ -204,9 +208,7 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, o
       return c.json(await getExpeditionCatalog(
         { learnerStateRef: c.get("learnerStateRef") },
         {
-          enrichmentRead: new PostgresEnrichmentInspectionRead(sql),
-          expeditionStore,
-          learnerKnowledgeAvailability
+          sourceExpeditions
         }
       ));
     })
@@ -222,9 +224,7 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, o
         getStudySession({
           enrichmentId,
           learnerStateRef,
-          enrichmentRead: new PostgresEnrichmentInspectionRead(sql),
-          studyItemStore: new PostgresStudyItemBankStore(sql),
-          conceptLessonStore: new PostgresConceptLessonStore(sql),
+          sourceExpeditions,
           lessonReadStore: new PostgresLessonReadStore(sql),
           layerPurposeStore: new PostgresEnrichmentLayerPurposeStore(sql),
           responseLog: new PostgresResponseLogStore(sql),
@@ -242,45 +242,24 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, o
     })
 
     .post("/expedition/choose", auth, zValidator("json", z.object({
-      enrichmentId: z.string(),
-      title: z.string(),
-      declaredDomain: z.string()
+      enrichmentId: z.string().uuid()
     })), async (c) => {
-      if (!learnerKnowledgeCapabilityIsAvailable(learnerKnowledgeAvailability, "sourceExpeditionAdoption")) {
-        return c.json({
-          error: "source_expedition_adoption_paused" as const,
-          availability: learnerKnowledgeAvailability.sourceExpeditionAdoption
-        }, 409);
-      }
       const input = c.req.valid("json");
-      const detail = await new PostgresEnrichmentInspectionRead(sql).getDerivedGraphDetail(input.enrichmentId);
-      if (!detail) return c.json({ error: "source_expedition_not_found" as const }, 404);
-      const detailAvailability = derivedGraphLearnerKnowledgeAvailability(learnerKnowledgeAvailability, detail);
-      if (detailAvailability.status !== "available") {
-        return c.json({
-          error: "learner_knowledge_unavailable" as const,
-          capability: detailAvailability.capability,
-          availability: detailAvailability
-        }, 409);
-      }
-      const learnerStateRef = c.get("learnerStateRef");
-      const existing = await expeditionStore.getByEnrichment({ learnerStateRef, enrichmentId: input.enrichmentId });
-      await expeditionStore.upsert({
-        learnerExpeditionId: existing?.learnerExpeditionId ?? randomUUID(),
-        learnerStateRef,
-        kind: "topic",
-        title: input.title,
-        declaredDomain: input.declaredDomain,
-        status: "ready",
-        enrichmentId: input.enrichmentId,
-        active: true
+      const result = await sourceExpeditions.adopt({
+        learnerStateRef: c.get("learnerStateRef"),
+        enrichmentId: input.enrichmentId
       });
-      return c.json({ ok: true as const });
+      if (!result.adopted) {
+        return c.json(
+          { error: result.refused },
+          result.refused === "enrichment_not_found" ? 404 : 409
+        );
+      }
+      return c.json({ ok: true as const, learnerExpeditionId: result.learnerExpeditionId });
     })
 
     .post("/expedition/activate", auth, zValidator("json", z.object({
-      learnerExpeditionId: z.string(),
-      enrichmentId: z.string().nullish()
+      learnerExpeditionId: z.string().uuid()
     })), async (c) => {
       const input = c.req.valid("json");
       const learnerStateRef = c.get("learnerStateRef");
@@ -288,26 +267,28 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, o
         learnerStateRef,
         learnerExpeditionId: input.learnerExpeditionId
       });
-      if (expedition && expedition.status !== "ready" &&
+      if (!expedition) return c.json({ error: "expedition_not_owned" as const }, 404);
+      if (expedition.kind === "topic" &&
           !learnerKnowledgeCapabilityIsAvailable(learnerKnowledgeAvailability, "syntheticTopicGeneration")) {
         return c.json({
           error: "synthetic_topic_generation_paused" as const,
           availability: learnerKnowledgeAvailability.syntheticTopicGeneration
         }, 409);
       }
-      if (expedition?.enrichmentId) {
-        const detail = await new PostgresEnrichmentInspectionRead(sql).getDerivedGraphDetail(expedition.enrichmentId);
-        if (!detail) return c.json({ error: "source_expedition_not_found" as const }, 404);
-        const detailAvailability = derivedGraphLearnerKnowledgeAvailability(learnerKnowledgeAvailability, detail);
-        if (detailAvailability.status !== "available") {
-          return c.json({
-            error: "learner_knowledge_unavailable" as const,
-            capability: detailAvailability.capability,
-            availability: detailAvailability
-          }, 409);
+      if (expedition.kind === "source") {
+        const result = await sourceExpeditions.activate({
+          learnerStateRef,
+          learnerExpeditionId: input.learnerExpeditionId
+        });
+        if (!result.activated) {
+          return c.json(
+            { error: result.refused },
+            result.refused === "expedition_not_owned" ? 404 : 409
+          );
         }
+      } else {
+        await expeditionStore.setActive({ learnerStateRef, learnerExpeditionId: input.learnerExpeditionId });
       }
-      await expeditionStore.setActive({ learnerStateRef, learnerExpeditionId: input.learnerExpeditionId });
       return c.json({ ok: true as const });
     })
 
@@ -417,7 +398,7 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, o
     })), async (c) => {
       const result = await checkMatchingAttempt(
         { learnerStateRef: c.get("learnerStateRef"), ...c.req.valid("json") },
-        { expeditionStore, studyItemStore: new PostgresStudyItemBankStore(sql) }
+        { sourceExpeditions, studyItemStore: new PostgresStudyItemBankStore(sql) }
       );
       if (!result.checked) {
         return c.json<LearnerMatchingAttemptResult>({
@@ -436,7 +417,16 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, o
       derivedNodeId: z.string(),
       verdict: z.enum(["known", "learn"])
     })), async (c) => {
-      await recordLearnerVerdict({ learnerStateRef: c.get("learnerStateRef"), ...c.req.valid("json") }, verdictDeps());
+      const result = await recordLearnerVerdict(
+        { learnerStateRef: c.get("learnerStateRef"), ...c.req.valid("json") },
+        verdictDeps()
+      );
+      if (!result.recorded) {
+        return c.json(
+          { ok: false as const, error: result.refused },
+          nodeWriteRefusalStatus(result.refused)
+        );
+      }
       return c.json({ ok: true as const });
     })
 
@@ -444,14 +434,19 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, o
       enrichmentId: z.string(),
       derivedNodeId: z.string()
     })), async (c) => {
-      await recordLessonRead(
+      const result = await recordLessonRead(
         { learnerStateRef: c.get("learnerStateRef"), ...c.req.valid("json") },
         {
-          expeditionStore,
-          enrichmentRead: new PostgresEnrichmentInspectionRead(sql),
+          sourceExpeditions,
           lessonReadStore: new PostgresLessonReadStore(sql)
         }
       );
+      if (!result.recorded) {
+        return c.json(
+          { ok: false as const, error: result.refused },
+          nodeWriteRefusalStatus(result.refused)
+        );
+      }
       return c.json({ ok: true as const });
     })
 

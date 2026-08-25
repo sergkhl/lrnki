@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { neutralResponses, type MatchingItem, type ResponseLogRow, type StudyItem } from "@lrnki/domain-core";
 import type {
-  EnrichmentInspectionReadPort,
   NewRecallChallengeEvent,
   RecallChallengeEvent,
   RecallChallenge,
@@ -9,13 +8,13 @@ import type {
   RecallChallengeRecord,
   RecallChallengeScopeKind,
   RecallChallengeStorePort,
-  ResponseLogStorePort,
-  StudyItemBankStorePort
+  ResponseLogStorePort
 } from "@lrnki/ports";
 import { deriveFlooredExpedition } from "./expeditionSections";
 import { keyedCorrectIdFor, keyedMatchIdFor } from "./gradedSelectionOutcome";
 import { ENRICHMENT_LINEUP_MAX, SECTION_LINEUP_MAX } from "./recallLineupBudget";
 import { studyItemToView, type StudyItemView } from "./studySessionProjection";
+import type { OpenedSourceExpedition, SourceExpeditionModule } from "./sourceExpedition";
 
 // The PURE half of the Recall Challenge deep module (plan 2026-07-13-003 U1; KTD1, KTD5, KTD6).
 // Everything here is data-in/data-out: lineup selection, the combat-state fold over the
@@ -365,8 +364,7 @@ export type RecallAnswerFeedback =
 // transport mapping only. No response-log writer is bound (KTD4): a challenge answer is
 // structurally incapable of touching neutral mastery, points, or prerequisite access.
 export type RecallChallengeDeps = {
-  enrichmentRead: EnrichmentInspectionReadPort;
-  studyItemStore: StudyItemBankStorePort;
+  sourceExpeditions: Pick<SourceExpeditionModule, "openActive">;
   responseLog: ResponseLogStorePort;
   challengeStore: RecallChallengeStorePort;
 };
@@ -500,11 +498,11 @@ export function createRecallChallenge(deps: RecallChallengeDeps) {
   // The scope skeleton for one enrichment: section milestones (Legs) + the derived summit
   // (Expedition), each with its floored stop set. Scope identity is the milestone/summit
   // node id — stable across re-ordering (KTD2).
-  const loadScopes = async (enrichmentId: string) => {
-    const detail = await deps.enrichmentRead.getDerivedGraphDetail(enrichmentId);
-    if (!detail) return undefined;
-    const { summit, sections } = deriveFlooredExpedition(detail);
-    return { detail, summit, sections };
+  const loadScopes = async (input: { learnerStateRef: string; enrichmentId: string }) => {
+    const opened = await deps.sourceExpeditions.openActive(input);
+    if (opened.status !== "available") return undefined;
+    const { summit, sections } = deriveFlooredExpedition(opened.assets.detail);
+    return { opened, detail: opened.assets.detail, summit, sections };
   };
 
   // The KTD5 eligible pool: CURRENT bank items on this scope's stops whose latest neutral
@@ -512,14 +510,37 @@ export function createRecallChallenge(deps: RecallChallengeDeps) {
   const loadEligible = async (input: {
     learnerStateRef: string;
     enrichmentId: string;
+    assetSetIdentity: string;
+    studyItems: readonly StudyItem[];
     nodeIdsInScope: (derivedNodeId: string) => number | undefined;
   }): Promise<RecallEligibleItem[]> => {
-    const [items, rows, exposure] = await Promise.all([
-      deps.studyItemStore.listStudyItemsForEnrichment(input.enrichmentId),
+    const [rows, exposure] = await Promise.all([
       deps.responseLog.listForLearner(input.learnerStateRef),
-      deps.challengeStore.priorExposure({ learnerStateRef: input.learnerStateRef, enrichmentId: input.enrichmentId })
+      deps.challengeStore.priorExposure({
+        learnerStateRef: input.learnerStateRef,
+        enrichmentId: input.enrichmentId,
+        assetSetIdentity: input.assetSetIdentity
+      })
     ]);
-    return eligibleRecallItems({ items, rows, exposure, sectionIndexFor: input.nodeIdsInScope });
+    return eligibleRecallItems({
+      items: input.studyItems,
+      rows,
+      exposure,
+      sectionIndexFor: input.nodeIdsInScope
+    });
+  };
+
+  const currentItemMap = (opened: OpenedSourceExpedition) =>
+    new Map(opened.assets.studyItems.map((item) => [item.studyItemId, item.derivedNodeId] as const));
+
+  const lineupMatchesCurrentAssets = (
+    record: RecallChallengeRecord,
+    opened: OpenedSourceExpedition
+  ): boolean => {
+    if (record.challenge.assetSetIdentity !== opened.assets.expectedAssets.assetSetIdentity ||
+        record.lineup.length === 0) return false;
+    const current = currentItemMap(opened);
+    return record.lineup.every((entry) => current.get(entry.studyItemId) === entry.derivedNodeId);
   };
 
   const pairCounts = (items: readonly StudyItem[]) => {
@@ -549,8 +570,42 @@ export function createRecallChallenge(deps: RecallChallengeDeps) {
   const reload = async (input: { learnerStateRef: string; challengeId: string }) => {
     const record = await deps.challengeStore.getForLearner(input);
     if (!record) return undefined;
+    const opened = await deps.sourceExpeditions.openActive({
+      learnerStateRef: input.learnerStateRef,
+      enrichmentId: record.challenge.enrichmentId
+    });
+    if (opened.status !== "available" || !lineupMatchesCurrentAssets(record, opened)) {
+      return undefined;
+    }
     const folded = await foldRecord(record);
-    return { record, ...folded };
+    return { record, opened, ...folded };
+  };
+
+  const scopeState = async (input: {
+    learnerStateRef: string;
+    enrichmentId: string;
+    scopes: Awaited<ReturnType<typeof loadScopes>> & {};
+  }) => {
+    const assetSetIdentity = input.scopes.opened.assets.expectedAssets.assetSetIdentity;
+    const sectionOf = new Map<string, number>();
+    for (const section of input.scopes.sections) {
+      for (const nodeId of section.stepDerivedNodeIds) sectionOf.set(nodeId, section.sectionIndex);
+    }
+    const storeInput = {
+      learnerStateRef: input.learnerStateRef,
+      enrichmentId: input.enrichmentId,
+      assetSetIdentity
+    };
+    const [challenges, won, eligible] = await Promise.all([
+      deps.challengeStore.listForLearnerEnrichment(storeInput),
+      deps.challengeStore.listWonScopes(storeInput),
+      loadEligible({
+        ...storeInput,
+        studyItems: input.scopes.opened.assets.studyItems,
+        nodeIdsInScope: (nodeId) => sectionOf.get(nodeId)
+      })
+    ]);
+    return { assetSetIdentity, sectionOf, challenges, won, eligible };
   };
 
   // Shared answer transition (KTD2/KTD6/KTD7): load + fold, replay a duplicate attempt as the
@@ -667,17 +722,9 @@ export function createRecallChallenge(deps: RecallChallengeDeps) {
     // Per-scope status for one enrichment: every Leg (section milestone) plus the Expedition
     // (summit) scope. Undefined = unknown enrichment.
     async scopeStatus(input: { learnerStateRef: string; enrichmentId: string }): Promise<RecallScopeStatus[] | undefined> {
-      const scopes = await loadScopes(input.enrichmentId);
+      const scopes = await loadScopes(input);
       if (!scopes) return undefined;
-      const sectionOf = new Map<string, number>();
-      for (const section of scopes.sections) {
-        for (const nodeId of section.stepDerivedNodeIds) sectionOf.set(nodeId, section.sectionIndex);
-      }
-      const [challenges, won, eligible] = await Promise.all([
-        deps.challengeStore.listForLearnerEnrichment(input),
-        deps.challengeStore.listWonScopes(input),
-        loadEligible({ ...input, nodeIdsInScope: (nodeId) => sectionOf.get(nodeId) })
-      ]);
+      const { challenges, won, eligible } = await scopeState({ ...input, scopes });
       return projectRecallScopeStatuses({
         nodes: scopes.detail.nodes,
         sections: scopes.sections,
@@ -696,7 +743,7 @@ export function createRecallChallenge(deps: RecallChallengeDeps) {
       scopeKind: RecallChallengeScopeKind;
       anchorDerivedNodeId: string;
     }): Promise<RecallCreateResult> {
-      const scopes = await loadScopes(input.enrichmentId);
+      const scopes = await loadScopes(input);
       if (!scopes) return { created: false, refused: "not_found" };
       const section = scopes.sections.find((candidate) => candidate.milestoneDerivedNodeId === input.anchorDerivedNodeId);
       const isSummit = scopes.summit?.derivedNodeId === input.anchorDerivedNodeId;
@@ -704,7 +751,15 @@ export function createRecallChallenge(deps: RecallChallengeDeps) {
         return { created: false, refused: "invalid_scope" };
       }
 
-      const scopeStatuses = await operations.scopeStatus(input);
+      const state = await scopeState({ ...input, scopes });
+      const scopeStatuses = projectRecallScopeStatuses({
+        nodes: scopes.detail.nodes,
+        sections: scopes.sections,
+        summit: scopes.summit,
+        eligible: state.eligible,
+        challenges: state.challenges,
+        wonScopes: state.won
+      });
       const scope = scopeStatuses?.find((candidate) => candidate.scopeKind === input.scopeKind && candidate.anchorDerivedNodeId === input.anchorDerivedNodeId);
       if (!scope) return { created: false, refused: "invalid_scope" };
       if (scope.activeChallengeId) return { created: false, refused: "active_challenge_exists", activeChallengeId: scope.activeChallengeId };
@@ -718,6 +773,8 @@ export function createRecallChallenge(deps: RecallChallengeDeps) {
       const eligible = await loadEligible({
         learnerStateRef: input.learnerStateRef,
         enrichmentId: input.enrichmentId,
+        assetSetIdentity: state.assetSetIdentity,
+        studyItems: scopes.opened.assets.studyItems,
         nodeIdsInScope: (nodeId) => (inScope.has(nodeId) ? sectionOf.get(nodeId) : undefined)
       });
       if (eligible.length === 0) return { created: false, refused: "no_eligible_items" };
@@ -728,6 +785,7 @@ export function createRecallChallenge(deps: RecallChallengeDeps) {
         challengeId,
         learnerStateRef: input.learnerStateRef,
         enrichmentId: input.enrichmentId,
+        assetSetIdentity: state.assetSetIdentity,
         scopeKind: input.scopeKind,
         scopeAnchorDerivedNodeId: input.anchorDerivedNodeId,
         lineup
@@ -737,6 +795,7 @@ export function createRecallChallenge(deps: RecallChallengeDeps) {
         const active = await deps.challengeStore.getActiveForScope({
           learnerStateRef: input.learnerStateRef,
           enrichmentId: input.enrichmentId,
+          assetSetIdentity: state.assetSetIdentity,
           scopeKind: input.scopeKind,
           scopeAnchorDerivedNodeId: input.anchorDerivedNodeId
         });

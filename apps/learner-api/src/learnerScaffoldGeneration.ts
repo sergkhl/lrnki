@@ -23,14 +23,12 @@ import {
 } from "@lrnki/infrastructure-litellm";
 import {
   PostgresCalibrationVerdictStore,
-  PostgresConceptLessonStore,
-  PostgresEnrichmentInspectionRead,
   PostgresLearnerScaffoldStore,
   PostgresResponseLogStore,
-  PostgresRunProgressReporter,
-  PostgresStudyItemBankStore
+  PostgresRunProgressReporter
 } from "@lrnki/infrastructure-postgres";
 import type { DatabaseClient } from "./db";
+import { createLearnerSourceExpeditions } from "./sourceExpedition";
 
 // Learner-Scoped Scaffold Generation, API composition (plan 2026-07-16-004 KTD8). Construction
 // ONLY: neural clients, Postgres adapters, reporter, the complete config identity, and the
@@ -40,11 +38,12 @@ import type { DatabaseClient } from "./db";
 // pool; the composition borrows it and never closes it.
 export function createLearnerScaffoldGeneration(sql: DatabaseClient): ScaffoldGeneration {
   const { deterministicClient, probeClient, embeddingClient } = createNeuralClients();
-  const enrichmentRead = new PostgresEnrichmentInspectionRead(sql);
-  const studyItemStore = new PostgresStudyItemBankStore(sql);
-  const conceptLessonStore = new PostgresConceptLessonStore(sql);
   const responseLog = new PostgresResponseLogStore(sql);
   const verdictStore = new PostgresCalibrationVerdictStore(sql);
+  const sourceExpeditions = createLearnerSourceExpeditions(
+    sql,
+    CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY
+  );
   const knowledgeBoundaryProbe = createKnowledgeBoundaryProbePort(probeClient);
   const nodeEmbedding = new LiteLlmNodeEmbeddingAdapter(embeddingClient);
   const groundingGeneration = createGroundingGenerationPort(deterministicClient);
@@ -72,9 +71,7 @@ export function createLearnerScaffoldGeneration(sql: DatabaseClient): ScaffoldGe
       getStudySession({
         enrichmentId,
         learnerStateRef,
-        enrichmentRead,
-        studyItemStore,
-        conceptLessonStore,
+        sourceExpeditions,
         responseLog,
         verdictStore,
         learnerKnowledgeAvailability: CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY
