@@ -11,6 +11,7 @@ import {
   buildClaimVerificationQuestionPlanningValidator,
   conceptAdmissionSchemaForCandidateKeys,
   conceptAdmissionValidatorForCandidateKeys,
+  CONCEPT_ADMISSION_TIER_POLICY,
   conceptCoreSelectionSchemaForCandidateKeys,
   conceptCoreSelectionValidatorForCandidateKeys,
   conceptEvidenceProfileSchema,
@@ -149,6 +150,21 @@ test("candidate-key enum is symmetric for admission schemas and validators", () 
   assert.doesNotThrow(() => conceptAdmissionValidatorForCandidateKeys().parse({
     decisions: [validAdmissionDecision("c")]
   }));
+});
+
+test("Concept Admission tier schema reserves quarantine for an evidenced semantic conflict", () => {
+  const schema = conceptAdmissionSchemaForCandidateKeys(["a"]);
+  const decisions = ((schema.properties as Record<string, unknown>).decisions as {
+    items: { properties: Record<string, unknown> };
+  }).items.properties;
+
+  assert.deepEqual(decisions.tier, {
+    type: "string",
+    enum: ["core", "optional", "reject", "quarantine"],
+    description: CONCEPT_ADMISSION_TIER_POLICY
+  });
+  assert.match(CONCEPT_ADMISSION_TIER_POLICY, /insufficient source evidence.*not a conflict/);
+  assert.match(CONCEPT_ADMISSION_TIER_POLICY, /otherwise use 'reject'/);
 });
 
 test("candidate-key enum is symmetric for core-selection schemas and validators", () => {

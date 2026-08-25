@@ -33,6 +33,15 @@ export const conceptDiscoverySchema: JsonSchema = toForcedToolSchema(conceptDisc
 
 // --- Concept Admission: submit_admission_decisions ------------------------
 
+// One model-facing definition shared mechanically by the forced-tool schema and
+// prompt. `quarantine` is a semantic-conflict state, not the reject option for an
+// uncertain or insufficiently supported classification (ADR-0015).
+export const CONCEPT_ADMISSION_TIER_POLICY = [
+  "Tier semantics: 'quarantine' is reserved for an unresolved conflict about this atom's identity or meaning within the Declared Domain, evidenced by mutually incompatible source passages or an unresolved same-scope identity collision.",
+  "Missing or deferred treatment, a bare mention, insufficient source evidence, low confidence, source-local detail, or failure of a core criterion is not a conflict: use 'optional' when the atom is a genuine taught domain concept that should remain inspectable, otherwise use 'reject'.",
+  "Use 'core' only for an eligible central concept."
+].join(" ");
+
 const admissionCriterion = z.object({
   passed: z.boolean(),
   rationale: z.string().min(1),
@@ -65,7 +74,7 @@ export function conceptAdmissionValidatorForCandidateKeys(parentCandidateKeys?: 
       parentCandidateKey: enumForKeys(parentCandidateKeys).describe("The discovered candidateKey this atomic concept was split from."),
       atomicKey: z.string().min(1).describe("Run-local key for this ATOMIC concept, unique across all decisions. Use the parentCandidateKey verbatim when the candidate names exactly one concept; append a distinct suffix per atom when splitting a conflated candidate (e.g. 'a_and_b__a', 'a_and_b__b')."),
       proposedCanonicalLabel: z.string().min(1).describe("Precise domain-qualified label for this single atomic concept. Keep the discovered label when it is already precise and atomic."),
-      tier: z.enum(["core", "optional", "reject", "quarantine"]),
+      tier: z.enum(["core", "optional", "reject", "quarantine"]).describe(CONCEPT_ADMISSION_TIER_POLICY),
       sourceRole: z.enum(["declared_domain_concept", "out_of_domain_illustration"]).describe("'declared_domain_concept' when this is a genuine concept of the Declared Domain that the source teaches. 'out_of_domain_illustration' when it belongs to another domain and appears ONLY as example, sample, benchmark, or evaluation material for this source; such material is rejected, never kept optional."),
       standaloneLearningObjective: admissionCriterion,
       establishedDomainMeaning: admissionCriterion,

@@ -5,7 +5,7 @@ lrnki:
   toolDescription: Submit one precision-first admission decision per candidate in the requested batch.
 ---
 {{#system}}
-You perform precision-first concept admission for an authoritative learner-neutral concept graph. Each decision must describe exactly one atomic concept; split conflated candidates, classify each atom as core, optional, reject, or quarantine, and judge source role against the Declared Domain. A core concept must pass standalone learning objective, established domain meaning, organizing power, and definition-bearing treatment with exact source evidence. Labels must name concepts, not full propositions or claims. Use exact verbatim evidence quotes and terse rationales. Be strict: source-local details, headings, malformed composites, bibliography, metadata, and off-domain illustrations are rejected.
+You perform precision-first concept admission for an authoritative learner-neutral concept graph. Each decision must describe exactly one atomic concept; split conflated candidates, classify each atom as core, optional, reject, or quarantine, and judge source role against the Declared Domain. {{tierPolicy}} A core concept must pass standalone learning objective, established domain meaning, organizing power, and definition-bearing treatment with exact source evidence. Labels must name concepts, not full propositions or claims. Use exact verbatim evidence quotes and terse rationales. Be strict: source-local details, headings, malformed composites, bibliography, metadata, and off-domain illustrations are rejected.
 {{/system}}
 
 {{#user}}

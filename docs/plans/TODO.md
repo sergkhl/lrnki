@@ -2,10 +2,10 @@
 
 ## TODO
 
-- **Curated-source learner workflow — in progress; U0–U6 complete and U7 evidence fusion repaired.**
+- **Curated-source learner workflow — in progress; U0–U6 complete and U7 contract/fresh pair qualified.**
   Follow [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md).
-  Correct the model-facing quarantine contract, re-extract the diagnostic source pair, then rebuild,
-  enrich, inspect, and admit one bank before adoption, Support Path, and external-source qualification.
+  Canonicalize, inspect, build, and enrich the fresh diagnostic pair; inspect its complete typed graph
+  before one bank, adoption, Support Path, and external-source qualification.
 
 ## COMPLETED
 

@@ -3,12 +3,18 @@ import test from "node:test";
 import type { SourceBlock } from "@lrnki/domain-core";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import {
+  admissionDecisionsDescriptor,
   createAdmissionLabelJudgmentPort,
   createAssertionEntailmentJudgmentPort,
   createDefinitionPassageQualityJudgmentPort,
   renderBlocks
 } from "./extractionAdapters";
-import { admissionLabelJudgmentValidator, definitionPassageQualityJudgmentValidator } from "./toolSchemas";
+import { renderPromptFile } from "./promptFile";
+import {
+  admissionLabelJudgmentValidator,
+  CONCEPT_ADMISSION_TIER_POLICY,
+  definitionPassageQualityJudgmentValidator
+} from "./toolSchemas";
 
 function sourceBlock(blockId: string, text: string, headingPath: string[] = []): SourceBlock {
   return {
@@ -55,6 +61,17 @@ test("renderBlocks can use full-document adjacency for filtered neighborhoods", 
 
 test("renderBlocks omits heading and adjacency for a single block when absent", () => {
   assert.equal(renderBlocks([sourceBlock("b1", "Only.")]), "[b1 type=paragraph] Only.");
+});
+
+test("Concept Admission prompt and forced-tool schema share one tier policy", () => {
+  const rendered = renderPromptFile(
+    admissionDecisionsDescriptor.promptPath,
+    admissionDecisionsDescriptor.templateData(admissionDecisionsDescriptor.sentinelInput)
+  );
+
+  assert.ok(rendered.messages[0]?.content.includes(CONCEPT_ADMISSION_TIER_POLICY));
+  assert.match(rendered.messages[0]?.content ?? "", /quarantine.*unresolved conflict/i);
+  assert.match(rendered.messages[0]?.content ?? "", /Missing or deferred treatment.*use 'optional'/);
 });
 
 function adapterReturning(result: {

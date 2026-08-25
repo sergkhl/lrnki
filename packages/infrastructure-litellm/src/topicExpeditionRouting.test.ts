@@ -341,7 +341,7 @@ test("only affected operation hashes change and Topic has twenty conceptual stag
     "learner-scaffold-generation-7930b34c0fdb",
     "Scaffold changes with the Grounding audit contract"
   );
-  assert.equal(extractionConfigHash(), "source-extraction-2b15b67d6238");
+  assert.equal(extractionConfigHash(), "source-extraction-349d7d8bf354");
   assert.equal(
     conceptCanonicalizationConfigHash({
       mode: "semantic",

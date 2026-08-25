@@ -25,6 +25,7 @@ import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import { executeForcedToolStage, type NeuralStageDescriptor } from "./forcedToolStage";
 import { readPromptFile } from "./promptFile";
 import {
+  CONCEPT_ADMISSION_TIER_POLICY,
   admissionLabelJudgmentSchema,
   admissionLabelJudgmentValidator,
   conceptAdmissionSchemaForCandidateKeys,
@@ -115,6 +116,7 @@ export const admissionDecisionsDescriptor: NeuralStageDescriptor<
   },
   templateData: (input) => ({
     declaredDomain: input.declaredDomain,
+    tierPolicy: CONCEPT_ADMISSION_TIER_POLICY,
     allCandidateLabels: input.allCandidateLabels,
     candidateList: input.candidateList,
     sourceBlocks: renderBlocks(extractableBlocks(input.document.blocks))

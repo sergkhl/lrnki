@@ -7,13 +7,13 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0–U6 complete; U7 evidence fusion repaired
+**Status:** In progress — U0–U6 complete; U7 contract and fresh extraction pair qualified
 
-**NEXT:** Define `quarantine` at the model-facing Concept Admission contract as the existing
-unresolved identity-or-meaning-conflict state, re-extract both diagnostic harbor sources under the
-new identity, then rebuild, enrich, and inspect before generating exactly one Study Item Bank. Only
-after that bank passes may the workflow adopt/read it, exercise exact-reference Support Path, and
-repeat the smallest representative path on an external Curated Source.
+**NEXT:** Canonicalize inspected runs `2e39c43c-8f4d-4d18-9ece-0a2afa4f536b` and
+`58a80d11-883f-4397-9cd1-bbf7acd9cbbb`, inspect the immutable artifact, then build and enrich under
+`graph-enrichment-7acf2b563308`. Inspect every derived node, typed grounding passage, merge, and
+prerequisite decision before generating exactly one Study Item Bank. Only a passing bank may be
+adopted/read, exercised through exact-reference Support Path, and repeated on an external source.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
 Curated Sources and automatically admits only source-backed learner assets. Anchor-less Synthetic
@@ -120,6 +120,13 @@ attributes or lineage. [W3C PROV Constraints](https://www.w3.org/TR/prov-constra
 compatible same-key attribute lists, while the [PROV overview](https://www.w3.org/TR/prov-overview/)
 retains origins and derivation. The repair retains typed absorbed grounding and unions only
 compatible source passages; it never converts unlike origins into source evidence.
+
+### Abstention confused with semantic quarantine
+
+Selective classification adds a reject option for uncertain cases; [optimal reject-option
+classifiers](https://www.jmlr.org/papers/v24/21-0048.html) separate prediction from selection.
+Insufficient/deferred support therefore resolves to optional/reject, while `quarantine` retains
+ADR-0015's unresolved same-scope conflict. One policy supplies both prompt and forced-tool schema.
 
 ### Transport authority leaking into application policy
 
@@ -567,34 +574,27 @@ The plan is complete only when all of the following are true:
 
 - Earlier core/combined banks were never adopted: exact inspection found citation, carrier/subject,
   and missing-lesson defects, so the strict gate refused both.
-- Definition admission now binds the named definiendum to its definiens. Concept Canonicalization
-  merges only `equivalent`; its conservative medium-reasoning DeepSeek route passed exact alias and
-  formula-input controls on both providers. Identity: `concept-canonicalization-c9f1b792acf4`.
-- Artifact `d67d6fef-6c1a-42a5-989a-a1afb01e0bbf` recorded one true merge, two related distinctions,
-  and no quarantine. Its seven-Concept graph had no false formula-input identity, but enrichment's
-  correct Forecast revision/update merge exposed provenance loss: the definition survived only as
-  audit text and hydration relabeled every passage as a mention. No bank was started.
-- Semantic merge records now retain complete typed absorbed grounding. Same-origin source nodes
-  union exact-deduped passages; unlike origins remain typed audit evidence, anchors cannot be
-  absorbed, and hydration preserves roles without a physical schema change. Identity:
-  `graph-enrichment-7acf2b563308`.
-- The repair passed 862 application and 207 LiteLLM tests, the reset-backed repository gate including
-  all Postgres suites, schema parity, all 11 typechecks, zero-error lint, and whitespace. Pre-repair
-  enrichment's 36 calls / 100,641 tokens / $0.015763842 are negative-control evidence.
-- After the required reset, fresh core run `185c0cf0-cd6d-4a48-8265-a518fc35f020` admitted three core
-  Concepts and supplement run `62736274-1f86-48fa-b3a7-3b6f20416ed4` admitted five; exact inspection
-  confirmed their named definitions. Build refused the core run because the model used undefined
-  `quarantine` for a safely deferred prerequisite, not an identity-or-meaning conflict. Authority is
-  local test-database plus live-provider only. **Safe to continue:** yes, to a domain-neutral contract
-  repair and fresh pair, not publication or a lucky rerun.
+- Definition admission, exact semantic-identity adjudication, and typed evidence fusion are repaired;
+  only `equivalent` merges, compatible passages retain roles, and unlike origins stay typed audit
+  evidence. Identities: `concept-canonicalization-c9f1b792acf4` / `graph-enrichment-7acf2b563308`.
+- A prior core run exposed selective-classification taxonomy drift: undefined `quarantine` blocked a
+  safely deferred prerequisite. One shared domain-neutral policy now reserves it for an evidenced
+  identity-or-meaning conflict; prompt and schema derive from it. Extraction identity is
+  `source-extraction-349d7d8bf354`; the failed run was not rerun for luck.
+- Fresh core run `2e39c43c-8f4d-4d18-9ece-0a2afa4f536b` admitted the three intended protocol Concepts;
+  supplement run `58a80d11-883f-4397-9cd1-bbf7acd9cbbb` admitted tide margin, adequate margin, and
+  movement authorization. All six core profiles are complete with exact named definitions; deferred
+  tide margin is optional in the core source, Forecast revision and Tide height in the supplement.
+- The contract repair passed 209 LiteLLM tests, typecheck, zero-error lint, and whitespace; fusion
+  passed 862 application tests and the reset-backed gate. Both runs had zero quarantines: 74 calls /
+  147,230 tokens / $0.0174940416. Local test-database/live-provider authority is safe to canonicalize.
 
 ### Open findings
 
 - U4's local verifier remains rejected for one material false acceptance and broken LiteLLM logging;
   do not rerun it or pick another. The remote assignment is qualified for source support and exact
   Concept identity, not general generation or source-less grounding.
-- Never publish or luckily rerun core run `185c0cf0-cd6d-4a48-8265-a518fc35f020`. Define
-  `quarantine` as the existing unresolved identity-or-meaning-conflict state in the prompt and tool
-  schema, bump identity, and re-extract both sources. The old supplement run is inspection evidence.
+- Canonicalize the inspected runs in core-then-supplement order and build only after a clean artifact;
+  enrich once and inspect all typed evidence before a bank. Every prior run or graph is stale.
 - Matching and impostor remain preserved but unqualified and structurally excluded from Source
   Expedition readiness. A future plan may qualify them after option-select works.
