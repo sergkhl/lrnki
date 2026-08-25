@@ -2,10 +2,10 @@
 
 ## TODO
 
-- **Curated-source learner workflow — in progress; U0–U6 complete and U7 contract/fresh pair qualified.**
+- **Curated-source learner workflow — in progress; U0–U6 complete and U7 fresh typed graph qualified.**
   Follow [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md).
-  Canonicalize, inspect, build, and enrich the fresh diagnostic pair; inspect its complete typed graph
-  before one bank, adoption, Support Path, and external-source qualification.
+  Generate and inspect exactly one bank for the fresh diagnostic enrichment before adoption, Support
+  Path, and external-source qualification.
 
 ## COMPLETED
 

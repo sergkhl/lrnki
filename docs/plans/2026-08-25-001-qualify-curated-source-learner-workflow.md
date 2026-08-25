@@ -7,12 +7,11 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0–U6 complete; U7 contract and fresh extraction pair qualified
+**Status:** In progress — U0–U6 complete; U7 fresh typed graph qualified
 
-**NEXT:** Canonicalize inspected runs `2e39c43c-8f4d-4d18-9ece-0a2afa4f536b` and
-`58a80d11-883f-4397-9cd1-bbf7acd9cbbb`, inspect the immutable artifact, then build and enrich under
-`graph-enrichment-7acf2b563308`. Inspect every derived node, typed grounding passage, merge, and
-prerequisite decision before generating exactly one Study Item Bank. Only a passing bank may be
+**NEXT:** Generate exactly one Study Item Bank for inspected enrichment
+`c06a62c8-2962-4648-93e6-726a0cea7f7a`; inspect every trail lesson, option key/explanation,
+distractor, rejection, and absence beside its admitted passage. Only a passing bank may be
 adopted/read, exercised through exact-reference Support Path, and repeated on an external source.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
@@ -574,27 +573,28 @@ The plan is complete only when all of the following are true:
 
 - Earlier core/combined banks were never adopted: exact inspection found citation, carrier/subject,
   and missing-lesson defects, so the strict gate refused both.
-- Definition admission, exact semantic-identity adjudication, and typed evidence fusion are repaired;
-  only `equivalent` merges, compatible passages retain roles, and unlike origins stay typed audit
-  evidence. Identities: `concept-canonicalization-c9f1b792acf4` / `graph-enrichment-7acf2b563308`.
-- A prior core run exposed selective-classification taxonomy drift: undefined `quarantine` blocked a
-  safely deferred prerequisite. One shared domain-neutral policy now reserves it for an evidenced
-  identity-or-meaning conflict; prompt and schema derive from it. Extraction identity is
-  `source-extraction-349d7d8bf354`; the failed run was not rerun for luck.
+- Definition admission, exact semantic identity, typed evidence fusion, and Concept Admission tier
+  semantics are repaired. Only `equivalent` merges; `quarantine` is an evidenced conflict, not the
+  reject option. Identities: extraction `349d7d8bf354`, canonicalization `c9f1b792acf4`, enrichment
+  `7acf2b563308`; failed candidates were not rerun for luck.
 - Fresh core run `2e39c43c-8f4d-4d18-9ece-0a2afa4f536b` admitted the three intended protocol Concepts;
   supplement run `58a80d11-883f-4397-9cd1-bbf7acd9cbbb` admitted tide margin, adequate margin, and
-  movement authorization. All six core profiles are complete with exact named definitions; deferred
-  tide margin is optional in the core source, Forecast revision and Tide height in the supplement.
-- The contract repair passed 209 LiteLLM tests, typecheck, zero-error lint, and whitespace; fusion
-  passed 862 application tests and the reset-backed gate. Both runs had zero quarantines: 74 calls /
-  147,230 tokens / $0.0174940416. Local test-database/live-provider authority is safe to canonicalize.
+  movement authorization. All six core profiles have exact named definitions and zero quarantine.
+- Artifact `176671df-f653-43d8-a349-e7577175f3ac` kept adequate/tide margin distinct and cleanly built
+  graph `cc478c10-6857-452d-a9de-011757ffbb56`: six source Concepts, 28 passages, five assertions.
+- Enrichment `c06a62c8-2962-4648-93e6-726a0cea7f7a` has six anchors, 13 source-mentioned nodes, zero
+  LLM-grounded nodes, 20 certain/12 uncertain edges, and six confidently floored nodes. Its sole
+  safety-override/interlock merge retains the typed absorbed snapshot and all five canonical passages.
+- Extraction used 74 calls / 147,230 tokens / $0.0174940416; canonicalization used 2 / 2,079 /
+  $0.00022112 and enrichment 58 / 140,750 / $0.0206374634. Automation passed 209 LiteLLM and 862
+  application tests plus typecheck/lint/reset gate. Local DB/provider evidence is safe for one bank.
 
 ### Open findings
 
 - U4's local verifier remains rejected for one material false acceptance and broken LiteLLM logging;
   do not rerun it or pick another. The remote assignment is qualified for source support and exact
   Concept identity, not general generation or source-less grounding.
-- Canonicalize the inspected runs in core-then-supplement order and build only after a clean artifact;
-  enrich once and inspect all typed evidence before a bank. Every prior run or graph is stale.
+- Generate one bank for enrichment `c06a62c8-2962-4648-93e6-726a0cea7f7a`; inspect every trail asset
+  and absence before adoption. Every prior run, graph, enrichment, or bank is stale evidence.
 - Matching and impostor remain preserved but unqualified and structurally excluded from Source
   Expedition readiness. A future plan may qualify them after option-select works.
