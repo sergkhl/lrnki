@@ -432,84 +432,51 @@ The plan is complete only when all of the following are true:
 
 ### U0 — accepted contract and diagnostic Curated Sources — 2026-08-25 — complete
 
-- Accepted supplied Curated Sources as the current entry, future acquisition through Source
-  Registration, no human runtime, source-mentioned prerequisites, and exact-reference Support
-  Steps. LLM-grounded prerequisites, generated Support Steps, and Synthetic Topic Generation remain
-  implemented but held out.
-- Added four project-authored Markdown/HTML/text diagnostic sources and a separate manifest; the
-  harbor pair exercises later source-supplied prerequisite completion without defining a neural
-  graph oracle or replacing the real-source matrix.
-- Ingestion typecheck, 12 fixture tests, manifest parsing, and whitespace passed after two excluded
-  test-harness corrections. No model call, database/source write, or learner/deployed evidence was
-  claimed.
+- Accepted registered Curated Sources, no human runtime, source-mentioned prerequisites, and exact
+  references; generated/source-less paths remain implemented but held out. Four project-authored
+  Markdown/HTML/text diagnostics and a separate manifest exercise later source-supplied completion.
+- Ingestion typecheck, 12 fixture tests, manifest parsing, and whitespace passed. No model,
+  database, learner, or deployed evidence was claimed.
 
 ### U1 — one availability policy for trusted learner knowledge — 2026-08-25 — complete
 
-- One source-typed application policy now governs all six learner-knowledge capabilities across API,
-  worker, supervisors, Journal/catalog/Study Session, Support Path, and Scaffold Generation. Held-
-  out entry points refuse before a write or wake; every producer, artifact, and historical row
-  remains.
-- Source Expedition adoption, verified source-mentioned prerequisites, and exact pinned references
-  remain reachable. LLM-grounded graphs, Synthetic Topic requests, and generated Support Steps return
-  stable unavailable reasons; generated artifacts remain inspectable but unprojected.
+- One source-typed policy governs all six capabilities across API, workers, supervisors, learner
+  projections, Support Path, and scaffolds. Held-out entry points refuse before write/wake while
+  source adoption, verified mentions, and exact pins remain reachable; all historical work remains.
 - The reset-backed repository gate, 820 application tests, eight worker tests, 26 database API tests,
   57 learner-app suites / 320 tests, four typechecks, lint, and no-call/no-write controls passed. This
   proves local availability mechanics only, not content usefulness or deployed/device behavior.
 
 ### U2 — deep Source Expedition qualification and adoption — 2026-08-25 — complete
 
-- One source-owned module derives authoritative presentation, the prerequisite-closed source trail,
-  current qualified assets, and opaque snapshot identity; identifier-only adoption is idempotent,
-  atomic, generation-free, and wakes no Topic supervisor.
-- The versioned wrapper rejects legacy/changed/missing assets, incomplete trails, LLM-grounded nodes,
-  and unverified source-mentioned nodes. Catalog, Journal, Study Session, activation, learner writes,
-  Recall, and exact-reference Support Path share that authority. Matching/impostor remain stored but
-  neither render nor grade.
+- One source-owned module derives presentation, prerequisite closure, qualified assets, and snapshot
+  identity. Identifier-only adoption is atomic, idempotent, generation-free, and rejects legacy,
+  changed, incomplete, LLM-grounded, or unverified candidates across every learner projection.
 - Seven module tests, `pnpm db:check`, the reset-backed repository gate, 111 Postgres tests, 26 API
   tests, 57 learner-app suites / 320 tests, all 11 typechecks, lint, and whitespace passed after two
   excluded fixture/runner corrections.
-- A read-only production-composition inspection found two exact two-stop/two-lesson/two-option
-  project-authored positive controls. It proves qualification composition and race identity only;
-  no model call or real-external/deployed usefulness claim was made.
+- Read-only production composition found two exact two-stop positive controls, proving local
+  qualification and race identity only; no model, external-source, or deployed claim was made.
 
 ### U3 — domain-neutral material-claim projection and evaluation harness — 2026-08-25 — complete
 
-- One versioned source-owned projection covers every lesson material field and option-select
-  question/key, explanation, and distractor. Compile-time owner maps preserve exact qualifiers;
-  typed direct evidence keeps generated aids from posing as quotations.
-- Exact immutable block reads feed separate source-support, distractor-invalidity, and key-uniqueness
-  decisions. The reused one-call answer-key verifier receives text-ordered candidates without key,
-  option, node, or generator-position leakage; missing/unresolved evidence and every unavailable
-  state remain distinct.
+- One source-owned projection covers every lesson and option material field; immutable blocks feed
+  separate support, distractor, and key outcomes. The answer-key verifier receives text-ordered
+  candidates without key or position leakage, and all unavailable states remain distinct.
 - The read-only, gitignored-output report joins raw payloads, evidence, decisions, asset/model/config
   identity, operation timing/spend, and positive controls. The 833 application tests, reset-backed
-  repository gate, all 11 typechecks, lint, and whitespace passed after one excluded CLI-separator
-  failure and repair.
-
-#### Real-use quality evaluation
-
-- **Milestone/fixture:** U3 mechanics over a project-authored two-stop text-source candidate in the
-  disposable test database; **real model calls:** no; **result:** PASS for report mechanics only.
-- The report joined two lessons, two options, 12 exact claims, one resolved block, all three decision
-  families, exact identities, and zero evaluator calls. Missing timeline/spend remained `null`.
-- This cannot establish semantic support, distractor quality, model fitness, or external-source
-  usefulness. Only the CLI separator was repaired; continuation was limited to U4.
+  repository gate, all typechecks, lint, and whitespace passed. A two-stop disposable-DB report
+  joined 12 exact claims with zero evaluator calls, proving report mechanics but not semantic quality.
 
 ### U4 — bounded local factual-consistency verifier experiment — 2026-08-25 — complete
 
-- The sole candidate was public MIT
-  [`lytang/MiniCheck-DeBERTa-v3-Large` revision
-  `60c4e0825ae044a6193ba811c5712c37548636a0`](https://huggingface.co/lytang/MiniCheck-DeBERTa-v3-Large/tree/60c4e0825ae044a6193ba811c5712c37548636a0):
-  a 1,740,304,440-byte two-label DeBERTa artifact whose safetensors SHA-256 matched
-  `8528d6a1399182054c3d2918f58bb67785de50ffde97f5ecdb215eabfb73297d`.
-- TEI 1.9.3/Candle/float32/no truncation reproduced both official `/predict` controls; `/rerank`
-  correctly refused the classifier. LiteLLM 1.88.1 transported it with call identity but crashed its
-  asynchronous success logger on every HTTP 200, so attribution/spend was not qualified.
+- The sole candidate was the public MIT
+  [`MiniCheck-DeBERTa-v3-Large` pinned revision](https://huggingface.co/lytang/MiniCheck-DeBERTa-v3-Large/tree/60c4e0825ae044a6193ba811c5712c37548636a0).
+  TEI 1.9.3 reproduced official controls, but LiteLLM 1.88.1 crashed success logging on every 200.
 - The fixed 43-case diagnostic plus held-out Rust/OpenStax matrix had three false rejections
   (15.789%) and one forbidden carrier/referent false acceptance (0.8887313 supported probability),
-  failing the zero-false-acceptance kill gate.
-- Nothing was activated or reassigned. Services and disposable model state were removed; complete
-  local output remains gitignored. This is measured local rejection evidence only.
+  failing the kill gate. Nothing was activated; disposable state was removed and full output stays
+  gitignored. This is local rejection evidence only.
 
 ### U5 — source-backed lesson and option-select admission — 2026-08-26 — complete
 
