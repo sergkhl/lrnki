@@ -7,12 +7,13 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0–U4 complete; U5 lesson admission complete, option-select next
+**Status:** In progress — U0–U4 complete; U5 admission mechanics complete, live gates next
 
-**NEXT:** Complete U5's option-select batch: consume source-support, distractor-invalidity, and key-
-uniqueness decisions before persistence; retain rejected candidates for inspection; and make
-matching/impostor preservation plus Source Expedition holdout structural. Run the diagnostic kill
-gate and one fresh external Curated Source operation before closing U5.
+**NEXT:** Complete U5's live gates. Qualify one source-support Model Assignment through the fixed
+diagnostic matrix, then run one fresh external Curated Source operation through lesson and option
+admission with payload-versus-evidence inspection. Do not admit on abstention, reuse U4's rejected
+local verifier, or proceed to U6 until the exact production consumers pass without a material false
+acceptance.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
 Curated Sources and automatically admits only source-backed learner assets. Anchor-less Synthetic
@@ -522,17 +523,28 @@ The plan is complete only when all of the following are true:
   absent after U4's rejection, so no Model Assignment or route changed. A qualification wrapper,
   rather than citation styling, proves semantic admission; an accepted supported paraphrase may
   remain honestly `generated` and uncited.
-- Automated evidence passed: 839 application tests; eight kg-worker tests; 26 learner-API tests in
+- **Option-admission batch:** guarded source candidates now cross one strict owner that first
+  requires source grounding plus a source-cited key, then accepted support for the exact
+  question/key and explanation, then affirmative key truth, falsity of every distractor for that
+  question, and uniqueness. Failed source support short-circuits answer-key spend; no abstention or
+  transport failure admits. Accepted payloads change only to the qualification config identity.
+- Exact rejected option payloads retain their base identity as `candidateStudyItems` in the
+  immutable Study Item Bank artifact while per-node rejection remains queryable. Matching and
+  impostor generation, relational rows, artifacts, and Admin Lab inspection remain intact, but
+  Source Expedition identity, atomic race checks, rendering, authorization, and grading consider
+  only qualified floored-trail lessons and option-select items.
+- Automated evidence passed: 844 application tests; eight kg-worker tests; 26 learner-API tests in
   the reset-backed run; the complete `CI=1 pnpm test:db` repository gate, including transactional
-  candidate-artifact/absence coverage and all 57 learner-app suites / 320 tests; four affected
-  production/package typechecks; targeted ESLint; and whitespace checks. The application gate first
+  lesson/option candidate-artifact coverage and all 57 learner-app suites / 320 tests; all 11
+  typechecks; targeted ESLint; and whitespace checks. The application gate first
   exposed four obsolete expectations that uncited or LLM-grounded content on a non-null source graph
   remained playable; they were corrected to the accepted U1/U5 inspection-only boundary. That
   excluded run is not evidence.
 
 #### Real-use quality evaluation
 
-- **Milestone:** fail-closed material-claim settlement for source-backed Concept Lessons.
+- **Milestone:** fail-closed material-claim settlement for source-backed Concept Lessons and
+  option-select candidates.
 - **Fixture and source type:** 33 existing raw lessons from the registered external Rust Book
   Curated Source, read with their current derived graph and immutable source blocks.
 - **Real model calls used:** no; verifier non-activation and candidate preservation were the changed
@@ -546,20 +558,26 @@ The plan is complete only when all of the following are true:
 - **Defects observed:** none in the refusal boundary. The first scratch runner location could not
   resolve workspace package exports and was excluded; the package-relative read-only rerun passed.
 - **Changes made after inspection:** none.
-- **Remaining caveats:** option-select admission is not yet connected, no support verifier is
-  qualified, and this reused prior artifact set rather than a fresh generation. U5 still requires
-  its diagnostic kill gate and one fresh external Curated Source operation before completion.
-- **Safe to continue downstream:** yes, to U5 option-select admission only.
+- **Option inspection:** 31 existing external Rust option candidates were read beside 37 resolved
+  evidence references. Seven failed the structural source-key boundary; the remaining 24 produced
+  48 explicit support-verifier-not-activated decisions. All 31 candidates were byte-for-byte
+  preserved, all 31 became explicit rejection, and both source-support and answer-key calls stayed
+  zero. The 26 matching and 32 impostor rows remained unchanged and inspection-only.
+- **Remaining caveats:** no source-support verifier is qualified, so this proves safe refusal only.
+  Both inspections reused prior external artifacts rather than a fresh generation; U5 still needs
+  its fixed diagnostic kill gate and one fresh external Curated Source operation.
+- **Safe to continue downstream:** yes, to U5's source-support qualification and live gates only.
 
 ### Open findings
 
 - No local source-support verifier is activated. U4 rejected its only permitted candidate for both
   one material false acceptance and broken LiteLLM success logging; do not rerun it for luck or pick
-  a second candidate in this plan. Lesson settlement now preserves raw candidates and emits explicit
-  absence; option-select must apply the same fail-closed boundary next.
+  a second local candidate in this plan. Lesson and option settlement preserve raw candidates and
+  fail closed; a separately qualified production source-support assignment is still required.
 - U3 proves lossless projection, exact evidence resolution, independent settlement, and report
-  mechanics only. Lesson admission now consumes its accepted decisions in deterministic positive
-  controls, but production has no activated support verifier. Option-select still needs complete
-  support/truth settlement, and external Curated Sources remain mandatory for usefulness acceptance.
+  mechanics only. Lesson and option admission consume accepted decisions in deterministic positive
+  and negative controls, but production has no activated support verifier. Diagnostic and fresh
+  external Curated Source usefulness gates remain mandatory.
 - Matching and impostor remain preserved but unqualified. They do not satisfy readiness in this plan;
-  a future plan may qualify them independently after the option-select Source Expedition works.
+  Source Expedition snapshots now exclude them structurally. A future plan may qualify them
+  independently after the option-select Source Expedition works.

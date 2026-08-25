@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test, { after } from "node:test";
-import type { ConceptLesson, OptionSelectItem } from "@lrnki/domain-core";
+import type { ConceptLesson, MatchingItem, OptionSelectItem } from "@lrnki/domain-core";
 import type { SourceExpeditionAssetExpectation } from "@lrnki/ports";
 import { createDatabaseClient } from "./db";
 import { PostgresLearnerExpeditionStore } from "./PostgresLearnerExpeditionStore";
@@ -110,11 +110,36 @@ async function persistSourceAssets(sql: Sql, input: {
       { optionId: randomUUID(), text: "Wrong three", isCorrect: false, provenance: "generated" }
     ]
   };
+  const matching: MatchingItem = {
+    studyItemId: randomUUID(),
+    graphVersionId: input.graphVersionId,
+    enrichmentId: input.enrichmentId,
+    derivedNodeId: input.derivedNodeId,
+    groundingProvenance: "generated",
+    generatingModel: "test-model",
+    configHash: "inspection-only-base-config",
+    explorableTerms: [],
+    itemType: "matching",
+    question: "Match each inspection-only clue.",
+    pairs: ["one", "two", "three"].map((value) => ({
+      pairId: randomUUID(),
+      matchId: randomUUID(),
+      promptText: `Prompt ${value}`,
+      matchText: `Match ${value}`,
+      citation: {
+        provenance: "generated" as const,
+        derivedNodeId: input.derivedNodeId,
+        passageText: "A source-backed definition."
+      }
+    }))
+  };
   await new PostgresStudyItemBankStore(sql).persist({
     graphVersionId: input.graphVersionId,
     enrichmentId: input.enrichmentId,
     configHash,
-    studyItems: [item],
+    // Matching remains current and inspectable, but the source snapshot contract below owns only
+    // learner-qualified option-select identities.
+    studyItems: [item, matching],
     rejected: []
   });
   return {

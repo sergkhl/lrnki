@@ -854,7 +854,16 @@ export interface LearnerAwardsStorePort {
 // 18). Rejected nodes are persisted so the no-item frontier fallback reads the real
 // rejection reason instead of guessing from grounding origin.
 export interface StudyItemBankStorePort {
-  persist(input: { graphVersionId: string | null; enrichmentId: string; configHash: string; studyItems: StudyItem[]; rejected: RejectedStudyItem[] }): Promise<void>;
+  persist(input: {
+    graphVersionId: string | null;
+    enrichmentId: string;
+    configHash: string;
+    // Current admitted query assets. Source-backed generation may additionally retain its exact
+    // post-guard, pre-settlement option candidates in the immutable artifact for inspection.
+    studyItems: StudyItem[];
+    candidateStudyItems?: StudyItem[];
+    rejected: RejectedStudyItem[];
+  }): Promise<void>;
   getStudyItem(derivedNodeId: string, itemType: StudyItemType): Promise<StudyItem | undefined>;
   // Current-generation lookup by primary key (`superseded_at IS NULL`), feeding the same
   // `hydrate` as the other reads. The server-side grading use-case resolves answer keys off

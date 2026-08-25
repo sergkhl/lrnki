@@ -324,7 +324,7 @@ test("qualification derives authoritative presentation and admits only qualified
   );
   assert.deepEqual(
     result.assets.expectedAssets.currentStudyItemIds,
-    ["matching-node-summit", "option-node-prerequisite", "option-node-summit"]
+    ["option-node-prerequisite", "option-node-summit"]
   );
 });
 

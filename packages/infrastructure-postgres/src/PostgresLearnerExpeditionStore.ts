@@ -232,14 +232,26 @@ export class PostgresLearnerExpeditionStore implements LearnerExpeditionStorePor
     const itemRows = await tx<{ study_item_id: string }[]>`
       SELECT study_item_id
       FROM study_items
-      WHERE enrichment_id = ${enrichmentId} AND superseded_at IS NULL
+      WHERE enrichment_id = ${enrichmentId}
+        AND item_type = 'option_select'
+        AND superseded_at IS NULL
       ORDER BY study_item_id
       FOR SHARE`;
+    // Qualification snapshots only the learner-visible floored trail. Extra current inspection
+    // assets (off-trail lessons/options and the held-out matching/impostor families) neither grant
+    // readiness nor invalidate it. Every expected id must still be present and current; replacing
+    // a visible generation updates/supersedes that exact row and is detected under these locks.
+    const expectedLessonIds = new Set(expected.currentConceptLessonIds);
+    const expectedItemIds = new Set(expected.currentStudyItemIds);
     return sameIds(
-      lessonRows.map((row) => row.concept_lesson_id),
+      lessonRows
+        .map((row) => row.concept_lesson_id)
+        .filter((conceptLessonId) => expectedLessonIds.has(conceptLessonId)),
       expected.currentConceptLessonIds
     ) && sameIds(
-      itemRows.map((row) => row.study_item_id),
+      itemRows
+        .map((row) => row.study_item_id)
+        .filter((studyItemId) => expectedItemIds.has(studyItemId)),
       expected.currentStudyItemIds
     );
   }

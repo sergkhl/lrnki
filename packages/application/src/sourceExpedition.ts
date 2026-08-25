@@ -2,8 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type {
   ConceptLesson,
   LessonAbsentNode,
-  OptionSelectItem,
-  StudyItem
+  OptionSelectItem
 } from "@lrnki/domain-core";
 import type {
   EnrichmentInspectionReadPort,
@@ -201,8 +200,8 @@ export function createSourceExpeditionModule(deps: SourceExpeditionModuleDeps) {
     if (!summitNode) return unavailable("trail_incomplete");
     const expectedAssets = assetExpectation({
       detail: qualifiedDetail,
-      lessons,
-      studyItems,
+      lessons: qualifiedLessons,
+      studyItems: qualifiedOptions,
       qualifiedAssetConfigHash: deps.qualifiedAssetConfigHash,
       trailNodeIds: floored.trailNodeIds
     });
@@ -423,7 +422,7 @@ function optionSelectQualifies(
 function assetExpectation(input: {
   detail: DerivedGraphDetail;
   lessons: ConceptLesson[];
-  studyItems: StudyItem[];
+  studyItems: OptionSelectItem[];
   qualifiedAssetConfigHash: string;
   trailNodeIds: Set<string>;
 }): SourceExpeditionAssetExpectation {

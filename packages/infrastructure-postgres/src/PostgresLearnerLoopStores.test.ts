@@ -149,6 +149,56 @@ maybe("persists an option_select item; it round-trips with options + citation; s
   }
 });
 
+maybe("a rejected source option remains in the immutable artifact without becoming a current item", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const s = await seedSubstrate(sql);
+    const candidate = { ...optionSelectFor(s), configHash: "base-candidate-config" };
+    await new PostgresStudyItemBankStore(sql).persist({
+      graphVersionId: s.graphVersionId,
+      enrichmentId: s.enrichmentId,
+      configHash: "base-bank-config",
+      studyItems: [],
+      candidateStudyItems: [candidate],
+      rejected: [{
+        derivedNodeId: s.derivedNodeId,
+        canonicalLabel: "Ownership",
+        itemType: "option_select",
+        reason: "source option-select admission rejected: explanation support was not established"
+      }]
+    });
+
+    assert.deepEqual(
+      await new PostgresStudyItemBankStore(sql).listStudyItemsForEnrichment(s.enrichmentId),
+      []
+    );
+    const rows = await sql<{
+      producer_version: string;
+      config_hash: string;
+      payload: {
+        studyItems: StudyItem[];
+        candidateStudyItems: StudyItem[];
+        rejected: RejectedStudyItem[];
+      };
+    }[]>`
+      SELECT producer_version, config_hash, payload
+      FROM artifact_versions
+      WHERE artifact_type = 'study_item_bank'
+        AND payload->>'enrichmentId' = ${s.enrichmentId}
+      ORDER BY created_at DESC
+      LIMIT 1`;
+    assert.equal(rows[0]?.producer_version, "0.2.0");
+    assert.equal(rows[0]?.config_hash, "base-bank-config");
+    assert.deepEqual(rows[0]?.payload.studyItems, []);
+    assert.equal(rows[0]?.payload.candidateStudyItems[0]?.studyItemId, candidate.studyItemId);
+    assert.equal(rows[0]?.payload.candidateStudyItems[0]?.configHash, "base-candidate-config");
+    assert.equal(rows[0]?.payload.candidateStudyItems[0]?.itemType, "option_select");
+    assert.equal(rows[0]?.payload.rejected.length, 1);
+  } finally {
+    await sql.end();
+  }
+});
+
 // Covers U1 scenario 1 (R1-R3): a study item's validated Explorable Terms persist to the
 // study_items.explorable_terms jsonb column and hydrate back in order; a lesson's anchored
 // terms round-trip on concept_lessons.explorable_terms.

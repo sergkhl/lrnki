@@ -63,6 +63,7 @@ import { selectLessonNeighborhood } from "./selectLessonNeighborhood";
 import { lessonGroundingShape, lessonOptionSelectAnswer, type LessonGroundingShape } from "./lessonGroundingShape";
 import { assembleConceptLesson, SUBSTANTIVE_KINDS } from "./assembleConceptLesson";
 import { admitSourceConceptLessons } from "./sourceLessonAdmission";
+import { admitSourceOptionSelectItems } from "./sourceOptionSelectAdmission";
 import { qualifiedSourceExpeditionAssetConfigHash } from "./sourceExpedition";
 import { STUDY_ITEM_BANK_STAGE_GROUP } from "./topicExpeditionStageProfile";
 
@@ -456,6 +457,20 @@ export async function generateStudyItemBank(input: {
   const pendingSubjects = <TSubject>(attempts: readonly NodeAttempt<TSubject>[]): TSubject[] =>
     attempts.flatMap((attempt) => (attempt.kind === "pending" ? [attempt.subject] : []));
 
+  const rejectedAttempts = <TSubject>(
+    attempts: readonly NodeAttempt<TSubject>[],
+    itemType: StudyItemType
+  ): RejectedStudyItem[] => attempts.flatMap((attempt, index) => {
+    if (attempt.kind !== "rejected") return [];
+    const node = layer.derivedNodes[index];
+    return [{
+      derivedNodeId: node.derivedNodeId,
+      canonicalLabel: node.canonicalLabel,
+      itemType,
+      reason: attempt.reason
+    }];
+  });
+
   // Re-joins one type's per-node attempts with its verification outcomes. Two order facts do
   // the work and neither may be weakened: `mapWithConcurrency` is input-ordered, so
   // `attempts[i]` is always `layer.derivedNodes[i]` regardless of response timing; and
@@ -567,6 +582,37 @@ export async function generateStudyItemBank(input: {
         )
       : layer.derivedNodes.map(() => ({ kind: "skipped" as const }));
     const subjects = pendingSubjects(attempts);
+    if (graphVersionId !== null) {
+      const admission = subjects.length === 0
+        ? null
+        : await studyStage(
+            STUDY_ITEM_BANK_STAGE_GROUP.optionSelectKeyVerification.stage,
+            () => admitSourceOptionSelectItems({
+              candidates: subjects.map((subject) => subject.item),
+              lessons,
+              nodes: layer.derivedNodes.map((node) => ({
+                derivedNodeId: node.derivedNodeId,
+                label: node.canonicalLabel,
+                aliases: node.aliases,
+                declaredDomain: node.declaredDomain
+              })),
+              baseConfigHash: input.configHash,
+              sourceEvidenceRead: input.sourceAssetQualification.sourceEvidenceRead,
+              sourceSupportVerifier: input.sourceAssetQualification.sourceSupportVerifier,
+              answerKeyVerifier: input.answerKeyVerification,
+              relatedConceptsForNode: (derivedNodeId) => siblingsByNode.get(derivedNodeId) ?? []
+            }),
+            subjects.length
+          );
+      return {
+        items: admission?.studyItems ?? [],
+        rejected: [
+          ...rejectedAttempts(attempts, "option_select"),
+          ...(admission?.rejected ?? [])
+        ],
+        candidates: admission?.candidates ?? []
+      };
+    }
     const outcomes = subjects.length === 0
       ? []
       : await studyStage(
@@ -587,7 +633,7 @@ export async function generateStudyItemBank(input: {
             }),
           subjects.length
         );
-    return mergeVerified(attempts, outcomes, "option_select");
+    return { ...mergeVerified(attempts, outcomes, "option_select"), candidates: [] };
   })();
 
   // --- Stage 4: matching items ---------------------------------------------------
@@ -777,12 +823,12 @@ export async function generateStudyItemBank(input: {
   // conditional conceptual stages in the Journal. Each mapper is input-ordered, so response or
   // stage completion timing cannot perturb persistence (R4). Up to three real verification stages
   // can overlap in wall-clock — see the concurrency knob's note.
-  const stageResults = await Promise.all([
+  const [optionSelectResult, matchingResult, impostorResult] = await Promise.all([
     optionSelectStage,
     matchingStage,
     impostorStage
   ]);
-  for (const result of stageResults) {
+  for (const result of [optionSelectResult, matchingResult, impostorResult]) {
     studyItems.push(...result.items);
     for (const rejection of result.rejected) reject({ derivedNodeId: rejection.derivedNodeId, canonicalLabel: rejection.canonicalLabel }, rejection.itemType, rejection.reason);
   }
@@ -794,6 +840,9 @@ export async function generateStudyItemBank(input: {
       enrichmentId: layer.enrichmentId,
       configHash: input.configHash,
       studyItems,
+      ...(graphVersionId !== null
+        ? { candidateStudyItems: optionSelectResult.candidates }
+        : {}),
       rejected
     })
   );

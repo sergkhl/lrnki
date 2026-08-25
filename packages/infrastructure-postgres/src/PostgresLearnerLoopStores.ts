@@ -5,7 +5,7 @@ import type { Sql, TransactionSql } from "postgres";
 import { writeArtifactEnvelope } from "./PostgresArtifacts";
 
 const STUDY_ITEM_BANK_PRODUCER = "@lrnki/infrastructure-postgres";
-const STUDY_ITEM_BANK_PRODUCER_VERSION = "0.1.0";
+const STUDY_ITEM_BANK_PRODUCER_VERSION = "0.2.0";
 
 // Study Item Bank persistence (R7, R12, ADR-0026). Normalized `study_items` +
 // `study_item_options` + `study_item_citations` are the query surface; the immutable
@@ -23,9 +23,10 @@ const STUDY_ITEM_BANK_PRODUCER_VERSION = "0.1.0";
 export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
   constructor(private readonly sql: Sql) {}
 
-  async persist(input: { graphVersionId: string | null; enrichmentId: string; configHash: string; studyItems: StudyItem[]; rejected: RejectedStudyItem[] }): Promise<void> {
-    const { graphVersionId, enrichmentId, configHash, studyItems, rejected } = input;
+  async persist(input: { graphVersionId: string | null; enrichmentId: string; configHash: string; studyItems: StudyItem[]; candidateStudyItems?: StudyItem[]; rejected: RejectedStudyItem[] }): Promise<void> {
+    const { graphVersionId, enrichmentId, configHash, studyItems, candidateStudyItems, rejected } = input;
     for (const item of studyItems) assertPersistableItem(item);
+    for (const item of candidateStudyItems ?? []) assertPersistableItem(item);
     // All items in one persist belong to a single enrichment layer. Regeneration is
     // replay, not mutation — but unlike rejections (which nothing outside this table
     // references, so a plain delete-then-insert is safe), prior items are SUPERSEDED
@@ -67,7 +68,13 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
         }
       }
 
-      const artifact: ArtifactEnvelope<{ graphVersionId: string | null; enrichmentId: string; studyItems: StudyItem[]; rejected: RejectedStudyItem[] }> = {
+      const artifact: ArtifactEnvelope<{
+        graphVersionId: string | null;
+        enrichmentId: string;
+        studyItems: StudyItem[];
+        candidateStudyItems?: StudyItem[];
+        rejected: RejectedStudyItem[];
+      }> = {
         artifactId: randomUUID(),
         artifactType: "study_item_bank",
         ...(graphVersionId ? { graphVersionId } : {}),
@@ -75,7 +82,13 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
         producerVersion: STUDY_ITEM_BANK_PRODUCER_VERSION,
         configHash,
         createdAt: new Date().toISOString(),
-        payload: { graphVersionId, enrichmentId, studyItems, rejected }
+        payload: {
+          graphVersionId,
+          enrichmentId,
+          studyItems,
+          ...(candidateStudyItems ? { candidateStudyItems } : {}),
+          rejected
+        }
       };
       await writeArtifactEnvelope(tx, artifact);
     });

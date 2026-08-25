@@ -2,11 +2,12 @@
 
 ## TODO
 
-- **Curated-source learner workflow — in progress; U0–U4 and U5 lesson admission complete.** Follow
+- **Curated-source learner workflow — in progress; U0–U4 complete and U5 admission mechanics
+  complete.** Follow
   [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md). Raw lesson
-  candidates now survive as inspection artifacts while absent support verification admits no lesson
-  or downstream item. Complete option-select support/truth settlement and the matching/impostor
-  Source Expedition holdout next.
+  and option candidates survive while strict settlement admits neither abstention nor verifier
+  failure; matching/impostor remain inspectable but cannot enter Source Expedition identity. Qualify
+  source support and run U5's diagnostic plus fresh external live gates next.
 
 ## COMPLETED
 

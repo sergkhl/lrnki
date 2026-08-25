@@ -269,6 +269,7 @@ export {
 } from "./sourceMaterialClaims";
 export {
   SOURCE_ASSET_EVALUATION_REPORT_SCHEMA_VERSION,
+  evaluateProjectedOptionSelectTruth,
   evaluateProjectedSourceSupport,
   evaluateQualifiedSourceExpedition,
   settleOptionSelectTruth,
@@ -276,6 +277,7 @@ export {
   type DistractorInvalidityDecisionReason,
   type EvaluationDisposition,
   type JoinedSourceMaterialEvidence,
+  type ProjectedOptionSelectTruthEvaluation,
   type ProjectedSourceSupportEvaluation,
   type KeyUniquenessDecision,
   type KeyUniquenessDecisionReason,
@@ -288,6 +290,10 @@ export {
   admitSourceConceptLessons,
   type SourceLessonAdmissionResult
 } from "./sourceLessonAdmission";
+export {
+  admitSourceOptionSelectItems,
+  type SourceOptionSelectAdmissionResult
+} from "./sourceOptionSelectAdmission";
 
 export {
   labelFor,

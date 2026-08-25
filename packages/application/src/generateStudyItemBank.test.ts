@@ -291,19 +291,21 @@ function generationReturning(opts: {
 // truth or option text does, so this one predicate separates keyed lies from everything else
 // without a hard-coded roster that would silently rot as fixtures are added.
 const FIXTURE_LIE = /\b(lie|false)\b/i;
+const FIXTURE_OPTION_KEY = "Heap";
 
-// A key-verification stub that admits every fixture item: `claim_false` for the planted lie,
-// `unclear` for everything else. Option-select passes because its rule is negative-only (no
-// distractor judged true, key not judged false); impostor passes because its one affirmative
-// requirement — the lie is PROVEN false — is met. Every test that composes a bank therefore
-// also asserts, incidentally, that `unclear` never vetoes (D5).
+// A key-verification stub that admits every local fixture without reading a server key. The
+// option-select fixture constructor above consistently uses one visible truth text, so this double
+// can return the strict true/false matrix U5 now requires from only the key-hidden request. Impostor
+// keeps its older negative-only envelope: its planted lie is false and its other claims are unclear.
 function keyVerifierPassing(): AnswerKeyVerificationPort {
   return {
     model: "mock-verifier",
     async verify(input) {
       return input.candidates.map((candidate) => ({
         ordinal: candidate.ordinal,
-        verdict: FIXTURE_LIE.test(candidate.text) ? "claim_false" as const : "unclear" as const,
+        verdict: input.itemType === "option_select"
+          ? candidate.text === FIXTURE_OPTION_KEY ? "claim_true" as const : "claim_false" as const
+          : FIXTURE_LIE.test(candidate.text) ? "claim_false" as const : "unclear" as const,
         reason: "stub verdict"
       }));
     }
@@ -422,11 +424,21 @@ function capturingLessonStore(): {
   return { store, lessons, candidateLessons, absent, configHashes };
 }
 
-function capturingStore(): { store: StudyItemBankStorePort; persisted: StudyItem[]; persistedRejected: RejectedStudyItem[] } {
+function capturingStore(): {
+  store: StudyItemBankStorePort;
+  persisted: StudyItem[];
+  candidateStudyItems: StudyItem[];
+  persistedRejected: RejectedStudyItem[];
+} {
   const persisted: StudyItem[] = [];
+  const candidateStudyItems: StudyItem[] = [];
   const persistedRejected: RejectedStudyItem[] = [];
   const store: StudyItemBankStorePort = {
-    async persist(input) { persisted.push(...input.studyItems); persistedRejected.push(...input.rejected); },
+    async persist(input) {
+      persisted.push(...input.studyItems);
+      candidateStudyItems.push(...(input.candidateStudyItems ?? []));
+      persistedRejected.push(...input.rejected);
+    },
     async getStudyItem() { return undefined; },
     async getStudyItemById() { return undefined; },
     async listStudyItemsForEnrichment() { return persisted; },
@@ -434,7 +446,7 @@ function capturingStore(): { store: StudyItemBankStorePort; persisted: StudyItem
       return [...new Set(persisted.filter((item) => item.derivedNodeId === derivedNodeId).map((item) => item.itemType))].sort();
     }
   };
-  return { store, persisted, persistedRejected };
+  return { store, persisted, candidateStudyItems, persistedRejected };
 }
 
 function typesFor(items: StudyItem[], derivedNodeId: string): string[] {
@@ -449,7 +461,7 @@ function sleep(ms: number): Promise<void> {
 
 test("a node whose lesson grounds an option-select that passes the guard persists one item and one lesson", async () => {
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
-  const { store, persisted, persistedRejected } = capturingStore();
+  const { store, persisted, candidateStudyItems, persistedRejected } = capturingStore();
   const lessonStore = capturingLessonStore();
   let optionSelectInput: Parameters<StudyItemGenerationPort["generateOptionSelect"]>[0] | undefined;
   const result = await generateStudyItemBank({
@@ -476,6 +488,13 @@ test("a node whose lesson grounds an option-select that passes the guard persist
   assert.equal(result.lessonAbsent.length, 0);
   assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor", "matching", "option_select"]);
   assert.deepEqual(persistedRejected, []);
+  assert.equal(candidateStudyItems.length, 1);
+  assert.equal(candidateStudyItems[0]?.itemType, "option_select");
+  assert.equal(candidateStudyItems[0]?.configHash, "cfg-1");
+  assert.equal(
+    persisted.find((item) => item.itemType === "option_select")?.configHash,
+    qualifiedSourceExpeditionAssetConfigHash("cfg-1")
+  );
   // The lesson is persisted through the lesson store, with a source-cited definition section.
   assert.equal(lessonStore.lessons.length, 1);
   assert.equal(lessonStore.lessons[0].conceptLessonId, "lesson-node-c1", "the application mints the stable lesson identity before persistence");
@@ -1236,7 +1255,9 @@ test("a vetoed impostor gets one regeneration informed by the offending candidat
       const lieIsFalse = input.itemType !== "impostor" || impostorVerifications > 1;
       return input.candidates.map((candidate) => ({
         ordinal: candidate.ordinal,
-        verdict: FIXTURE_LIE.test(candidate.text)
+        verdict: input.itemType === "option_select"
+          ? candidate.text === FIXTURE_OPTION_KEY ? "claim_true" as const : "claim_false" as const
+          : FIXTURE_LIE.test(candidate.text)
           // First impostor pass: the planted lie is judged TRUE of the node, which is exactly
           // the item ADR-0026 refuses to ship. Second pass: it is proven false.
           ? (lieIsFalse ? "claim_false" as const : "claim_true" as const)
@@ -1366,7 +1387,7 @@ test("matching assignment verification unavailable admits the board unverified",
   assert.deepEqual(persistedRejected, []);
 });
 
-test("key verification unavailable drops the impostor and passes a verbatim-anchored option-select through", async () => {
+test("key verification unavailable drops every source option-select and impostor candidate", async () => {
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
   const { store, persisted, persistedRejected } = capturingStore();
   const verifier: AnswerKeyVerificationPort = {
@@ -1389,26 +1410,31 @@ test("key verification unavailable drops the impostor and passes a verbatim-anch
     studyItemBankStore: store
   });
 
-  // The D5 asymmetry, asserted in one run: impostor drops (a true "lie" teaches a falsehood),
-  // option-select passes through unverified because its citation still holds a VERBATIM
-  // anchor — its status quo, and the node's only primary activity. Matching is unaffected:
-  // it never enters a verification bracket at all.
-  assert.deepEqual(typesFor(persisted, "node-c1"), ["matching", "option_select"]);
-  const rejection = persistedRejected.find((item) => item.itemType === "impostor");
-  assert.ok(rejection);
-  assert.match(rejection.reason, /^impostor key verification unavailable: judge offline/);
-  assert.equal(persistedRejected.some((item) => item.itemType === "option_select"), false);
+  // Source-backed U5 admission is affirmative for key truth, every distractor's falsity, and
+  // uniqueness, so even a verbatim citation cannot turn verifier unavailability into admission.
+  // Matching remains persisted for inspection but is structurally held out of Source Expedition.
+  assert.deepEqual(typesFor(persisted, "node-c1"), ["matching"]);
+  const impostorRejection = persistedRejected.find((item) => item.itemType === "impostor");
+  assert.ok(impostorRejection);
+  assert.match(impostorRejection.reason, /^impostor key verification unavailable: judge offline/);
+  const optionRejection = persistedRejected.find((item) => item.itemType === "option_select");
+  assert.ok(optionRejection);
+  assert.match(optionRejection.reason, /answer_key_verifier_unavailable: judge offline/);
 });
 
-test("key verification unavailable DROPS an option-select admitted only through the fallback rung", async () => {
+test("a generated-citation fallback candidate drops before source answer-key verification", async () => {
   // The lesson's applications bullets are generated passages, so a quote that verifies
   // nowhere resolves through D9 rung 3 — the item exists only because a judge was expected to
   // check the claim its citation no longer anchors. With no verdict, that expectation failed.
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
   const { store, persisted, persistedRejected } = capturingStore();
+  let optionVerificationCalls = 0;
   const verifier: AnswerKeyVerificationPort = {
     model: "mock-verifier",
-    async verify() { throw new Error("judge offline"); }
+    async verify(input) {
+      if (input.itemType === "option_select") optionVerificationCalls += 1;
+      throw new Error("judge offline");
+    }
   };
   await generateStudyItemBank({
     enrichmentId: "enr-1",
@@ -1428,7 +1454,8 @@ test("key verification unavailable DROPS an option-select admitted only through 
   assert.equal(persisted.some((item) => item.itemType === "option_select"), false);
   const rejection = persistedRejected.find((item) => item.itemType === "option_select");
   assert.ok(rejection);
-  assert.match(rejection.reason, /^option-select key verification unavailable and the item has no verbatim grounding anchor: judge offline/);
+  assert.match(rejection.reason, /key_citation: exactly one source-cited key required/);
+  assert.equal(optionVerificationCalls, 0, "a structurally non-source key cannot spend a truth-verifier call");
 });
 
 test("source-grounded lesson with no verified substantive citation gets one feedback retry", async () => {

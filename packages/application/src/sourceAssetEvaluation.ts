@@ -111,6 +111,12 @@ export type ProjectedSourceSupportEvaluation = {
   calls: number;
 };
 
+export type ProjectedOptionSelectTruthEvaluation = {
+  distractorInvalidity: DistractorInvalidityDecision[];
+  keyUniqueness: KeyUniquenessDecision[];
+  calls: number;
+};
+
 // One evaluator owns evidence resolution and claim-versus-source settlement for both the read-only
 // U3 report and U5 learner admission. It never decides whether an asset is sufficient: consumers
 // interpret only the typed decisions for the exact fields they own.
@@ -243,6 +249,146 @@ export async function evaluateProjectedSourceSupport(input: {
   return { evidence, decisions, calls };
 }
 
+// The same strict truth settlement feeds both the diagnostic report and source-item admission.
+// It derives its grounding from the exact question/key evidence projection, never from a server key
+// or an admission caller's assertion that an item is already sound.
+export async function evaluateProjectedOptionSelectTruth(input: {
+  items: readonly OptionSelectItem[];
+  projection: SourceMaterialClaimSet;
+  evidence: readonly JoinedSourceMaterialEvidence[];
+  nodes: readonly SourceSupportNodeContext[];
+  answerKeyVerifier?: AnswerKeyVerificationPort;
+  relatedConceptsForNode?: (derivedNodeId: string) => { label: string; snippet: string }[];
+}): Promise<ProjectedOptionSelectTruthEvaluation> {
+  const evidenceByKey = new Map(input.evidence.map((row) => [row.evidenceKey, row] as const));
+  const nodeById = new Map(input.nodes.map((node) => [node.derivedNodeId, node] as const));
+  const distractorInvalidity: DistractorInvalidityDecision[] = [];
+  const keyUniqueness: KeyUniquenessDecision[] = [];
+  let calls = 0;
+
+  for (const item of [...input.items].sort((left, right) =>
+    left.studyItemId.localeCompare(right.studyItemId)
+  )) {
+    const itemDistractorClaims = input.projection.claims.filter((claim) =>
+      claim.assetId === item.studyItemId && claim.purpose === "distractor_invalidity"
+    );
+    const keyed = item.options.filter((option) => option.isCorrect);
+    if (keyed.length !== 1) {
+      throw new Error(`Evaluation requires exactly one keyed option for ${JSON.stringify(item.studyItemId)}.`);
+    }
+    const keyedOption = keyed[0]!;
+    const itemEvidenceKeys = input.projection.claims.find((claim) =>
+      claim.assetId === item.studyItemId && claim.subject.kind === "option_select_question_key"
+    )?.evidenceKeys ?? [];
+    const itemEvidence = itemEvidenceKeys.flatMap((evidenceKey) => {
+      const row = evidenceByKey.get(evidenceKey);
+      return row ? [row] : [];
+    });
+
+    const unavailable = itemEvidenceKeys.length === 0
+      ? {
+          distractorReason: "missing_source_evidence" as const,
+          keyReason: "missing_source_evidence" as const,
+          detail: "The option-select item has no admitted source evidence reference."
+        }
+      : itemEvidence.length !== itemEvidenceKeys.length || itemEvidence.some((row) => !row.resolved)
+        ? {
+            distractorReason: "unresolved_source_evidence" as const,
+            keyReason: "unresolved_source_evidence" as const,
+            detail: "At least one option-select source evidence reference did not resolve."
+          }
+        : !input.answerKeyVerifier
+          ? {
+              distractorReason: "answer_key_verifier_not_activated" as const,
+              keyReason: "answer_key_verifier_not_activated" as const,
+              detail: "No answer-key verifier was activated for this operation."
+            }
+          : null;
+    if (unavailable) {
+      const disposition: EvaluationDisposition = unavailable.distractorReason === "missing_source_evidence" ||
+          unavailable.distractorReason === "unresolved_source_evidence"
+        ? "rejected"
+        : "not_evaluated";
+      for (const claim of itemDistractorClaims) {
+        distractorInvalidity.push(distractorDecision(
+          claim,
+          item,
+          disposition,
+          unavailable.distractorReason,
+          unavailable.detail,
+          input.answerKeyVerifier?.model ?? null
+        ));
+      }
+      keyUniqueness.push(keyDecision(
+        item,
+        keyedOption.text,
+        disposition,
+        unavailable.keyReason,
+        unavailable.detail,
+        input.answerKeyVerifier?.model ?? null
+      ));
+      continue;
+    }
+
+    const node = nodeById.get(item.derivedNodeId);
+    if (!node) {
+      throw new Error(`Option-select item references unknown derived node ${JSON.stringify(item.derivedNodeId)}.`);
+    }
+    const candidates = answerKeyCandidates(item.options);
+    try {
+      calls += 1;
+      const verdicts = await input.answerKeyVerifier!.verify({
+        itemType: "option_select",
+        declaredDomain: node.declaredDomain,
+        subject: { canonicalLabel: node.label, aliases: [...node.aliases] },
+        question: item.question,
+        candidates,
+        groundingPassages: itemEvidence.map((row) => ({
+          passageId: row.evidenceKey,
+          kind: row.passageKind,
+          text: row.evidenceQuote
+        })),
+        relatedConcepts: input.relatedConceptsForNode?.(item.derivedNodeId) ?? []
+      });
+      const settled = settleOptionSelectTruth({
+        item,
+        distractorClaims: itemDistractorClaims,
+        candidates,
+        verdicts
+      });
+      distractorInvalidity.push(...settled.distractorInvalidity.map((decision) => ({
+        ...decision,
+        verifierModel: input.answerKeyVerifier!.model
+      })));
+      keyUniqueness.push({
+        ...settled.keyUniqueness,
+        verifierModel: input.answerKeyVerifier!.model
+      });
+    } catch (error) {
+      for (const claim of itemDistractorClaims) {
+        distractorInvalidity.push(distractorDecision(
+          claim,
+          item,
+          "not_evaluated",
+          "answer_key_verifier_unavailable",
+          errorMessage(error),
+          input.answerKeyVerifier!.model
+        ));
+      }
+      keyUniqueness.push(keyDecision(
+        item,
+        keyedOption.text,
+        "not_evaluated",
+        "answer_key_verifier_unavailable",
+        errorMessage(error),
+        input.answerKeyVerifier!.model
+      ));
+    }
+  }
+
+  return { distractorInvalidity, keyUniqueness, calls };
+}
+
 export type SourceAssetEvaluationReport = {
   schemaVersion: typeof SOURCE_ASSET_EVALUATION_REPORT_SCHEMA_VERSION;
   generatedAt: string;
@@ -333,129 +479,21 @@ export async function evaluateQualifiedSourceExpedition(input: {
   });
   const joinedEvidence = sourceSupportEvaluation.evidence;
   const joinedEvidenceByKey = new Map(joinedEvidence.map((row) => [row.evidenceKey, row] as const));
-  const nodeById = new Map(qualification.assets.detail.nodes.map((node) => [node.derivedNodeId, node] as const));
-  let answerKeyCalls = 0;
   const sourceSupport = sourceSupportEvaluation.decisions;
-
-  const distractorInvalidity: DistractorInvalidityDecision[] = [];
-  const keyUniqueness: KeyUniquenessDecision[] = [];
-  for (const item of [...qualification.assets.studyItems].sort((left, right) =>
-    left.studyItemId.localeCompare(right.studyItemId)
-  )) {
-    const itemDistractorClaims = projection.claims.filter((claim) =>
-      claim.assetId === item.studyItemId && claim.purpose === "distractor_invalidity"
-    );
-    const keyed = item.options.filter((option) => option.isCorrect);
-    if (keyed.length !== 1) {
-      throw new Error(`Evaluation requires exactly one keyed option for ${JSON.stringify(item.studyItemId)}.`);
-    }
-    const keyedOption = keyed[0]!;
-    const itemEvidenceKeys = projection.claims.find((claim) =>
-      claim.assetId === item.studyItemId && claim.subject.kind === "option_select_question_key"
-    )?.evidenceKeys ?? [];
-    const itemEvidence = itemEvidenceKeys.flatMap((evidenceKey) => {
-      const row = joinedEvidenceByKey.get(evidenceKey);
-      return row ? [row] : [];
-    });
-
-    const unavailable = itemEvidenceKeys.length === 0
-      ? {
-          distractorReason: "missing_source_evidence" as const,
-          keyReason: "missing_source_evidence" as const,
-          detail: "The option-select item has no admitted source evidence reference."
-        }
-      : itemEvidence.length !== itemEvidenceKeys.length || itemEvidence.some((row) => !row.resolved)
-        ? {
-            distractorReason: "unresolved_source_evidence" as const,
-            keyReason: "unresolved_source_evidence" as const,
-            detail: "At least one option-select source evidence reference did not resolve."
-          }
-        : !input.answerKeyVerifier
-          ? {
-              distractorReason: "answer_key_verifier_not_activated" as const,
-              keyReason: "answer_key_verifier_not_activated" as const,
-              detail: "No answer-key verifier was activated for this diagnostic run."
-            }
-          : null;
-    if (unavailable) {
-      const disposition: EvaluationDisposition = unavailable.distractorReason === "missing_source_evidence" ||
-          unavailable.distractorReason === "unresolved_source_evidence"
-        ? "rejected"
-        : "not_evaluated";
-      for (const claim of itemDistractorClaims) {
-        distractorInvalidity.push(distractorDecision(
-          claim,
-          item,
-          disposition,
-          unavailable.distractorReason,
-          unavailable.detail,
-          input.answerKeyVerifier?.model ?? null
-        ));
-      }
-      keyUniqueness.push(keyDecision(
-        item,
-        keyedOption.text,
-        disposition,
-        unavailable.keyReason,
-        unavailable.detail,
-        input.answerKeyVerifier?.model ?? null
-      ));
-      continue;
-    }
-
-    const node = nodeById.get(item.derivedNodeId);
-    if (!node) throw new Error(`Option-select item references unknown derived node ${JSON.stringify(item.derivedNodeId)}.`);
-    const candidates = answerKeyCandidates(item.options);
-    try {
-      answerKeyCalls += 1;
-      const verdicts = await input.answerKeyVerifier!.verify({
-        itemType: "option_select",
-        declaredDomain: node.declaredDomain,
-        subject: { canonicalLabel: node.label, aliases: [...node.aliases] },
-        question: item.question,
-        candidates,
-        groundingPassages: itemEvidence.map((row) => ({
-          passageId: row.evidenceKey,
-          kind: row.passageKind,
-          text: row.evidenceQuote
-        })),
-        relatedConcepts: relatedConceptsFor(
-          item.derivedNodeId,
-          qualification,
-          projection,
-          joinedEvidenceByKey
-        )
-      });
-      const settled = settleOptionSelectTruth({ item, distractorClaims: itemDistractorClaims, candidates, verdicts });
-      distractorInvalidity.push(...settled.distractorInvalidity.map((decision) => ({
-        ...decision,
-        verifierModel: input.answerKeyVerifier!.model
-      })));
-      keyUniqueness.push({
-        ...settled.keyUniqueness,
-        verifierModel: input.answerKeyVerifier!.model
-      });
-    } catch (error) {
-      for (const claim of itemDistractorClaims) {
-        distractorInvalidity.push(distractorDecision(
-          claim,
-          item,
-          "not_evaluated",
-          "answer_key_verifier_unavailable",
-          errorMessage(error),
-          input.answerKeyVerifier!.model
-        ));
-      }
-      keyUniqueness.push(keyDecision(
-        item,
-        keyedOption.text,
-        "not_evaluated",
-        "answer_key_verifier_unavailable",
-        errorMessage(error),
-        input.answerKeyVerifier!.model
-      ));
-    }
-  }
+  const optionTruthEvaluation = await evaluateProjectedOptionSelectTruth({
+    items: qualification.assets.studyItems,
+    projection,
+    evidence: joinedEvidence,
+    nodes: qualification.assets.detail.nodes,
+    answerKeyVerifier: input.answerKeyVerifier,
+    relatedConceptsForNode: (derivedNodeId) => relatedConceptsFor(
+      derivedNodeId,
+      qualification,
+      projection,
+      joinedEvidenceByKey
+    )
+  });
+  const { distractorInvalidity, keyUniqueness } = optionTruthEvaluation;
 
   const timing = input.operationEvidence
     ? await costTimingReport({
@@ -508,8 +546,8 @@ export async function evaluateQualifiedSourceExpedition(input: {
     operationEvidence,
     evaluationCalls: {
       sourceSupport: sourceSupportEvaluation.calls,
-      answerKey: answerKeyCalls,
-      total: sourceSupportEvaluation.calls + answerKeyCalls
+      answerKey: optionTruthEvaluation.calls,
+      total: sourceSupportEvaluation.calls + optionTruthEvaluation.calls
     },
     positiveControls: {
       qualifiedCandidateRows: 1,
