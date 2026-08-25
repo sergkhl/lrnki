@@ -4,8 +4,9 @@ import { cors } from "hono/cors";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import {
-  CURRENT_SYNTHETIC_TOPIC_GENERATION_AVAILABILITY,
+  CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY,
   checkMatchingAttempt,
+  derivedGraphLearnerKnowledgeAvailability,
   getExpeditionCatalog,
   getExpeditionJournal,
   getStudySession,
@@ -18,9 +19,9 @@ import {
   recordScaffoldLessonRead,
   requestLearnerScaffold,
   retryLearnerScaffold,
-  syntheticTopicGenerationIsAvailable,
+  learnerKnowledgeCapabilityIsAvailable,
   type GradeRefusalReason,
-  type SyntheticTopicGenerationAvailability
+  type LearnerKnowledgeAvailability
 } from "@lrnki/application";
 import {
   PostgresCalibrationVerdictStore,
@@ -100,7 +101,7 @@ function challengeRefusalStatus(refused: string): 404 | 409 | 422 {
 // store on the shared pool (see `createAuthDatabase`). It is a separate parameter precisely so
 // the constraint is visible at every call site rather than buried in a composition root.
 export type LearnerAppOptions = Readonly<{
-  syntheticTopicGenerationAvailability?: SyntheticTopicGenerationAvailability;
+  learnerKnowledgeAvailability?: LearnerKnowledgeAvailability;
   wakeTopicGeneration?: () => void;
 }>;
 
@@ -108,8 +109,8 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, o
   const expeditionStore = new PostgresLearnerExpeditionStore(sql);
   const learnerAuth = createLearnerAuth(authSql);
   const auth = requireSession(learnerAuth);
-  const syntheticTopicGenerationAvailability = options.syntheticTopicGenerationAvailability
-    ?? CURRENT_SYNTHETIC_TOPIC_GENERATION_AVAILABILITY;
+  const learnerKnowledgeAvailability = options.learnerKnowledgeAvailability
+    ?? CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY;
   const wakeTopicGeneration = options.wakeTopicGeneration ?? wakeTopicGenerationSupervisor;
   // The Recall Challenge deep module, bound once at the composition root (KTD1).
   const recallChallenges = createLearnerRecallChallenge(sql);
@@ -129,7 +130,19 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, o
     studyItemStore: new PostgresStudyItemBankStore(sql),
     conceptLessonStore: new PostgresConceptLessonStore(sql),
     enrichmentRead: new PostgresEnrichmentInspectionRead(sql),
-    scaffoldStore: new PostgresLearnerScaffoldStore(sql)
+    scaffoldStore: new PostgresLearnerScaffoldStore(sql),
+    learnerKnowledgeAvailability,
+    readStudySession: ({ enrichmentId, learnerStateRef }: { enrichmentId: string; learnerStateRef: string }) =>
+      getStudySession({
+        enrichmentId,
+        learnerStateRef,
+        enrichmentRead: new PostgresEnrichmentInspectionRead(sql),
+        studyItemStore: new PostgresStudyItemBankStore(sql),
+        conceptLessonStore: new PostgresConceptLessonStore(sql),
+        responseLog: new PostgresResponseLogStore(sql),
+        verdictStore: new PostgresCalibrationVerdictStore(sql),
+        learnerKnowledgeAvailability
+      })
   });
   const scaffoldGradeDeps = () => ({
     scaffoldStore: new PostgresLearnerScaffoldStore(sql),
@@ -175,12 +188,13 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, o
           responseLog: new PostgresResponseLogStore(sql),
           lessonReadStore: new PostgresLessonReadStore(sql),
           layerPurposeStore: new PostgresEnrichmentLayerPurposeStore(sql),
-          timelineRead: new PostgresOperationTimelineRead(sql)
+          timelineRead: new PostgresOperationTimelineRead(sql),
+          learnerKnowledgeAvailability
         }
       );
       return c.json({
         ...journal,
-        capabilities: { syntheticTopicGeneration: syntheticTopicGenerationAvailability }
+        capabilities: { syntheticTopicGeneration: learnerKnowledgeAvailability.syntheticTopicGeneration }
       });
     })
 
@@ -189,7 +203,11 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, o
     .get("/catalog", auth, async (c) => {
       return c.json(await getExpeditionCatalog(
         { learnerStateRef: c.get("learnerStateRef") },
-        { enrichmentRead: new PostgresEnrichmentInspectionRead(sql), expeditionStore }
+        {
+          enrichmentRead: new PostgresEnrichmentInspectionRead(sql),
+          expeditionStore,
+          learnerKnowledgeAvailability
+        }
       ));
     })
 
@@ -211,6 +229,7 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, o
           layerPurposeStore: new PostgresEnrichmentLayerPurposeStore(sql),
           responseLog: new PostgresResponseLogStore(sql),
           verdictStore: new PostgresCalibrationVerdictStore(sql),
+          learnerKnowledgeAvailability,
           scaffoldStore: new PostgresLearnerScaffoldStore(sql),
           scaffoldReferenceRead: new PostgresScaffoldReferenceActivityRead(sql),
           // Guardian scope views ride down with the session (plan 2026-07-13-003 U4, KTD3).
@@ -227,7 +246,23 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, o
       title: z.string(),
       declaredDomain: z.string()
     })), async (c) => {
+      if (!learnerKnowledgeCapabilityIsAvailable(learnerKnowledgeAvailability, "sourceExpeditionAdoption")) {
+        return c.json({
+          error: "source_expedition_adoption_paused" as const,
+          availability: learnerKnowledgeAvailability.sourceExpeditionAdoption
+        }, 409);
+      }
       const input = c.req.valid("json");
+      const detail = await new PostgresEnrichmentInspectionRead(sql).getDerivedGraphDetail(input.enrichmentId);
+      if (!detail) return c.json({ error: "source_expedition_not_found" as const }, 404);
+      const detailAvailability = derivedGraphLearnerKnowledgeAvailability(learnerKnowledgeAvailability, detail);
+      if (detailAvailability.status !== "available") {
+        return c.json({
+          error: "learner_knowledge_unavailable" as const,
+          capability: detailAvailability.capability,
+          availability: detailAvailability
+        }, 409);
+      }
       const learnerStateRef = c.get("learnerStateRef");
       const existing = await expeditionStore.getByEnrichment({ learnerStateRef, enrichmentId: input.enrichmentId });
       await expeditionStore.upsert({
@@ -248,15 +283,39 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, o
       enrichmentId: z.string().nullish()
     })), async (c) => {
       const input = c.req.valid("json");
-      await expeditionStore.setActive({ learnerStateRef: c.get("learnerStateRef"), learnerExpeditionId: input.learnerExpeditionId });
+      const learnerStateRef = c.get("learnerStateRef");
+      const expedition = await expeditionStore.getForLearner({
+        learnerStateRef,
+        learnerExpeditionId: input.learnerExpeditionId
+      });
+      if (expedition && expedition.status !== "ready" &&
+          !learnerKnowledgeCapabilityIsAvailable(learnerKnowledgeAvailability, "syntheticTopicGeneration")) {
+        return c.json({
+          error: "synthetic_topic_generation_paused" as const,
+          availability: learnerKnowledgeAvailability.syntheticTopicGeneration
+        }, 409);
+      }
+      if (expedition?.enrichmentId) {
+        const detail = await new PostgresEnrichmentInspectionRead(sql).getDerivedGraphDetail(expedition.enrichmentId);
+        if (!detail) return c.json({ error: "source_expedition_not_found" as const }, 404);
+        const detailAvailability = derivedGraphLearnerKnowledgeAvailability(learnerKnowledgeAvailability, detail);
+        if (detailAvailability.status !== "available") {
+          return c.json({
+            error: "learner_knowledge_unavailable" as const,
+            capability: detailAvailability.capability,
+            availability: detailAvailability
+          }, 409);
+        }
+      }
+      await expeditionStore.setActive({ learnerStateRef, learnerExpeditionId: input.learnerExpeditionId });
       return c.json({ ok: true as const });
     })
 
     .post("/expedition/start", auth, zValidator("json", z.object({ topic: z.string().trim().min(1) })), async (c) => {
-      if (!syntheticTopicGenerationIsAvailable(syntheticTopicGenerationAvailability)) {
+      if (!learnerKnowledgeCapabilityIsAvailable(learnerKnowledgeAvailability, "syntheticTopicGeneration")) {
         return c.json({
           error: "synthetic_topic_generation_paused" as const,
-          availability: syntheticTopicGenerationAvailability
+          availability: learnerKnowledgeAvailability.syntheticTopicGeneration
         }, 409);
       }
       await expeditionStore.upsert({
@@ -273,10 +332,10 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, o
     })
 
     .post("/expedition/retry", auth, zValidator("json", z.object({ learnerExpeditionId: z.string() })), async (c) => {
-      if (!syntheticTopicGenerationIsAvailable(syntheticTopicGenerationAvailability)) {
+      if (!learnerKnowledgeCapabilityIsAvailable(learnerKnowledgeAvailability, "syntheticTopicGeneration")) {
         return c.json({
           error: "synthetic_topic_generation_paused" as const,
-          availability: syntheticTopicGenerationAvailability
+          availability: learnerKnowledgeAvailability.syntheticTopicGeneration
         }, 409);
       }
       await expeditionStore.resetGeneration({
@@ -412,7 +471,11 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, o
         { learnerStateRef: c.get("learnerStateRef"), ...c.req.valid("json") },
         scaffoldRequestDeps()
       );
-      if (!result.created) return c.json({ created: false as const, reason: result.refused }, 422);
+      if (!result.created) {
+        const status = result.refused === "generated_support_step_unavailable" ||
+          result.refused === "reference_support_step_unavailable" ? 409 : 422;
+        return c.json({ created: false as const, reason: result.refused }, status);
+      }
       wakeScaffoldGenerationSupervisor();
       return c.json({ created: true as const, detourId: result.detourId, status: result.status });
     })
@@ -421,10 +484,13 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, o
     .post("/scaffold/retry", auth, zValidator("json", z.object({ detourId: z.string() })), async (c) => {
       const result = await retryLearnerScaffold(
         { learnerStateRef: c.get("learnerStateRef"), detourId: c.req.valid("json").detourId },
-        { scaffoldStore: new PostgresLearnerScaffoldStore(sql) }
+        {
+          scaffoldStore: new PostgresLearnerScaffoldStore(sql),
+          learnerKnowledgeAvailability
+        }
       );
       if (result.retried) wakeScaffoldGenerationSupervisor();
-      return c.json({ retried: result.retried });
+      return result.retried || !result.refused ? c.json(result) : c.json(result, 409);
     })
 
     // Hide a ready detour or dismiss a failed one (content + evidence preserved).
@@ -441,6 +507,12 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, o
       scaffoldStepId: z.string(),
       chosenOptionId: z.string()
     })), async (c) => {
+      if (!learnerKnowledgeCapabilityIsAvailable(learnerKnowledgeAvailability, "generatedSupportSteps")) {
+        return c.json({
+          error: "generated_support_steps_paused" as const,
+          availability: learnerKnowledgeAvailability.generatedSupportSteps
+        }, 409);
+      }
       const result = await gradeScaffoldOptionSelect(
         { learnerStateRef: c.get("learnerStateRef"), ...c.req.valid("json") },
         scaffoldGradeDeps()
@@ -465,6 +537,12 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, o
 
     // Mark a generated Scaffold Step's micro-lesson read (R12).
     .post("/scaffold/lesson-read", auth, zValidator("json", z.object({ scaffoldStepId: z.string() })), async (c) => {
+      if (!learnerKnowledgeCapabilityIsAvailable(learnerKnowledgeAvailability, "generatedSupportSteps")) {
+        return c.json({
+          error: "generated_support_steps_paused" as const,
+          availability: learnerKnowledgeAvailability.generatedSupportSteps
+        }, 409);
+      }
       const result = await recordScaffoldLessonRead(
         { learnerStateRef: c.get("learnerStateRef"), scaffoldStepId: c.req.valid("json").scaffoldStepId },
         { scaffoldStore: new PostgresLearnerScaffoldStore(sql) }

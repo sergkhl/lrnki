@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { CURRENT_SYNTHETIC_TOPIC_GENERATION_AVAILABILITY } from "@lrnki/application";
+import { CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY } from "@lrnki/application";
 import { answerGuardianSelection, applyGuardianLifecycle, guardianView } from "./guardianFixture";
 import { E2E_FIXTURE_EMAIL, E2E_FIXTURE_PASSWORD } from "../src/lib/e2eFixture";
 
@@ -33,7 +33,7 @@ const SESSION = scenario("session");
 // application-owned policy into the wire fixture instead of freezing a duplicate client flag.
 const JOURNAL = {
   ...(scenario("journal") as Record<string, unknown>),
-  capabilities: { syntheticTopicGeneration: CURRENT_SYNTHETIC_TOPIC_GENERATION_AVAILABILITY }
+  capabilities: { syntheticTopicGeneration: CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY.syntheticTopicGeneration }
 };
 const CATALOG = scenario("catalog");
 const EXPEDITION = scenario("expedition");

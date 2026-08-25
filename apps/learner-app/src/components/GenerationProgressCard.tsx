@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { View } from "react-native";
-import type { SyntheticTopicGenerationAvailability } from "@lrnki/application";
+import type { LearnerKnowledgeCapabilityAvailability } from "@lrnki/application";
 import { retryTopicExpedition } from "@/lib/actions";
 import type { JournalView } from "@/lib/queries";
 import { Badge, Button, Card, Progress, Text } from "@/ui";
@@ -17,7 +17,7 @@ export function GenerationProgressCard({
   topicGenerationAvailability
 }: Readonly<{
   expedition: GeneratingRow;
-  topicGenerationAvailability: SyntheticTopicGenerationAvailability;
+  topicGenerationAvailability: LearnerKnowledgeCapabilityAvailability;
 }>) {
   const [pending, setPending] = useState(false);
   const { generation } = expedition;

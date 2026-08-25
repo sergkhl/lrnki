@@ -91,7 +91,9 @@ type GraphEnrichmentMintingDependencies =
 // anchors; enrichment additionally RESCUES `source_mentioned` nodes from the member runs'
 // non-core mentions and MINTS `llm_grounded` nodes via an explicit anchor-driven proposal
 // pass, so a sparse source still yields a usable learner path. The deduplicated derived
-// node set is grouped by Declared Domain (ADR-0015), and each domain is ordered by
+// Source-mentioned rescue is independent from LLM-grounded minting so the learner-knowledge
+// policy can retain cited prerequisites without invoking any source-less producer. The node set
+// is grouped by Declared Domain (ADR-0015), and each domain is ordered by
 // K-SAMPLING the whole-set call: the boundary draws the directed-DAG ordering K times on
 // the SAME input (bounded concurrency) and tallies a per-pair DIRECTIONAL VOTE, because MoE
 // inference is non-deterministic and one draw is one sample from a distribution (ADR-0028,
@@ -113,6 +115,9 @@ export async function runGraphEnrichment(input: {
   difficulty: DifficultyPort;
   enrichmentStore: EnrichmentRunStorePort;
   config?: GraphEnrichmentConfig;
+  // Explicit production availability for source-backed rescue. When omitted, the legacy direct
+  // application seam keeps rescue coupled to an enabled minting tuple for existing callers.
+  sourceMentionedNodesAvailable?: boolean;
   // The proposal path is structurally paired with its durability judge and the finished
   // admission module below. Either all three dependencies are present or the operation is
   // anchor-only; direct grounding is not a Graph Enrichment dependency any more.
@@ -163,6 +168,8 @@ export async function runGraphEnrichment(input: {
   if (mintingDependencyCount !== 0 && mintingDependencyCount !== 3) {
     throw new Error("runGraphEnrichment requires prerequisite proposal, minting durability, and Source-less Grounding Admission together.");
   }
+  const mintingEnabled = mintingDependencyCount === 3;
+  const sourceMentionedNodesAvailable = input.sourceMentionedNodesAvailable ?? mintingEnabled;
   const config = input.config ?? DEFAULT_ENRICHMENT_CONFIG;
   const reporter = input.reporter ?? noopRunProgressReporter;
   const operationId = input.enrichmentId;
@@ -198,12 +205,14 @@ export async function runGraphEnrichment(input: {
     let rescuedDefinitionDispositions: DefinitionPassageDisposition[] = [];
     let mintingDispositions: MintingDisposition[] = [];
     let groundingAdmissionDispositions: GroundingAdmissionDisposition[] = [];
-    if (input.missingPrerequisiteProposal && input.mintingDurabilityJudge && input.sourceLessGroundingAdmission) {
+    if (sourceMentionedNodesAvailable || mintingEnabled) {
       // No coarse `rescue-mint` bracket: assembleEnrichmentNodes brackets each inner LLM
       // call onto its fine STAGE_TAGS name (U1), so wall-clock joins the cost the calls
       // already self-tag. The surrounding candidate fetch + verbatim floor are deterministic
       // and LLM-free — they need no stage row (they carry no spend to join).
-      const rescueCandidates = await input.enrichmentStore.nonCoreRescueCandidates(input.graphVersionId);
+      const rescueCandidates = sourceMentionedNodesAvailable
+        ? await input.enrichmentStore.nonCoreRescueCandidates(input.graphVersionId)
+        : [];
       const mintingAnchors: MintingAnchor[] = concepts.map((concept) => ({
         conceptId: concept.conceptId,
         canonicalLabel: concept.canonicalLabel,
@@ -214,15 +223,19 @@ export async function runGraphEnrichment(input: {
       const assembled = await assembleEnrichmentNodes({
         anchors: mintingAnchors,
         rescueCandidates,
-        proposalPort: input.missingPrerequisiteProposal!,
-        sourceLessGroundingAdmission: input.sourceLessGroundingAdmission,
         rescueDurabilityJudge: input.rescueDurabilityJudge,
         rescuedNodeLabelingJudge: input.rescuedNodeLabelingJudge,
-        mintingDurabilityJudge: input.mintingDurabilityJudge,
         bounds: config.mintingBounds,
         newNodeId,
-        stage: runStage
-      });
+        stage: runStage,
+        ...(mintingEnabled
+          ? {
+              proposalPort: input.missingPrerequisiteProposal!,
+              sourceLessGroundingAdmission: input.sourceLessGroundingAdmission!,
+              mintingDurabilityJudge: input.mintingDurabilityJudge!
+            }
+          : {})
+      } as Parameters<typeof assembleEnrichmentNodes>[0]);
       rescueDispositions = assembled.rescueDispositions;
       mintingDispositions = assembled.mintingDispositions;
       groundingAdmissionDispositions = assembled.groundingAdmissionDispositions;

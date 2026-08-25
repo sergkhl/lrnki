@@ -13,6 +13,11 @@ import type {
   StudyItemBankStorePort
 } from "@lrnki/ports";
 import { deriveFlooredExpedition } from "./expeditionSections";
+import {
+  derivedGraphLearnerKnowledgeAvailability,
+  learnerKnowledgeCapabilityIsAvailable,
+  type LearnerKnowledgeAvailability
+} from "./learnerKnowledgeAvailability";
 import { isStaleOperation } from "./operationRunLiveness";
 import {
   TOPIC_EXPEDITION_STAGE_PROFILE,
@@ -101,6 +106,7 @@ export type ExpeditionCatalog = {
 export type ExpeditionCatalogDeps = {
   enrichmentRead: EnrichmentInspectionReadPort;
   expeditionStore: LearnerExpeditionStorePort;
+  learnerKnowledgeAvailability: LearnerKnowledgeAvailability;
 };
 
 // Every dependency is required (KTD7): the interface no longer encodes the
@@ -127,20 +133,24 @@ export async function getExpeditionJournal(
   deps: ExpeditionJournalDeps
 ): Promise<ExpeditionJournal> {
   const [candidates, expeditions, responseRows, lessonReads] = await Promise.all([
-    deriveSharedCandidates(deps.enrichmentRead),
+    deriveSharedCandidates(deps.enrichmentRead, deps.learnerKnowledgeAvailability),
     deps.expeditionStore.listForLearner(input.learnerStateRef),
     deps.responseLog.listForLearner(input.learnerStateRef),
     deps.lessonReadStore.listForLearner(input.learnerStateRef)
   ]);
 
   const attempts = foldGradedAttempts(responseRows);
-  const rows = await Promise.all(
-    expeditions.map((expedition) =>
+  const ownedExpeditions = expeditions.filter((expedition) =>
+    expedition.status === "ready" ||
+    learnerKnowledgeCapabilityIsAvailable(deps.learnerKnowledgeAvailability, "syntheticTopicGeneration")
+  );
+  const rows = (await Promise.all(
+    ownedExpeditions.map((expedition) =>
       expedition.status === "ready"
         ? readyRow(expedition, attempts, lessonReads, deps)
         : generatingRow(expedition, deps.timelineRead)
     )
-  );
+  )).filter((row): row is ExpeditionJournalRow => row !== undefined);
 
   // Partition WITHOUT re-sorting: owned rows arrive active-first from the store and
   // candidates readiness-ranked from the derivation; preserving input order keeps those
@@ -171,7 +181,7 @@ export async function getExpeditionCatalog(
   deps: ExpeditionCatalogDeps
 ): Promise<ExpeditionCatalog> {
   const [candidates, expeditions] = await Promise.all([
-    deriveSharedCandidates(deps.enrichmentRead),
+    deriveSharedCandidates(deps.enrichmentRead, deps.learnerKnowledgeAvailability),
     deps.expeditionStore.listForLearner(input.learnerStateRef)
   ]);
   return { candidates: filterAdopted(candidates, expeditions).map(candidateCard) };
@@ -185,14 +195,22 @@ type InternalCandidate = ExpeditionCandidateCard & {
   readyStopCount: number;
 };
 
-async function deriveSharedCandidates(enrichmentRead: EnrichmentInspectionReadPort): Promise<InternalCandidate[]> {
+async function deriveSharedCandidates(
+  enrichmentRead: EnrichmentInspectionReadPort,
+  availability: LearnerKnowledgeAvailability
+): Promise<InternalCandidate[]> {
+  if (!learnerKnowledgeCapabilityIsAvailable(availability, "sourceExpeditionAdoption")) return [];
   const summaries = await enrichmentRead.listEnrichmentSummaries();
   const details = await Promise.all(
     summaries
       .filter((summary) => summary.status === "succeeded" && summary.studyItemCount > 0)
       .map(async (summary) => ({ summary, detail: await enrichmentRead.getDerivedGraphDetail(summary.enrichmentId) }))
   );
-  const candidates = details.flatMap(({ summary, detail }) => (detail ? candidateForSummary(summary, detail) : []));
+  const candidates = details.flatMap(({ summary, detail }) =>
+    detail && derivedGraphLearnerKnowledgeAvailability(availability, detail).status === "available"
+      ? candidateForSummary(summary, detail)
+      : []
+  );
   candidates.sort(compareExpeditionCandidates);
   return candidates;
 }
@@ -271,7 +289,7 @@ async function readyRow(
   attempts: GradedAttempts,
   lessonReads: Awaited<ReturnType<LessonReadStorePort["listForLearner"]>>,
   deps: ExpeditionJournalDeps
-): Promise<ReadyExpeditionRow> {
+): Promise<ReadyExpeditionRow | undefined> {
   const base = {
     status: "ready" as const,
     learnerExpeditionId: expedition.learnerExpeditionId,
@@ -283,9 +301,12 @@ async function readyRow(
   if (!expedition.enrichmentId) {
     return { ...base, progress: { itemsPassed: 0, itemsAttempted: 0, lessonsRead: 0, itemsTotal: 0 }, layerPurpose: null };
   }
-  const [items, detail, layerPurpose] = await Promise.all([
+  const detail = await deps.enrichmentRead.getDerivedGraphDetail(expedition.enrichmentId);
+  if (detail && derivedGraphLearnerKnowledgeAvailability(deps.learnerKnowledgeAvailability, detail).status !== "available") {
+    return undefined;
+  }
+  const [items, layerPurpose] = await Promise.all([
     deps.studyItemStore.listStudyItemsForEnrichment(expedition.enrichmentId),
-    deps.enrichmentRead.getDerivedGraphDetail(expedition.enrichmentId),
     deps.layerPurposeStore.get(expedition.enrichmentId)
   ]);
   // Count only items on TRAIL-reachable (non-floored) nodes, so the total matches the

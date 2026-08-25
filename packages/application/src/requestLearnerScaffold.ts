@@ -6,6 +6,14 @@ import type {
   ScaffoldDetourStorePort,
   StudyItemBankStorePort
 } from "@lrnki/ports";
+import {
+  resolveExactScaffoldReference,
+  type ScaffoldOpeningStudySession
+} from "./learnerScaffoldGeneration";
+import {
+  learnerKnowledgeCapabilityIsAvailable,
+  type LearnerKnowledgeAvailability
+} from "./learnerKnowledgeAvailability";
 
 // Request-or-restore a learner-scoped Scaffold Detour (plan 2026-07-12-002 U5, F1, R4-R5). The
 // server NEVER trusts a client-sent term: it verifies the active ready expedition, resolves the
@@ -25,7 +33,9 @@ export type RequestScaffoldRefusal =
   | "expedition_inactive"
   | "source_not_found"
   | "node_not_in_enrichment"
-  | "term_not_advertised";
+  | "term_not_advertised"
+  | "generated_support_step_unavailable"
+  | "reference_support_step_unavailable";
 
 export type RequestLearnerScaffoldResult =
   | { created: true; detourId: string; status: ScaffoldDetourStatus }
@@ -37,6 +47,11 @@ type RequestScaffoldPorts = {
   conceptLessonStore: ConceptLessonStorePort;
   enrichmentRead: EnrichmentInspectionReadPort;
   scaffoldStore: ScaffoldDetourStorePort;
+  learnerKnowledgeAvailability: LearnerKnowledgeAvailability;
+  readStudySession: (input: {
+    enrichmentId: string;
+    learnerStateRef: string;
+  }) => Promise<ScaffoldOpeningStudySession | undefined>;
 };
 
 // Resolve the source block to its parent node id + the exact terms it advertised, or a refusal.
@@ -78,6 +93,24 @@ export async function requestLearnerScaffold(
   // proved these are distinct exact rendered substrings, so an exact membership test is sufficient.
   if (!resolved.advertisedTerms.includes(term)) return { created: false, refused: "term_not_advertised" };
 
+  // Current production publishes only an exact pinned reference. Prove that outcome against the
+  // same finished Study Session the generator will reopen before creating or waking a detour; an
+  // absent/colliding term returns a stable refusal with no queue write and therefore no neural call.
+  if (!learnerKnowledgeCapabilityIsAvailable(ports.learnerKnowledgeAvailability, "generatedSupportSteps")) {
+    if (!learnerKnowledgeCapabilityIsAvailable(ports.learnerKnowledgeAvailability, "referenceSupportSteps")) {
+      return { created: false, refused: "reference_support_step_unavailable" };
+    }
+    const session = await ports.readStudySession({
+      enrichmentId: input.enrichmentId,
+      learnerStateRef: input.learnerStateRef
+    });
+    const parent = session?.detail.nodes.find((node) => node.derivedNodeId === resolved.parentDerivedNodeId);
+    if (!session || !parent) return { created: false, refused: "reference_support_step_unavailable" };
+    if (resolveExactScaffoldReference(term, session, parent).kind !== "reference") {
+      return { created: false, refused: "generated_support_step_unavailable" };
+    }
+  }
+
   const detour = await ports.scaffoldStore.upsertPending({
     learnerStateRef: input.learnerStateRef,
     enrichmentId: input.enrichmentId,
@@ -92,9 +125,18 @@ export async function requestLearnerScaffold(
 // fresh claim. Scoped to the owning learner by the store, so a learner cannot retry another's row.
 export async function retryLearnerScaffold(
   input: { learnerStateRef: string; detourId: string },
-  ports: { scaffoldStore: ScaffoldDetourStorePort }
-): Promise<{ retried: boolean }> {
+  ports: {
+    scaffoldStore: ScaffoldDetourStorePort;
+    learnerKnowledgeAvailability: LearnerKnowledgeAvailability;
+  }
+): Promise<
+  | { retried: true }
+  | { retried: false; refused?: "generated_support_step_unavailable" }
+> {
   if (!input.learnerStateRef || !input.detourId) return { retried: false };
+  if (!learnerKnowledgeCapabilityIsAvailable(ports.learnerKnowledgeAvailability, "generatedSupportSteps")) {
+    return { retried: false, refused: "generated_support_step_unavailable" };
+  }
   const detour = await ports.scaffoldStore.restartGenerating({ detourId: input.detourId, learnerStateRef: input.learnerStateRef });
   return { retried: detour !== undefined };
 }

@@ -1,7 +1,7 @@
 import {
-  CURRENT_SYNTHETIC_TOPIC_GENERATION_AVAILABILITY,
+  CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY,
+  learnerKnowledgeCapabilityIsAvailable,
   operationStaleBefore,
-  syntheticTopicGenerationIsAvailable,
   type TopicExpeditionGeneration
 } from "@lrnki/application";
 import { PostgresLearnerExpeditionStore, PostgresRunProgressReporter } from "@lrnki/infrastructure-postgres";
@@ -54,18 +54,18 @@ const supervisor = createGenerationSupervisor({
 });
 
 export function startTopicGenerationSupervisor(): boolean {
-  if (!syntheticTopicGenerationIsAvailable(CURRENT_SYNTHETIC_TOPIC_GENERATION_AVAILABILITY)) return false;
+  if (!learnerKnowledgeCapabilityIsAvailable(CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY, "syntheticTopicGeneration")) return false;
   supervisor.start();
   return true;
 }
 
 export function wakeTopicGenerationSupervisor(): boolean {
-  if (!syntheticTopicGenerationIsAvailable(CURRENT_SYNTHETIC_TOPIC_GENERATION_AVAILABILITY)) return false;
+  if (!learnerKnowledgeCapabilityIsAvailable(CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY, "syntheticTopicGeneration")) return false;
   supervisor.wake();
   return true;
 }
 
 export function runSupervisorOnce(): Promise<void> {
-  if (!syntheticTopicGenerationIsAvailable(CURRENT_SYNTHETIC_TOPIC_GENERATION_AVAILABILITY)) return Promise.resolve();
+  if (!learnerKnowledgeCapabilityIsAvailable(CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY, "syntheticTopicGeneration")) return Promise.resolve();
   return supervisor.runOnce();
 }

@@ -60,11 +60,21 @@ export type MintingAnchor = {
 // durability-kept label before a node can exist. Both caps are enforced deterministically.
 // Nothing here enters the asserted layer (R5); the verbatim floor (U6) runs over the result
 // before pair judging.
+type EnrichmentNodeMintingDependencies =
+  | {
+      proposalPort?: undefined;
+      sourceLessGroundingAdmission?: undefined;
+      mintingDurabilityJudge?: undefined;
+    }
+  | {
+      proposalPort: MissingPrerequisiteProposalPort;
+      sourceLessGroundingAdmission: SourceLessGroundingAdmission;
+      mintingDurabilityJudge: MintingDurabilityJudgmentPort;
+    };
+
 export async function assembleEnrichmentNodes(input: {
   anchors: MintingAnchor[];
   rescueCandidates: NonCoreRescueCandidate[];
-  proposalPort: MissingPrerequisiteProposalPort;
-  sourceLessGroundingAdmission: SourceLessGroundingAdmission;
   // Optional measured rescue durability judge (U3). When provided, each AGGREGATED
   // rescued node is judged against its same-domain anchors before minting runs; a
   // node judged non-durable (confident + grounded) is dropped with a recorded
@@ -79,14 +89,13 @@ export async function assembleEnrichmentNodes(input: {
   // Every reserved assumed-prerequisite proposal is durability-judged before it may
   // cross source-less grounding admission. The Graph Enrichment boundary structurally
   // pairs this dependency with proposal and admission, so there is no bypass path.
-  mintingDurabilityJudge: MintingDurabilityJudgmentPort;
   bounds?: EnrichmentMintingBounds;
   newNodeId: () => string;
   // Stage-bracket seam (U1): local LLM ports use their fine STAGE_TAGS names and the
   // finished admission module receives the same operation-scoped bracket. Defaults to
   // a passthrough so a direct unit test runs un-instrumented.
   stage?: StageBracket;
-}): Promise<{
+} & EnrichmentNodeMintingDependencies): Promise<{
   rescuedNodes: SourceMentionedEnrichmentNode[];
   mintedNodes: LlmGroundedEnrichmentNode[];
   rescueDispositions: RescueDisposition[];
@@ -95,6 +104,14 @@ export async function assembleEnrichmentNodes(input: {
 }> {
   const bounds = input.bounds ?? DEFAULT_MINTING_BOUNDS;
   const stage = input.stage ?? passthroughStageBracket;
+  const mintingDependencyCount = [
+    input.proposalPort,
+    input.sourceLessGroundingAdmission,
+    input.mintingDurabilityJudge
+  ].filter(Boolean).length;
+  if (mintingDependencyCount !== 0 && mintingDependencyCount !== 3) {
+    throw new Error("assembleEnrichmentNodes requires proposal, durability, and Source-less Grounding Admission together.");
+  }
 
   // A label is "taken" when an anchor, a rescued node, or an already-minted node in
   // the same Declared Domain already carries it — the single dedupe authority for the
@@ -214,6 +231,9 @@ export async function assembleEnrichmentNodes(input: {
   const mintedNodes: LlmGroundedEnrichmentNode[] = [];
   const mintingDispositions: MintingDisposition[] = [];
   const groundingAdmissionDispositions: GroundingAdmissionDisposition[] = [];
+  if (!input.proposalPort || !input.sourceLessGroundingAdmission || !input.mintingDurabilityJudge) {
+    return { rescuedNodes, mintedNodes, rescueDispositions, mintingDispositions, groundingAdmissionDispositions };
+  }
   const admission = input.sourceLessGroundingAdmission.forOperation(stage);
   let runBudget = bounds.maxMintedPerRun;
   // Deterministic anchor order so a replayed run proposes in the same sequence.

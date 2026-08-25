@@ -85,7 +85,7 @@ function assemble(
   }
 ) {
   const { mintingDurabilityJudge = acceptAllMintingJudge, ...rest } = input;
-  return assembleEnrichmentNodes({ ...rest, mintingDurabilityJudge });
+  return assembleEnrichmentNodes({ ...rest, mintingDurabilityJudge } as AssemblyInput);
 }
 
 function mention(label: string, runId: string): NonCoreRescueCandidate {

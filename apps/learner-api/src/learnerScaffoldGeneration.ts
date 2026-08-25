@@ -1,6 +1,7 @@
 import {
   createScaffoldGeneration,
   createSourceLessGroundingAdmission,
+  CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY,
   DEFAULT_SCAFFOLD_GENERATION_CONFIG,
   getStudySession,
   type ScaffoldGeneration
@@ -68,7 +69,17 @@ export function createLearnerScaffoldGeneration(sql: DatabaseClient): ScaffoldGe
     // learner plays from decides included/locked state, confidently floored membership, and the
     // current pinnable neutral lesson/item identities.
     readStudySession: ({ enrichmentId, learnerStateRef }) =>
-      getStudySession({ enrichmentId, learnerStateRef, enrichmentRead, studyItemStore, conceptLessonStore, responseLog, verdictStore }),
+      getStudySession({
+        enrichmentId,
+        learnerStateRef,
+        enrichmentRead,
+        studyItemStore,
+        conceptLessonStore,
+        responseLog,
+        verdictStore,
+        learnerKnowledgeAvailability: CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY
+      }),
+    learnerKnowledgeAvailability: CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY,
     outline: createScaffoldOutlinePort(deterministicClient),
     content: createScaffoldContentPort(deterministicClient),
     // The generation-time congruence re-pick shares the SAME cross-family independent judge on

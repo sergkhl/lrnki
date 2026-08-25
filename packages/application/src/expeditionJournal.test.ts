@@ -21,8 +21,18 @@ import {
   type ExpeditionJournalDeps
 } from "./expeditionJournal";
 import { OPERATION_HEARTBEAT_STALE_AFTER_MS } from "./operationRunLiveness";
+import {
+  CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY,
+  type LearnerKnowledgeAvailability
+} from "./learnerKnowledgeAvailability";
 
 const TOTAL = 19;
+const ALL_LEARNER_KNOWLEDGE_AVAILABLE = {
+  ...CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY,
+  syntheticTopicGeneration: { status: "available" },
+  llmGroundedPrerequisites: { status: "available" },
+  generatedSupportSteps: { status: "available" }
+} as const satisfies LearnerKnowledgeAvailability;
 
 test("generation facts count completed expected stages against the fixed denominator", async () => {
   const journal = await journalWithTimeline(timeline({
@@ -298,6 +308,31 @@ test("ranking prefers fully ready candidates over larger unready ones", async ()
   assert.deepEqual(journal.shared.map((candidate) => candidate.enrichmentId), ["ready", "unready"]);
 });
 
+test("the current policy lists source-mentioned candidates but holds out any LLM-grounded candidate", async () => {
+  const sourceMentioned = (id: string, label: string) => ({
+    ...node(id, label, true),
+    groundingOrigin: "source_mentioned" as const
+  });
+  const journal = await getExpeditionJournal({ learnerStateRef: "learner-one" }, deps({
+    summaries: [
+      summary("source-backed", "2026-01-01T00:00:00.000Z"),
+      summary("llm-grounded", "2026-01-02T00:00:00.000Z")
+    ],
+    details: {
+      "source-backed": detail("source-backed", [
+        sourceMentioned("s-a", "Source prerequisite"),
+        { ...sourceMentioned("s-b", "Source summit"), groundingOrigin: "document_anchored" }
+      ], [edge("s-a", "s-b")]),
+      "llm-grounded": detail("llm-grounded", [
+        node("l-a", "Generated prerequisite", true),
+        { ...node("l-b", "Generated summit", true), groundingOrigin: "document_anchored" }
+      ], [edge("l-a", "l-b")])
+    },
+    learnerKnowledgeAvailability: CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY
+  }));
+  assert.deepEqual(journal.shared.map((candidate) => candidate.enrichmentId), ["source-backed"]);
+});
+
 test("the journal returns only the learner's own expedition rows", async () => {
   const journal = await getExpeditionJournal({ learnerStateRef: "learner-one" }, deps({
     expeditions: [expedition("learner-one", "mine"), expedition("learner-two", "theirs")]
@@ -334,6 +369,7 @@ function deps(input: {
   responses?: ResponseLogRow[];
   lessonReadNodeIds?: string[];
   timelines?: Record<string, OperationTimelineDetail>;
+  learnerKnowledgeAvailability?: LearnerKnowledgeAvailability;
 }): ExpeditionJournalDeps {
   return {
     enrichmentRead: fakeRead(input.summaries ?? [], input.details ?? {}),
@@ -342,7 +378,8 @@ function deps(input: {
     responseLog: fakeResponseLog(input.responses ?? []),
     lessonReadStore: fakeLessonReadStore(input.lessonReadNodeIds ?? []),
     layerPurposeStore: fakeLayerPurposeStore(),
-    timelineRead: fakeTimelineRead(input.timelines ?? {})
+    timelineRead: fakeTimelineRead(input.timelines ?? {}),
+    learnerKnowledgeAvailability: input.learnerKnowledgeAvailability ?? ALL_LEARNER_KNOWLEDGE_AVAILABLE
   };
 }
 

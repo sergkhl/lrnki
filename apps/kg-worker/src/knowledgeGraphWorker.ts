@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import {
-  CURRENT_SYNTHETIC_TOPIC_GENERATION_AVAILABILITY,
+  CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY,
   buildGraphVersion,
   canonicalizeConcepts,
   loadConceptCanonicalizationArtifact,
@@ -19,7 +19,7 @@ import {
   synthesizeResponses,
   runGraphEnrichment,
   runSyntheticGeneration,
-  syntheticTopicGenerationIsAvailable,
+  learnerKnowledgeCapabilityIsAvailable,
   costTimingReport,
   rankBottleneckTargets,
   type CostTimingReport,
@@ -480,12 +480,21 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
     graphVersionId: targetVersionId,
     graphStore: ctx.graphStore,
     prerequisiteOrdering: ctx.prerequisiteOrdering,
-    missingPrerequisiteProposal: ctx.missingPrerequisiteProposal,
-    sourceLessGroundingAdmission: ctx.sourceLessGroundingAdmission,
+    sourceMentionedNodesAvailable: learnerKnowledgeCapabilityIsAvailable(
+      CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY,
+      "sourceMentionedPrerequisites"
+    ),
     rescueDurabilityJudge: ctx.rescueDurabilityJudge,
     rescuedNodeLabelingJudge: ctx.rescuedNodeLabelingJudge,
     rescuedDefinitionQualityJudge: ctx.rescuedDefinitionQualityJudge,
-    mintingDurabilityJudge: ctx.mintingDurabilityJudge,
+    ...(learnerKnowledgeCapabilityIsAvailable(
+      CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY,
+      "llmGroundedPrerequisites"
+    ) ? {
+      missingPrerequisiteProposal: ctx.missingPrerequisiteProposal,
+      sourceLessGroundingAdmission: ctx.sourceLessGroundingAdmission,
+      mintingDurabilityJudge: ctx.mintingDurabilityJudge
+    } : {}),
     // Dedup is opt-in (plan U3): ENRICH_DISABLE_DEDUP unsets both ports to produce the
     // exact-label baseline run for the U7 rule-14 comparison (same command, ports unset).
     nodeEmbedding: process.env.ENRICH_DISABLE_DEDUP ? undefined : ctx.nodeEmbedding,
@@ -504,7 +513,7 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
     // committed at consensus confidence, routed to uncertain as direction-contested, cut
     // below the presence quorum, or routed for an aggregate cycle.
     onOrderingSummary: (summary) => console.log(`   ordering: k=${summary.k} committed=${summary.committed} contested=${summary.contested} weakCut=${summary.weakCut} cycleRouted=${summary.cycleRouted}`)
-  });
+  } as Parameters<typeof runGraphEnrichment>[0]);
   const anchorNodes = layer.derivedNodes.filter((node) => node.nodeKind === "anchor").length;
   const enrichmentNodeCount = layer.derivedNodes.length - anchorNodes;
   console.log(`   nodes(anchor/enrichment)=${anchorNodes}/${enrichmentNodeCount}`);
@@ -1129,8 +1138,8 @@ async function main() {
   // Refuse the paused anchor-less arm before database or neural-client construction. Curated-source
   // commands continue through the normal context below.
   if (command === "generate-synthetic-layer" &&
-      !syntheticTopicGenerationIsAvailable(CURRENT_SYNTHETIC_TOPIC_GENERATION_AVAILABILITY)) {
-    console.error(`! ${CURRENT_SYNTHETIC_TOPIC_GENERATION_AVAILABILITY.message}`);
+      !learnerKnowledgeCapabilityIsAvailable(CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY, "syntheticTopicGeneration")) {
+    console.error(`! ${CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY.syntheticTopicGeneration.message}`);
     process.exitCode = 1;
     return;
   }

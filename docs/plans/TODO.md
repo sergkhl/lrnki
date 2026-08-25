@@ -4,12 +4,12 @@
 
 ## TODO
 
-- **Curated-source learner workflow — in progress; U0 complete, U1 next.** Follow
+- **Curated-source learner workflow — in progress; U0–U1 complete, U2 next.** Follow
   [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md). The
-  accepted contract starts at registered Curated Sources, requires a complete automatically
-  qualified source-backed lesson/item trail, retains exact-reference Support Steps, and keeps
-  Synthetic Topic Generation, LLM-grounded learner nodes, and generated Support Steps unavailable
-  without deleting their implementations. Implement only the single availability-policy unit next.
+  accepted availability policy is now enforced across production-shaped entry points without
+  deleting held-out implementations. Implement only the deep Source Expedition qualification and
+  adoption unit next: one authoritative trusted-trail/current-asset outcome must govern every
+  catalog, adoption, activation, direct-session, and supervisor path.
 
 ## COMPLETED
 

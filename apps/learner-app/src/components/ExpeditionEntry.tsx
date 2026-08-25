@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { View } from "react-native";
 import { useRouter } from "expo-router";
-import type { SyntheticTopicGenerationAvailability } from "@lrnki/application";
+import type { LearnerKnowledgeCapabilityAvailability } from "@lrnki/application";
 import { ArrowRight, Compass, Map as MapIcon } from "lucide-react-native";
 import { Badge, Button, Card, Progress, Text, buttonIconColor, colors } from "@/ui";
 import { expeditionStatusLabel, learnerTerm } from "@/learn/vocabulary";
@@ -127,7 +127,7 @@ function LearnerExpeditionRow({
   topicGenerationAvailability
 }: Readonly<{
   expedition: JournalRow;
-  topicGenerationAvailability: SyntheticTopicGenerationAvailability;
+  topicGenerationAvailability: LearnerKnowledgeCapabilityAvailability;
 }>) {
   const router = useRouter();
   const [pending, setPending] = useState(false);

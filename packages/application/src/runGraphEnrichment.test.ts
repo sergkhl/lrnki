@@ -489,6 +489,31 @@ test("rescues a source_mentioned node from a member-run mention and orders it as
   assert.ok(layer.prerequisiteEdges.some((e) => e.prerequisiteDerivedNodeId === id.get("Pointer") && e.dependentDerivedNodeId === id.get("Move Semantics")));
 });
 
+test("source-mentioned rescue remains available when LLM-grounded minting dependencies are absent", async () => {
+  const ports = buildNodePorts({
+    rescue: [rescueCandidate("Pointer")],
+    proposals: [{ proposedLabel: "Must not be proposed", rationale: "held-out path" }],
+    responder: (input) => presentEdges(input, [edgeOf("Pointer", "Move Semantics")])
+  });
+  const layer = await runGraphEnrichment({
+    enrichmentId: "e1",
+    graphVersionId: "v1",
+    graphStore: ports.graphStore as GraphVersionStorePort,
+    prerequisiteOrdering: ports.prerequisiteOrdering,
+    sourceMentionedNodesAvailable: true,
+    difficulty: ports.difficulty,
+    enrichmentStore: ports.enrichmentStore as EnrichmentRunStorePort,
+    newNodeId: ports.newNodeId
+  });
+  assert.deepEqual(
+    layer.derivedNodes.filter((node) => node.nodeKind === "enrichment").map((node) => node.groundingOrigin),
+    ["source_mentioned"]
+  );
+  assert.equal(ports.getAdmissionOperationCount(), 0, "no Source-less Grounding Admission operation opens");
+  assert.deepEqual(ports.getTrace()?.mintingDispositions, []);
+  assert.deepEqual(ports.getTrace()?.groundingAdmissionDispositions, []);
+});
+
 test("U3: a hollow rescued definition passage is dropped before it becomes learner-facing; the node stays mention-only", async () => {
   // An `optional`-tier candidate carries a bare-name (hollow) Definition Passage whose
   // quote verifies verbatim against its block, so the floor admits it as a

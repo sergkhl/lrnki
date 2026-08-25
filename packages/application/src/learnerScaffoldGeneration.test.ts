@@ -27,6 +27,10 @@ import {
   type GroundingAdmissionOutcome,
   type SourceLessGroundingAdmission
 } from "./sourceLessGroundingAdmission";
+import {
+  CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY,
+  type LearnerKnowledgeAvailability
+} from "./learnerKnowledgeAvailability";
 
 // Every test crosses the same process-lived interface production uses. The admission fake is
 // deliberately a finished deep-module seam: tests can settle labels, but cannot reach a raw
@@ -50,6 +54,13 @@ const TEST_CONFIG: ScaffoldGenerationConfig = {
     }
   }
 };
+
+const ALL_LEARNER_KNOWLEDGE_AVAILABLE = {
+  ...CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY,
+  syntheticTopicGeneration: { status: "available" },
+  llmGroundedPrerequisites: { status: "available" },
+  generatedSupportSteps: { status: "available" }
+} as const satisfies LearnerKnowledgeAvailability;
 
 function fakeNode(overrides: Partial<DerivedGraphNode> & { derivedNodeId: string; label: string }): DerivedGraphNode {
   return {
@@ -336,6 +347,7 @@ function makeHarness(input: {
       state.sessionReads += 1;
       return typeof input.session === "function" ? input.session() : input.session;
     },
+    learnerKnowledgeAvailability: ALL_LEARNER_KNOWLEDGE_AVAILABLE,
     outline: {
       model: "fake-outline",
       async propose(request) {
@@ -437,6 +449,41 @@ test("a unique eligible frontier match publishes one pinned reference with zero 
   assert.equal(h.claimPlanningInputs.length, 0);
   assert.equal(h.keyInputs.length, 0);
   assert.deepEqual(h.beginConfigHashes, ["hash-under-test"]);
+});
+
+test("the current policy still publishes an exact reference with zero neural calls", async () => {
+  const session = fakeSession({
+    nodes: [
+      parentNode(),
+      fakeNode({ derivedNodeId: "n-1", label: "Borrow Checker", groundingOrigin: "document_anchored" })
+    ],
+    stateByNode: { parent: "frontier", "n-1": "frontier" },
+    assets: { "n-1": { conceptLessonId: "lesson-1", studyItemId: "item-1" } }
+  });
+  const h = makeHarness({
+    session,
+    overrides: { learnerKnowledgeAvailability: CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY }
+  });
+  await h.run();
+  assert.equal(h.published[0]?.[0]?.kind, "reference");
+  assert.deepEqual(h.outlineInputs, []);
+  assert.deepEqual(h.admissionBatches, []);
+  assert.equal(h.contentInputs.length, 0);
+  assert.equal(h.keyInputs.length, 0);
+});
+
+test("the current policy rejects a non-reference detour before every neural port and publishes nothing", async () => {
+  const h = makeHarness({
+    session: generatedSession(),
+    overrides: { learnerKnowledgeAvailability: CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY }
+  });
+  await assert.rejects(h.run(), /generated_support_step_unavailable/);
+  assert.deepEqual(h.outlineInputs, []);
+  assert.deepEqual(h.admissionBatches, []);
+  assert.equal(h.contentInputs.length, 0);
+  assert.equal(h.claimPlanningInputs.length, 0);
+  assert.equal(h.keyInputs.length, 0);
+  assert.deepEqual(h.published, []);
 });
 
 test("mastered and confidently floored matches remain eligible for direct reuse", async () => {

@@ -7,12 +7,11 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0 complete; U1 is next
+**Status:** In progress — U0–U1 complete; U2 is next
 
-**NEXT:** Implement U1 only: make the accepted learner-knowledge availability policy one
-application-owned source, prove that Synthetic Topic Generation, `llm_grounded` prerequisite
-publication, and generated Support Step publication remain unavailable, and prove that Curated
-Source processing, `source_mentioned` rescue, and exact-reference Support Steps remain available.
+**NEXT:** Implement U2 only: add the source-owned Source Expedition kind and one deep qualification/
+adoption boundary, then make catalog, Journal, adoption, activation, direct Study Session entry,
+and supervisor behavior consume its authoritative trusted-trail and current-asset outcome.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
 Curated Sources and automatically admits only source-backed learner assets. Anchor-less Synthetic
@@ -449,13 +448,49 @@ The plan is complete only when all of the following are true:
   learner asset, browser/native/device action, deployment, or release action occurred. Semantic
   usefulness remains unqualified until U3–U7.
 
+### U1 — one availability policy for trusted learner knowledge — 2026-08-25 — complete
+
+- Replaced the one-capability Synthetic Topic policy with one application-owned, source-typed
+  learner-knowledge availability value covering all six accepted paths. The current value keeps
+  Source Expedition adoption, source-mentioned prerequisites, and exact-reference Support Steps
+  available while returning stable held-out reasons for Synthetic Topic Generation, LLM-grounded
+  prerequisites, and generated Support Steps. Only the superseded policy definition and its test
+  were deleted; every producer, artifact type, stored row, and historical implementation remains.
+- API composition, the worker, both process-lived supervisors, Journal/catalog/Study Session
+  projection, Support Path request/retry, and Scaffold Generation now consume that policy. A
+  held-out graph cannot be cataloged, chosen, activated, or projected; paused topic mutations and
+  generated-step mutations refuse before a write or wake. Source-mentioned rescue is structurally
+  independent from the LLM-grounded proposal/admission tuple, and its focused test proves a rescued
+  node is retained while zero Source-less Grounding Admission operations open.
+- Exact eligible Support Path requests still enqueue and publish the existing pinned reference with
+  zero neural calls. A request without an exact eligible reference now returns
+  `generated_support_step_unavailable` before queue creation; stored generated artifacts are
+  preserved but filtered from learner projection. Reference grading continues through the existing
+  neutral activity path; only generated-step grade/read/retry routes are held out.
+- Local automated evidence passed: 820 application tests; eight kg-worker tests; 22 hermetic
+  learner-API tests with four database cases correctly skipped without `TEST_DATABASE_URL`; the
+  reset-backed `pnpm test:db` route including all 26 learner-API database tests; and all 57 learner
+  app suites / 320 tests. Application, kg-worker, learner-API, and learner-app typechecks plus
+  targeted ESLint passed. The learner-app runner emitted its existing late Expo logger warning but
+  exited zero after every suite passed; that warning is not counted as positive evidence.
+- This unit intentionally made no model call: its acceptance question is that held-out producers
+  make none, while source-backed/reference paths remain reachable. The focused no-call counters and
+  database no-write assertions establish that local application boundary only. No fresh learner
+  asset was semantically qualified, and no browser/native, simulator/emulator, physical-device,
+  deployed, production, or release evidence was produced.
+
 ### Open findings
 
-- U1 is the only next implementation unit. The exact availability type and its composition call
-  sites must be derived from current source; do not create a general feature-flag framework.
 - The readiness snapshot needs a race-safe current-asset identity. U2 must choose the smallest
   persistence/read seam that prevents a superseded lesson or item bank from being adopted after its
   qualification read; do not expose that mechanism to Hono or the client.
+- U2 must close every direct learner write/read path over the same adopted Source Expedition
+  authority, including activation, direct Study Session entry, neutral grading, lesson reads, and
+  challenge entry where applicable. A transport route must not reconstruct readiness from row
+  status or an `enrichmentId` alone.
+- U2 must decide where the current learner-asset qualification identity is folded into asset-set
+  identity so an old availability mode or legacy asset generation cannot be mistaken for a current
+  qualified snapshot. Keep this mechanical identity out of transport and UI types.
 - No local verifier is selected or downloaded. U4 must reject candidates that cannot be routed and
   attributed within the architecture, even if their public benchmark is strong. Failure leaves
   unsupported assets absent and does not block exact-source deterministic work.

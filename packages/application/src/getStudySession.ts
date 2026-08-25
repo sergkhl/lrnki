@@ -11,6 +11,11 @@ import type {
   StudyItemBankStorePort
 } from "@lrnki/ports";
 import { deriveFlooredExpedition } from "./expeditionSections";
+import {
+  derivedGraphLearnerKnowledgeAvailability,
+  learnerKnowledgeCapabilityIsAvailable,
+  type LearnerKnowledgeAvailability
+} from "./learnerKnowledgeAvailability";
 import { eligibleRecallItems, projectRecallScopeStatuses } from "./recallChallenge";
 import { composeStudySession, type StudySession } from "./studySessionProjection";
 
@@ -32,6 +37,7 @@ export async function getStudySession(input: {
   layerPurposeStore?: EnrichmentLayerPurposeStorePort;
   responseLog: ResponseLogStorePort;
   verdictStore: CalibrationVerdictStorePort;
+  learnerKnowledgeAvailability: LearnerKnowledgeAvailability;
   // The learner-scoped Scaffold Detour store (plan 2026-07-12-002 U4). Optional so existing
   // callers compose a session with no detours unchanged; the learner API wires it so the finished
   // Study Session carries active detours and the `generatingDetours` polling flag.
@@ -48,6 +54,9 @@ export async function getStudySession(input: {
 }): Promise<StudySession | undefined> {
   const detail = await input.enrichmentRead.getDerivedGraphDetail(input.enrichmentId);
   if (!detail) return undefined;
+  if (derivedGraphLearnerKnowledgeAvailability(input.learnerKnowledgeAvailability, detail).status !== "available") {
+    return undefined;
+  }
   const challengeScope = { learnerStateRef: input.learnerStateRef, enrichmentId: input.enrichmentId };
 
   const [studyItems, lessons, lessonAbsent, lessonReads, rows, verdicts, layerPurpose, detours, referenceActivities, challenges, wonScopes, exposure] = await Promise.all([
@@ -58,7 +67,10 @@ export async function getStudySession(input: {
     input.responseLog.listForLearner(input.learnerStateRef),
     input.verdictStore.listForLearner(input.learnerStateRef),
     input.layerPurposeStore ? input.layerPurposeStore.get(input.enrichmentId) : Promise.resolve(undefined),
-    input.scaffoldStore ? input.scaffoldStore.listActiveForLearnerEnrichment(input.learnerStateRef, input.enrichmentId) : Promise.resolve([]),
+    input.scaffoldStore
+      ? input.scaffoldStore.listActiveForLearnerEnrichment(input.learnerStateRef, input.enrichmentId)
+          .then((rows) => rows.filter((detour) => scaffoldDetourIsLearnerAvailable(detour, input.learnerKnowledgeAvailability)))
+      : Promise.resolve([]),
     input.scaffoldReferenceRead ? input.scaffoldReferenceRead.listForLearnerEnrichment(challengeScope) : Promise.resolve([]),
     input.challengeStore ? input.challengeStore.listForLearnerEnrichment(challengeScope) : Promise.resolve([]),
     input.challengeStore ? input.challengeStore.listWonScopes(challengeScope) : Promise.resolve([]),
@@ -97,4 +109,16 @@ export async function getStudySession(input: {
     referenceActivities,
     recallScopes
   });
+}
+
+function scaffoldDetourIsLearnerAvailable(
+  detour: Awaited<ReturnType<ScaffoldDetourStorePort["listActiveForLearnerEnrichment"]>>[number],
+  availability: LearnerKnowledgeAvailability
+): boolean {
+  const generatedAvailable = learnerKnowledgeCapabilityIsAvailable(availability, "generatedSupportSteps");
+  const referenceAvailable = learnerKnowledgeCapabilityIsAvailable(availability, "referenceSupportSteps");
+  if (detour.status === "generating") return generatedAvailable || referenceAvailable;
+  if (detour.status === "failed") return generatedAvailable;
+  if (detour.status !== "ready" || detour.steps.length === 0) return false;
+  return detour.steps.every((step) => step.kind === "reference" ? referenceAvailable : generatedAvailable);
 }

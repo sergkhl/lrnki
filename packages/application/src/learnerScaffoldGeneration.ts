@@ -26,6 +26,10 @@ import { bestEffort } from "./bestEffort";
 import { createClaimAdmission, type ClaimAdmission } from "./claimAdmission";
 import { isTransientGenerationError } from "./generationFailureClassification";
 import { GenerationClaimLostError } from "./generationClaimLost";
+import {
+  learnerKnowledgeCapabilityIsAvailable,
+  type LearnerKnowledgeAvailability
+} from "./learnerKnowledgeAvailability";
 import { normalizeOptionText } from "./optionSelectGuard";
 import { runInstrumentedOperation, type StageBracket } from "./runProgressReporter";
 import {
@@ -105,6 +109,10 @@ export type ScaffoldGenerationConstruction = {
   // projection is retained for the whole attempt even if learner state changes during neural
   // work; publication never recomputes eligibility.
   readStudySession: (input: { enrichmentId: string; learnerStateRef: string }) => Promise<ScaffoldOpeningStudySession | undefined>;
+  // Product availability is explicit at the process-lived boundary. The retained neural ports
+  // remain injectable for qualification, but current production policy is checked before any
+  // outline, grounding, content, congruence, claim, or answer-key call.
+  learnerKnowledgeAvailability: LearnerKnowledgeAvailability;
   outline: ScaffoldOutlinePort;
   content: ScaffoldContentPort;
   // Generation-time label↔content congruence re-pick (plan 2026-07-16-001 U5, KTD4b). The SAME
@@ -138,6 +146,13 @@ class ScaffoldNoSafeStepError extends Error {
   constructor(term: string) {
     super(`No safe Support Step survived for term "${term}".`);
     this.name = "ScaffoldNoSafeStepError";
+  }
+}
+
+class ScaffoldGenerationUnavailableError extends Error {
+  constructor() {
+    super("generated_support_step_unavailable");
+    this.name = "ScaffoldGenerationUnavailableError";
   }
 }
 
@@ -208,7 +223,7 @@ export function createScaffoldGeneration(construction: ScaffoldGenerationConstru
 
 type ReferencePin = { derivedNodeId: string; conceptLessonId: string; studyItemId: string };
 
-type ExactMatch =
+export type ExactScaffoldReferenceResolution =
   | { kind: "reference"; pin: ReferencePin }
   | { kind: "none" }
   | { kind: "collision" };
@@ -218,7 +233,11 @@ type ExactMatch =
 // carries current lesson + option-select identities pins a reference. Any parent, locked,
 // ambiguous, cross-domain, or payload-incomplete collision is unusable: never referenced, never
 // cloned as a generated node. No match at all is `none` (safe to generate).
-function resolveExactMatch(term: string, session: ScaffoldOpeningStudySession, parent: DerivedGraphNode): ExactMatch {
+export function resolveExactScaffoldReference(
+  term: string,
+  session: ScaffoldOpeningStudySession,
+  parent: DerivedGraphNode
+): ExactScaffoldReferenceResolution {
   const normalized = normalizeConceptLabel(term);
   if (normalized.length === 0) return { kind: "none" };
   const matches = session.detail.nodes.filter((node) =>
@@ -253,7 +272,8 @@ function planOutline(
   proposals: readonly ScaffoldOutlineStep[],
   session: ScaffoldOpeningStudySession,
   parent: DerivedGraphNode,
-  maxSupportSteps: number
+  maxSupportSteps: number,
+  referenceSupportStepsAvailable: boolean
 ): { planned: PlannedStep[]; rejected: string[] } {
   const planned: PlannedStep[] = [];
   const rejected: string[] = [];
@@ -268,12 +288,16 @@ function planOutline(
       continue;
     }
     seenLabels.add(normalized);
-    const match = resolveExactMatch(proposed.label, session, parent);
+    const match = resolveExactScaffoldReference(proposed.label, session, parent);
     if (match.kind === "collision") {
       rejected.push(proposed.label);
       continue;
     }
     if (match.kind === "reference") {
+      if (!referenceSupportStepsAvailable) {
+        rejected.push(proposed.label);
+        continue;
+      }
       if (usedNodeIds.has(match.pin.derivedNodeId)) {
         rejected.push(proposed.label);
         continue;
@@ -304,9 +328,16 @@ async function generateSteps(input: {
 
   // 1. Direct selected-term reuse: a unique eligible exact match publishes one pinned reference
   // and makes ZERO neural calls (frontier, mastered, and confidently floored alike).
-  const direct = resolveExactMatch(input.detour.term, session, parent);
-  if (direct.kind === "reference") {
+  const referenceSupportStepsAvailable = learnerKnowledgeCapabilityIsAvailable(
+    construction.learnerKnowledgeAvailability,
+    "referenceSupportSteps"
+  );
+  const direct = resolveExactScaffoldReference(input.detour.term, session, parent);
+  if (direct.kind === "reference" && referenceSupportStepsAvailable) {
     return [referenceStep(direct.pin, 0, newId)];
+  }
+  if (!learnerKnowledgeCapabilityIsAvailable(construction.learnerKnowledgeAvailability, "generatedSupportSteps")) {
+    throw new ScaffoldGenerationUnavailableError();
   }
 
   // 2. Settle the outline plan. The initial proposal plus bounded feedback re-outlines when a
@@ -322,14 +353,26 @@ async function generateSteps(input: {
     existingLabels
   };
   let outline = await runStage(STAGE_TAGS.scaffoldOutlineGeneration, () => construction.outline.propose(proposeInput));
-  let plan = planOutline(outline.steps, session, parent, config.maxSupportSteps);
+  let plan = planOutline(
+    outline.steps,
+    session,
+    parent,
+    config.maxSupportSteps,
+    referenceSupportStepsAvailable
+  );
   for (let attempt = 1; attempt < config.outlineAttempts && plan.rejected.length > 0; attempt++) {
     const retryFeedback =
       `These proposed labels were rejected: ${plan.rejected.map((label) => `"${label}"`).join(", ")}. ` +
       `Each one collides with an existing concept in this layer or duplicates another proposed step. ` +
       `Propose distinct, strictly simpler prerequisites of "${input.detour.term}" with different labels.`;
     outline = await runStage(STAGE_TAGS.scaffoldOutlineGeneration, () => construction.outline.propose({ ...proposeInput, retryFeedback }));
-    plan = planOutline(outline.steps, session, parent, config.maxSupportSteps);
+    plan = planOutline(
+      outline.steps,
+      session,
+      parent,
+      config.maxSupportSteps,
+      referenceSupportStepsAvailable
+    );
   }
 
   // 3. Admit every generated label in ONE settled-outline batch. Reference steps bypass the

@@ -14,6 +14,17 @@ import type {
 } from "@lrnki/ports";
 import { getStudySession } from "./getStudySession";
 import { composeStudySession } from "./studySessionProjection";
+import {
+  CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY,
+  type LearnerKnowledgeAvailability
+} from "./learnerKnowledgeAvailability";
+
+const ALL_LEARNER_KNOWLEDGE_AVAILABLE = {
+  ...CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY,
+  syntheticTopicGeneration: { status: "available" },
+  llmGroundedPrerequisites: { status: "available" },
+  generatedSupportSteps: { status: "available" }
+} as const satisfies LearnerKnowledgeAvailability;
 
 function node(id: string, label: string, difficulty: number): DerivedGraphDetail["nodes"][number] {
   return { derivedNodeId: id, label, aliases: [], declaredDomain: "rust", difficulty, difficultyRationale: null, nodeKind: "anchor", groundingOrigin: "document_anchored", role: "prerequisite", hasStudyItem: false, grounding: null };
@@ -113,12 +124,34 @@ function callGetStudySession(args: { enrichmentId?: string; items?: StudyItem[];
     conceptLessonStore: conceptLessonStore(args.lessons ?? [], args.absent ?? []),
     lessonReadStore: lessonReadStore(),
     responseLog: responseLog(args.rows ?? []),
-    verdictStore: verdictStore(args.verdicts ?? [])
+    verdictStore: verdictStore(args.verdicts ?? []),
+    learnerKnowledgeAvailability: ALL_LEARNER_KNOWLEDGE_AVAILABLE
   });
 }
 
 test("getStudySession returns undefined for an unknown enrichment", async () => {
   assert.equal(await callGetStudySession({ enrichmentId: "missing" }), undefined);
+});
+
+test("the current policy refuses an LLM-grounded Study Session before loading learner assets", async () => {
+  const heldDetail = detail();
+  heldDetail.nodes[0] = { ...heldDetail.nodes[0], groundingOrigin: "llm_grounded" };
+  let assetRead = false;
+  const session = await getStudySession({
+    enrichmentId: "e",
+    learnerStateRef: "L1",
+    enrichmentRead: enrichmentRead({ e: heldDetail }),
+    studyItemStore: {
+      ...studyItemStore([]),
+      async listStudyItemsForEnrichment() { assetRead = true; return []; }
+    },
+    conceptLessonStore: conceptLessonStore([]),
+    responseLog: responseLog([]),
+    verdictStore: verdictStore([]),
+    learnerKnowledgeAvailability: CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY
+  });
+  assert.equal(session, undefined);
+  assert.equal(assetRead, false);
 });
 
 test("getStudySession returns exactly what composeStudySession produces for the loaded data", async () => {
@@ -191,7 +224,8 @@ test("getStudySession composes server-owned recall scopes from the challenge sto
     conceptLessonStore: conceptLessonStore([]),
     responseLog: responseLog([correctRow]),
     verdictStore: verdictStore([]),
-    challengeStore
+    challengeStore,
+    learnerKnowledgeAvailability: ALL_LEARNER_KNOWLEDGE_AVAILABLE
   });
   assert.ok(session);
   // The two-node layer is one section anchored on `ownership`: the passed item on `scope`
@@ -257,7 +291,8 @@ test("getStudySession loads learner-owned pinned reference activities into the f
     responseLog: responseLog([]),
     verdictStore: verdictStore([]),
     scaffoldStore,
-    scaffoldReferenceRead
+    scaffoldReferenceRead,
+    learnerKnowledgeAvailability: ALL_LEARNER_KNOWLEDGE_AVAILABLE
   });
   assert.ok(session);
   const step = session.detours[0].steps[0];
@@ -266,4 +301,69 @@ test("getStudySession loads learner-owned pinned reference activities into the f
     conceptLessonId: scopeLesson.conceptLessonId,
     studyItemId: optionItem.studyItemId
   });
+});
+
+test("the current policy projects reference detours and suppresses stored generated Support Steps", async () => {
+  const referenceDetour: ScaffoldDetour = {
+    detourId: "d-ref",
+    learnerStateRef: "L1",
+    enrichmentId: "e",
+    parentDerivedNodeId: "ownership",
+    term: "Variable scope",
+    normalizedTerm: "variable scope",
+    status: "ready",
+    latestOperationId: null,
+    claimToken: null,
+    steps: [{
+      scaffoldStepId: "step-ref",
+      ordinal: 0,
+      kind: "reference",
+      referencedDerivedNodeId: "scope",
+      referencedConceptLessonId: scopeLesson.conceptLessonId,
+      referencedStudyItemId: optionItem.studyItemId
+    }]
+  };
+  const generatedDetour = {
+    ...referenceDetour,
+    detourId: "d-generated",
+    term: "Generated prerequisite",
+    normalizedTerm: "generated prerequisite",
+    steps: [{
+      scaffoldStepId: "step-generated",
+      ordinal: 0,
+      kind: "generated",
+      payload: {} as never,
+      groundingBundle: {} as never,
+      lessonReadAt: null
+    }]
+  } as ScaffoldDetour;
+  const scaffoldStore = {
+    async listActiveForLearnerEnrichment() { return [referenceDetour, generatedDetour]; }
+  } as unknown as ScaffoldDetourStorePort;
+  const scaffoldReferenceRead: ScaffoldReferenceActivityReadPort = {
+    async listForLearnerEnrichment() {
+      return [{
+        scaffoldStepId: "step-ref",
+        detourId: "d-ref",
+        referencedDerivedNodeId: "scope",
+        lesson: scopeLesson,
+        item: optionItem
+      }];
+    },
+    async getForLearnerStep() { throw new Error("not used"); }
+  };
+  const session = await getStudySession({
+    enrichmentId: "e",
+    learnerStateRef: "L1",
+    enrichmentRead: enrichmentRead({ e: detail() }),
+    studyItemStore: studyItemStore([optionItem]),
+    conceptLessonStore: conceptLessonStore([scopeLesson]),
+    responseLog: responseLog([]),
+    verdictStore: verdictStore([]),
+    scaffoldStore,
+    scaffoldReferenceRead,
+    learnerKnowledgeAvailability: CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY
+  });
+  assert.ok(session);
+  assert.deepEqual(session.detours.map((detour) => detour.detourId), ["d-ref"]);
 });

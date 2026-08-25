@@ -150,12 +150,76 @@ maybeDb("paused Synthetic Topic routes expose one capability and perform no writ
     assert.equal(retry.status, 409);
     assert.equal((await retry.json() as { error: string }).error, "synthetic_topic_generation_paused");
 
+    const generatedGrade = await authed("/scaffold/option-select", {
+      scaffoldStepId: randomUUID(),
+      chosenOptionId: randomUUID()
+    });
+    assert.equal(generatedGrade.status, 409);
+    assert.equal((await generatedGrade.json() as { error: string }).error, "generated_support_steps_paused");
+    const generatedLessonRead = await authed("/scaffold/lesson-read", { scaffoldStepId: randomUUID() });
+    assert.equal(generatedLessonRead.status, 409);
+    assert.equal((await generatedLessonRead.json() as { error: string }).error, "generated_support_steps_paused");
+    const generatedRetry = await authed("/scaffold/retry", { detourId: randomUUID() });
+    assert.equal(generatedRetry.status, 409);
+    assert.deepEqual(await generatedRetry.json(), {
+      retried: false,
+      refused: "generated_support_step_unavailable"
+    });
+
     const [count] = await sql<{ count: number }[]>`
       SELECT count(*)::int AS count
       FROM learner_expeditions
       WHERE learner_state_ref = ${learner}`;
     assert.equal(count.count, 0, "paused requests create or reset no expedition rows");
     assert.equal(wakes, 0, "paused requests never wake the supervisor");
+
+    // A production-shaped source adoption cannot bypass the same graph policy by posting an
+    // enrichment id directly. The held-out detail is inspectable in Postgres, but choose and
+    // activation both refuse before making it learner-active.
+    const heldEnrichmentId = randomUUID();
+    await sql`
+      INSERT INTO graph_enrichments (
+        enrichment_id, graph_version_id, enrichment_config_hash, status,
+        judge_model, difficulty_method, completed_at
+      ) VALUES (${heldEnrichmentId}, NULL, 'test', 'succeeded', 'test', 'test', now())`;
+    await sql`
+      INSERT INTO derived_graph_nodes (
+        derived_node_id, enrichment_id, node_kind, concept_id, grounding_origin,
+        role, canonical_label, normalized_label, declared_domain, aliases
+      ) VALUES (
+        ${randomUUID()}, ${heldEnrichmentId}, 'enrichment', NULL, 'llm_grounded',
+        'prerequisite', 'Held prerequisite', 'held prerequisite', 'test', '[]'::jsonb
+      )`;
+    const chooseHeld = await authed("/expedition/choose", {
+      enrichmentId: heldEnrichmentId,
+      title: "Client-supplied title",
+      declaredDomain: "client-supplied domain"
+    });
+    assert.equal(chooseHeld.status, 409);
+    assert.equal((await chooseHeld.json() as { capability: string }).capability, "llmGroundedPrerequisites");
+    const [afterChoose] = await sql<{ count: number }[]>`
+      SELECT count(*)::int AS count
+      FROM learner_expeditions
+      WHERE learner_state_ref = ${learner}`;
+    assert.equal(afterChoose.count, 0, "held-out choose writes no learner expedition");
+
+    const historicalExpeditionId = randomUUID();
+    await sql`
+      INSERT INTO learner_expeditions (
+        learner_expedition_id, learner_state_ref, kind, title, declared_domain,
+        status, enrichment_id, active
+      ) VALUES (
+        ${historicalExpeditionId}, ${learner}, 'topic', 'Historical held row', 'test',
+        'ready', ${heldEnrichmentId}, false
+      )`;
+    const activateHeld = await authed("/expedition/activate", {
+      learnerExpeditionId: historicalExpeditionId,
+      enrichmentId: heldEnrichmentId
+    });
+    assert.equal(activateHeld.status, 409);
+    const [heldRow] = await sql<{ active: boolean }[]>`
+      SELECT active FROM learner_expeditions WHERE learner_expedition_id = ${historicalExpeditionId}`;
+    assert.equal(heldRow.active, false, "held historical row remains inactive");
   } finally {
     if (learner) await deleteLearner(sql, learner);
     await Promise.all([sql.end(), authClientSql.end()]);

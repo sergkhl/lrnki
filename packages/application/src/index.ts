@@ -231,10 +231,16 @@ export {
 } from "./expeditionJournal";
 
 export {
-  CURRENT_SYNTHETIC_TOPIC_GENERATION_AVAILABILITY,
-  syntheticTopicGenerationIsAvailable,
-  type SyntheticTopicGenerationAvailability
-} from "./syntheticTopicGenerationAvailability";
+  CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY,
+  derivedGraphLearnerKnowledgeAvailability,
+  learnerKnowledgeCapabilityIsAvailable,
+  learnerKnowledgeIsAvailable,
+  type LearnerKnowledgeAvailability,
+  type LearnerKnowledgeCapability,
+  type LearnerKnowledgeCapabilityAvailability,
+  type LearnerKnowledgeHoldoutReason,
+  type DerivedGraphLearnerKnowledgeAvailability
+} from "./learnerKnowledgeAvailability";
 
 export {
   labelFor,
