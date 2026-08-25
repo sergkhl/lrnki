@@ -268,6 +268,16 @@ export {
   type SourceMaterialEvidenceReference
 } from "./sourceMaterialClaims";
 export {
+  SOURCE_MATERIAL_CLAIM_SUPPORT_QUALIFICATION_SCHEMA_VERSION,
+  parseSourceMaterialClaimSupportQualificationMatrix,
+  qualifySourceMaterialClaimSupport,
+  type SourceMaterialClaimSupportQualificationCase,
+  type SourceMaterialClaimSupportQualificationMatrix,
+  type SourceMaterialClaimSupportQualificationObservation,
+  type SourceMaterialClaimSupportQualificationReport,
+  type SourceMaterialClaimSupportQualificationSource
+} from "./sourceMaterialClaimSupportQualification";
+export {
   SOURCE_ASSET_EVALUATION_REPORT_SCHEMA_VERSION,
   evaluateProjectedOptionSelectTruth,
   evaluateProjectedSourceSupport,

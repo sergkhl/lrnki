@@ -1,0 +1,521 @@
+{
+  "$comment": "The fixed source-support kill matrix first used for the rejected U4 local verifier, now tracked so every later candidate faces the same project-authored diagnostics and held-out real-source controls. Precision-first qualification permits safe refusal but no material false acceptance.",
+  "schemaVersion": "lrnki.source-material-claim-support-qualification.v1",
+  "drawsPerCase": 3,
+  "maximumFalseAcceptances": 0,
+  "maximumFalseRejectionRate": 0.25,
+  "sources": [
+    {
+      "path": "fixtures/markdown/lrnki-diagnostic-harbor-dispatch-core.md",
+      "contentType": "text/markdown",
+      "sourceClass": "project_diagnostic",
+      "declaredDomain": "harbor operations",
+      "subject": {
+        "canonicalLabel": "North Quay harbor dispatch protocol",
+        "aliases": [
+          "Harbor Dispatch Core Protocol"
+        ]
+      }
+    },
+    {
+      "path": "fixtures/html/lrnki-diagnostic-harbor-tide-margin-supplement.html",
+      "contentType": "text/html",
+      "sourceClass": "project_diagnostic",
+      "declaredDomain": "harbor operations",
+      "subject": {
+        "canonicalLabel": "North Quay tide margin",
+        "aliases": [
+          "tide margin"
+        ]
+      }
+    },
+    {
+      "path": "fixtures/plaintext/lrnki-diagnostic-microgrid-reserve-procedure.txt",
+      "contentType": "text/plain",
+      "sourceClass": "project_diagnostic",
+      "declaredDomain": "microgrid operations",
+      "subject": {
+        "canonicalLabel": "Rowan Microgrid reserve procedure",
+        "aliases": [
+          "islanded reserve floor"
+        ]
+      }
+    },
+    {
+      "path": "fixtures/markdown/lrnki-diagnostic-archive-frame-encoding.md",
+      "contentType": "text/markdown",
+      "sourceClass": "project_diagnostic",
+      "declaredDomain": "data serialization",
+      "subject": {
+        "canonicalLabel": "Archive Frame encoding",
+        "aliases": [
+          "Lattice Archive Frame"
+        ]
+      }
+    },
+    {
+      "path": "fixtures/markdown/rust-book-ch04-01-what-is-ownership.md",
+      "contentType": "text/markdown",
+      "sourceClass": "held_out_real_source",
+      "declaredDomain": "Rust programming",
+      "subject": {
+        "canonicalLabel": "Rust ownership",
+        "aliases": [
+          "ownership system"
+        ]
+      }
+    },
+    {
+      "path": "fixtures/html/openstax-biology-2e-14-3-dna-replication.html",
+      "contentType": "text/html",
+      "sourceClass": "held_out_real_source",
+      "declaredDomain": "molecular biology",
+      "subject": {
+        "canonicalLabel": "DNA replication",
+        "aliases": [
+          "DNA replication models"
+        ]
+      }
+    }
+  ],
+  "cases": [
+    {
+      "id": "diagnostic-reservation-supported",
+      "source": "fixtures/markdown/lrnki-diagnostic-harbor-dispatch-core.md",
+      "harmClass": "supported_claim",
+      "expected": "supported",
+      "claim": "A berth reservation temporarily authorizes one named vessel to request entry to one named berth during one clearance window.",
+      "evidenceQuotes": [
+        "A berth reservation is a temporary authorization for one named vessel to request entry to one named berth during one clearance window. It does not transfer ownership of the berth, guarantee that the vessel will enter, or authorize movement through a different berth."
+      ]
+    },
+    {
+      "id": "diagnostic-token-copy-supported",
+      "source": "fixtures/markdown/lrnki-diagnostic-harbor-dispatch-core.md",
+      "harmClass": "supported_claim",
+      "expected": "supported",
+      "claim": "Copying a dispatch token copies its record without creating another reservation or extending the original expiry time.",
+      "evidenceQuotes": [
+        "A dispatch token is a record that carries a reservation identifier, vessel call sign, berth identifier, issue time, and expiry time. The token refers to a berth reservation; it is not itself the reservation or the berth. Copying a token copies the record, but it does not create another reservation and does not extend the original expiry time."
+      ]
+    },
+    {
+      "id": "diagnostic-window-supported",
+      "source": "fixtures/markdown/lrnki-diagnostic-harbor-dispatch-core.md",
+      "harmClass": "supported_claim",
+      "expected": "supported",
+      "claim": "The twelve-minute clearance window begins when Harbor Control confirms that the channel is clear.",
+      "evidenceQuotes": [
+        "A clearance window is the twelve-minute interval in which a vessel with an active reservation may request channel entry. The interval begins when Harbor Control confirms that the channel is clear; it does not begin at the vessel's scheduled departure time or when a token is printed."
+      ]
+    },
+    {
+      "id": "diagnostic-tide-definition-supported",
+      "source": "fixtures/html/lrnki-diagnostic-harbor-tide-margin-supplement.html",
+      "harmClass": "supported_claim",
+      "expected": "supported",
+      "claim": "Tide margin subtracts the vessel's required water depth in its current loading condition from the predicted minimum depth along the planned channel at the planned transit time.",
+      "evidenceQuotes": [
+        "Tide margin is the predicted minimum water depth along the planned channel at the planned transit time minus the vessel's required water depth in its current loading condition. The calculation uses the lowest predicted channel depth, not the harbor's average depth."
+      ]
+    },
+    {
+      "id": "diagnostic-tide-threshold-supported",
+      "source": "fixtures/html/lrnki-diagnostic-harbor-tide-margin-supplement.html",
+      "harmClass": "supported_claim",
+      "expected": "supported",
+      "claim": "For North Quay ferry departures, a calculated tide margin of at least 0.8 metres is adequate.",
+      "evidenceQuotes": [
+        "A North Quay ferry has adequate tide margin when its calculated tide margin is at least 0.8 metres. A positive margin below 0.8 metres is not adequate for this protocol. The threshold applies to North Quay ferry departures; it is not a universal threshold for every harbor or vessel class."
+      ]
+    },
+    {
+      "id": "diagnostic-forecast-supported",
+      "source": "fixtures/html/lrnki-diagnostic-harbor-tide-margin-supplement.html",
+      "harmClass": "supported_claim",
+      "expected": "supported",
+      "claim": "Harbor Control recalculates tide margin when a newer pre-authorization forecast lowers the predicted minimum channel depth.",
+      "evidenceQuotes": [
+        "The calculation is tied to the forecast revision used for the planned transit time. If a newer forecast lowers the predicted minimum channel depth before movement is authorized, Harbor Control recalculates the margin. An earlier adequate result does not remain valid merely because a dispatch token has already been issued."
+      ]
+    },
+    {
+      "id": "diagnostic-reserve-scope-supported",
+      "source": "fixtures/plaintext/lrnki-diagnostic-microgrid-reserve-procedure.txt",
+      "harmClass": "supported_claim",
+      "expected": "supported",
+      "claim": "During ordinary islanded operation, the Rowan Microgrid's reserve floor requires the battery state-of-charge estimate to remain at or above 30 percent.",
+      "evidenceQuotes": [
+        "The reserve floor is a control target used only while the Rowan Microgrid is islanded. It requires the battery state-of-charge estimate to remain at or above 30 percent during ordinary islanded operation. The reserve floor is not a universal minimum for grid-connected operation, battery shipping, maintenance, or emergency shutdown."
+      ]
+    },
+    {
+      "id": "diagnostic-stale-estimate-supported",
+      "source": "fixtures/plaintext/lrnki-diagnostic-microgrid-reserve-procedure.txt",
+      "harmClass": "supported_claim",
+      "expected": "supported",
+      "claim": "An estimate with no accepted sensor update for sixty seconds is stale and cannot authorize an ordinary discharge command.",
+      "evidenceQuotes": [
+        "The controller marks an estimate stale when no accepted sensor update has arrived for sixty seconds. A stale estimate must not authorize an ordinary discharge command, even when its displayed value is above the reserve floor."
+      ]
+    },
+    {
+      "id": "diagnostic-emergency-supported",
+      "source": "fixtures/plaintext/lrnki-diagnostic-microgrid-reserve-procedure.txt",
+      "harmClass": "supported_claim",
+      "expected": "supported",
+      "claim": "In a declared emergency, the emergency controller may authorize below-floor discharge for the protected medical circuit, but the battery safety interlock may still refuse it.",
+      "evidenceQuotes": [
+        "During a declared emergency, the emergency controller may authorize discharge below the ordinary reserve floor to supply the protected medical circuit. This exception does not redefine the reserve floor and does not make below-floor discharge ordinary operation. The battery safety interlock still has priority and may refuse the emergency command."
+      ]
+    },
+    {
+      "id": "diagnostic-recovery-supported",
+      "source": "fixtures/plaintext/lrnki-diagnostic-microgrid-reserve-procedure.txt",
+      "harmClass": "supported_claim",
+      "expected": "supported",
+      "claim": "After grid service returns, the microgrid synchronizes, closes the grid connection, and only then leaves islanded mode.",
+      "evidenceQuotes": [
+        "After grid service returns, the microgrid first synchronizes with the external grid, then closes the grid connection, and only then leaves islanded mode. The islanded reserve floor stops governing ordinary dispatch after the mode transition completes. A grid-available signal by itself does not complete that transition."
+      ]
+    },
+    {
+      "id": "diagnostic-octet-supported",
+      "source": "fixtures/markdown/lrnki-diagnostic-archive-frame-encoding.md",
+      "harmClass": "supported_claim",
+      "expected": "supported",
+      "claim": "Payload Octet Count includes every stored payload octet while excluding the frame header, label, and checksum.",
+      "evidenceQuotes": [
+        "The Payload Octet Count is the number of octets in the encoded payload exactly as stored in the frame. An octet is an eight-bit unit. The count includes every payload octet and excludes the frame header, label, and checksum."
+      ]
+    },
+    {
+      "id": "diagnostic-scalar-supported",
+      "source": "fixtures/markdown/lrnki-diagnostic-archive-frame-encoding.md",
+      "harmClass": "supported_claim",
+      "expected": "supported",
+      "claim": "The writer normalizes the label to NFC before counting its Unicode scalar values, and the terminating zero octet is excluded.",
+      "evidenceQuotes": [
+        "The Label Scalar Count is the number of Unicode scalar values in the normalized label. Before counting, the writer normalizes the label to Unicode Normalization Form C. The count excludes the terminating zero octet used by the binary frame."
+      ]
+    },
+    {
+      "id": "diagnostic-checksum-supported",
+      "source": "fixtures/markdown/lrnki-diagnostic-archive-frame-encoding.md",
+      "harmClass": "supported_claim",
+      "expected": "supported",
+      "claim": "A matching Payload Checksum does not prove that the payload is truthful, safe, or meaningful.",
+      "evidenceQuotes": [
+        "The reader verifies the checksum before decoding or interpreting the payload. A checksum match shows that the stored payload octets agree with the recorded checksum under this algorithm; it does not prove that the payload is truthful, safe, or meaningful."
+      ]
+    },
+    {
+      "id": "diagnostic-timetable-reservation-swap",
+      "source": "fixtures/markdown/lrnki-diagnostic-harbor-dispatch-core.md",
+      "harmClass": "carrier_referent_swap",
+      "expected": "unsupported",
+      "claim": "A vessel's timetable entry is its active berth reservation.",
+      "evidenceQuotes": [
+        "Only Harbor Control creates or suspends a berth reservation. A timetable entry is a planning notice, not a reservation. A vessel with a timetable entry but no active reservation must remain outside the channel."
+      ]
+    },
+    {
+      "id": "diagnostic-token-reservation-swap",
+      "source": "fixtures/markdown/lrnki-diagnostic-harbor-dispatch-core.md",
+      "harmClass": "carrier_referent_swap",
+      "expected": "unsupported",
+      "claim": "The dispatch token is the berth reservation itself.",
+      "evidenceQuotes": [
+        "A dispatch token is a record that carries a reservation identifier, vessel call sign, berth identifier, issue time, and expiry time. The token refers to a berth reservation; it is not itself the reservation or the berth."
+      ]
+    },
+    {
+      "id": "diagnostic-token-copy-creates-authority",
+      "source": "fixtures/markdown/lrnki-diagnostic-harbor-dispatch-core.md",
+      "harmClass": "carrier_referent_swap",
+      "expected": "unsupported",
+      "claim": "Copying a dispatch token creates a second reservation with a fresh expiry time.",
+      "evidenceQuotes": [
+        "Copying a token copies the record, but it does not create another reservation and does not extend the original expiry time.",
+        "Possession of a token alone therefore never guarantees movement authority."
+      ]
+    },
+    {
+      "id": "diagnostic-window-start-qualifier-drop",
+      "source": "fixtures/markdown/lrnki-diagnostic-harbor-dispatch-core.md",
+      "harmClass": "omitted_material_qualifier",
+      "expected": "unsupported",
+      "claim": "A vessel's clearance window begins at its scheduled departure time.",
+      "evidenceQuotes": [
+        "The interval begins when Harbor Control confirms that the channel is clear; it does not begin at the vessel's scheduled departure time or when a token is printed."
+      ]
+    },
+    {
+      "id": "diagnostic-margin-authority-qualifier-drop",
+      "source": "fixtures/html/lrnki-diagnostic-harbor-tide-margin-supplement.html",
+      "harmClass": "omitted_material_qualifier",
+      "expected": "unsupported",
+      "claim": "Adequate tide margin by itself grants movement authority.",
+      "evidenceQuotes": [
+        "Adequate tide margin is necessary for ordinary release, but it is not movement authority. Harbor Control must still create a berth reservation, validate the dispatch token during the clearance window, and confirm that no safety override is active."
+      ]
+    },
+    {
+      "id": "diagnostic-tide-average-swap",
+      "source": "fixtures/html/lrnki-diagnostic-harbor-tide-margin-supplement.html",
+      "harmClass": "carrier_referent_swap",
+      "expected": "unsupported",
+      "claim": "Tide margin is the harbor's average depth minus the vessel's scheduled departure time.",
+      "evidenceQuotes": [
+        "Tide margin is the predicted minimum water depth along the planned channel at the planned transit time minus the vessel's required water depth in its current loading condition. The calculation uses the lowest predicted channel depth, not the harbor's average depth."
+      ]
+    },
+    {
+      "id": "diagnostic-threshold-universalized",
+      "source": "fixtures/html/lrnki-diagnostic-harbor-tide-margin-supplement.html",
+      "harmClass": "context_bound_quantity",
+      "expected": "unsupported",
+      "claim": "Every harbor and vessel class has adequate tide margin at 0.8 metres.",
+      "evidenceQuotes": [
+        "A North Quay ferry has adequate tide margin when its calculated tide margin is at least 0.8 metres. A positive margin below 0.8 metres is not adequate for this protocol. The threshold applies to North Quay ferry departures; it is not a universal threshold for every harbor or vessel class."
+      ]
+    },
+    {
+      "id": "diagnostic-threshold-quantity-change",
+      "source": "fixtures/html/lrnki-diagnostic-harbor-tide-margin-supplement.html",
+      "harmClass": "context_bound_quantity",
+      "expected": "unsupported",
+      "claim": "Ferry Dune's 0.6-metre margin is adequate for North Quay release.",
+      "evidenceQuotes": [
+        "Ferry Dune requires 4.0 metres under the same forecast, so its 0.6-metre margin is positive but not adequate for North Quay release."
+      ]
+    },
+    {
+      "id": "diagnostic-reserve-scope-drop",
+      "source": "fixtures/plaintext/lrnki-diagnostic-microgrid-reserve-procedure.txt",
+      "harmClass": "omitted_material_qualifier",
+      "expected": "unsupported",
+      "claim": "The 30 percent reserve floor is the universal minimum for grid-connected operation and battery shipping.",
+      "evidenceQuotes": [
+        "The reserve floor is a control target used only while the Rowan Microgrid is islanded.",
+        "The reserve floor is not a universal minimum for grid-connected operation, battery shipping, maintenance, or emergency shutdown."
+      ]
+    },
+    {
+      "id": "diagnostic-estimate-energy-swap",
+      "source": "fixtures/plaintext/lrnki-diagnostic-microgrid-reserve-procedure.txt",
+      "harmClass": "carrier_referent_swap",
+      "expected": "unsupported",
+      "claim": "The state-of-charge estimate is the battery's stored energy itself, so copying it to a dashboard copies energy.",
+      "evidenceQuotes": [
+        "The state-of-charge estimate is the controller's current estimate of usable battery energy expressed as a percentage of the configured usable capacity. It is a measurement-derived representation, not the stored energy itself. Copying the estimate to a dashboard does not copy energy, alter the battery, or guarantee that the estimate remains current."
+      ]
+    },
+    {
+      "id": "diagnostic-stale-qualifier-drop",
+      "source": "fixtures/plaintext/lrnki-diagnostic-microgrid-reserve-procedure.txt",
+      "harmClass": "omitted_material_qualifier",
+      "expected": "unsupported",
+      "claim": "An above-floor displayed estimate may authorize ordinary discharge even when the estimate is stale.",
+      "evidenceQuotes": [
+        "A stale estimate must not authorize an ordinary discharge command, even when its displayed value is above the reserve floor."
+      ]
+    },
+    {
+      "id": "diagnostic-emergency-scope-drop",
+      "source": "fixtures/plaintext/lrnki-diagnostic-microgrid-reserve-procedure.txt",
+      "harmClass": "omitted_material_qualifier",
+      "expected": "unsupported",
+      "claim": "The emergency exception permanently redefines below-floor discharge as ordinary operation.",
+      "evidenceQuotes": [
+        "During a declared emergency, the emergency controller may authorize discharge below the ordinary reserve floor to supply the protected medical circuit. This exception does not redefine the reserve floor and does not make below-floor discharge ordinary operation."
+      ]
+    },
+    {
+      "id": "diagnostic-transition-order-drop",
+      "source": "fixtures/plaintext/lrnki-diagnostic-microgrid-reserve-procedure.txt",
+      "harmClass": "omitted_material_qualifier",
+      "expected": "unsupported",
+      "claim": "A grid-available signal by itself immediately takes the microgrid out of islanded mode.",
+      "evidenceQuotes": [
+        "After grid service returns, the microgrid first synchronizes with the external grid, then closes the grid connection, and only then leaves islanded mode.",
+        "A grid-available signal by itself does not complete that transition."
+      ]
+    },
+    {
+      "id": "diagnostic-octet-character-swap",
+      "source": "fixtures/markdown/lrnki-diagnostic-archive-frame-encoding.md",
+      "harmClass": "carrier_referent_swap",
+      "expected": "unsupported",
+      "claim": "Payload Octet Count is the number of displayed characters in the payload.",
+      "evidenceQuotes": [
+        "Payload Octet Count does not count displayed characters. A UTF-8 text payload can use more than one octet for a character, while a compressed or encrypted payload may not have a meaningful character count at all."
+      ]
+    },
+    {
+      "id": "diagnostic-scalar-byte-swap",
+      "source": "fixtures/markdown/lrnki-diagnostic-archive-frame-encoding.md",
+      "harmClass": "carrier_referent_swap",
+      "expected": "unsupported",
+      "claim": "Label Scalar Count is the UTF-8 byte length of the normalized label.",
+      "evidenceQuotes": [
+        "Label Scalar Count is not a byte length and is not a count of user-perceived grapheme clusters. A single displayed symbol can contain more than one Unicode scalar value, and one scalar value can use multiple octets in UTF-8."
+      ]
+    },
+    {
+      "id": "diagnostic-cafe-quantity-change",
+      "source": "fixtures/markdown/lrnki-diagnostic-archive-frame-encoding.md",
+      "harmClass": "context_bound_quantity",
+      "expected": "unsupported",
+      "claim": "The normalized label `Café` uses four UTF-8 octets.",
+      "evidenceQuotes": [
+        "The normalized label `Café` also contains four Unicode scalar values, but it uses five UTF-8 octets. Equal scalar counts therefore do not imply equal byte lengths."
+      ]
+    },
+    {
+      "id": "diagnostic-checksum-scope-drop",
+      "source": "fixtures/markdown/lrnki-diagnostic-archive-frame-encoding.md",
+      "harmClass": "omitted_material_qualifier",
+      "expected": "unsupported",
+      "claim": "The Payload Checksum includes the normalized label and terminating zero octet.",
+      "evidenceQuotes": [
+        "The Payload Checksum is calculated over the stored payload octets in order. It excludes the header, normalized label, terminating zero octet, and the checksum field itself."
+      ]
+    },
+    {
+      "id": "diagnostic-checksum-authority-drop",
+      "source": "fixtures/markdown/lrnki-diagnostic-archive-frame-encoding.md",
+      "harmClass": "omitted_material_qualifier",
+      "expected": "unsupported",
+      "claim": "A matching Payload Checksum proves that the payload is truthful and safe.",
+      "evidenceQuotes": [
+        "A checksum match shows that the stored payload octets agree with the recorded checksum under this algorithm; it does not prove that the payload is truthful, safe, or meaningful."
+      ]
+    },
+    {
+      "id": "heldout-rust-ownership-supported",
+      "source": "fixtures/markdown/rust-book-ch04-01-what-is-ownership.md",
+      "harmClass": "supported_claim",
+      "expected": "supported",
+      "claim": "Rust's compiler checks ownership rules, and violating them prevents the program from compiling.",
+      "evidenceQuotes": [
+        "Rust uses a third approach: Memory is managed through a system of ownership with a set of rules that the compiler checks. If any of the rules are violated, the program won’t compile. None of the features of ownership will slow down your program while it’s running."
+      ]
+    },
+    {
+      "id": "heldout-rust-stack-supported",
+      "source": "fixtures/markdown/rust-book-ch04-01-what-is-ownership.md",
+      "harmClass": "supported_claim",
+      "expected": "supported",
+      "claim": "The stack removes values in last-in, first-out order, and stack data must have a known fixed size.",
+      "evidenceQuotes": [
+        "The stack stores values in the order it gets them and removes the values in the opposite order. This is referred to as last in, first out (LIFO).",
+        "All data stored on the stack must have a known, fixed size. Data with an unknown size at compile time or a size that might change must be stored on the heap instead."
+      ]
+    },
+    {
+      "id": "heldout-rust-one-owner-supported",
+      "source": "fixtures/markdown/rust-book-ch04-01-what-is-ownership.md",
+      "harmClass": "supported_claim",
+      "expected": "supported",
+      "claim": "A Rust value can have only one owner at a time and is dropped when that owner goes out of scope.",
+      "evidenceQuotes": [
+        "Each value in Rust has an owner.",
+        "There can only be one owner at a time.",
+        "When the owner goes out of scope, the value will be dropped."
+      ]
+    },
+    {
+      "id": "heldout-dna-template-supported",
+      "source": "fixtures/html/openstax-biology-2e-14-3-dna-replication.html",
+      "harmClass": "supported_claim",
+      "expected": "supported",
+      "claim": "During DNA replication, the two strands separate and each serves as a template for a new complementary strand.",
+      "evidenceQuotes": [
+        "The double-helix model suggests that the two strands of the double helix separate during replication, and each strand serves as a template from which the new complementary strand is copied."
+      ]
+    },
+    {
+      "id": "heldout-dna-semiconservative-supported",
+      "source": "fixtures/html/openstax-biology-2e-14-3-dna-replication.html",
+      "harmClass": "supported_claim",
+      "expected": "supported",
+      "claim": "In semi-conservative replication, each resulting double-stranded DNA has one parental strand and one new strand.",
+      "evidenceQuotes": [
+        "The semi-conservative method suggests that each of the two parental DNA strands acts as a template for new DNA to be synthesized; after replication, each double-stranded DNA includes one parental or old strand and one new strand."
+      ]
+    },
+    {
+      "id": "heldout-dna-first-generation-supported",
+      "source": "fixtures/html/openstax-biology-2e-14-3-dna-replication.html",
+      "harmClass": "supported_claim",
+      "expected": "supported",
+      "claim": "After one generation in 14N following the shift from 15N, Meselson and Stahl observed one intermediate DNA band.",
+      "evidenceQuotes": [
+        "After one generation of growth in 14N after they had been shifted from 15N, the single band observed was intermediate in position in between DNA of cells grown exclusively in 15N and 14N. This suggested either a semi-conservative or dispersive mode of replication."
+      ]
+    },
+    {
+      "id": "heldout-rust-gc-contradiction",
+      "source": "fixtures/markdown/rust-book-ch04-01-what-is-ownership.md",
+      "harmClass": "contradiction",
+      "expected": "unsupported",
+      "claim": "Rust manages memory with a garbage collector that runs regularly.",
+      "evidenceQuotes": [
+        "Some languages have garbage collection that regularly looks for no-longer-used memory as the program runs; in other languages, the programmer must explicitly allocate and free the memory. Rust uses a third approach: Memory is managed through a system of ownership with a set of rules that the compiler checks."
+      ]
+    },
+    {
+      "id": "heldout-rust-size-location-contradiction",
+      "source": "fixtures/markdown/rust-book-ch04-01-what-is-ownership.md",
+      "harmClass": "contradiction",
+      "expected": "unsupported",
+      "claim": "Data with an unknown size at compile time must be stored on the stack.",
+      "evidenceQuotes": [
+        "All data stored on the stack must have a known, fixed size. Data with an unknown size at compile time or a size that might change must be stored on the heap instead."
+      ]
+    },
+    {
+      "id": "heldout-rust-owner-count-quantity-change",
+      "source": "fixtures/markdown/rust-book-ch04-01-what-is-ownership.md",
+      "harmClass": "context_bound_quantity",
+      "expected": "unsupported",
+      "claim": "Each Rust value can have several owners at the same time.",
+      "evidenceQuotes": [
+        "Each value in Rust has an owner.",
+        "There can only be one owner at a time.",
+        "When the owner goes out of scope, the value will be dropped."
+      ]
+    },
+    {
+      "id": "heldout-dna-conservative-semiconservative-swap",
+      "source": "fixtures/html/openstax-biology-2e-14-3-dna-replication.html",
+      "harmClass": "carrier_referent_swap",
+      "expected": "unsupported",
+      "claim": "In conservative replication, every daughter double helix contains one parental strand and one new strand.",
+      "evidenceQuotes": [
+        "In conservative replication, the parental DNA remains together, and the newly formed daughter strands are together. The semi-conservative method suggests that each of the two parental DNA strands acts as a template for new DNA to be synthesized; after replication, each double-stranded DNA includes one parental or “old” strand and one “new” strand."
+      ]
+    },
+    {
+      "id": "heldout-dna-first-generation-quantity-change",
+      "source": "fixtures/html/openstax-biology-2e-14-3-dna-replication.html",
+      "harmClass": "context_bound_quantity",
+      "expected": "unsupported",
+      "claim": "After one generation in 14N following the shift from 15N, two separate DNA bands were observed.",
+      "evidenceQuotes": [
+        "After one generation of growth in 14N after they had been shifted from 15N, the single band observed was intermediate in position in between DNA of cells grown exclusively in 15N and 14N."
+      ]
+    },
+    {
+      "id": "heldout-dna-second-generation-quantity-change",
+      "source": "fixtures/html/openstax-biology-2e-14-3-dna-replication.html",
+      "harmClass": "context_bound_quantity",
+      "expected": "unsupported",
+      "claim": "After two generations in 14N, all of the DNA appeared only in a single intermediate band.",
+      "evidenceQuotes": [
+        "The DNA harvested from cells grown for two generations in 14N formed two bands: one DNA band was at the intermediate position between 15N and 14N, and the other corresponded to the band of 14N DNA."
+      ]
+    }
+  ]
+}

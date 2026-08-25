@@ -9,6 +9,16 @@ export { LiteLlmEmbeddingClient } from "./LiteLlmEmbeddingClient";
 export { createNeuralClients, resolveNeuralClientBaseOptions } from "./neuralClients";
 export type { NeuralClientBaseOptions, NeuralClients } from "./neuralClients";
 export {
+  modelAssignmentIdentity,
+  modelRoutingBehaviorIdentity,
+  readLitellmProxyConfig
+} from "./litellmProxyConfig";
+export type {
+  LitellmProxyConfig,
+  ModelAssignmentIdentity,
+  ModelRoutingBehaviorIdentity
+} from "./litellmProxyConfig";
+export {
   LiteLlmNodeEmbeddingAdapter,
   NODE_EMBEDDING_MODEL,
   GENERATED_NODE_JUDGE_MODEL,
@@ -66,6 +76,8 @@ export {
   studyItemBlueprintValidator,
   matchingSchema,
   matchingValidator,
+  sourceMaterialClaimSupportSchema,
+  sourceMaterialClaimSupportValidator,
   conceptLessonRedundancyJudgmentSchema,
   conceptLessonRedundancyJudgmentValidator,
   discoveryCoverageAuditSchema,
@@ -81,6 +93,10 @@ export {
   createScaffoldContentCongruencePort,
   scaffoldContentCongruenceDescriptor
 } from "./scaffoldContentCongruenceAdapters";
+export {
+  createSourceMaterialClaimSupportVerificationPort,
+  sourceMaterialClaimSupportDescriptor
+} from "./sourceMaterialClaimSupportAdapters";
 export {
   createStudyItemBlueprintPort,
   createStudyItemGenerationPort,

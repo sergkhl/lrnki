@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
+import { evidenceQuoteMatches } from "@lrnki/domain-core";
 import { HtmlStructuredDocumentParser } from "./HtmlStructuredDocumentParser";
 import { MarkdownStructuredDocumentParser } from "./MarkdownStructuredDocumentParser";
 import { StructuredDocumentParserRegistry } from "./StructuredDocumentParserRegistry";
@@ -72,4 +73,52 @@ test("the harbor diagnostic models one prerequisite completed by a second Curate
   const supplement = readFileSync(path.join(repoRoot, harbor[1].path), "utf8");
   assert.match(core, /does not define how tide margin is\s+calculated/i);
   assert.match(supplement, /Tide margin<\/strong> is the predicted minimum water depth/i);
+});
+
+test("the tracked source-support matrix preserves the fixed diagnostics and real-source controls", async () => {
+  const matrix = JSON.parse(readFileSync(
+    path.join(repoRoot, "fixtures/source-material-claim-support-qualification.json"),
+    "utf8"
+  )) as {
+    drawsPerCase: number;
+    maximumFalseAcceptances: number;
+    maximumFalseRejectionRate: number;
+    sources: Array<{ path: string; contentType: string; sourceClass: string }>;
+    cases: Array<{ id: string; source: string; harmClass: string; expected: string; evidenceQuotes: string[] }>;
+  };
+  assert.equal(matrix.drawsPerCase, 3);
+  assert.equal(matrix.maximumFalseAcceptances, 0);
+  assert.equal(matrix.maximumFalseRejectionRate, 0.25);
+  assert.equal(matrix.sources.length, 6);
+  assert.equal(matrix.cases.length, 43);
+  assert.equal(new Set(matrix.cases.map((entry) => entry.id)).size, 43);
+  assert.equal(matrix.cases.filter((entry) => entry.expected === "supported").length, 19);
+  assert.equal(matrix.cases.filter((entry) => entry.expected === "unsupported").length, 24);
+  assert.deepEqual(
+    [...new Set(matrix.cases.map((entry) => entry.harmClass))].sort(),
+    ["carrier_referent_swap", "context_bound_quantity", "contradiction", "omitted_material_qualifier", "supported_claim"]
+  );
+
+  const sourceByPath = new Map(matrix.sources.map((source) => [source.path, source] as const));
+  for (const source of matrix.sources) {
+    const bytes = new Uint8Array(readFileSync(path.join(repoRoot, source.path)));
+    const document = await parsers.parserFor(source.contentType).parse({
+      sourceResourceId: source.path,
+      bytes,
+      contentType: source.contentType
+    });
+    for (const testCase of matrix.cases.filter((entry) => entry.source === source.path)) {
+      assert.ok(testCase.evidenceQuotes.length > 0, `${testCase.id} must retain evidence`);
+      for (const evidenceQuote of testCase.evidenceQuotes) {
+        assert.equal(
+          document.blocks.filter((block) => evidenceQuoteMatches(block.text, evidenceQuote)).length,
+          1,
+          `${testCase.id} evidence must resolve to exactly one native-parser block in ${source.path}`
+        );
+      }
+    }
+  }
+  assert.ok(matrix.cases.every((entry) => sourceByPath.has(entry.source)));
+  assert.ok(matrix.sources.some((source) => source.sourceClass === "project_diagnostic"));
+  assert.ok(matrix.sources.some((source) => source.sourceClass === "held_out_real_source"));
 });

@@ -656,6 +656,18 @@ export const answerKeyVerificationValidator = z.object({
 
 export const answerKeyVerificationSchema: JsonSchema = toForcedToolSchema(answerKeyVerificationValidator);
 
+// --- Source Material Claim Support: submit_source_material_claim_support --------
+// One exact application-projected learner-visible claim against its admitted source evidence.
+// The deliberately flat result keeps the forced-tool decoder contract narrow: evidence cardinality
+// belongs to the input prompt, while one disposition and one reason settle this one claim.
+
+export const sourceMaterialClaimSupportValidator = z.object({
+  disposition: z.enum(["supported", "unsupported", "unclear"]).describe("'supported' only when the supplied source evidence entails every material part of the exact claim, including scope, quantities, actors, referents, conditions, negation, and ordering. 'unsupported' when any material part is absent, contradicted, swapped, or changed. 'unclear' only when the evidence itself is genuinely ambiguous."),
+  reason: z.string().min(1).describe("One terse evidence-grounded reason identifying the decisive supported, missing, contradicted, swapped, or ambiguous material part.")
+}).strict();
+
+export const sourceMaterialClaimSupportSchema: JsonSchema = toForcedToolSchema(sourceMaterialClaimSupportValidator);
+
 // --- Matching Assignment Verification: submit_matching_assignment_verification
 // Cross-family semantic judgment over the FULL N×N grid of one guarded matching item, after the
 // deterministic guard passes. It answers, per (prompt, match) cell, whether that match is a
@@ -828,6 +840,7 @@ export const toolValidators = [
   matchingValidator,
   impostorValidator,
   answerKeyVerificationValidator,
+  sourceMaterialClaimSupportValidator,
   matchingAssignmentVerificationValidator,
   conceptLessonRedundancyJudgmentValidator,
   conceptLessonValidator

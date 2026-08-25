@@ -1928,6 +1928,10 @@ export const STAGE_TAGS = {
   // one prompt file mean two Neural Stage Descriptors (ADR-0034).
   optionSelectKeyVerification: "option-select-key-verification",
   impostorKeyVerification: "impostor-key-verification",
+  // Precision-first source-backed learner-asset support settlement. This stage asks only whether
+  // one application-projected material claim is fully supported by its admitted source evidence;
+  // answer truth, distractor invalidity, uniqueness, and citation honesty remain separate.
+  sourceMaterialClaimSupport: "source-material-claim-support",
   // Matching Assignment Verification (plan 2026-08-07-001 D5/D12). A THIRD verification
   // bracket, separate from the two above because it asks a different question (fit across the
   // pair set, not per-candidate claim truth) from its own prompt file — so it is its own

@@ -31,6 +31,7 @@ import { impostorKeyVerificationDescriptor, matchingAssignmentVerificationDescri
 import { scaffoldContentGenerationDescriptor, scaffoldOutlineGenerationDescriptor } from "./learnerScaffoldGenerationAdapters";
 import { scaffoldContentCongruenceDescriptor } from "./scaffoldContentCongruenceAdapters";
 import { discoveryCoverageAuditDescriptor } from "./discoveryCoverageAuditAdapters";
+import { sourceMaterialClaimSupportDescriptor } from "./sourceMaterialClaimSupportAdapters";
 import { operationConfigHash } from "./operationConfigHash";
 import { withModelOverride, type AnyNeuralStageDescriptor } from "./forcedToolStage";
 
@@ -157,7 +158,8 @@ export type NeuralOperationName = keyof typeof neuralOperationRegistry;
 // `scaffold-content-congruence` is NOT here — its descriptor genuinely runs inside the scaffold
 // operation (the re-pick) and is registered there; the standing audit merely reuses it.
 export const measurementNeuralStageDescriptors: readonly AnyNeuralStageDescriptor[] = [
-  discoveryCoverageAuditDescriptor as AnyNeuralStageDescriptor
+  discoveryCoverageAuditDescriptor as AnyNeuralStageDescriptor,
+  sourceMaterialClaimSupportDescriptor as AnyNeuralStageDescriptor
 ];
 
 // Deduplicated (by stage config identity) inventory of every registered runtime descriptor, for

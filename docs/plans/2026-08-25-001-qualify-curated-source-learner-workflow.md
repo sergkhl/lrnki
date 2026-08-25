@@ -7,13 +7,13 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0–U4 complete; U5 admission mechanics complete, live gates next
+**Status:** In progress — U0–U4 complete; U5 mechanics and source-support gate complete, external live gate next
 
-**NEXT:** Complete U5's live gates. Qualify one source-support Model Assignment through the fixed
-diagnostic matrix, then run one fresh external Curated Source operation through lesson and option
-admission with payload-versus-evidence inspection. Do not admit on abstention, reuse U4's rejected
-local verifier, or proceed to U6 until the exact production consumers pass without a material false
-acceptance.
+**NEXT:** Activate the qualified source-support port in the Study Item Bank composition, operation
+identity, and timeline, then run one fresh external Curated Source operation through lesson and
+option admission with payload-versus-evidence inspection. Do not admit on abstention, widen the
+provider route, reuse U4's rejected local verifier, or proceed to U6 until the exact production
+consumers pass without a material false acceptance.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
 Curated Sources and automatically admits only source-backed learner assets. Anchor-less Synthetic
@@ -519,10 +519,10 @@ The plan is complete only when all of the following are true:
   calls, and inspection-only candidates. Null-version synthetic generation remains mechanically
   unchanged and production-held by U1.
 - Both production roots must now supply exact source evidence and the Concept Lesson redundancy
-  judge; the kg-worker's previously omitted judge is wired. The support verifier stays deliberately
-  absent after U4's rejection, so no Model Assignment or route changed. A qualification wrapper,
-  rather than citation styling, proves semantic admission; an accepted supported paraphrase may
-  remain honestly `generated` and uncited.
+  judge; the kg-worker's previously omitted judge is wired. The qualified support port is not yet
+  bound into either root, so no operation identity changed. A qualification wrapper, rather than
+  citation styling, proves semantic admission; a supported paraphrase may remain honestly
+  `generated` and uncited.
 - **Option-admission batch:** guarded source candidates now cross one strict owner that first
   requires source grounding plus a source-cited key, then accepted support for the exact
   question/key and explanation, then affirmative key truth, falsity of every distractor for that
@@ -540,6 +540,18 @@ The plan is complete only when all of the following are true:
   exposed four obsolete expectations that uncited or LLM-grounded content on a non-null source graph
   remained playable; they were corrected to the accepted U1/U5 inspection-only boundary. That
   excluded run is not evidence.
+- **Source-support qualification batch:** the U4 matrix is now a tracked 43-case fixture whose 51
+  quotes resolve uniquely through native parsers to complete blocks. The exact production port uses
+  one strict flat forced tool and the new `kg-source-material-support-verifier` alias: DeepSeek V4
+  Flash 0731, DeepInfra FP8 only, medium reasoning, temperature 0/seed 7, and no fallback.
+- All 129 repeated live draws passed: 57/57 supported controls, 72/72 safe rejections, zero false
+  acceptances, false rejections, unclear results, or unavailable calls. This includes three correct
+  rejections of the held-out DNA carrier/referent swap that killed MiniCheck. LiteLLM attributed all
+  129 calls to DeepInfra: 150,868 tokens and $0.00853934. The assignment is qualified for this one
+  harm class but remains unactivated until the fresh external exact-consumer gate passes.
+- The qualification batch also passed 848 application, 39 domain, 13 ingestion, 196 LiteLLM, and
+  eight worker tests; all 11 workspace typechecks; targeted ESLint with one unchanged warning; and
+  tracked/untracked whitespace plus machine-specific-data checks. No database gate was implicated.
 
 #### Real-use quality evaluation
 
@@ -563,21 +575,18 @@ The plan is complete only when all of the following are true:
   48 explicit support-verifier-not-activated decisions. All 31 candidates were byte-for-byte
   preserved, all 31 became explicit rejection, and both source-support and answer-key calls stayed
   zero. The 26 matching and 32 impostor rows remained unchanged and inspection-only.
-- **Remaining caveats:** no source-support verifier is qualified, so this proves safe refusal only.
-  Both inspections reused prior external artifacts rather than a fresh generation; U5 still needs
-  its fixed diagnostic kill gate and one fresh external Curated Source operation.
-- **Safe to continue downstream:** yes, to U5's source-support qualification and live gates only.
+- **Remaining caveats:** these inspections prove safe refusal only and reused prior external
+  artifacts. The separately qualified source-support assignment has not yet run through either
+  production consumer; U5 still needs one fresh external Curated Source operation.
+- **Safe to continue downstream:** yes, to U5's production activation and fresh external gate only.
 
 ### Open findings
 
-- No local source-support verifier is activated. U4 rejected its only permitted candidate for both
-  one material false acceptance and broken LiteLLM success logging; do not rerun it for luck or pick
-  a second local candidate in this plan. Lesson and option settlement preserve raw candidates and
-  fail closed; a separately qualified production source-support assignment is still required.
-- U3 proves lossless projection, exact evidence resolution, independent settlement, and report
-  mechanics only. Lesson and option admission consume accepted decisions in deterministic positive
-  and negative controls, but production has no activated support verifier. Diagnostic and fresh
-  external Curated Source usefulness gates remain mandatory.
+- U4's local verifier remains rejected for one material false acceptance and broken LiteLLM success
+  logging; do not rerun it or pick a second local candidate. The separately qualified DeepSeek
+  assignment remains unactivated until exact lesson/option consumers pass a fresh external source.
+- Projection, settlement, and the repeated diagnostic gate are qualified. They do not establish
+  generated-asset usefulness; the fresh external Curated Source gate remains mandatory.
 - Matching and impostor remain preserved but unqualified. They do not satisfy readiness in this plan;
   Source Expedition snapshots now exclude them structurally. A future plan may qualify them
   independently after the option-select Source Expedition works.

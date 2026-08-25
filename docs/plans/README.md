@@ -12,9 +12,9 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-25-001 — Qualify the Curated-Source Learner Workflow](./2026-08-25-001-qualify-curated-source-learner-workflow.md)
-   — **In progress; U0–U4 complete and U5 admission mechanics complete, live gates next.** Raw lesson
-   and option candidates remain inspectable while only fully accepted material receives qualified
-   identity; matching/impostor remain preserved but structurally excluded. Qualify source support,
-   run the fixed diagnostic kill gate, and inspect one fresh external operation next.
+   — **In progress; U0–U4 complete and U5 mechanics/source-support gate complete, external live gate
+   next.** DeepSeek FP8/medium passed all 129 fixed-matrix draws; it remains unactivated while raw
+   candidates stay inspectable and matching/impostor stay excluded. Wire the qualified port through
+   exact production ownership and inspect one fresh external operation next.
 
 <!-- Hygiene and retention rules: AGENTS.md → Documentation workflow. -->

@@ -2,12 +2,13 @@
 
 ## TODO
 
-- **Curated-source learner workflow — in progress; U0–U4 complete and U5 admission mechanics
-  complete.** Follow
+- **Curated-source learner workflow — in progress; U0–U4 complete and U5 mechanics/source-support
+  gate complete.** Follow
   [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md). Raw lesson
   and option candidates survive while strict settlement admits neither abstention nor verifier
-  failure; matching/impostor remain inspectable but cannot enter Source Expedition identity. Qualify
-  source support and run U5's diagnostic plus fresh external live gates next.
+  failure; matching/impostor remain inspectable but cannot enter Source Expedition identity. The
+  DeepSeek FP8/medium assignment passed 129/129 fixed-matrix draws; activate it through exact
+  production ownership and run U5's fresh external live gate next.
 
 ## COMPLETED
 

@@ -14,6 +14,7 @@ const ROLE = "kg-grounding-generation";
 const MODEL = "openrouter/deepseek/deepseek-v4-flash-0731";
 const PRIMARY = MODEL;
 const BACKUP = "openrouter/deepseek/deepseek-v4-flash-0731-parasail-backup";
+const SOURCE_SUPPORT = "openrouter/deepseek/deepseek-v4-flash-0731-source-support";
 
 function deployment(input: {
   name: string;
@@ -182,7 +183,11 @@ test("neutral DeepSeek generation aliases are primary-only while the source judg
     .filter((deployment) => deployment.model === MODEL)
     .map((deployment) => deployment.modelName)
     .sort();
-  assert.deepEqual(deepSeekGroups, [BACKUP, PRIMARY].sort(), "one primary and one backup own this revision");
+  assert.deepEqual(
+    deepSeekGroups,
+    [BACKUP, PRIMARY, SOURCE_SUPPORT].sort(),
+    "the reasoning-off primary/backup and separate source-support assignment own this revision"
+  );
 
   const identities = aliases.map((alias) => modelAssignmentIdentity(alias, proxy));
   assert.deepEqual(identities[1], identities[0]);
@@ -217,4 +222,29 @@ test("neutral DeepSeek generation aliases are primary-only while the source judg
   assert.equal(sourceJudge.primary.modelGroup, PRIMARY);
   assert.deepEqual(sourceJudge.fallbacks.map((fallback) => fallback.modelGroup), [BACKUP]);
   assert.deepEqual(sourceJudge.fallbacks[0]?.deployments[0]?.behavior, expectedBehavior("parasail/fp8"));
+
+  const supportRoute = modelRoutingBehaviorIdentity("kg-source-material-support-verifier", proxy);
+  assert.equal(supportRoute.primary.modelGroup, SOURCE_SUPPORT);
+  assert.deepEqual(supportRoute.fallbacks, []);
+  assert.deepEqual(supportRoute.primary.deployments[0]?.behavior, {
+    litellmParams: {
+      model: MODEL,
+      extra_body: {
+        reasoning: { effort: "medium" },
+        provider: {
+          require_parameters: true,
+          quantizations: ["fp8"],
+          only: ["deepinfra/fp8"],
+          order: ["deepinfra/fp8"],
+          allow_fallbacks: false
+        }
+      }
+    },
+    modelInfo: { mode: "chat", max_input_tokens: 1048576 }
+  });
+  assert.notDeepEqual(
+    modelAssignmentIdentity("kg-source-material-support-verifier", proxy),
+    modelAssignmentIdentity("kg-independent-judge", proxy),
+    "reasoning effort is a distinct Model Assignment"
+  );
 });
