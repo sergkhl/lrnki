@@ -461,3 +461,7 @@ The plan is complete only when all of the following are true:
   unsupported assets absent and does not block exact-source deterministic work.
 - Matching and impostor remain preserved but unqualified. They do not satisfy readiness in this plan;
   a future plan may qualify them independently after the option-select Source Expedition works.
+- U5 must make Concept Lesson redundancy policy structural across both production roots. The
+  kg-worker currently constructs but does not pass `conceptLessonRedundancyJudge`, while learner
+  generation passes it and `generateStudyItemBank` makes it optional; source-backed qualification
+  cannot permit those compositions to diverge.

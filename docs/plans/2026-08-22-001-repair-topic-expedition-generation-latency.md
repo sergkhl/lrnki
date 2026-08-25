@@ -7,11 +7,14 @@ execution: code
 
 # Restore Topic Expedition Generation to Seven Minutes
 
-**Status:** Blocked — U0–U2 complete; U3 remains `FIX_FIRST`; U4 gated
+**Status:** Closed — U0–U2 retained; failed calibration consolidated; synthetic work paused
 
-**Decision state:** Locked. The accepted problem framing and stage-profile deletion test remain in
-[Candidate 2 of the architecture-deepening brainstorm](../brainstorms/2026-08-19-001-architecture-deepening-review.md#candidate-2--give-topic-expedition-generation-one-application-owned-stage-profile).
-This plan owns only the active implementation design and its validation record.
+**NEXT:** No implementation. Preserve the detailed record in this commit, then delete this closed
+plan in the required plan-deletion commit.
+
+**Decision state:** Closed. The implemented stage-profile mechanics are source-owned by
+[`topicExpeditionStageProfile.ts`](../../packages/application/src/topicExpeditionStageProfile.ts),
+and current outcome/status is consolidated in [TODO](./TODO.md).
 
 ## Goal capsule
 
@@ -454,18 +457,18 @@ seven-minute threshold does not apply to this contention soak.
   deployed, browser, native, physical-device, successful latency, or persisted-artifact quality
   evidence.
 
+### Closure consolidation — 2026-08-25 — complete
+
+- The bounded verification pipeline and nineteen-stage profile remain implemented; failed
+  calibration arms stay non-qualifying history while Synthetic Topic Generation is paused.
+- README/TODO and source/config authority were checked before closure. No source, model, route,
+  database, runtime, or evidence-class change occurred; plan deletion is the only next step.
+
 ### Open findings
 
-- U3 remains `FIX_FIRST`; U4 is gated because no execution width is frozen. Do not run the
-  contention soak or consolidate this plan as completed without a qualifying single-run pass.
-- The problem class is now researched, but the conventional repair changes Grounding Generation,
-  which this locked plan excludes, and the bounded prompt/schema and pre-draft trials did not clear
-  the current admission contract. The
-  [operation-neutral DeepSeek Grounding plan](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md)
-  is itself on hold behind the owner-gated Grounding assignment decision in
-  [BLOCKERS.md](./BLOCKERS.md); no latency unit is actionable. Do not retry the rejected variants or hide
-  the defect with a weaker judge, lower quorum, unqualified model swap, lexical veto, or regenerated
-  draft.
-- A future passing run must provide both the successful end-to-end latency baseline and direct
-  persisted-artifact inspection this calibration could not produce. Failed enrichment durations
-  are lower bounds and quality evidence, never atomic-readiness claims.
+- None remain in this closed plan. The bounded verification pipeline and exact nineteen-stage
+  profile stay implemented; all failed calibration arms remain non-qualifying history and must not
+  be rerun while Synthetic Topic Generation is paused.
+- Durable current status lives in [TODO](./TODO.md), source-owned stage/admission modules, and the
+  [curated-source successor](./2026-08-25-001-qualify-curated-source-learner-workflow.md). Delete
+  this plan next.

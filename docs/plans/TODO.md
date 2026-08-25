@@ -11,31 +11,6 @@
   Synthetic Topic Generation, LLM-grounded learner nodes, and generated Support Steps unavailable
   without deleting their implementations. Implement only the single availability-policy unit next.
 
-- **Same-call Grounding identity-scope audit — terminally rejected; closing record.** The first fixed
-  Pyruvate draw narrowed identity to the PDH/NAD+ mechanism despite a strict DeepInfra FP8 contract
-  pass. Do not rerun it; consolidate and delete
-  [the experiment](./2026-08-24-001-test-grounding-identity-scope-audit.md) after the successor's
-  detailed U0 record is committed.
-
-- **Operation-neutral DeepSeek Grounding — superseded for execution; closing record.** U0–U3 and U5
-  are complete; U4 remains `FIX_FIRST`. The accepted source-backed policy holds the affected
-  source-less consumers out rather than selecting another assignment. Preserve the implementation,
-  then consolidate and delete [Plan 003](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md).
-
-- **Source-less Grounding context and answer correlation — superseded for execution; closing
-  record.** U0–U1 and their committed interface changes remain. Do not resume the shared-MiMo
-  preflight; consolidate and delete
-  [the predecessor](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md) without
-  deleting its implementation.
-
-- **Topic Expedition generation latency — superseded for execution; closing record.** U3 remains
-  `FIX_FIRST` in [the latency record](./2026-08-22-001-repair-topic-expedition-generation-latency.md).
-  The bounded admission pipeline and honest 19-stage Journal profile are complete, but equal widths
-  8, 12, and 16 all exceeded seven minutes during enrichment and every settled attempt rejected
-  over-broad Grounding Bundles. Production-model prompt/schema and pre-draft trials did not clear
-  the unchanged admission contract and were discarded. Keep width four and the implementation;
-  consolidate and delete the plan while Synthetic Topic Generation remains paused.
-
 ## COMPLETED
 
 - **Anchor-less generation is paused and the source-backed diagnostic is handed back honestly
@@ -48,13 +23,18 @@
   Detailed record: commits `a19baa0`, `60bb3f5`, `ccd3512`, `08de20d`, `8249d1d`, `02798fe`, and
   `e5e147c`.
 
-- **Topic Expedition generation is scoped to DeepSeek and its stage decisions are frozen
-  (2026-08-23).** One composition-owned routing value moves the nine direct generators without
-  repointing shared consumers; exact aliases, assignments, fallbacks, and operation identities are
-  source/config owned. Local provider recovery passed under natural load. Mixed-domain inspection
-  kept seventeen stages and handed only Grounding Generation plus Verification Answering to the
-  [implemented predecessor](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md).
-  Detailed record: commits `54329cf`, `8efc7e7`, `3938f19`, `8adfa00`, `f3e2a79`, and `8bf3e3a`.
+- **Synthetic Topic mechanics are retained and honestly held out (2026-08-22–24).** One shared
+  admission module owns bounded role-specific verification, identity context, exact-key answer
+  correlation, and atomic failure; one
+  [19-stage profile](../../packages/application/src/topicExpeditionStageProfile.ts) owns producer and
+  Journal progress. Equal widths 8, 12, and 16 all exceeded 420 seconds before a usable bank and
+  every settled attempt rejected over-broad Grounding. MiMo's first exact-key preflight returned
+  malformed tool JSON; the replacement DeepSeek composition passed route contracts but failed its
+  first Topic scope gate; the terminal same-call audit repeated a material identity narrowing on its
+  first draw. No failed arm is to be rerun for luck. Exact current aliases and assignments remain
+  source-owned by [`litellm/config.yaml`](../../litellm/config.yaml). Detailed implementation record:
+  commits `54329cf`, `8efc7e7`, `3938f19`, `8adfa00`, `f3e2a79`, `8bf3e3a`, `af957ee`, `b649d06`,
+  `d59856f`, `61da45e`, `16ee119`, and `75373c1`.
 
 - **Concept Canonicalization is explicit and replayable (2026-08-23).** An immutable inspected
   artifact now separates neural identity judgment from LLM-free Graph-Version Build, and the
@@ -121,5 +101,5 @@
 - Authority: the pause, repository mechanics, repaired source-backed graph, and exact projection are
   qualified only at their exercised local layers. The learner bank is not useful/adoptable evidence;
   no deployment, production write, browser/native, simulator/emulator, physical-device, or release
-  claim was made. The exact next owner action and drain criterion are in
-  [BLOCKERS](./BLOCKERS.md).
+  claim was made. The accepted next work and drain criteria are in the
+  [curated-source learner plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md).

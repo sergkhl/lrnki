@@ -7,7 +7,10 @@ execution: code
 
 # Deepen Source-less Grounding Context and Answer Correlation
 
-**Status:** On hold — U0–U1 complete; remaining qualification delegated to execution-order plan 003
+**Status:** Closed — U0–U1 retained; superseded qualification matrix abandoned
+
+**NEXT:** No implementation. Preserve the detailed record in this commit, then delete this closed
+plan in the required plan-deletion commit.
 
 **Decision state:** U0–U1 are locked and implemented. The owner-approved
 [operation-neutral DeepSeek Grounding plan](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md)
@@ -356,16 +359,17 @@ baseline and soak.
   deployment, browser, native, physical-device, latency, or release action occurred. U0–U1 remain
   committed local evidence, but neither U2 nor plan completion passed.
 
+### Closure consolidation — 2026-08-25 — complete
+
+- Batch identity context and exact-key answer correlation remain implemented, while the superseded
+  shared-MiMo matrix is abandoned under the accepted source-backed policy.
+- README/TODO and source/config authority were checked before closure. No source, model, route,
+  database, runtime, or evidence-class change occurred; plan deletion is the only next step.
+
 ### Open findings
 
-- **ON HOLD:** the
-  [same-call audit experiment](./2026-08-24-001-test-grounding-identity-scope-audit.md) was rejected,
-  so the Grounding Generation assignment decision is owner-gated under
-  [BLOCKERS.md](./BLOCKERS.md). Plan 003 remains the final qualification owner after a separately
-  qualified successor; do not resume this plan's superseded U2 matrix.
-- Revision `61da45e` failed its first qualifying shared-MiMo observation with malformed tool JSON.
-  That result remains valid for the old candidate but does not prove persistent MiMo incapability or
-  identity-context causation. The owner-approved topology retires MiMo Grounding rather than
-  claiming to repair it.
-- The latency plan remains blocked until the successor produces one successful, fully inspected
-  quality baseline. Do not restart width calibration from the current all-failed operations.
+- None remain in this closed plan. Batch identity context and exact-key answer correlation stay
+  implemented; its superseded shared-MiMo qualification matrix must not resume.
+- Durable current status lives in [TODO](./TODO.md) and the
+  [curated-source successor](./2026-08-25-001-qualify-curated-source-learner-workflow.md). Delete
+  this plan next.

@@ -7,7 +7,10 @@ execution: code
 
 # Test a Same-Call Grounding Identity-Scope Audit
 
-**Status:** Blocked — U0–U2 and U4 complete; candidate rejected; U3 skipped; owner decision required
+**Status:** Closed — terminally rejected; findings consolidated; deletion is next
+
+**NEXT:** No implementation. Preserve the detailed record in this commit, then delete this closed
+plan in the required plan-deletion commit.
 
 **Decision state:** Authorized by the owner on 2026-08-24 as one contract-only experiment ahead of
 [Plan 003](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md). The candidate may change
@@ -486,12 +489,17 @@ Implementation units are exclusive and must run in order. This plan declares no 
   in this plan chain until the owner chooses a new Grounding Generation Model Assignment or abandons
   the affected Source-less Grounding consumer work.
 
+### Closure consolidation — 2026-08-25 — complete
+
+- The accepted curated-source successor holds the affected source-less path out, so this rejected
+  candidate has no remaining implementation unit. TODO retains the terminal semantic finding.
+- README/TODO and the retained source/config owners were checked before closure. No source, model,
+  route, database, runtime, or evidence-class change occurred; plan deletion is the only next step.
+
 ### Open findings
 
-- **BLOCKED:** the owner must choose the next Grounding Generation Model Assignment or explicitly
-  abandon the affected Source-less Grounding consumer work, as recorded in
-  [BLOCKERS.md](./BLOCKERS.md). No unit in this plan is actionable before that decision.
-- The candidate is terminally rejected; do not resume its remaining eight direct draws or use its
-  strict-contract success as semantic, admission, persistence, or consumer evidence.
-- Plan 003 and the latency plan remain on hold behind the owner Model Assignment decision and a new
-  successful, fully inspected Grounding baseline respectively.
+- None remain in this closed experiment. The candidate is terminally rejected and must not be
+  rerun; the accepted source-backed policy holds the affected source-less learner path out.
+- Durable current status lives in [TODO](./TODO.md) and the
+  [curated-source successor](./2026-08-25-001-qualify-curated-source-learner-workflow.md). Exact
+  model routing and operation identity remain source/config owned. Delete this plan next.

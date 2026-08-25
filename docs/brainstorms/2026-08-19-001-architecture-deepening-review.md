@@ -6,8 +6,9 @@ date: 2026-08-19
 
 # Architecture deepening review
 
-**Status:** Candidates 2–7 remain shaping findings. Their original numbering is retained for stable
-references.
+**Status:** Candidate 3's Source Expedition adoption slice is accepted by the active curated-source
+plan. Candidates 4–7 remain shaping findings; original numbering is retained for stable references.
+Candidate 2 is implemented and its durable mechanics are source-owned.
 
 ## Review question
 
@@ -24,115 +25,18 @@ Historical architecture reviews were checked only to avoid proposing work that h
 
 | Original rank | Candidate | Strength | Why it made the cut |
 | ---: | --- | --- | --- |
-| 2 | Give Topic Expedition generation one application-owned stage profile | **Strong — top remaining recommendation** | A hand-maintained second representation has already omitted three running stages and reports false indeterminate progress. |
-| 3 | Move Topic Expedition commands out of the Hono adapter | **Strong** | Presentation facts are accepted as authority, one transport field is unused, and successful command policy has no application test surface. |
-| 4 | Own navigation memory once over raw platform storage adapters | **Strong** | Native and web files duplicate policy, and leaked identity construction has already caused a collision defect. |
+| 3 | Move Topic Expedition commands out of the Hono adapter | **Accepted for Source Expedition adoption** | The active plan moves authoritative source candidate qualification/adoption behind one application seam; paused synthetic start/retry are not reopened. |
+| 4 | Own navigation memory once over raw platform storage adapters | **Strong — top unplanned recommendation** | Native and web files duplicate policy, and leaked identity construction has already caused a collision defect. |
 | 5 | Deepen the Learner App's Support Path interaction lifecycle | **Worth exploring** | Important sequencing and projected-state replacement are spread across two entry paths, rendering modules, and transport-shaped wrappers. |
 | 6 | Deepen persisted Study Item and Concept Lesson loading | **Worth exploring** | Raw row shapes and current-versus-pinned selection policy leak across three Postgres implementations. |
 | 7 | Narrow the Study Session reader's construction seam | **Worth exploring** | The implementation is deep, but its interface accepts broad write-capable ports and optional wiring that changes projection completeness. |
 
-## Candidate 2 — Give Topic Expedition generation one application-owned stage profile
-
-**Recommendation strength:** Accepted — implementation tracked by the
-[Topic Expedition generation latency plan](../plans/2026-08-22-001-repair-topic-expedition-generation-latency.md)
-
-### Files
-
-- [`runSyntheticGeneration.ts`](../../packages/application/src/runSyntheticGeneration.ts)
-- [`completeDerivedGraphLayer.ts`](../../packages/application/src/completeDerivedGraphLayer.ts)
-- [`generateStudyItemBank.ts`](../../packages/application/src/generateStudyItemBank.ts)
-- [`topicExpeditionStageProfile.ts`](../../packages/application/src/topicExpeditionStageProfile.ts)
-- [`operationTimelineCatalog.ts`](../../packages/application/src/operationTimelineCatalog.ts)
-- [`expeditionJournal.ts`](../../packages/application/src/expeditionJournal.ts), especially
-  `generationFacts`
-- [`expeditionJournal.test.ts`](../../packages/application/src/expeditionJournal.test.ts)
-- [`configHashes.ts`](../../packages/infrastructure-litellm/src/configHashes.ts) and
-  [`configHashes.test.ts`](../../packages/infrastructure-litellm/src/configHashes.test.ts)
-
-### Problem
-
-Topic Expedition progress spans Synthetic Topic Generation on the `enrichment` timeline and Study
-Item Bank generation on the `study_items` timeline. The broad operation catalog cannot describe that
-flow by itself because its `enrichment` entry also contains Graph Enrichment-only stages. The
-Expedition Journal therefore carries a second, flow-specific list.
-
-That list has already drifted. Synthetic Topic Generation executes these stages, but the Journal's
-expected plan omits them:
-
-- `grounding-verification-question-planning`
-- `grounding-verification-answering`
-- `grounding-factuality-revision`
-
-While any omitted stage is running, `generationFacts` treats it as unknown and returns indeterminate
-progress. Completed omitted stages do not advance the count, while the Study Item Bank offset still
-assumes the older six-stage synthetic phase.
-
-The current test proves only that every manually listed stage belongs to the broad catalog. It does
-not prove that every stage actually used by Topic Expedition generation belongs to the flow-specific
-profile. Its hard-coded total restates the same incomplete representation. Repository history shows
-that the grounding-verification change updated orchestration, the broad catalog, neural descriptors,
-config hashing, and tests, but not the Journal list.
-
-### Deletion test
-
-Positive. Deleting the manual list does not remove the need for Topic Expedition-specific sequence
-knowledge; deriving from the broad catalog would include stages from the wrong flow. Deleting the
-Journal progress implementation would instead spread phase and progress interpretation back into
-learner-facing callers. The knowledge needs one application owner shared by producers and the
-finished Journal projection.
-
-### Solution direction
-
-Keep the Expedition Journal's finished interface, but put the Topic Expedition flow-specific stage
-profile and progress interpretation behind one in-process application module. Producers, Journal
-projection, and exactness tests should cross the same seam. No adapter is justified: this is
-deterministic in-process implementation, not a substitutable dependency.
-
-The infrastructure neural-descriptor registry remains the outward authority for model configuration
-and hashing. A mechanical exactness check may compare it with the application profile without making
-application code depend on infrastructure. The exact interface must represent conditional stages
-honestly; descriptor registration does not mean every successful run executes every optional stage.
-
-### Benefits and test surface
-
-- **Locality:** adding, removing, or conditionally routing a Topic Expedition stage changes one
-  application module.
-- **Leverage:** Synthetic Topic Generation, Study Item Bank generation, Journal progress, and their
-  tests share the same flow knowledge.
-- **Tests:** replace permissive subset coverage with an exact profile assertion, then exercise every
-  running stage through the finished Journal interface.
-- **Conditional behavior:** successful runs may still omit optional domain inference, activity-family
-  generation, or judgments while completing their phase correctly.
-
-### Before / after
-
-```mermaid
-flowchart LR
-  subgraph Before
-    Producer["generation implementations"] --> Timeline["operation timeline"]
-    HandList["Journal hand-maintained stage list"] --> Journal["Expedition Journal progress"]
-    Registry["infrastructure descriptor registry"] -. separate exact list .-> Hash["config identity"]
-  end
-
-  subgraph After
-    Profile["deep Topic Expedition stage-profile module"] --> Producer2["generation implementations"]
-    Profile --> Journal2["finished Expedition Journal progress"]
-    Profile --> Exact["exact flow tests"]
-    Registry2["infrastructure descriptor registry"] -. mechanical exactness check .-> Exact
-  end
-```
-
-### ADR fit
-
-This preserves the existing operation identities, strengthens the finished learner projection in
-[ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md), and closes the
-stage-registration/reporting drift guarded by
-[ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md). It does not reopen the
-already-shipped Expedition Journal architecture.
 
 ## Candidate 3 — Move Topic Expedition commands out of the Hono adapter
 
-**Recommendation strength:** Strong
+**Recommendation strength:** Accepted for the Source Expedition adoption slice — tracked by
+[plan U2](../plans/2026-08-25-001-qualify-curated-source-learner-workflow.md#u2--deep-source-expedition-qualification-and-adoption).
+Synthetic Topic start/retry remain paused and outside that unit.
 
 ### Files
 
@@ -566,19 +470,6 @@ learner-projection ownership in
 implementation as an adapter under
 [ADR-0035](../adr/0035-separate-learner-app-static-spa-typed-api.md).
 
-## Concrete defect uncovered that does not justify another module
-
-The kg-worker constructs `conceptLessonRedundancyJudge` in
-[`knowledgeGraphWorker.ts`](../../apps/kg-worker/src/knowledgeGraphWorker.ts), but its
-`generateStudyItemBank` call does not pass that adapter. The learner-side composition does pass it in
-[`learnerGeneration.ts`](../../apps/learner-api/src/learnerGeneration.ts), while
-[`generateStudyItemBank.ts`](../../packages/application/src/generateStudyItemBank.ts) makes the
-dependency optional. The two production roots therefore apply different Concept Lesson redundancy
-policy even though [ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md) owns one policy.
-
-This is a correctness defect and evidence against optional policy dependencies, but it does not pass
-the deletion test for a new module. The bounded correction is to make policy completeness structural
-and wire the existing adapter; it should not wait for an architecture candidate to be selected.
 
 ## Tempting false positives rejected
 
@@ -603,12 +494,10 @@ and wire the existing adapter; it should not wait for an architecture candidate 
 
 ## Top remaining recommendation
 
-Start with candidate 2. The missing verification stages already demonstrate that Topic Expedition
-progress cannot safely depend on a hand-maintained partial list.
+Execute candidate 3's accepted Source Expedition slice through the active plan. Among work without a
+plan owner, candidate 4 is next: navigation-memory policy still spans two platform implementations.
 
 ## Open decisions
 
-1. For candidate 2, which stages are unconditional, conditional, or repeated in the Topic Expedition
-   profile?
-2. For candidate 5, which interaction transitions are genuinely shared and which close/open timings
+1. For candidate 5, which interaction transitions are genuinely shared and which close/open timings
    must remain inside rendering modules?

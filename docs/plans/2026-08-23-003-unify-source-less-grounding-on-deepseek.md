@@ -7,7 +7,10 @@ execution: code
 
 # Unify Source-less Node Generation and Grounding on DeepSeek
 
-**Status:** On hold — U0–U3 and U5 complete; U4 `FIX_FIRST`; Grounding assignment owner-gated
+**Status:** Closed — implemented mechanics retained; unqualified source-less consumers held out
+
+**NEXT:** No implementation. Preserve the detailed record in this commit, then delete this closed
+plan in the required plan-deletion commit.
 
 **Decision state:** Locked by owner decision on 2026-08-23. DeepSeek V4 Flash 0731 owns Grounding
 Generation for every Source-less Grounding Admission consumer. Preserving ADR-0023 makes the paired
@@ -595,12 +598,18 @@ direct preflight, successful retry, or HTTP 200 does not substitute for real-use
   validation upgrade, consolidation, plan deletion, or latency unblock occurred; repository health
   does not supersede the real-use `FIX_FIRST`.
 
+### Closure consolidation — 2026-08-25 — complete
+
+- The accepted curated-source successor retains this plan's implemented routing/admission mechanics
+  while holding every unqualified source-less learner consumer out. No U4 case remains actionable.
+- README/TODO and source/config authority were checked before closure. No source, model, route,
+  database, runtime, or evidence-class change occurred; plan deletion is the only next step.
+
 ### Open findings
 
-- **ON HOLD:** the same-call successor was rejected before activation. Under
-  [BLOCKERS.md](./BLOCKERS.md), the owner must select a new Grounding Generation Model Assignment or
-  abandon the work; no unit here is actionable before that decision and a qualified successor.
-- A future passing successor may count its first Topic evidence as this plan's first U4 fixture,
-  then resume remaining cases without repeating evidence. Do not tune or rerun the rejected candidate.
-- Latency remains blocked until a repaired candidate has one fully inspected successful baseline;
-  this plan does not claim or tune 420 seconds.
+- None remain in this closed plan. Its implemented routing/admission mechanics stay in source,
+  while every unqualified source-less learner consumer remains held out under the accepted policy.
+- Durable current status lives in [TODO](./TODO.md) and the
+  [curated-source successor](./2026-08-25-001-qualify-curated-source-learner-workflow.md). Exact
+  aliases, assignments, fallbacks, and operation identity remain source/config owned. Delete this
+  plan next.
