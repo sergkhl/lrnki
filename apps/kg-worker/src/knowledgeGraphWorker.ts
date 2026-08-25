@@ -217,9 +217,9 @@ function buildContext() {
     admissionLabelJudge: createAdmissionLabelJudgmentPort(deterministicClient),
     // Definition-Passage quality judge (ADR-0007 extension). Same independent
     // production judge (kg-independent-judge) and deterministic decoding; runs after
-    // the verbatim floor and drops hollow Definition Passages (bare name, heading,
-    // title, citation), routing a last-passage veto into the existing demotion with a
-    // distinct reason code.
+    // the verbatim floor and drops passages that do not define the named subject
+    // (wrong-subject definition, bare name, heading, title, citation), routing a
+    // last-passage veto into the existing demotion with a distinct reason code.
     definitionPassageQualityJudge: createDefinitionPassageQualityJudgmentPort(deterministicClient),
     // Graph Enrichment ports (ADR-0019 amended — whole-set ordering, plan U5). ONE
     // kg-prerequisite-ordering call per Declared Domain returns the directed prerequisite
@@ -253,8 +253,8 @@ function buildContext() {
     // Rescue-seam Definition-Passage quality judge (plan 2026-06-26-001 U3). The SAME
     // independent meaning judge (kg-independent-judge) and deterministic decoding as the
     // extraction-time core gate — no new alias — but tagged `rescue-definition-quality` so
-    // its spend joins the enrichment operation (ADR-0029). Drops hollow rescued optional
-    // definitions before they reach study items; fails closed = preserve.
+    // its spend joins the enrichment operation (ADR-0029). Drops wrong-subject or hollow
+    // rescued optional definitions before they reach study items; fails closed = preserve.
     rescuedDefinitionQualityJudge: createDefinitionPassageQualityJudgmentPort(deterministicClient, STAGE_TAGS.rescueDefinitionQuality),
     // The operation-neutral generated-node judge gates every DeepSeek prerequisite proposal before
     // source-less admission. Drop-only, fail-open-with-flag; the enabled minting path requires this

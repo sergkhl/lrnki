@@ -84,6 +84,30 @@ test("a genuinely defining rescued passage is kept as a definition passage", asy
   assert.deepEqual(kept.groundingPassages.map((p) => p.passageType), ["definition"]);
 });
 
+test("a wrong-subject rescued definition becomes one deduplicated mention", async () => {
+  const quote = "Output quantity is the input quantity minus the baseline quantity.";
+  const node = rescuedNode({
+    canonicalLabel: "Input quantity",
+    normalizedLabel: "input quantity",
+    groundingPassages: [defPassage(quote, "b1"), mentionPassage(quote, "b1")]
+  });
+  const judge: DefinitionPassageQualityJudgmentPort = {
+    model: "kg-independent-judge",
+    judgeDefinitions: async () => [{
+      establishesMeaning: false,
+      category: "defines_different_subject",
+      judgedSpan: quote,
+      rationale: "The passage defines output quantity and uses input quantity in its definiens."
+    }]
+  };
+
+  const { nodes, dispositions } = await applyRescuedDefinitionQualityJudge({ nodes: [node], judge });
+  const kept = nodes[0] as SourceMentionedEnrichmentNode;
+  assert.deepEqual(kept.groundingPassages.map((passage) => passage.passageType), ["mention"]);
+  assert.equal(kept.groundingPassages[0].evidenceQuote, quote);
+  assert.equal(dispositions[0].category, "defines_different_subject");
+});
+
 test("a judge transport failure keeps every passage and flags kept_judge_unavailable (fail closed = preserve)", async () => {
   const node = rescuedNode({
     groundingPassages: [defPassage("Ownership defines who frees memory.", "b1"), mentionPassage("Ownership again.", "b2")]

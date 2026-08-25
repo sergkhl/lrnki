@@ -10,10 +10,12 @@ Passages, selected Mention Passages, and only the typed evidence permitted by
 source location and must match their cited block, allowing only normalization that preserves the
 quoted text's meaning.
 
-Semantic judges may remove hollow definitions or unentailed typed evidence, but deterministic
-surface heuristics may not stand in for those judgments. A negative judgment must be grounded;
-transport or schema failure preserves otherwise valid evidence rather than manufacturing a semantic
-rejection.
+Semantic judges may remove passages that define a different subject, structurally hollow
+definitions, or unentailed typed evidence, but deterministic surface heuristics may not stand in
+for those judgments. Definition judgment binds the named Concept as the definiendum; merely using
+it inside another Concept's definiens is not a definition of it. A negative judgment must be
+grounded; transport or schema failure preserves otherwise valid evidence rather than manufacturing
+a semantic rejection.
 
 A core proposal left without a meaning-bearing verified definition is not published, although its
 successful evidence remains inspectable and may support the derived rescue path in

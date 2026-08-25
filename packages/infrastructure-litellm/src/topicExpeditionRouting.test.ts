@@ -326,7 +326,7 @@ test("only affected operation hashes change and Topic has twenty conceptual stag
     "default Synthetic changes with the Grounding audit contract"
   );
   assert.equal(studyItemBankConfigHash(), "study-item-bank-21e87c60d969");
-  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-928893987225");
+  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-99aeeb9577ac");
   assert.notEqual(
     graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG),
     "graph-enrichment-2af0ada6d7e6",
@@ -341,7 +341,7 @@ test("only affected operation hashes change and Topic has twenty conceptual stag
     "learner-scaffold-generation-7930b34c0fdb",
     "Scaffold changes with the Grounding audit contract"
   );
-  assert.equal(extractionConfigHash(), "source-extraction-5c5e8e7d6321");
+  assert.equal(extractionConfigHash(), "source-extraction-2b15b67d6238");
   assert.equal(
     conceptCanonicalizationConfigHash({
       mode: "semantic",

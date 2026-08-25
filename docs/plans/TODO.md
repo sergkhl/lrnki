@@ -2,11 +2,11 @@
 
 ## TODO
 
-- **Curated-source learner workflow — in progress; U0–U6 complete and U7 completion-source gaps
-  made explicit.** Follow
-  [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md). Register
-  the revised supplement that defines the two surviving missing prerequisites, inspect the extended
-  graph, then qualify/adopt/read it before repeating the representative external source.
+- **Curated-source learner workflow — in progress; U0–U6 complete and U7 term-definition binding
+  repaired.** Follow
+  [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md). Harden the
+  input/result equivalence boundary, then inspect and extend the graph from the fresh revised-source
+  run before qualification, automatic adoption/read, Support Path, and the external-source repeat.
 
 ## COMPLETED
 

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  ADMISSION_LABEL_NON_CONCEPT_POLICY,
   DEFAULT_ENRICHMENT_CONFIG,
   DEFAULT_CONCEPT_CANONICALIZATION_CONFIG,
   DEFAULT_SCAFFOLD_GENERATION_CONFIG,
@@ -72,6 +73,13 @@ test("Extraction identity includes the application-owned non-concept availabilit
     operationConfigHash(entry.configSeed, entry.descriptors),
     extractionConfigHash(),
     "prompt identity alone must not hide the fail-operation availability policy"
+  );
+  assert.notEqual(
+    operationConfigHash(entry.configSeed, entry.descriptors, {
+      admissionLabelNonConceptPolicy: ADMISSION_LABEL_NON_CONCEPT_POLICY
+    }),
+    extractionConfigHash(),
+    "prompt and label policy must not hide Definition Passage disposition behavior"
   );
 });
 
@@ -328,7 +336,7 @@ test("dropping any shared admission descriptor changes Graph Enrichment identity
 // same DeepSeek Provider Route, so an intentional route change re-baselines them together even
 // when their Model Assignment is preserved. Non-behavioral refactors must not perturb them.
 test("default operation config hashes are stable across the registry derivation", () => {
-  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-928893987225");
+  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-99aeeb9577ac");
   assert.equal(scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG), "learner-scaffold-generation-25c065547f8a");
   assert.equal(syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG), "synthetic-topic-generation-3286a5adf7a3");
 });

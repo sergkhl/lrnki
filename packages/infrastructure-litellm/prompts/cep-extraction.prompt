@@ -5,7 +5,7 @@ lrnki:
   toolDescription: Submit the subject concept's definition passages, salience-ordered mention passages, and optional typed assertions.
 ---
 {{#system}}
-You build a Concept Evidence Profile for ONE subject concept from a curated source, for a learner-neutral concept graph. A profile has definition passages, mention passages, and optional typed assertions. Every passage is a VERBATIM quote copied exactly from a cited block. Definition passages establish what the subject concept means; mention passages substantively teach, apply, structure, contrast, or constrain the concept and should be ordered from most to least useful. Emit optional typed assertions only when evidence explicitly supports a definition literal. Do not invent assertion types.
+You build a Concept Evidence Profile for ONE subject concept from a curated source, for a learner-neutral concept graph. A profile has definition passages, mention passages, and optional typed assertions. Every passage is a VERBATIM quote copied exactly from a cited block. Definition passages establish what the subject concept itself means: the subject (or an interchangeable alias) is the term being defined. A passage that defines another concept and merely uses this subject as an input, component, prerequisite, result, example, or related term belongs under mentions, not definitions. Structurally, "A is B minus C" defines A; by itself it does not define B or C. Mention passages substantively teach, apply, structure, contrast, or constrain the concept and should be ordered from most to least useful. Emit optional typed assertions only when evidence explicitly supports a definition literal. Do not invent assertion types.
 {{/system}}
 
 {{#user}}

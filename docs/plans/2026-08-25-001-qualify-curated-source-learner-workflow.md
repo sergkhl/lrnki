@@ -7,12 +7,12 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0–U6 complete; U7 completion-source gaps made explicit
+**Status:** In progress — U0–U6 complete; U7 term-definition binding repaired
 
-**NEXT:** Register the revised harbor supplement, extend combined graph
-`12743f40-7e92-4028-8556-fcd516c710f5`, and inspect the new extraction and enrichment before one
-Study Item Bank run. Then qualify, automatically adopt/read, exercise exact-reference Support Path,
-and repeat one external-source journey.
+**NEXT:** Harden Concept Canonicalization against related input/result fusion, then inspect and use
+fresh revised-supplement run `57a2b5aa-fd0b-49e2-a5df-17a2ae5ae821` to extend graph
+`12743f40-7e92-4028-8556-fcd516c710f5`. Only after the extended graph passes inspection, generate
+one bank, qualify/adopt/read it, exercise exact-reference Support Path, and repeat the external path.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
 Curated Sources and automatically admits only source-backed learner assets. Anchor-less Synthetic
@@ -98,6 +98,15 @@ likewise distinguishes works and their titles from subjects and subject terms. T
 extends the existing grounded semantic admission judge to demote source artifacts; it does not infer
 artifact identity from fixture words or transfer the carrier's contents to its label.
 
+### Definiendum confused with a term inside its definition
+
+The reproduced definition-extraction defect treated an input named inside a formula as though that
+formula defined the input. Conventional term-definition extraction binds a *definiendum* (the term
+being defined) to its *definiens* (the meaning supplied for that term), rather than classifying the
+sentence alone; see the [DEFT task](https://aclanthology.org/2020.semeval-1.41/) and the component
+annotation in [Storrer and Wellinghoff](https://aclanthology.org/L06-1066/). The existing independent
+semantic gate now verifies that relation; no lexical definition pattern is introduced.
+
 ### Transport authority leaking into application policy
 
 The learner API currently accepts client-echoed title and Declared Domain, writes `kind: "topic"`
@@ -109,29 +118,6 @@ for the source-backed adoption path without reopening Synthetic Topic Generation
 
 ## Current repository facts
 
-- `LearnerExpeditionKind` is currently only `"topic"`, while
-  [CONTEXT.md](../../CONTEXT.md#learner-experience) defines Topic Expedition as source-less.
-  Successful source-backed enrichments are nevertheless exposed as candidates and adopted as
-  `"topic"` rows.
-- `getExpeditionCatalog` filters to succeeded enrichments with at least one Study Item and merely
-  ranks fully item-covered trails above partial trails. It does not require one current lesson and
-  one qualified item for every learner-visible node.
-- `POST /expedition/choose` trusts client title/domain and marks the requested enrichment ready
-  without re-resolving the candidate or asset completeness. `GET /expedition/:enrichmentId` can
-  project an enrichment without proving learner ownership or Source Expedition readiness.
-- Current lesson and Study Item store reads select only non-superseded generations. Their immutable
-  artifacts and config identities are available for a readiness contract; legacy banks must not be
-  grandfathered merely because rows exist.
-- Graph Enrichment may contain `document_anchored`, `source_mentioned`, and `llm_grounded` nodes.
-  Source-mentioned passages already fail closed on verbatim source verification. LLM-grounded nodes
-  carry no source citation and remain outside the trusted learner layer in this plan.
-- Concept Lesson assembly protects citation honesty, and option-select now projects its keyed claim
-  exactly from the lesson. The latest source-backed inspection still found unsupported lesson
-  context, defensible distractors, a qualifier-dropping matching prompt, and a true impostor that
-  existing judges accepted. Row existence is therefore not qualification evidence.
-- Reference Support Steps already pin an exact current neutral Concept Lesson and option-select item.
-  Generated Support Steps use a separate learner-scoped identity and cannot affect neutral mastery,
-  but their content quality is unqualified.
 - `fixtures/diagnostic-manifest.json` now registers four project-authored, mixed-format diagnostic
   Curated Sources. They pressure carrier/referent identity, expiring authority, context-scoped
   quantities, stale measurements, exceptions, ordered state changes, byte/scalar distinctions, and
@@ -566,35 +552,44 @@ The plan is complete only when all of the following are true:
 ### U7 — complete-journey real-use qualification — 2026-08-26 — in progress
 
 - Earlier core/supplement attempts were never adopted: inspection found one multi-span lesson under
-  single-span attribution and one source title promoted as its subject. The extractive Definition
-  Passage fallback and grounded `source_artifact` demotion repaired those problem classes; source
-  artifacts now fail the Extraction Run closed when the independent judge is unavailable.
+  single-span attribution, one source title promoted as its subject, and overstated citation fidelity.
+  Extractive lesson fallback, grounded `source_artifact` demotion, and block-derived citation match
+  classes repaired those boundaries; unavailable source-artifact judgment fails the run closed.
 - After resetting only disposable `lrnki_test`, the fresh core produced four document anchors plus
   four source-mentioned prerequisites and zero LLM-grounded nodes. Its seven-stop floored trail
   persisted five source-supported lessons/options plus three explicit lesson absences; production
   qualification refused `lesson_missing`, proving the intended core-only negative control. The full
   journey recorded about $0.0304; no readiness evaluation or adoption call followed the refusal.
-- Inspection then found all five citations overstated byte-exact fidelity across Markdown line
-  wrapping. Source-material projection v2 now derives `exact`, `normalized`, or `none` only where the
-  immutable block is loaded; admission settles that provenance for lessons and options, while a
-  non-verbatim direct citation is vetoed before neural spend. Report schema 5 and Study Item Bank
-  identity `study-item-bank-21e87c60d969` invalidate the pre-repair bank.
-- The repair passed 858 application tests, 205 infrastructure-LiteLLM tests, four affected
-  typechecks, focused lint with zero errors, and whitespace checks. This is local test-database plus
-  live-provider evidence only.
 - The first fresh combined bank correctly remained unavailable: five low-difficulty mention nodes
   were floored, but `Forecast Revision` and `Movement authorization` survived with explicit lesson
   absences. The strict whole-trail gate stayed unchanged; the project-authored completion source now
-  defines those two terms instead of pruning required prerequisites or rerunning the same input for
-  luck. **Safe to continue:** yes, with the revised source bytes only.
+  defines those two terms rather than pruning prerequisites or rerunning unchanged input for luck.
+- Revised-source canonicalization artifact `1a59ce72-bf74-4552-a994-c2df3737d58a` remains unpublished:
+  it falsely merged `Predicted minimum channel depth` into `Tide Margin`. The upstream Definition
+  Passage gate had accepted the result's formula as a definition of its input. Its forced-tool
+  contract now owns one verdict category and explicitly binds the named definiendum to its definiens;
+  formula input/component/result relations are non-defining for the named candidate.
+- The exact live counterexample returned `defines_different_subject`, while the same passage remained
+  a positive definition of `Tide margin`. Fresh production-composition run
+  `57a2b5aa-fd0b-49e2-a5df-17a2ae5ae821` (`source-extraction-2b15b67d6238`) persisted three grounded
+  wrong-subject vetoes as deduplicated mentions beside four kept definitions, succeeded non-degraded
+  in 193.911 seconds, and was inspected directly. Its 25 successful calls used 53,354 tokens and
+  about $0.007312 estimated spend; all 12 independent-judge calls resolved to the configured
+  DeepInfra FP8, reasoning-disabled DeepSeek assignment. No graph used the invalid artifact.
+- Current automation passed 860 application and 206 infrastructure-LiteLLM tests, four affected
+  typechecks, focused lint with zero errors, config-identity regressions, and whitespace checks.
+  This is local test-database plus live-provider evidence only. **Safe to continue:** yes, after the
+  canonicalization equivalence boundary passes its own negative control.
 
 ### Open findings
 
 - U4's local verifier remains rejected for one material false acceptance and broken LiteLLM success
   logging; do not rerun it or pick a second local candidate. The activated remote assignment is
   qualified only for source material support, not general generation or source-less grounding.
-- Register only the revised supplement bytes, extend the inspected combined graph, and do not reuse
-  either earlier incomplete Study Item Bank as passing evidence.
+- Never publish canonicalization artifact `1a59ce72-bf74-4552-a994-c2df3737d58a`. Repair and validate
+  the input/result equivalence boundary, then canonicalize fresh run
+  `57a2b5aa-fd0b-49e2-a5df-17a2ae5ae821` against graph `12743f40-7e92-4028-8556-fcd516c710f5`;
+  do not reuse either incomplete Study Item Bank as passing evidence.
 - Matching and impostor remain preserved but unqualified. They do not satisfy readiness in this plan;
   Source Expedition snapshots now exclude them structurally. A future plan may qualify them
   independently after the option-select Source Expedition works.

@@ -276,8 +276,7 @@ test("admission label validator rejects a verdict missing labelKind (fail-closed
 
 function definitionQualityAdapterReturning(judgments: {
   index: number;
-  establishesMeaning: boolean;
-  category: "establishes_meaning" | "bare_name_repetition" | "heading_or_title" | "citation_or_bibliographic";
+  category: "establishes_meaning" | "defines_different_subject" | "bare_name_repetition" | "heading_or_title" | "citation_or_bibliographic";
   judgedSpan: string;
   rationale: string;
 }[]) {
@@ -301,8 +300,8 @@ const ownershipPassages = {
 
 test("definition quality judge keeps a defining passage and vetoes a grounded hollow one, index-aligned", async () => {
   const adapter = definitionQualityAdapterReturning([
-    { index: 0, establishesMeaning: true, category: "establishes_meaning", judgedSpan: "", rationale: "states the rule" },
-    { index: 1, establishesMeaning: false, category: "heading_or_title", judgedSpan: "Ownership", rationale: "bare heading" }
+    { index: 0, category: "establishes_meaning", judgedSpan: "", rationale: "states the rule" },
+    { index: 1, category: "heading_or_title", judgedSpan: "Ownership", rationale: "bare heading" }
   ]);
   const result = await adapter.judgeDefinitions(ownershipPassages);
   assert.equal(result.length, 2);
@@ -314,8 +313,8 @@ test("definition quality judge keeps a defining passage and vetoes a grounded ho
 
 test("definition quality judge coerces an ungrounded veto back to keep (fail closed)", async () => {
   const adapter = definitionQualityAdapterReturning([
-    { index: 0, establishesMeaning: true, category: "establishes_meaning", judgedSpan: "", rationale: "fine" },
-    { index: 1, establishesMeaning: false, category: "heading_or_title", judgedSpan: "text not in the passage", rationale: "claims a span absent from the quote" }
+    { index: 0, category: "establishes_meaning", judgedSpan: "", rationale: "fine" },
+    { index: 1, category: "heading_or_title", judgedSpan: "text not in the passage", rationale: "claims a span absent from the quote" }
   ]);
   const result = await adapter.judgeDefinitions(ownershipPassages);
   assert.equal(result[1].establishesMeaning, true);
@@ -324,7 +323,7 @@ test("definition quality judge coerces an ungrounded veto back to keep (fail clo
 
 test("definition quality judge keeps a passage with no returned verdict (fail closed)", async () => {
   const adapter = definitionQualityAdapterReturning([
-    { index: 0, establishesMeaning: true, category: "establishes_meaning", judgedSpan: "", rationale: "fine" }
+    { index: 0, category: "establishes_meaning", judgedSpan: "", rationale: "fine" }
     // no verdict for index 1
   ]);
   const result = await adapter.judgeDefinitions(ownershipPassages);
@@ -334,7 +333,7 @@ test("definition quality judge keeps a passage with no returned verdict (fail cl
 
 test("definition quality judge grounding tolerates markdown and typographic-quote noise", async () => {
   const adapter = definitionQualityAdapterReturning([
-    { index: 0, establishesMeaning: false, category: "citation_or_bibliographic", judgedSpan: 'see "Smith et al."', rationale: "citation" }
+    { index: 0, category: "citation_or_bibliographic", judgedSpan: 'see "Smith et al."', rationale: "citation" }
   ]);
   const result = await adapter.judgeDefinitions({
     declaredDomain: "software engineering",
@@ -348,28 +347,55 @@ test("definition quality judge grounding tolerates markdown and typographic-quot
 test("definition quality validator rejects malformed batched arguments (fail-closed arg validation)", () => {
   assert.equal(
     definitionPassageQualityJudgmentValidator.safeParse({
-      judgments: [{ index: 0, establishesMeaning: true, category: "establishes_meaning", judgedSpan: "", rationale: "ok" }]
+      judgments: [{ index: 0, category: "establishes_meaning", judgedSpan: "", rationale: "ok" }]
     }).success,
     true
   );
   // missing category
   assert.equal(
-    definitionPassageQualityJudgmentValidator.safeParse({ judgments: [{ index: 0, establishesMeaning: true, judgedSpan: "", rationale: "x" }] }).success,
+    definitionPassageQualityJudgmentValidator.safeParse({ judgments: [{ index: 0, judgedSpan: "", rationale: "x" }] }).success,
     false
   );
   // unknown enum value
   assert.equal(
-    definitionPassageQualityJudgmentValidator.safeParse({ judgments: [{ index: 0, establishesMeaning: false, category: "weird", judgedSpan: "x", rationale: "x" }] }).success,
+    definitionPassageQualityJudgmentValidator.safeParse({ judgments: [{ index: 0, category: "weird", judgedSpan: "x", rationale: "x" }] }).success,
     false
   );
   // extra property (additionalProperties: false)
   assert.equal(
-    definitionPassageQualityJudgmentValidator.safeParse({ judgments: [{ index: 0, establishesMeaning: true, category: "establishes_meaning", judgedSpan: "", rationale: "x", extra: 1 }] }).success,
+    definitionPassageQualityJudgmentValidator.safeParse({ judgments: [{ index: 0, category: "establishes_meaning", judgedSpan: "", rationale: "x", extra: 1 }] }).success,
     false
   );
   // empty rationale
   assert.equal(
-    definitionPassageQualityJudgmentValidator.safeParse({ judgments: [{ index: 0, establishesMeaning: true, category: "establishes_meaning", judgedSpan: "", rationale: "" }] }).success,
+    definitionPassageQualityJudgmentValidator.safeParse({ judgments: [{ index: 0, category: "establishes_meaning", judgedSpan: "", rationale: "" }] }).success,
     false
   );
+});
+
+test("definition quality judge vetoes a grounded definition of a different subject", async () => {
+  const adapter = definitionQualityAdapterReturning([
+    {
+      index: 0,
+      category: "defines_different_subject",
+      judgedSpan: "Output quantity is the input quantity minus the baseline quantity",
+      rationale: "The passage defines output quantity and merely uses input quantity in its definiens."
+    }
+  ]);
+  const result = await adapter.judgeDefinitions({
+    declaredDomain: "measurement",
+    subject: { canonicalLabel: "Input quantity", aliases: [] },
+    passages: [{
+      sourceBlockId: "b1",
+      evidenceQuote: "Output quantity is the input quantity minus the baseline quantity.",
+      blockType: "paragraph",
+      headingPath: []
+    }]
+  });
+  assert.deepEqual(result[0], {
+    establishesMeaning: false,
+    category: "defines_different_subject",
+    judgedSpan: "Output quantity is the input quantity minus the baseline quantity",
+    rationale: "The passage defines output quantity and merely uses input quantity in its definiens."
+  });
 });

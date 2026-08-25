@@ -40,7 +40,7 @@ export function detectExtractionQualityIssues(run: ExtractionRunResult): Extract
       issueType: CORE_DEMOTED_HOLLOW_DEFINITION_REASON,
       severity: run.degraded ? "critical" : "warning",
       evidenceQuotes: candidateEvidenceQuotes(candidate),
-      rationale: "A core Concept was demoted because its only Definition Passage conveyed no meaning (a bare name, heading, title, or citation), so it was demoted to optional and the run succeeded with the remaining cores. Whether the source defines it elsewhere across a chunk boundary is a separate retrieval question (layer B)."
+      rationale: "A core Concept was demoted because its only Definition Passage did not define that Concept (it defined a different subject or was a bare name, heading, title, or citation), so the run succeeded with the remaining cores. Whether the source defines it elsewhere across a chunk boundary is a separate retrieval question (layer B)."
     });
   }
 

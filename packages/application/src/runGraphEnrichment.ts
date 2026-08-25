@@ -133,7 +133,8 @@ export async function runGraphEnrichment(input: {
   // Optional rescue-seam Definition-Passage quality judge (plan 2026-06-26-001 U3). When
   // provided, the `definition`-typed grounding passages of verbatim-floored
   // `source_mentioned` nodes are meaning-judged before they become learner-facing study
-  // items; hollow definition passages are dropped (the node stays mention-only), failing
+  // items; non-defining passages leave the definition role (wrong-subject evidence stays
+  // as a mention; structural hollows drop), failing
   // CLOSED = preserve on judge-unavailable. Omit it to leave rescued definitions unjudged
   // (prior behavior). Same `kg-independent-judge` meaning judge as the extraction-time core
   // gate — no new alias.

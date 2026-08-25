@@ -157,8 +157,9 @@ export async function executeExtractionRun(input: {
   );
 
   // Stage 3b — Definition-Passage quality judge (ADR-0007 extension). Runs on the
-  // already-verbatim-verified core definitions, drops hollow passages (bare name,
-  // heading, title, citation), and recomputes `complete`. The recomputed flag flows
+  // already-verbatim-verified core definitions, drops passages that do not define
+  // the named subject (wrong-subject definition, bare name, heading, title, citation),
+  // and recomputes `complete`. The recomputed flag flows
   // naturally into reconciliation below; a vetoed last definition adds its key to
   // `hollowDefinitionKeys`, which selects the distinct demotion reason code. Block
   // structure is passed only as judge CONTEXT (KTD7), never as a deterministic gate.

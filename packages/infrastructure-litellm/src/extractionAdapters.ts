@@ -351,8 +351,7 @@ type DefinitionPassageQualityInput = {
 type DefinitionPassageQualityArgs = {
   judgments: Array<{
     index: number;
-    establishesMeaning: boolean;
-    category: "establishes_meaning" | "bare_name_repetition" | "heading_or_title" | "citation_or_bibliographic";
+    category: "establishes_meaning" | "defines_different_subject" | "bare_name_repetition" | "heading_or_title" | "citation_or_bibliographic";
     judgedSpan: string;
     rationale: string;
   }>;
@@ -459,7 +458,7 @@ function mapDefinitionPassageQuality(
   return input.passages.map((passage, index) => {
     const judgment = byIndex.get(index);
     if (!judgment) return keep(`[no verdict for index ${index}: kept]`);
-    if (judgment.establishesMeaning) {
+    if (judgment.category === "establishes_meaning") {
       return { establishesMeaning: true, category: "establishes_meaning", judgedSpan: "", rationale: judgment.rationale };
     }
     const span = judgment.judgedSpan.trim();
@@ -467,8 +466,7 @@ function mapDefinitionPassageQuality(
     if (!grounded) {
       return keep(`${judgment.rationale} [ungrounded veto kept: judgedSpan=${JSON.stringify(span)}]`);
     }
-    const category: DefinitionPassageVetoCategory =
-      judgment.category === "establishes_meaning" ? "bare_name_repetition" : judgment.category;
+    const category: DefinitionPassageVetoCategory = judgment.category;
     return { establishesMeaning: false, category, judgedSpan: span, rationale: judgment.rationale };
   });
 }

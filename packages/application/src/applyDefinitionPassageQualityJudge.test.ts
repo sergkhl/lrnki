@@ -85,10 +85,35 @@ test("drop last -> hollow: sole passage vetoed, complete false, key hollow, cate
   const out = await applyDefinitionPassageQualityJudge({ profiles, declaredDomain: "se", conceptsByKey, blockContextById, judge });
 
   assert.equal(out.profiles[0].definitions.length, 0);
+  assert.deepEqual(out.profiles[0].mentions, []);
   assert.equal(out.profiles[0].complete, false);
   assert.equal(out.hollowDefinitionKeys.has("ownership"), true);
   assert.equal(out.dispositions[0].disposition, "vetoed");
   assert.equal(out.dispositions[0].category, "heading_or_title");
+});
+
+test("a passage defining another subject is removed from the candidate's definitions", async () => {
+  const profiles = [defProfile("ownership", [{
+    blockId: "b1",
+    evidenceQuote: "Output quantity is the input quantity minus the baseline quantity."
+  }])];
+  const judge = cannedJudge(new Map([["ownership", [veto(
+    "defines_different_subject",
+    "Output quantity is the input quantity minus the baseline quantity"
+  )]]]));
+  const out = await applyDefinitionPassageQualityJudge({
+    profiles,
+    declaredDomain: "measurement",
+    conceptsByKey,
+    blockContextById,
+    judge
+  });
+
+  assert.equal(out.profiles[0].definitions.length, 0);
+  assert.deepEqual(out.profiles[0].mentions, profiles[0].definitions);
+  assert.equal(out.profiles[0].complete, false);
+  assert.equal(out.hollowDefinitionKeys.has("ownership"), true);
+  assert.equal(out.dispositions[0].category, "defines_different_subject");
 });
 
 test("fail-closed throw: all passages kept, complete unchanged, dispositions kept_judge_unavailable", async () => {

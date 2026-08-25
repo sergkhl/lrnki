@@ -1,5 +1,6 @@
 export { runExtractionOverSources, type ExtractionSourceUnit } from "./runExtractionOverSources";
 export { ADMISSION_LABEL_NON_CONCEPT_POLICY } from "./applyAdmissionLabelJudge";
+export { DEFINITION_PASSAGE_DISPOSITION_POLICY } from "./applyDefinitionPassageQualityJudge";
 export { buildGraphVersion } from "./buildGraphVersion";
 export {
   canonicalizeConcepts,

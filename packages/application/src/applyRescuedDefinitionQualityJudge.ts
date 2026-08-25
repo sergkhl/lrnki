@@ -17,11 +17,12 @@ import { gateByJudgment } from "./gateByJudgment";
 // definitional-adequacy-judged. The rescue durability judge judges concept durability and
 // fails open; it is NOT a definitional gate.
 //
-// Same independent meaning judge (`kg-independent-judge`), same drop-only / index-aligned
+// Same independent meaning judge (`kg-independent-judge`), same definition-veto / index-aligned
 // discipline, and the SAME fail-CLOSED-as-preserve semantics as the extraction-time judge
 // (rule 16): a transport blip KEEPS every passage flagged `kept_judge_unavailable`, never
-// shrinking the rescued surface on a model outage. It only DROPS a `definition`-typed
-// passage vetoed as hollow; `mention` passages are NEVER touched, and `llm_grounded`
+// shrinking the rescued surface on a model outage. It reclassifies a wrong-subject
+// `definition` as a deduplicated mention and drops other vetoed definitions; existing
+// `mention` passages are NEVER touched, and `llm_grounded`
 // nodes (generated grounding, no source quote) pass through untouched. A node whose
 // definitions all veto is retained MENTION-ONLY — dropping the node is the rescue
 // durability judge's decision, not this one's. The cited block's `blockType` is not
@@ -37,8 +38,8 @@ export async function applyRescuedDefinitionQualityJudge(input: {
   // The Measured Judge Gate (rule 16, gateByJudgment) owns the control flow. `skip`
   // is the pre-filter (R6): a non-`source_mentioned` node (`llm_grounded`: generated
   // grounding, no source quote) or one carrying no `definition`-typed passage passes
-  // through untouched with no neural call. `onVerdict` drops only vetoed definition
-  // passages (preserving order and every mention, and object identity when nothing
+  // through untouched with no neural call. `onVerdict` removes vetoed definitions from
+  // that role, reclassifies wrong-subject evidence as a mention, and preserves object identity when nothing
   // drops); `onUnavailable` keeps every passage flagged `kept_judge_unavailable` so a
   // transport blip never shrinks the rescued surface (fail closed = preserve recall).
   const judged = await gateByJudgment(input.nodes, {
@@ -61,23 +62,29 @@ export async function applyRescuedDefinitionQualityJudge(input: {
       // the union for TypeScript (it is never the deciding branch — that is `skip`).
       if (node.groundingOrigin !== "source_mentioned") return { node, dispositions: [] as DefinitionPassageDisposition[] };
       const definitionPassages = node.groundingPassages.filter((passage) => passage.passageType === "definition");
-      const vetoedBlockIds = new Set<string>();
+      const vetoedPassageKeys = new Set<string>();
+      const reclassifiedPassageKeys = new Set<string>();
       const nodeDispositions: DefinitionPassageDisposition[] = [];
       definitionPassages.forEach((passage, index) => {
         const verdict = verdicts?.[index];
         if (!verdict || verdict.establishesMeaning) {
           nodeDispositions.push(dispositionFor(node.derivedNodeId, passage, "kept", "establishes_meaning", verdict?.rationale ?? "no verdict: passage kept"));
         } else {
-          vetoedBlockIds.add(passage.sourceBlockId);
+          const key = passageKey(passage);
+          vetoedPassageKeys.add(key);
+          if (verdict.category === "defines_different_subject") reclassifiedPassageKeys.add(key);
           nodeDispositions.push(dispositionFor(node.derivedNodeId, passage, "vetoed", verdict.category, verdict.rationale));
         }
       });
 
-      if (vetoedBlockIds.size === 0) return { node, dispositions: nodeDispositions };
-      // Drop only the vetoed definition passages, preserving order and every mention.
-      const survivors = node.groundingPassages.filter(
-        (passage) => passage.passageType !== "definition" || !vetoedBlockIds.has(passage.sourceBlockId)
-      );
+      if (vetoedPassageKeys.size === 0) return { node, dispositions: nodeDispositions };
+      const rebuilt = node.groundingPassages.flatMap((passage): SourceMentionGroundingPassage[] => {
+        if (passage.passageType !== "definition") return [passage];
+        const key = passageKey(passage);
+        if (reclassifiedPassageKeys.has(key)) return [{ ...passage, passageType: "mention" }];
+        return vetoedPassageKeys.has(key) ? [] : [passage];
+      });
+      const survivors = dedupeGroundingPassages(rebuilt);
       const next: SourceMentionedEnrichmentNode = { ...node, groundingPassages: survivors };
       return { node: next, dispositions: nodeDispositions };
     },
@@ -103,6 +110,20 @@ export async function applyRescuedDefinitionQualityJudge(input: {
 function definitionPassagesOf(node: EnrichmentNode): SourceMentionGroundingPassage[] {
   if (node.groundingOrigin !== "source_mentioned") return [];
   return node.groundingPassages.filter((passage) => passage.passageType === "definition");
+}
+
+function passageKey(passage: SourceMentionGroundingPassage): string {
+  return `${passage.sourceBlockId}\u0000${passage.evidenceQuote}`;
+}
+
+function dedupeGroundingPassages(passages: SourceMentionGroundingPassage[]): SourceMentionGroundingPassage[] {
+  const seen = new Set<string>();
+  return passages.filter((passage) => {
+    const key = `${passage.passageType}\u0000${passageKey(passage)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function dispositionFor(

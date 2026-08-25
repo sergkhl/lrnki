@@ -6,12 +6,23 @@ import type {
 import type { DefinitionPassageQualityJudgmentPort } from "@lrnki/ports";
 import { gateByJudgment } from "./gateByJudgment";
 
+// Application-owned disposition behavior shared by Extraction and rescued Graph
+// Enrichment. Both operation hashes include this closed value so a change in what
+// happens after the semantic verdict cannot hide behind unchanged prompt identity.
+export const DEFINITION_PASSAGE_DISPOSITION_POLICY = {
+  establishesMeaning: "keep_definition",
+  definesDifferentSubject: "reclassify_as_mention",
+  structurallyHollow: "drop",
+  judgeUnavailableOrUngrounded: "keep_definition"
+} as const;
+
 // Composed Definition-Passage quality stage (ADR-0007 extension). Runs AFTER the
 // deterministic `applyEvidenceProfilePolicy` (the verbatim floor) and BEFORE
 // `applyAssertionEntailmentJudge`. Every definition passage handed here is already
 // verbatim-verified, so the judge checks MEANING, not grounding. The judge can only
-// DROP: a passage vetoed as hollow (bare name, heading, title, citation) is removed
-// entirely (KTD5 — unlike a rejected assertion it is low-value as a mention). Only
+// DROP from `definitions`: a wrong-subject passage is preserved as a deduplicated
+// Mention Passage because it can still teach a relation involving the candidate; a
+// bare name, heading, title, or citation is removed entirely as low-value mention text. Only
 // `core`-tier profiles are judged (KTD2): optional profiles never gate publication on
 // a complete definition, so judging them spends tokens for no disposition consequence.
 //
@@ -64,6 +75,7 @@ export async function applyDefinitionPassageQualityJudge(input: {
     },
     onVerdict: (profile, verdicts) => {
       const survivors: BlockEvidence[] = [];
+      const reclassifiedMentions: BlockEvidence[] = [];
       const profileDispositions: DefinitionPassageDisposition[] = [];
       profile.definitions.forEach((definition, index) => {
         const verdict = verdicts?.[index];
@@ -71,6 +83,7 @@ export async function applyDefinitionPassageQualityJudge(input: {
           survivors.push(definition);
           profileDispositions.push(dispositionFor(profile.candidateKey, definition, "kept", "establishes_meaning", verdict?.rationale ?? "no verdict: passage kept"));
         } else {
+          if (verdict.category === "defines_different_subject") reclassifiedMentions.push(definition);
           profileDispositions.push(dispositionFor(profile.candidateKey, definition, "vetoed", verdict.category, verdict.rationale));
         }
       });
@@ -79,7 +92,12 @@ export async function applyDefinitionPassageQualityJudge(input: {
         // Nothing dropped: preserve object identity (like reconcileUngroundableCores).
         return { profile, dispositions: profileDispositions, hollow: false };
       }
-      const next: RunEvidenceProfile = { ...profile, definitions: survivors, complete: survivors.length >= 1 };
+      const next: RunEvidenceProfile = {
+        ...profile,
+        definitions: survivors,
+        mentions: dedupeEvidence([...reclassifiedMentions, ...profile.mentions]),
+        complete: survivors.length >= 1
+      };
       return { profile: next, dispositions: profileDispositions, hollow: survivors.length === 0 };
     },
     onUnavailable: (profile) => ({
@@ -98,6 +116,16 @@ export async function applyDefinitionPassageQualityJudge(input: {
   });
 
   return { profiles, dispositions, hollowDefinitionKeys };
+}
+
+function dedupeEvidence(passages: BlockEvidence[]): BlockEvidence[] {
+  const seen = new Set<string>();
+  return passages.filter((passage) => {
+    const key = `${passage.blockId}\u0000${passage.evidenceQuote}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function dispositionFor(

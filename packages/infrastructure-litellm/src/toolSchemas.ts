@@ -444,9 +444,10 @@ export const definitionEntailmentJudgmentSchema: JsonSchema = toForcedToolSchema
 // --- Definition-Passage quality judgment: submit_definition_passage_quality_judgments
 // BATCHED judgment over ONE core Concept's already-verbatim-verified Definition
 // Passages (ADR-0007 extension, KTD4). The model returns one verdict per passage,
-// keyed by the passage's input `index`, deciding whether each passage ESTABLISHES the
-// Concept's meaning or is a hollow passage. `category` is a DOMAIN-NEUTRAL structural
-// shape (AGENTS rule 17 — names no fixture concept); `judgedSpan` is the minimal
+// keyed by the passage's input `index`, deciding whether each passage DEFINES the
+// named Concept or has a non-defining relationship/shape. `category` is the single
+// authoritative verdict (there is no contradictory boolean copy) and stays
+// DOMAIN-NEUTRAL (AGENTS rules 17/18); `judgedSpan` is the minimal
 // verbatim sub-quote the verdict rests on, ground-checked fail-closed-to-keep at the
 // application boundary so an ungrounded veto never drops a passage.
 
@@ -454,9 +455,8 @@ export const definitionPassageQualityJudgmentValidator = z.object({
   judgments: z.array(
     z.object({
       index: z.number().int().min(0).describe("The 0-based index of the passage this verdict applies to, copied from the listed passage."),
-      establishesMeaning: z.boolean().describe("true when the passage actually conveys the concept's meaning — it states defining properties, distinguishing criteria, the mechanism, or a contrast that pins down what the concept IS. false when the passage is hollow: a bare repetition of the concept's own name, a section heading or title, or a citation/bibliographic reference, with no defining content."),
-      category: z.enum(["establishes_meaning", "bare_name_repetition", "heading_or_title", "citation_or_bibliographic"]).describe("The structural shape of the passage. 'establishes_meaning' when establishesMeaning is true. Otherwise the kind of hollow passage: 'bare_name_repetition' (the passage only restates the concept's name or label), 'heading_or_title' (the passage is a section heading or document title, not prose about the concept), or 'citation_or_bibliographic' (the passage is a reference, citation, or bibliographic phrase). Judge by what the text MEANS, not solely by the block's structural type, which is provided only as context."),
-      judgedSpan: z.string().describe("The minimal exact sub-quote (copied verbatim from this passage) the verdict rests on. For a veto, the span the model judged hollow. Must be a verbatim substring of the passage."),
+      category: z.enum(["establishes_meaning", "defines_different_subject", "bare_name_repetition", "heading_or_title", "citation_or_bibliographic"]).describe("'establishes_meaning' only when the named subject (or an interchangeable alias) is the term being defined and the passage pins down that subject's meaning. 'defines_different_subject' when meaningful prose defines another term while this candidate appears only as an input, component, prerequisite, result, example, or related term in that other definition. The remaining categories are non-defining structural shapes: bare name repetition, heading/title, or citation/reference/bibliographic text. Judge the term-definition relation, not word overlap or block type."),
+      judgedSpan: z.string().describe("The minimal exact sub-quote (copied verbatim from this passage) that supports the category. For defines_different_subject, identify the actual definitional relation or its other subject. Must be a verbatim substring of the passage."),
       rationale: z.string().min(1).describe("One terse sentence.")
     }).strict()
   ).describe("One verdict per provided Definition Passage, identified by its input index.")

@@ -1,5 +1,6 @@
 import {
   ADMISSION_LABEL_NON_CONCEPT_POLICY,
+  DEFINITION_PASSAGE_DISPOSITION_POLICY,
   SOURCE_CITATION_MATCH_CLASSIFICATION_POLICY,
   SOURCE_LESSON_EXTRACTIVE_ADMISSION_POLICY,
   SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS,
@@ -179,7 +180,8 @@ export const allNeuralOperationDescriptors: readonly AnyNeuralStageDescriptor[] 
 export function extractionConfigHash(): string {
   const entry = neuralOperationRegistry.extraction;
   return operationConfigHash(entry.configSeed, entry.descriptors, {
-    admissionLabelNonConceptPolicy: ADMISSION_LABEL_NON_CONCEPT_POLICY
+    admissionLabelNonConceptPolicy: ADMISSION_LABEL_NON_CONCEPT_POLICY,
+    definitionPassageDispositionPolicy: DEFINITION_PASSAGE_DISPOSITION_POLICY
   });
 }
 
@@ -206,6 +208,7 @@ export function graphEnrichmentConfigHash(config: GraphEnrichmentConfig): string
   const entry = neuralOperationRegistry.graphEnrichment;
   return operationConfigHash(entry.configSeed, entry.descriptors, {
     ...graphEnrichmentBehaviorConfig(config),
+    definitionPassageDispositionPolicy: DEFINITION_PASSAGE_DISPOSITION_POLICY,
     nodeEmbeddingModel: NODE_EMBEDDING_MODEL
   }, {
     additionalModels: [NODE_EMBEDDING_MODEL]
