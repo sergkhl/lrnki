@@ -71,7 +71,13 @@ void diagramFieldTreatment;
 void optionSelectFieldTreatment;
 void optionFieldTreatment;
 
-export const SOURCE_MATERIAL_CLAIM_PROJECTION = "source_material_claims_v1" as const;
+// Citation fidelity is not part of reference identity: it is derived from the immutable source
+// block at the evidence-read boundary, where byte-exact versus formatting-normalized matching can
+// actually be proven. The v1 projection trusted the intermediate asset's matchKind and therefore
+// could preserve `exact` after Markdown line wrapping made the source-block match normalized.
+export const SOURCE_MATERIAL_CLAIM_PROJECTION = "source_material_claims_v2" as const;
+export const SOURCE_CITATION_MATCH_CLASSIFICATION_POLICY =
+  "source_citation_match_from_resolved_block_v1" as const;
 export type SourceMaterialClaimProjection = typeof SOURCE_MATERIAL_CLAIM_PROJECTION;
 
 export type SourceMaterialEvidenceReference = {
@@ -79,7 +85,6 @@ export type SourceMaterialEvidenceReference = {
   sourceResourceId: string;
   sourceBlockId: string;
   evidenceQuote: string;
-  matchKind: "exact" | "normalized";
   passageKind: "definition" | "mention";
 };
 
@@ -234,7 +239,6 @@ export function projectSourceMaterialClaims(input: {
           sourceResourceId: citation.sourceResourceId,
           sourceBlockId: citation.sourceBlockId,
           evidenceQuote: citation.evidenceQuote,
-          matchKind: citation.matchKind,
           passageKind
         };
         const evidenceKey = `source-evidence-${createHash("sha256")
@@ -423,8 +427,7 @@ function citationSignature(citation: Extract<StudyItemCitation, { provenance: "s
   return JSON.stringify({
     sourceResourceId: citation.sourceResourceId,
     sourceBlockId: citation.sourceBlockId,
-    evidenceQuote: citation.evidenceQuote,
-    matchKind: citation.matchKind
+    evidenceQuote: citation.evidenceQuote
   });
 }
 

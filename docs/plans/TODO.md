@@ -2,12 +2,11 @@
 
 ## TODO
 
-- **Curated-source learner workflow — in progress; U0–U6 complete and U7 combined diagnostic
-  stopped and repaired.** Follow
-  [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md). The
-  grounded admission judge now demotes a source artifact without rejecting a taught protocol.
-  Reset only the disposable database, rebuild core plus supplement under the new extraction
-  identity, inspect the combined journey, and then repeat the representative external source.
+- **Curated-source learner workflow — in progress; U0–U6 complete and U7 fresh core rebuilt and
+  attribution repaired.** Follow
+  [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md). Extend the
+  inspected core with the supplement, inspect the combined graph, then qualify/adopt/read it under
+  the current bank identity before repeating the representative external source.
 
 ## COMPLETED
 

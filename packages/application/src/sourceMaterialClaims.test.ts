@@ -87,9 +87,14 @@ const item: OptionSelectItem = {
 test("projects every material source-asset field without losing qualifiers or citation identity", () => {
   const result = projectSourceMaterialClaims({ lessons: [lesson], optionSelectItems: [item] });
 
-  assert.equal(result.projection, "source_material_claims_v1");
+  assert.equal(result.projection, "source_material_claims_v2");
   assert.equal(result.evidence.length, 1, "the shared section/key citation is one evidence row");
   assert.equal(result.evidence[0]?.passageKind, "definition");
+  assert.equal(
+    "matchKind" in (result.evidence[0] ?? {}),
+    false,
+    "reference identity does not trust an intermediate citation-fidelity claim"
+  );
   assert.equal(result.claims.length, 10);
   assert.equal(result.claims.filter((claim) => claim.purpose === "source_support").length, 7);
   assert.equal(result.claims.filter((claim) => claim.purpose === "distractor_invalidity").length, 3);

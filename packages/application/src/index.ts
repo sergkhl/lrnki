@@ -258,6 +258,7 @@ export {
   type SourceExpeditionUnavailableReason
 } from "./sourceExpedition";
 export {
+  SOURCE_CITATION_MATCH_CLASSIFICATION_POLICY,
   SOURCE_MATERIAL_CLAIM_PROJECTION,
   projectSourceMaterialClaims,
   renderSourceMaterialClaim,
@@ -268,6 +269,10 @@ export {
   type SourceMaterialClaimSubject,
   type SourceMaterialEvidenceReference
 } from "./sourceMaterialClaims";
+export {
+  settleSourceCitationMatchKinds,
+  type ResolvedSourceCitationEvidence
+} from "./sourceCitationMatch";
 export {
   SOURCE_MATERIAL_CLAIM_SUPPORT_QUALIFICATION_SCHEMA_VERSION,
   parseSourceMaterialClaimSupportQualificationMatrix,

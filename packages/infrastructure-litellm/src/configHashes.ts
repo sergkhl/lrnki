@@ -1,5 +1,6 @@
 import {
   ADMISSION_LABEL_NON_CONCEPT_POLICY,
+  SOURCE_CITATION_MATCH_CLASSIFICATION_POLICY,
   SOURCE_LESSON_EXTRACTIVE_ADMISSION_POLICY,
   SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS,
   SOURCE_OPTION_EXACT_REFERENCE_ADMISSION_POLICY,
@@ -227,6 +228,7 @@ export function syntheticGenerationConfigHash(
 export function studyItemBankConfigHash(routing?: TopicExpeditionModelRouting): string {
   const entry = neuralOperationRegistry.studyItemBank;
   return operationConfigHash(entry.configSeed, effectiveStudyItemBankDescriptors(routing), {
+    sourceCitationMatchClassificationPolicy: SOURCE_CITATION_MATCH_CLASSIFICATION_POLICY,
     sourceLessonExtractiveAdmissionPolicy: SOURCE_LESSON_EXTRACTIVE_ADMISSION_POLICY,
     sourceOptionExactReferenceAdmissionPolicy: SOURCE_OPTION_EXACT_REFERENCE_ADMISSION_POLICY,
     sourceMaterialClaimSupportAcceptanceDraws: SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS

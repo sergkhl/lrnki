@@ -27,6 +27,7 @@ import {
   type SourceMaterialClaimSet
 } from "./sourceMaterialClaims";
 import { lessonOptionSelectAnswer } from "./lessonGroundingShape";
+import { settleSourceCitationMatchKinds } from "./sourceCitationMatch";
 import {
   sourceOptionExactReferenceContractReasons,
   sourceOptionUsesExactReferenceContract
@@ -58,7 +59,7 @@ export async function admitSourceOptionSelectItems(input: {
   answerKeyStage?: SourceAssetEvaluationStage;
   relatedConceptsForNode?: (derivedNodeId: string) => { label: string; snippet: string }[];
 }): Promise<SourceOptionSelectAdmissionResult> {
-  const candidates = [...input.candidates];
+  let candidates = [...input.candidates];
   const nodeById = new Map(input.nodes.map((node) => [node.derivedNodeId, node] as const));
   const expectedReferenceByNode = new Map(input.lessons.map((lesson) => [
     lesson.derivedNodeId,
@@ -105,6 +106,10 @@ export async function admitSourceOptionSelectItems(input: {
         supportClaimCount * SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS
       )
     : await evaluateSourceSupport();
+  candidates = settleSourceCitationMatchKinds({
+    optionSelectItems: candidates,
+    evidence: sourceSupport.evidence
+  }).optionSelectItems;
   const sourceDecisionByClaim = new Map(
     sourceSupport.decisions.map((decision) => [decision.claimKey, decision] as const)
   );

@@ -14,6 +14,7 @@ import type {
 } from "@lrnki/ports";
 import type { QualifiedSourceExpedition } from "./sourceExpedition";
 import {
+  evaluateProjectedSourceSupport,
   evaluateQualifiedSourceExpedition,
   SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS,
   settleOptionSelectTruth
@@ -141,6 +142,42 @@ const sourceEvidenceRead = {
   }
 };
 
+test("resolved source blocks reclassify fidelity and veto a non-verbatim direct citation", async () => {
+  const qualified = qualifiedFixture();
+  const lesson = structuredClone(qualified.assets.lessons[0]!);
+  const lessonCitation = lesson.sections[0]?.citation;
+  assert.equal(lessonCitation?.provenance, "source");
+  if (lessonCitation?.provenance !== "source") return;
+  lessonCitation.evidenceQuote = "A sentence that does not occur in the immutable source block.";
+  let calls = 0;
+  const result = await evaluateProjectedSourceSupport({
+    projection: projectSourceMaterialClaims({ lessons: [lesson], optionSelectItems: [] }),
+    nodes: qualified.assets.detail.nodes.map((node) => ({
+      derivedNodeId: node.derivedNodeId,
+      label: node.label,
+      aliases: node.aliases,
+      declaredDomain: node.declaredDomain
+    })),
+    sourceEvidenceRead,
+    sourceSupportVerifier: {
+      model: "false-accepting-source-support-test",
+      async verify() {
+        calls += 1;
+        return { disposition: "supported", reason: "Would accept if called." };
+      }
+    }
+  });
+
+  assert.equal(result.evidence[0]?.resolved, true);
+  assert.equal(result.evidence[0]?.matchKind, "none");
+  assert.equal(result.calls, 0);
+  assert.equal(calls, 0);
+  assert.deepEqual(
+    result.decisions.map((decision) => [decision.disposition, decision.reasonCode]),
+    [["rejected", "source_citation_not_verbatim"]]
+  );
+});
+
 test("no-activation report joins payload, evidence, identity, and deterministic exact-reference truth with zero calls", async () => {
   const report = await evaluateQualifiedSourceExpedition({
     qualification: qualifiedFixture(),
@@ -148,7 +185,7 @@ test("no-activation report joins payload, evidence, identity, and deterministic 
     generatedAt: "2026-08-25T12:00:00.000Z"
   });
 
-  assert.equal(report.schemaVersion, 4);
+  assert.equal(report.schemaVersion, 5);
   assert.deepEqual(report.activation, {
     sourceSupportVerifierModel: null,
     answerKeyVerifierModel: null
@@ -159,6 +196,7 @@ test("no-activation report joins payload, evidence, identity, and deterministic 
   assert.equal(report.candidatePayloads.optionSelectItems.length, 1);
   assert.equal(report.evidence.length, 1);
   assert.equal(report.evidence[0]?.resolved, true);
+  assert.equal(report.evidence[0]?.matchKind, "exact");
   assert.match(report.evidence[0]?.blockText ?? "", /signed exception/);
   assert.ok(report.positiveControls.projectedClaimRows > 0);
   assert.ok(report.positiveControls.sourceSupportClaimRows > 0);

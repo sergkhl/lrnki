@@ -126,6 +126,47 @@ test("lesson admission omits unsupported optional fields and assigns qualificati
   assert.deepEqual(candidate, candidateLesson(), "settlement does not mutate the raw candidate");
 });
 
+test("lesson admission derives normalized citation fidelity from the immutable source block", async () => {
+  const raw = candidateLesson();
+  const result = await admitSourceConceptLessons({
+    candidates: [raw],
+    nodes,
+    baseConfigHash: "base-config",
+    sourceEvidenceRead: {
+      async readSourceEvidence() {
+        return [{
+          sourceResourceId: "resource-1",
+          sourceTitle: "Wrapped generated policy source",
+          sourceBlockId: "block-1",
+          blockType: "paragraph",
+          headingPath: ["Authorization"],
+          text: "A bounded authorization retains the stated exception\nand deadline. Keep this supported condition. Keep this supported caption. A supported paraphrase contains the retained term."
+        }];
+      }
+    },
+    sourceSupportVerifier: verifierRejectingDropMarkers([])
+  });
+
+  assert.equal(result.lessons.length, 1);
+  const admittedCitation = result.lessons[0]?.sections[0]?.citation;
+  assert.equal(admittedCitation?.provenance, "source");
+  if (admittedCitation?.provenance === "source") {
+    assert.equal(admittedCitation.matchKind, "normalized");
+  }
+  const candidateCitation = result.candidates[0]?.sections[0]?.citation;
+  assert.equal(candidateCitation?.provenance, "source");
+  if (candidateCitation?.provenance === "source") {
+    assert.equal(candidateCitation.matchKind, "normalized");
+  }
+  assert.equal(
+    raw.sections[0]?.citation?.provenance === "source"
+      ? raw.sections[0].citation.matchKind
+      : null,
+    "exact",
+    "settlement does not mutate the input candidate"
+  );
+});
+
 test("a neural false acceptance cannot admit a non-extractive source lesson field", async () => {
   const candidate = candidateLesson();
   candidate.sections = [{

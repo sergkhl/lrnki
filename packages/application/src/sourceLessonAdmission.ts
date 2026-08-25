@@ -18,6 +18,7 @@ import {
   type SourceSupportNodeContext
 } from "./sourceAssetEvaluation";
 import { qualifiedSourceExpeditionAssetConfigHash } from "./sourceExpedition";
+import { settleSourceCitationMatchKinds } from "./sourceCitationMatch";
 import {
   projectSourceMaterialClaims,
   type SourceMaterialClaim,
@@ -45,9 +46,9 @@ export async function admitSourceConceptLessons(input: {
   sourceSupportVerifier?: SourceMaterialClaimSupportVerificationPort;
   sourceSupportStage?: SourceAssetEvaluationStage;
 }): Promise<SourceLessonAdmissionResult> {
-  const candidates = [...input.candidates];
+  const projectedCandidates = [...input.candidates];
   const projection = projectSourceMaterialClaims({
-    lessons: candidates,
+    lessons: projectedCandidates,
     optionSelectItems: []
   });
   const evaluateSourceSupport = () => evaluateProjectedSourceSupport({
@@ -63,6 +64,10 @@ export async function admitSourceConceptLessons(input: {
         supportClaimCount * SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS
       )
     : await evaluateSourceSupport();
+  const candidates = settleSourceCitationMatchKinds({
+    lessons: projectedCandidates,
+    evidence: evaluation.evidence
+  }).lessons;
   const decisionByClaimKey = new Map(
     evaluation.decisions.map((decision) => [decision.claimKey, decision] as const)
   );

@@ -97,12 +97,12 @@ test("Graph Enrichment registers the complete shared admission stage family", ()
   );
 });
 
-test("Study Item Bank identity includes the source-support acceptance policy", () => {
+test("Study Item Bank identity includes source-support and citation-fidelity policy", () => {
   const entry = neuralOperationRegistry.studyItemBank;
   assert.notEqual(
     operationConfigHash(entry.configSeed, effectiveStudyItemBankDescriptors()),
     studyItemBankConfigHash(),
-    "the source-extractive and three-draw policies must invalidate unqualified learner assets"
+    "the source-extractive, citation-fidelity, and three-draw policies must invalidate unqualified learner assets"
   );
 });
 

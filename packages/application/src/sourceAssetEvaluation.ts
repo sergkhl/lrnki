@@ -4,7 +4,11 @@ import type {
   StudyItemCandidateVerdict,
   StudyItemClaimVerdict
 } from "@lrnki/domain-core";
-import { evidenceQuoteMatches } from "@lrnki/domain-core";
+import {
+  classifyEvidenceMatch,
+  evidenceQuoteMatches,
+  type EvidenceMatchKind
+} from "@lrnki/domain-core";
 import type {
   AnswerKeyVerificationPort,
   JourneyLineageReadPort,
@@ -35,7 +39,7 @@ import {
   sourceOptionUsesExactReferenceContract
 } from "./sourceOptionExactReference";
 
-export const SOURCE_ASSET_EVALUATION_REPORT_SCHEMA_VERSION = 4 as const;
+export const SOURCE_ASSET_EVALUATION_REPORT_SCHEMA_VERSION = 5 as const;
 export const SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS = 3 as const;
 export const SOURCE_LESSON_EXTRACTIVE_ADMISSION_POLICY =
   "source_lesson_extractive_fields_with_definition_fallback_v2" as const;
@@ -51,7 +55,8 @@ export type SourceSupportDecisionReason =
   | "source_support_verifier_unavailable"
   | "source_evidence_read_unavailable"
   | "missing_source_evidence"
-  | "unresolved_source_evidence";
+  | "unresolved_source_evidence"
+  | "source_citation_not_verbatim";
 
 export type DistractorInvalidityDecisionReason =
   | "distractor_invalid_for_question"
@@ -110,6 +115,9 @@ export type KeyUniquenessDecision = {
 
 export type JoinedSourceMaterialEvidence = SourceMaterialEvidenceReference & {
   resolved: boolean;
+  // Derived here from the resolved immutable source block. `none` is retained in inspection
+  // evidence but can never back an admitted source-cited learner field.
+  matchKind: EvidenceMatchKind;
   sourceTitle: string | null;
   blockType: string | null;
   headingPath: string[] | null;
@@ -171,6 +179,9 @@ export async function evaluateProjectedSourceSupport(input: {
     return {
       ...reference,
       resolved: block !== undefined,
+      matchKind: block === undefined
+        ? "none"
+        : classifyEvidenceMatch(block.text, reference.evidenceQuote),
       sourceTitle: block?.sourceTitle ?? null,
       blockType: block?.blockType ?? null,
       headingPath: block?.headingPath ?? null,
@@ -213,6 +224,23 @@ export async function evaluateProjectedSourceSupport(input: {
         "rejected",
         "unresolved_source_evidence",
         "At least one admitted source evidence reference did not resolve to its exact resource/block pair.",
+        input.sourceSupportVerifier?.model ?? null
+      ));
+      continue;
+    }
+    const directEvidenceRows = claim.directEvidenceKeys.flatMap((evidenceKey) => {
+      const row = evidenceByKey.get(evidenceKey);
+      return row ? [row] : [];
+    });
+    if (
+      directEvidenceRows.length !== claim.directEvidenceKeys.length ||
+      directEvidenceRows.some((row) => row.matchKind === "none")
+    ) {
+      decisions.push(sourceSupportDecision(
+        claim,
+        "rejected",
+        "source_citation_not_verbatim",
+        "A learner-visible source citation did not match its immutable source block byte-exactly or after the approved formatting normalization.",
         input.sourceSupportVerifier?.model ?? null
       ));
       continue;
