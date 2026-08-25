@@ -2,12 +2,12 @@
 
 ## TODO
 
-- **Curated-source learner workflow — in progress; U0–U6 complete and U7 end-to-end readiness
-  qualification next.** Follow
-  [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md). Exact
-  qualified Support Path references publish ready without a generation attempt, and missing reuse
-  creates or wakes nothing. Run the harbor core then its registered supplement through the complete
-  automatic learner journey, inspect every visible asset, and repeat the smallest external path.
+- **Curated-source learner workflow — in progress; U0–U6 complete and U7 core diagnostic inspected
+  and repaired.** Follow
+  [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md). The core
+  refused safely; exact Definition Passage fallback now preserves truthful single-span attribution
+  and the raw neural draft remains inspectable. Register the harbor supplement, inspect the combined
+  automatic journey, and repeat the smallest representative external-source path.
 
 ## COMPLETED
 

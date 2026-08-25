@@ -38,7 +38,7 @@ import {
 export const SOURCE_ASSET_EVALUATION_REPORT_SCHEMA_VERSION = 4 as const;
 export const SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS = 3 as const;
 export const SOURCE_LESSON_EXTRACTIVE_ADMISSION_POLICY =
-  "source_lesson_extractive_fields_v1" as const;
+  "source_lesson_extractive_fields_with_definition_fallback_v2" as const;
 
 export type EvaluationDisposition = "accepted" | "rejected" | "not_evaluated";
 

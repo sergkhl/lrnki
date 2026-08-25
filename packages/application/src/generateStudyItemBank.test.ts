@@ -21,6 +21,7 @@ import {
   generateStudyItemBank as generateStudyItemBankApplication,
   OPTION_SELECT_GENERATION_ATTEMPTS
 } from "./generateStudyItemBank";
+import { SOURCE_EXTRACTIVE_DEFINITION_LESSON_GENERATOR } from "./assembleConceptLesson";
 import { NON_LLM_STAGES } from "./runProgressReporter";
 import { qualifiedSourceExpeditionAssetConfigHash } from "./sourceExpedition";
 import { sourceOptionExactReferenceQuestion } from "./sourceOptionExactReference";
@@ -1082,27 +1083,20 @@ test("an option-select guard miss gets one INFORMED retry carrying the first att
   assert.match(retryFeedbacks[1] ?? "", /citation does not verify against grounding/);
 });
 
-test("an uncited candidate on a source graph remains inspectable but cannot ground learner items", async () => {
-  const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
-  const { store, persisted, persistedRejected } = capturingStore();
+test("a multi-span source synthesis falls back to one exact Definition Passage while retaining the raw candidate", async () => {
+  const secondDefinition = "Borrowing lets code reference values without taking ownership.";
+  const snapshot = snapshotWith([{
+    conceptId: "c1",
+    label: "Ownership",
+    definitions: [passage("b1", ownershipDef), passage("b2", secondDefinition)]
+  }]);
+  const { store, persisted } = capturingStore();
   const lessonStore = capturingLessonStore();
-  // A lesson that meets the minimum but whose substantive section is uncited (all synthesized).
-  // Its `applications` bullets are grounding of their own (D10), so the option-select's quote —
-  // which the examples body does not carry — still verifies verbatim against a bullet passage.
-  const synthesizedLesson: ConceptLessonDraft = {
+  let lessonCalls = 0;
+  const multiSpanDraft: ConceptLessonDraft = {
     explorableTerms: [],
     sections: [
-      { kind: "gist", text: "Gist." },
-      { kind: "examples", text: "An example with no citation." },
-      {
-        kind: "applications",
-        text: "Applications.",
-        items: [
-          "Rules that govern memory keep one current owner.",
-          "Rules that govern memory describe transfer.",
-          "Rules that govern memory prevent stale use."
-        ]
-      }
+      { kind: "definition", text: `${ownershipDef} ${secondDefinition}` }
     ]
   };
   const result = await generateStudyItemBank({
@@ -1110,11 +1104,80 @@ test("an uncited candidate on a source graph remains inspectable but cannot grou
     configHash: "cfg-1",
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
-    conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": synthesizedLesson } }),
+    conceptLessonGeneration: {
+      model: "mock-lesson",
+      async generate() {
+        lessonCalls += 1;
+        return multiSpanDraft;
+      }
+    },
     answerKeyVerification: keyVerifierPassing(),
     matchingAssignmentVerification: matchingVerifierPassing(),
     conceptLessonStore: lessonStore.store,
-    studyItemGeneration: generationReturning({ optionSelect: { "node-c1": osDraft("rules that govern memory") } }),
+    studyItemGeneration: generationReturning({
+      optionSelect: {
+        "node-c1": osDraft(ownershipDef, ["Stack", "Register", "Cache"], lessonPassageId("node-c1", 0))
+      }
+    }),
+    studyItemBankStore: store
+  });
+
+  assert.equal(lessonCalls, 2, "the existing bounded retry runs before the deterministic fallback");
+  assert.equal(result.lessons.length, 1);
+  assert.equal(lessonStore.lessons.length, 1);
+  assert.equal(lessonStore.lessons[0]?.generatingModel, SOURCE_EXTRACTIVE_DEFINITION_LESSON_GENERATOR);
+  assert.deepEqual(lessonStore.lessons[0]?.sections, [{
+    kind: "definition",
+    text: ownershipDef,
+    groundingProvenance: "source_cep",
+    citation: {
+      provenance: "source",
+      sourceResourceId: "res-1",
+      sourceBlockId: "b1",
+      evidenceQuote: ownershipDef,
+      matchKind: "exact"
+    }
+  }]);
+  assert.equal(persisted.filter((item) => item.itemType === "option_select").length, 1);
+  assert.equal(lessonStore.candidateLessons.length, 1);
+  assert.equal(lessonStore.candidateLessons[0]?.sections[0]?.text, `${ownershipDef} ${secondDefinition}`);
+  assert.equal(lessonStore.candidateLessons[0]?.sections[0]?.groundingProvenance, "generated");
+  assert.notEqual(
+    lessonStore.candidateLessons[0]?.conceptLessonId,
+    lessonStore.lessons[0]?.conceptLessonId,
+    "the raw neural candidate and code-owned fallback retain distinct identities"
+  );
+  assert.deepEqual(lessonStore.absent, []);
+});
+
+test("an uncited mention-only candidate remains inspectable and cannot trigger the Definition Passage fallback", async () => {
+  const mention = "Borrowing lets you reference a value without taking ownership.";
+  const { store, persisted, persistedRejected } = capturingStore();
+  const lessonStore = capturingLessonStore();
+  const synthesizedLesson: ConceptLessonDraft = {
+    explorableTerms: [],
+    sections: [{ kind: "definition", text: "Borrowing is a broad reference-management mechanism." }]
+  };
+  const result = await generateStudyItemBank({
+    enrichmentId: "enr-1",
+    configHash: "cfg-1",
+    graphStore: graphStoreReturning(snapshotWith([])),
+    enrichmentStore: enrichmentStoreReturning(layerWith([
+      sourceMentionedNode({
+        id: "node-borrow",
+        label: "Borrowing",
+        passageType: "mention",
+        quote: mention,
+        blockId: "m-1"
+      })
+    ])),
+    conceptLessonGeneration: lessonGenerationReturning({
+      lessons: { "node-borrow": synthesizedLesson }
+    }),
+    answerKeyVerification: keyVerifierPassing(),
+    matchingAssignmentVerification: matchingVerifierPassing(),
+    conceptLessonStore: lessonStore.store,
+    studyItemGeneration: generationReturning({ optionSelect: {} }),
     studyItemBankStore: store
   });
 
@@ -1122,11 +1185,12 @@ test("an uncited candidate on a source graph remains inspectable but cannot grou
   assert.equal(result.lessons.length, 0);
   assert.equal(lessonStore.lessons.length, 0);
   assert.equal(lessonStore.candidateLessons.length, 1);
-  assert.ok(lessonStore.candidateLessons[0]?.sections.every((section) =>
-    section.groundingProvenance === "generated"
-  ));
+  assert.equal(lessonStore.candidateLessons[0]?.sections[0]?.groundingProvenance, "generated");
   assert.equal(lessonStore.absent.length, 1);
-  assert.deepEqual(persistedRejected.map((row) => row.itemType).sort(), ["impostor", "matching", "option_select"]);
+  assert.deepEqual(
+    persistedRejected.map((row) => row.itemType).sort(),
+    ["impostor", "matching", "option_select"]
+  );
 });
 
 test("a rescued node with a verified DEFINITION passage yields source_mentioned study items (R5/U4)", async () => {

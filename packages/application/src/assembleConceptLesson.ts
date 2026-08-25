@@ -43,6 +43,13 @@ export type AssembleConceptLessonResult =
   | { kind: "lesson"; lesson: ConceptLesson }
   | { kind: "absent"; absent: LessonAbsentNode };
 
+// Stable producer identity for the source-only fallback. This is deliberately not an LLM alias:
+// the lesson is copied from one already-admitted Definition Passage when the bounded neural path
+// cannot satisfy the one-section/one-citation contract. Keeping the identity explicit prevents an extractive
+// lesson from being misreported as model-authored in real-use inspection.
+export const SOURCE_EXTRACTIVE_DEFINITION_LESSON_GENERATOR =
+  "source-extractive-definition-v1";
+
 function isSourcePassage(passage: GroundingPassage): passage is Extract<GroundingPassage, { sourceResourceId: string }> {
   return "sourceResourceId" in passage;
 }
@@ -97,6 +104,39 @@ function deriveSectionGrounding(
     return { provenance: "generated" };
   }
   return citeVerifiedPassage(passage, section.citation.evidenceQuote, grounding);
+}
+
+// Precision fallback for source-derived lessons whose generator synthesized across multiple
+// passages. One lesson section can own one citation, so the fallback selects one verified source
+// Definition Passage byte-for-byte instead of fabricating a citation for a multi-span synthesis.
+// Mention-only grounding intentionally has no fallback: a source that names but does not define a
+// prerequisite must remain an inspectable absence until another Curated Source supplies meaning.
+export function assembleExtractiveDefinitionLesson(input: Omit<
+  AssembleConceptLessonInput,
+  "draft" | "generatingModel"
+>): ConceptLesson | undefined {
+  const passage = input.grounding.passages.find(
+    (candidate): candidate is Extract<GroundingPassage, { sourceResourceId: string }> =>
+      candidate.kind === "definition" && isSourcePassage(candidate)
+  );
+  if (!passage) return undefined;
+  const grounded = citeVerifiedPassage(passage, passage.text, input.grounding);
+  return {
+    conceptLessonId: input.conceptLessonId,
+    derivedNodeId: input.node.derivedNodeId,
+    graphVersionId: input.node.graphVersionId,
+    enrichmentId: input.node.enrichmentId,
+    generatingModel: SOURCE_EXTRACTIVE_DEFINITION_LESSON_GENERATOR,
+    configHash: input.configHash,
+    canonicalLabel: input.node.canonicalLabel,
+    sections: [{
+      kind: "definition",
+      text: passage.text,
+      groundingProvenance: grounded.provenance,
+      citation: grounded.citation
+    }],
+    explorableTerms: []
+  };
 }
 
 export function assembleConceptLesson(input: AssembleConceptLessonInput): AssembleConceptLessonResult {

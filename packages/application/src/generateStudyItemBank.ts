@@ -61,7 +61,11 @@ import { selectSiblingContext } from "./selectSiblingContext";
 import { selectNodeGrounding } from "./selectNodeGrounding";
 import { selectLessonNeighborhood } from "./selectLessonNeighborhood";
 import { lessonGroundingShape, lessonOptionSelectAnswer, type LessonGroundingShape } from "./lessonGroundingShape";
-import { assembleConceptLesson, SUBSTANTIVE_KINDS } from "./assembleConceptLesson";
+import {
+  assembleConceptLesson,
+  assembleExtractiveDefinitionLesson,
+  SUBSTANTIVE_KINDS
+} from "./assembleConceptLesson";
 import { admitSourceConceptLessons } from "./sourceLessonAdmission";
 import { admitSourceOptionSelectItems } from "./sourceOptionSelectAdmission";
 import { qualifiedSourceExpeditionAssetConfigHash } from "./sourceExpedition";
@@ -213,13 +217,32 @@ export async function generateStudyItemBank(input: {
   // single source of grounding; option-select derives from it (U7). A node whose grounding is
   // entirely unusable, or whose draft cannot meet the R3 minimum, is recorded lesson-absent.
   let lessonDone = 0;
-  const generateLessonForNode = async (node: DerivedGraphNode): Promise<{ lesson?: ConceptLesson; absent?: LessonAbsentNode }> => {
+  const generateLessonForNode = async (node: DerivedGraphNode): Promise<{
+    lesson?: ConceptLesson;
+    absent?: LessonAbsentNode;
+    inspectionCandidate?: ConceptLesson;
+  }> => {
     const grounding = selectNodeGrounding(node, snapshot, profileByConcept);
     if (!grounding || grounding.passages.length === 0) {
       return { absent: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, reason: "no usable grounding passages" } };
     }
+    const conceptLessonId = newConceptLessonId();
+    const extractiveFallback = () => graphVersionId === null
+      ? undefined
+      : assembleExtractiveDefinitionLesson({
+          // The raw final neural candidate remains immutable under `conceptLessonId`; the
+          // code-owned fallback is a different artifact and therefore receives its own identity.
+          conceptLessonId: newConceptLessonId(),
+          node: {
+            derivedNodeId: node.derivedNodeId,
+            canonicalLabel: node.canonicalLabel,
+            graphVersionId,
+            enrichmentId: layer.enrichmentId
+          },
+          configHash: input.configHash,
+          grounding
+        });
     try {
-      const conceptLessonId = newConceptLessonId();
       const neighbors = selectLessonNeighborhood(node, layer);
       const initialDraft = await input.conceptLessonGeneration.generate({
         declaredDomain: node.declaredDomain,
@@ -281,8 +304,19 @@ export async function generateStudyItemBank(input: {
         }
       }
       if (assembled.kind === "lesson") assembled.lesson = dropRedundantNonSubstantiveSections(assembled.lesson, activeRedundancy);
+      if (assembled.kind !== "lesson" || !hasVerifiedSubstantiveSourceCitation(assembled.lesson)) {
+        const fallback = extractiveFallback();
+        if (fallback) {
+          return {
+            lesson: fallback,
+            ...(assembled.kind === "lesson" ? { inspectionCandidate: assembled.lesson } : {})
+          };
+        }
+      }
       return assembled.kind === "lesson" ? { lesson: assembled.lesson } : { absent: assembled.absent };
     } catch (error) {
+      const fallback = extractiveFallback();
+      if (fallback) return { lesson: fallback };
       return { absent: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, reason: `concept-lesson generation failed: ${error instanceof Error ? error.message : String(error)}` } };
     }
   };
@@ -304,9 +338,16 @@ export async function generateStudyItemBank(input: {
   );
 
   const candidateLessons: ConceptLesson[] = [];
+  const replacedInspectionCandidateByNode = new Map<string, ConceptLesson>();
   const assemblyAbsent: LessonAbsentNode[] = [];
   for (const result of perNodeLessons) {
     if (result.lesson) candidateLessons.push(result.lesson);
+    if (result.inspectionCandidate) {
+      replacedInspectionCandidateByNode.set(
+        result.inspectionCandidate.derivedNodeId,
+        result.inspectionCandidate
+      );
+    }
     if (result.absent) assemblyAbsent.push(result.absent);
   }
   const sourceLessonAdmission = graphVersionId === null
@@ -325,6 +366,9 @@ export async function generateStudyItemBank(input: {
         sourceSupportStage
       });
   const lessons = sourceLessonAdmission?.lessons ?? candidateLessons;
+  const inspectionCandidates = sourceLessonAdmission?.candidates.map((candidate) =>
+    replacedInspectionCandidateByNode.get(candidate.derivedNodeId) ?? candidate
+  );
   const lessonAbsent = [
     ...assemblyAbsent,
     ...(sourceLessonAdmission?.absent ?? [])
@@ -350,7 +394,7 @@ export async function generateStudyItemBank(input: {
         ? input.configHash
         : qualifiedSourceExpeditionAssetConfigHash(input.configHash),
       lessons,
-      ...(sourceLessonAdmission ? { candidateLessons: sourceLessonAdmission.candidates } : {}),
+      ...(inspectionCandidates ? { candidateLessons: inspectionCandidates } : {}),
       absent: lessonAbsent
     })
   );

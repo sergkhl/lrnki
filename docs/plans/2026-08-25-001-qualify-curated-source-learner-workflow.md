@@ -7,12 +7,12 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0–U6 complete; U7 end-to-end readiness qualification next
+**Status:** In progress — U0–U6 complete; U7 core diagnostic inspected and repaired
 
-**NEXT:** Execute U7 starting only from `diagnostic-manifest.json`: run the harbor core alone, add
-its supplement through Source Registration, and carry the resulting complete Source Expedition
-through automatic qualification, adoption, learner read, and exact-reference Support Path. Inspect
-every visible payload beside evidence, then repeat the smallest representative external-source path.
+**NEXT:** Resume U7 by registering the harbor supplement, extending the inspected core graph, and
+generating the combined candidate under the new extractive-definition policy identity. Carry it
+through qualification, automatic adoption, learner read, and exact-reference Support Path; then
+repeat the smallest representative external-source path.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
 Curated Sources and automatically admits only source-backed learner assets. Anchor-less Synthetic
@@ -79,6 +79,15 @@ against grounding documents with a specialized sub-billion-parameter model; [Ali
 learns a general alignment function. Their benchmark results do not qualify lrnki's domains,
 negative options, unique assignments, or production threshold. U4 therefore treats a local model as
 an explicit measured module with a kill gate, not as a drop-in oracle.
+
+### Multi-span synthesis under single-span attribution
+
+One lesson section can cite one admitted passage, so prose synthesized across two passages cannot
+truthfully inherit either citation. FActScore's atomic-fact discipline and citation-completeness and
+precision measures in [ALCE](https://aclanthology.org/2023.emnlp-main.398/) and
+[generative-search verifiability](https://aclanthology.org/2023.findings-emnlp.467/) favor smaller
+attributable units. Because the current persisted contract intentionally has one citation per
+section, the bounded repair is one verbatim Definition Passage, not a fabricated multi-span citation.
 
 ### Transport authority leaking into application policy
 
@@ -578,14 +587,29 @@ The plan is complete only when all of the following are true:
   projection mechanics and no generation attempt; it makes no neural-content, deployed, browser,
   native, emulator/simulator, or physical-device claim. **Safe to continue:** yes, to U7.
 
+### U7 — core diagnostic and attribution repair — 2026-08-26 — in progress
+
+- The harbor core crossed registration, extraction, canonicalization, publication, enrichment,
+  Study Item Bank generation, and qualification in disposable `lrnki_test`. Its 12-node closure had
+  zero LLM-grounded nodes; five exact lessons/options qualified, 11 lesson absences remained, and
+  qualification refused `lesson_missing`. Mention-only Tide Margin remained absent as designed.
+- Inspection found a dispatch-token section combining two admitted Definition Passages under the
+  one-citation contract. The existing gates rejected it; no learner asset was falsely accepted.
+  Generation now falls back to one exact Definition Passage with explicit non-model producer
+  identity, retains the neural draft under a distinct inspection identity, and cannot fall back from
+  mention-only grounding. Study Item Bank identity changed to `study-item-bank-db1cc7c888fa`.
+- The application and infrastructure-LiteLLM suites, four affected typechecks, focused lint, and
+  whitespace checks pass. This is local test-database plus live-provider evidence only. **Safe to
+  continue:** yes, with the registered supplement and combined-candidate inspection.
+
 ### Open findings
 
 - U4's local verifier remains rejected for one material false acceptance and broken LiteLLM success
   logging; do not rerun it or pick a second local candidate. The activated remote assignment is
   qualified only for source material support, not general generation or source-less grounding.
-- The final external U5 candidate remained unavailable because three nodes had no admitted lesson.
-  This proves safe refusal, not complete readiness; U7 must use the harbor-plus-supplement path to
-  prove a complete automatic expedition before the representative external-source repetition.
+- The core-only U7 candidate and final external U5 candidate remain unavailable because their
+  prerequisite closures have lesson absences. This proves safe refusal, not readiness. Register the
+  harbor supplement and inspect the combined candidate before the external-source repetition.
 - Matching and impostor remain preserved but unqualified. They do not satisfy readiness in this plan;
   Source Expedition snapshots now exclude them structurally. A future plan may qualify them
   independently after the option-select Source Expedition works.
