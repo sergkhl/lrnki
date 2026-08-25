@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>North Quay Tide Margin Supplement</title>
+  </head>
+  <body>
+    <main>
+      <article>
+        <h1>North Quay Tide Margin Supplement</h1>
+        <p>
+          This supplement defines the tide-margin input used by the Harbor Dispatch Core Protocol.
+          It applies to a particular vessel, planned channel, and planned transit time.
+        </p>
+
+        <h2>Tide margin</h2>
+        <p>
+          <strong>Tide margin</strong> is the predicted minimum water depth along the planned
+          channel at the planned transit time minus the vessel's required water depth in its current
+          loading condition. The calculation uses the lowest predicted channel depth, not the harbor's
+          average depth.
+        </p>
+        <p>
+          Tide height and tide margin are different quantities. Tide height describes water level
+          relative to a chart reference. Tide margin additionally depends on channel depth and the
+          required water depth of the particular vessel. Two vessels at the same tide height can
+          therefore have different tide margins.
+        </p>
+
+        <h2>Adequate margin</h2>
+        <p>
+          A North Quay ferry has <strong>adequate tide margin</strong> when its calculated tide margin
+          is at least 0.8 metres. A positive margin below 0.8 metres is not adequate for this protocol.
+          The threshold applies to North Quay ferry departures; it is not a universal threshold for
+          every harbor or vessel class.
+        </p>
+        <p>
+          Adequate tide margin is necessary for ordinary release, but it is not movement authority.
+          Harbor Control must still create a berth reservation, validate the dispatch token during
+          the clearance window, and confirm that no safety override is active.
+        </p>
+
+        <h2>Forecast updates</h2>
+        <p>
+          The calculation is tied to the forecast revision used for the planned transit time. If a
+          newer forecast lowers the predicted minimum channel depth before movement is authorized,
+          Harbor Control recalculates the margin. An earlier adequate result does not remain valid
+          merely because a dispatch token has already been issued.
+        </p>
+
+        <h2>Example</h2>
+        <p>
+          At 10:20, the predicted minimum channel depth is 4.6 metres. Ferry Cedar requires 3.7
+          metres in its current loading condition, so its tide margin is 0.9 metres and is adequate.
+          Ferry Dune requires 4.0 metres under the same forecast, so its 0.6-metre margin is positive
+          but not adequate for North Quay release.
+        </p>
+      </article>
+    </main>
+  </body>
+</html>

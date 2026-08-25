@@ -4,32 +4,37 @@
 
 ## TODO
 
-- **Same-call Grounding identity-scope audit — blocked; U0–U2 and U4 complete, candidate rejected,
-  U3 skipped.** Follow
-  [the execution-order experiment](./2026-08-24-001-test-grounding-identity-scope-audit.md). Its first
-  fixed Pyruvate draw narrowed identity to the PDH/NAD+ mechanism despite a strict DeepInfra FP8
-  contract pass, so the kill rule stopped all later draws and activation. Do not rerun it; new
-  assignment and learner-asset policy work is owner-gated in [BLOCKERS](./BLOCKERS.md).
+- **Curated-source learner workflow — in progress; U0 complete, U1 next.** Follow
+  [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md). The
+  accepted contract starts at registered Curated Sources, requires a complete automatically
+  qualified source-backed lesson/item trail, retains exact-reference Support Steps, and keeps
+  Synthetic Topic Generation, LLM-grounded learner nodes, and generated Support Steps unavailable
+  without deleting their implementations. Implement only the single availability-policy unit next.
 
-- **Operation-neutral DeepSeek Grounding — on hold; U0–U3 and U5 complete, U4 remains
-  `FIX_FIRST`.** [Plan 003](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md) remains the
-  affected-consumer qualification owner, but its same-call successor failed the first direct kill
-  gate. Resume only after the owner selects and a successor qualifies a new Grounding assignment;
-  do not repeat already qualifying evidence merely to move status.
+- **Same-call Grounding identity-scope audit — terminally rejected; closing record.** The first fixed
+  Pyruvate draw narrowed identity to the PDH/NAD+ mechanism despite a strict DeepInfra FP8 contract
+  pass. Do not rerun it; consolidate and delete
+  [the experiment](./2026-08-24-001-test-grounding-identity-scope-audit.md) after the successor's
+  detailed U0 record is committed.
 
-- **Source-less Grounding context and answer correlation — on hold; U0–U1 complete.** The
-  [predecessor plan](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md) retains
-  its committed interface evidence. Plan 003 still owns final affected-consumer qualification and
-  consolidation after the owner-gated Grounding assignment decision; do not resume the shared-MiMo
-  preflight.
+- **Operation-neutral DeepSeek Grounding — superseded for execution; closing record.** U0–U3 and U5
+  are complete; U4 remains `FIX_FIRST`. The accepted source-backed policy holds the affected
+  source-less consumers out rather than selecting another assignment. Preserve the implementation,
+  then consolidate and delete [Plan 003](./2026-08-23-003-unify-source-less-grounding-on-deepseek.md).
 
-- **Topic Expedition generation latency — blocked; U3 remains `FIX_FIRST`.** Follow
-  [the active plan](./2026-08-22-001-repair-topic-expedition-generation-latency.md) in U0–U4 order.
+- **Source-less Grounding context and answer correlation — superseded for execution; closing
+  record.** U0–U1 and their committed interface changes remain. Do not resume the shared-MiMo
+  preflight; consolidate and delete
+  [the predecessor](./2026-08-23-002-deepen-source-less-grounding-and-answer-correlation.md) without
+  deleting its implementation.
+
+- **Topic Expedition generation latency — superseded for execution; closing record.** U3 remains
+  `FIX_FIRST` in [the latency record](./2026-08-22-001-repair-topic-expedition-generation-latency.md).
   The bounded admission pipeline and honest 19-stage Journal profile are complete, but equal widths
   8, 12, and 16 all exceeded seven minutes during enrichment and every settled attempt rejected
   over-broad Grounding Bundles. Production-model prompt/schema and pre-draft trials did not clear
-  the unchanged admission contract and were discarded. Keep width four and resume only after the
-  deepening plan supplies a successful, fully inspected quality baseline.
+  the unchanged admission contract and were discarded. Keep width four and the implementation;
+  consolidate and delete the plan while Synthetic Topic Generation remains paused.
 
 ## COMPLETED
 
@@ -38,8 +43,10 @@
   preserving ready curated-source expeditions. Rust source-backed Graph Enrichment was repaired and
   inspected; option-select now copies its keyed claim losslessly from the Concept Lesson. The full
   learner bank remains unqualified after independent lesson, distractor, matching, and impostor
-  counterexamples, so the next product/spend choice lives in [BLOCKERS](./BLOCKERS.md). Detailed
-  record: commits `a19baa0`, `60bb3f5`, `ccd3512`, `08de20d`, `8249d1d`, `02798fe`, and `e5e147c`.
+  counterexamples. The accepted precision-first successor is the
+  [curated-source learner workflow](./2026-08-25-001-qualify-curated-source-learner-workflow.md).
+  Detailed record: commits `a19baa0`, `60bb3f5`, `ccd3512`, `08de20d`, `8249d1d`, `02798fe`, and
+  `e5e147c`.
 
 - **Topic Expedition generation is scoped to DeepSeek and its stage decisions are frozen
   (2026-08-23).** One composition-owned routing value moves the nine direct generators without

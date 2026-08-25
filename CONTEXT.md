@@ -183,6 +183,11 @@ A learner-owned expedition created from a requested topic and backed, when ready
 Generation layer and its study assets.
 _Avoid_: source-grounded expedition, synthetic pipeline
 
+**Source Expedition**:
+A learner-owned expedition adopted from a learner-ready source-derived Graph Enrichment layer whose
+knowledge and current study assets are backed by registered Curated Sources.
+_Avoid_: Topic Expedition, raw enrichment, client-approved source layer
+
 **Learner App**:
 The learner-facing application that turns Derived Graph Layers and Learner State into playable study
 experiences.

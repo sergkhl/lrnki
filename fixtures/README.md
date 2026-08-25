@@ -2,6 +2,29 @@
 
 Stable English-language sources for integration quality runs. Generated artifacts belong under `tmp/`, not here.
 
+## Project-authored diagnostic sources
+
+[`diagnostic-manifest.json`](./diagnostic-manifest.json) registers a compact source-backed workflow
+suite authored for lrnki. It supplements the real-source quality matrix below; it does not replace
+representative real Curated Source inspection or act as a standing semantic oracle under ADR-0013.
+
+| Source | Domain | Format | Diagnostic pressure |
+|--------|--------|--------|---------------------|
+| *Harbor Dispatch Core Protocol* | Harbor operations | Markdown | Carrier versus referent, expiring authority, conditional scope, and one intentionally undefined prerequisite |
+| *North Quay Tide Margin Supplement* | Harbor operations | HTML | A second Curated Source supplies the missing prerequisite, distinguishes related quantities, and limits a threshold to one context |
+| *Islanded Microgrid Reserve Procedure* | Microgrid operations | Plaintext | Mode-qualified rules, measurement versus measured state, emergency exception, and ordered recovery |
+| *Archive Frame Encoding* | Data serialization | Markdown | Octet, Unicode scalar, and grapheme distinctions; equal-value non-equivalence; checksum scope |
+
+The harbor pair is the source-acquisition handoff example. A run over the core protocol alone names
+Tide Margin without defining its calculation. Registering the supplement through the same Curated
+Source interface supplies that evidence; tests must not inject the supplement directly into a model
+prompt or treat the core document's mention as a definition.
+
+These files are intentionally short enough for direct artifact inspection. Their prose may expose a
+candidate verifier or generator defect, but a fixed expected neural output must not become a
+deterministic quality oracle. Prompt and forced-tool descriptions remain domain-neutral and must not
+name these fixture concepts or expected outcomes.
+
 ## Canonical fixture matrix
 
 Two gates (decided 2026-06-11, clarified 2026-06-16): Gate 1 exercises the

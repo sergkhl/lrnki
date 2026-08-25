@@ -1,0 +1,56 @@
+ISLANDED MICROGRID RESERVE PROCEDURE
+
+Purpose
+
+The fictional Rowan Microgrid can operate in grid-connected mode or islanded mode. Grid-connected
+mode allows the external grid to balance short changes in demand. Islanded mode disconnects the
+microgrid from the external grid, so local storage and generation must balance demand.
+
+Reserve floor
+
+The reserve floor is a control target used only while the Rowan Microgrid is islanded. It requires
+the battery state-of-charge estimate to remain at or above 30 percent during ordinary islanded
+operation. The reserve floor is not a universal minimum for grid-connected operation, battery
+shipping, maintenance, or emergency shutdown.
+
+Crossing below 30 percent does not mean the battery contains no energy. It means ordinary islanded
+dispatch has crossed the configured reserve target. The safety controller may disconnect loads or
+shut down the battery at a different limit.
+
+State-of-charge estimate
+
+The state-of-charge estimate is the controller's current estimate of usable battery energy expressed
+as a percentage of the configured usable capacity. It is a measurement-derived representation, not
+the stored energy itself. Copying the estimate to a dashboard does not copy energy, alter the battery,
+or guarantee that the estimate remains current.
+
+The controller marks an estimate stale when no accepted sensor update has arrived for sixty seconds.
+A stale estimate must not authorize an ordinary discharge command, even when its displayed value is
+above the reserve floor.
+
+Ordinary islanded discharge
+
+An ordinary islanded discharge command is eligible only when all of the following are true:
+
+1. The microgrid is in islanded mode.
+2. The state-of-charge estimate is current.
+3. The estimated state of charge is above the 30 percent reserve floor.
+4. No battery safety interlock is active.
+
+These conditions make a command eligible; they do not require the controller to discharge. The
+dispatch controller may continue charging or hold the current output when local generation already
+meets demand.
+
+Emergency override
+
+During a declared emergency, the emergency controller may authorize discharge below the ordinary
+reserve floor to supply the protected medical circuit. This exception does not redefine the reserve
+floor and does not make below-floor discharge ordinary operation. The battery safety interlock still
+has priority and may refuse the emergency command.
+
+Recovery
+
+After grid service returns, the microgrid first synchronizes with the external grid, then closes the
+grid connection, and only then leaves islanded mode. The islanded reserve floor stops governing
+ordinary dispatch after the mode transition completes. A grid-available signal by itself does not
+complete that transition.

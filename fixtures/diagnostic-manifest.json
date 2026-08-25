@@ -1,0 +1,41 @@
+{
+  "$comment": "Project-authored diagnostic Curated Sources. This compact suite stresses source traceability, qualifiers, provenance distinctions, and multi-source prerequisite completion. It supplements rather than replaces the real-source quality manifest.",
+  "fixtures": [
+    {
+      "fixtureId": "diagnostic-harbor-dispatch-core",
+      "path": "fixtures/markdown/lrnki-diagnostic-harbor-dispatch-core.md",
+      "contentType": "text/markdown",
+      "declaredDomain": "harbor operations",
+      "title": "Harbor Dispatch Core Protocol",
+      "source": "lrnki project-authored diagnostic source",
+      "license": "Project test fixture"
+    },
+    {
+      "fixtureId": "diagnostic-harbor-tide-margin",
+      "path": "fixtures/html/lrnki-diagnostic-harbor-tide-margin-supplement.html",
+      "contentType": "text/html",
+      "declaredDomain": "harbor operations",
+      "title": "North Quay Tide Margin Supplement",
+      "source": "lrnki project-authored diagnostic source",
+      "license": "Project test fixture"
+    },
+    {
+      "fixtureId": "diagnostic-microgrid-reserve",
+      "path": "fixtures/plaintext/lrnki-diagnostic-microgrid-reserve-procedure.txt",
+      "contentType": "text/plain",
+      "declaredDomain": "microgrid operations",
+      "title": "Islanded Microgrid Reserve Procedure",
+      "source": "lrnki project-authored diagnostic source",
+      "license": "Project test fixture"
+    },
+    {
+      "fixtureId": "diagnostic-archive-frame-encoding",
+      "path": "fixtures/markdown/lrnki-diagnostic-archive-frame-encoding.md",
+      "contentType": "text/markdown",
+      "declaredDomain": "data serialization",
+      "title": "Archive Frame Encoding",
+      "source": "lrnki project-authored diagnostic source",
+      "license": "Project test fixture"
+    }
+  ]
+}
