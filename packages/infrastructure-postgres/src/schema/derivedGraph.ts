@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import type { AbsorbedNodeGrounding } from "@lrnki/domain-core";
 import {
   boolean,
   check,
@@ -330,7 +331,10 @@ export const derivedNodeMerges = pgTable(
     absorbedLabel: text("absorbed_label").notNull(),
     absorbedAliases: jsonb("absorbed_aliases").notNull(),
     absorbedNodeKind: text("absorbed_node_kind").notNull(),
-    absorbedEvidence: jsonb("absorbed_evidence").notNull(),
+    // The physical column predates typed grounding retention. Its current code-owned
+    // JSON shape is AbsorbedNodeGrounding; keep the column name so this behavior fix
+    // does not create an unrelated reset-only schema rename.
+    absorbedGrounding: jsonb("absorbed_evidence").$type<AbsorbedNodeGrounding>().notNull(),
     proposingSignal: text("proposing_signal").notNull(),
     proposingScore: real("proposing_score").notNull(),
     rationale: text("rationale").notNull(),

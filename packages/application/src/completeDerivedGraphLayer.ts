@@ -492,11 +492,12 @@ const hasEvidence = (context: PrerequisiteConceptContext): boolean =>
 
 // Reduce a derived node to exactly what the prerequisite and difficulty judges need
 // (KTD2). An anchor uses its published CEP (verbatim definition + bounded mention quotes
-// + LABELED `defines` assertions); a `source_mentioned` node has no definition — only
-// verbatim mention quotes; an `llm_grounded` node uses its generated definition/mention
-// text (exempt from the verbatim floor). The bare label is never the evidence — an empty
-// context is treated as insufficient upstream. Exported for the dedup front half, whose
-// merge-adjudication contexts reuse the same reduction — one authority, two readers.
+// + LABELED `defines` assertions); a `source_mentioned` node projects its verified typed
+// passages into source-quote context (the prerequisite contract does not assign passage
+// roles); an `llm_grounded` node uses its generated definition/mention text (exempt from
+// the verbatim floor). The bare label is never the evidence — an empty context is treated
+// as insufficient upstream. Exported for the dedup front half, whose merge-adjudication
+// contexts reuse the same reduction — one authority, two readers.
 export function derivedNodeJudgmentContext(
   node: DerivedGraphNode,
   profileByConcept: Map<string, PublishedConceptEvidenceProfile>,
@@ -508,7 +509,9 @@ export function derivedNodeJudgmentContext(
   absorbedGrounding?: string[]
 ): PrerequisiteConceptContext {
   const withAbsorbed = (mentions: string[]): string[] =>
-    absorbedGrounding && absorbedGrounding.length ? [...mentions, ...absorbedGrounding] : mentions;
+    absorbedGrounding && absorbedGrounding.length
+      ? [...new Set([...mentions, ...absorbedGrounding])]
+      : mentions;
   if (node.nodeKind === "anchor") {
     const profile = profileByConcept.get(node.conceptId);
     const publishedAssertions = profile?.assertions ?? [];

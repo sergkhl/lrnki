@@ -138,7 +138,7 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
           VALUES (
             ${randomUUID()}, ${layer.enrichmentId}, ${merge.declaredDomain},
             ${merge.canonicalDerivedNodeId}, ${merge.canonicalLabel}, ${merge.canonicalNodeKind},
-            ${merge.absorbedDerivedNodeId}, ${merge.absorbedLabel}, ${tx.json(merge.absorbedAliases)}, ${merge.absorbedNodeKind}, ${tx.json(merge.absorbedEvidence)},
+            ${merge.absorbedDerivedNodeId}, ${merge.absorbedLabel}, ${tx.json(merge.absorbedAliases)}, ${merge.absorbedNodeKind}, ${tx.json(merge.absorbedGrounding as Parameters<Sql["json"]>[0])},
             ${merge.proposingSignal}, ${merge.proposingScore}, ${merge.rationale}, ${merge.canonicalSelectionReason}
           )`;
       }
@@ -335,7 +335,7 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
         declaredDomain: node.declared_domain,
         aliases: node.aliases,
         groundingPassages: (passagesByNode.get(node.derived_node_id) ?? []).map((passage) => ({
-          passageType: "mention",
+          passageType: passage.passage_type as SourceMentionGroundingPassage["passageType"],
           text: passage.evidence_quote ?? "",
           groundingOrigin: "source_mentioned",
           sourceResourceId: passage.source_resource_id ?? "",

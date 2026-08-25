@@ -434,7 +434,10 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
         { nodeKind: "enrichment", derivedNodeId: mintedId, groundingOrigin: "llm_grounded", mintingReason: "assumed_prerequisite", role: "prerequisite", layer: "derived", canonicalLabel: "Stack allocation", normalizedLabel: "stack allocation", declaredDomain: "software engineering", aliases: [],
           groundingBundle: { groundingOrigin: "llm_grounded", definitions: [{ passageType: "definition", text: "Stack allocation stores short-lived values.", groundingOrigin: "llm_grounded", headingPath: [], locator: {}, verbatimCheck: { disposition: "not_applicable_by_grounding", rationale: "generated" } }], mentions: [], groundingAnchorReferences: [anchorId], generatingModel: "mock-gen", rationale: "scaffolds ownership" } },
         { nodeKind: "enrichment", derivedNodeId: rescuedId, groundingOrigin: "source_mentioned", role: "prerequisite", layer: "derived", canonicalLabel: "Borrowing", normalizedLabel: "borrowing", declaredDomain: "software engineering", aliases: [],
-          groundingPassages: [{ passageType: "mention", text: "Borrowing lets you reference a value without taking ownership.", groundingOrigin: "source_mentioned", sourceResourceId, sourceBlockId: blk("b2"), evidenceQuote: "Borrowing lets you reference a value without taking ownership.", headingPath: ["Borrowing"], locator: {}, verbatimCheck: { disposition: "verified", sourceResourceId, sourceBlockId: blk("b2") } }] }
+          groundingPassages: [
+            { passageType: "definition", text: "Borrowing lets you reference a value without taking ownership.", groundingOrigin: "source_mentioned", sourceResourceId, sourceBlockId: blk("b2"), evidenceQuote: "Borrowing lets you reference a value without taking ownership.", headingPath: ["Borrowing"], locator: {}, verbatimCheck: { disposition: "verified", sourceResourceId, sourceBlockId: blk("b2") } },
+            { passageType: "mention", text: "Ownership is a set of rules that govern memory.", groundingOrigin: "source_mentioned", sourceResourceId, sourceBlockId: blk("b1"), evidenceQuote: "Ownership is a set of rules that govern memory.", headingPath: ["Ownership"], locator: {}, verbatimCheck: { disposition: "verified", sourceResourceId, sourceBlockId: blk("b1") } }
+          ] }
       ],
       prerequisiteEdges: [
         { prerequisiteDerivedNodeId: mintedId, dependentDerivedNodeId: anchorId, predicate: "inferred-prerequisite-of", confidence: 0.8, uncertain: false, provenance: { judgmentRationale: "minted scaffolds anchor" } },
@@ -477,7 +480,11 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
     nodeMerges: [
       { declaredDomain: "software engineering", canonicalDerivedNodeId: anchorId, canonicalLabel: anchorLabel, canonicalNodeKind: "anchor",
         absorbedDerivedNodeId: absorbedMergeId, absorbedLabel: "Ownership (Rust)", absorbedAliases: ["owning"], absorbedNodeKind: "enrichment",
-        absorbedEvidence: ["the owner frees memory"], proposingSignal: "embedding_cosine", proposingScore: 0.97, rationale: "two surface forms of one concept", canonicalSelectionReason: "anchor_over_enrichment" }
+        absorbedGrounding: {
+          groundingOrigin: "source_mentioned",
+          groundingPassages: [{ passageType: "mention", text: "the owner frees memory", groundingOrigin: "source_mentioned", sourceResourceId, sourceBlockId: blk("b1"), evidenceQuote: "the owner frees memory", headingPath: [], locator: {}, verbatimCheck: { disposition: "verified", sourceResourceId, sourceBlockId: blk("b1") } }]
+        },
+        proposingSignal: "embedding_cosine", proposingScore: 0.97, rationale: "two surface forms of one concept", canonicalSelectionReason: "anchor_over_enrichment" }
     ] };
     const store = new PostgresEnrichmentRunStore(sql);
     await store.persist({ layer, artifact: { artifactId: `${enrichmentId}:enrichment-run`, artifactType: "enrichment_run", graphVersionId, producer: "test", producerVersion: "0", configHash: "test-enrichment", createdAt: new Date().toISOString(), payload: trace } });
@@ -491,6 +498,7 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
     const rescued = hydrated.derivedNodes.find((node) => node.derivedNodeId === rescuedId);
     assert.ok(rescued && rescued.nodeKind === "enrichment" && rescued.groundingOrigin === "source_mentioned");
     assert.equal(rescued.groundingPassages[0].evidenceQuote, "Borrowing lets you reference a value without taking ownership.");
+    assert.deepEqual(rescued.groundingPassages.map((passage) => passage.passageType), ["definition", "mention"]);
     assert.equal(hydrated.prerequisiteEdges.length, 2);
     assert.equal(hydrated.difficulties.length, 3);
 
@@ -528,7 +536,7 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
     // (label/aliases/evidence/signal/score/reason) round-trip.
     const merges = await sql<{
       canonical_derived_node_id: string; absorbed_derived_node_id: string; absorbed_label: string;
-      absorbed_aliases: string[]; absorbed_evidence: string[]; proposing_signal: string; proposing_score: number;
+      absorbed_aliases: string[]; absorbed_evidence: { groundingOrigin: string; groundingPassages: { evidenceQuote: string; passageType: string }[] }; proposing_signal: string; proposing_score: number;
       canonical_selection_reason: string; canonical_node_kind: string; absorbed_node_kind: string;
     }[]>`SELECT canonical_derived_node_id, absorbed_derived_node_id, absorbed_label, absorbed_aliases, absorbed_evidence,
             proposing_signal, proposing_score, canonical_selection_reason, canonical_node_kind, absorbed_node_kind
@@ -538,7 +546,8 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
     assert.equal(merges[0].absorbed_derived_node_id, absorbedMergeId);
     assert.equal(merges[0].absorbed_label, "Ownership (Rust)");
     assert.deepEqual(merges[0].absorbed_aliases, ["owning"]);
-    assert.deepEqual(merges[0].absorbed_evidence, ["the owner frees memory"]);
+    assert.equal(merges[0].absorbed_evidence.groundingOrigin, "source_mentioned");
+    assert.deepEqual(merges[0].absorbed_evidence.groundingPassages.map((passage) => [passage.passageType, passage.evidenceQuote]), [["mention", "the owner frees memory"]]);
     assert.equal(merges[0].proposing_signal, "embedding_cosine");
     assert.ok(Math.abs(Number(merges[0].proposing_score) - 0.97) < 1e-5);
     assert.equal(merges[0].canonical_selection_reason, "anchor_over_enrichment");

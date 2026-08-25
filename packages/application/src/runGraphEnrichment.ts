@@ -59,6 +59,12 @@ export type GraphEnrichmentConfig = DerivedGraphCompletionConfig & {
   // Semantic-dedup knobs (plan U3). Only consulted when both dedup ports are provided;
   // tuned in the U7 rule-14 pass against the largest domain.
   dedup: DedupConfig;
+  // Entity-fusion application policy. A semantic identity merge unions compatible
+  // source passages on the surviving source-mentioned node and retains the absorbed
+  // node's complete typed grounding in the immutable merge record. This literal is
+  // load-bearing artifact identity: changing evidence/provenance handling re-derives
+  // the layer even when the neural routing is unchanged.
+  semanticMergeGroundingPolicy: "typed_grounding_union";
 };
 
 export const DEFAULT_ENRICHMENT_CONFIG: GraphEnrichmentConfig = {
@@ -71,7 +77,8 @@ export const DEFAULT_ENRICHMENT_CONFIG: GraphEnrichmentConfig = {
   difficultySampleCount: 5,
   mintingBounds: DEFAULT_MINTING_BOUNDS,
   sourceLessGroundingAdmission: DEFAULT_SOURCE_LESS_GROUNDING_ADMISSION_POLICY,
-  dedup: DEFAULT_DEDUP_CONFIG
+  dedup: DEFAULT_DEDUP_CONFIG,
+  semanticMergeGroundingPolicy: "typed_grounding_union"
 };
 
 type GraphEnrichmentMintingDependencies =

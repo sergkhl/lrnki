@@ -7,12 +7,13 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0–U6 complete; U7 revised graph published
+**Status:** In progress — U0–U6 complete; U7 evidence fusion repaired
 
-**NEXT:** Enrich inspected graph `cb834545-b02e-4aae-8906-123f9514586e`, inspect every derived node,
-grounding passage, and prerequisite decision, then generate exactly one Study Item Bank. Only after
-that bank passes qualification may the workflow adopt/read it, exercise exact-reference Support
-Path, and repeat the smallest representative path on an external Curated Source.
+**NEXT:** Define `quarantine` at the model-facing Concept Admission contract as the existing
+unresolved identity-or-meaning-conflict state, re-extract both diagnostic harbor sources under the
+new identity, then rebuild, enrich, and inspect before generating exactly one Study Item Bank. Only
+after that bank passes may the workflow adopt/read it, exercise exact-reference Support Path, and
+repeat the smallest representative path on an external Curated Source.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
 Curated Sources and automatically admits only source-backed learner assets. Anchor-less Synthetic
@@ -111,6 +112,14 @@ only mutually substitutable identities may merge: SKOS distinguishes high-confid
 related, and other non-identity relations. The forced enum also reproduced recognized
 [answer-choice position bias](https://aclanthology.org/2024.findings-naacl.130/). The bounded repair
 uses mutual substitution, medium reasoning, conservative enum order, and exact provider controls; no lexical veto.
+
+### Provenance loss during entity fusion
+
+Semantic resolution and evidence fusion are separate: collapsing identities must not discard
+attributes or lineage. [W3C PROV Constraints](https://www.w3.org/TR/prov-constraints/) unions
+compatible same-key attribute lists, while the [PROV overview](https://www.w3.org/TR/prov-overview/)
+retains origins and derivation. The repair retains typed absorbed grounding and unions only
+compatible source passages; it never converts unlike origins into source evidence.
 
 ### Transport authority leaking into application policy
 
@@ -557,44 +566,35 @@ The plan is complete only when all of the following are true:
 ### U7 — complete-journey real-use qualification — 2026-08-26 — in progress
 
 - Earlier core/combined banks were never adopted: exact inspection found citation, carrier/subject,
-  and missing-lesson defects; the strict gate refused both. The completion source defines the gaps.
-- The Definition Passage contract now binds the named definiendum to its definiens. Fresh run
-  `57a2b5aa-fd0b-49e2-a5df-17a2ae5ae821` (`source-extraction-2b15b67d6238`) kept four definitions,
-  moved three wrong-subject passages to mentions, and passed exact negative/positive inspection.
-- Concept Canonicalization now records one relationship taxonomy and merges only `equivalent`.
-  The relationship reaches immutable artifacts, refinement provenance, inspection, and Admin Lab;
-  old binary artifacts read as `legacy_binary_distinct` without invented detail.
-- A reasoning-disabled DeepSeek control reproduced forced-enum position bias: the rationale correctly
-  concluded input/result while the first-listed enum said `equivalent`. Conservative enum order plus
-  the flat medium-reasoning route made both DeepInfra and direct Io Net return `input_or_result` for
-  the exact negative and `equivalent` for the alias positive. Current identities are
-  `concept-canonicalization-c9f1b792acf4` and `graph-enrichment-eddd447accc5`.
-- Negative-control artifact `edd91f19-2780-4fd8-ac7e-5ee5d7f12dc0` kept the 0.9358-cosine formula
-  input distinct and remains unbuilt because its run predates the upstream repair. Current artifact
-  `d67d6fef-6c1a-42a5-989a-a1afb01e0bbf` recorded one true merge, two related distinctions, and no
-  quarantine/unavailable result. Invalid artifact `1a59ce72-bf74-4552-a994-c2df3737d58a` is unbuilt.
-- Published disposable graph `cb834545-b02e-4aae-8906-123f9514586e` has seven Concepts and no false
-  `Predicted minimum channel depth` identity. Revised evidence is confined to `Adequate Margin`,
-  `Tide Margin`, and new `movement authorization`; their full profiles contain 2/2/2 definitions
-  and 7/10/3 mentions; the build made no LLM call.
-- Both canonicalizations made nine calls / 9,899 tokens for $0.000686198; all seven judgments were
-  DeepInfra FP8 medium-reasoning DeepSeek. Io Net controls added 2,332 tokens / $0.000534674, while
-  the generated-layer Xiaomi override also passed both controls with 2,068 unbilled tokens.
-  Automation passed 860 application, 207 LiteLLM, and 116 Postgres tests (101 DB tests skipped
-  outside the reset route), all 11 typechecks, full lint with zero errors, and whitespace. Authority
-  is local disposable-database plus live-provider only. **Safe to continue:** yes, to enrichment;
-  its changed identity requires fresh evidence.
+  and missing-lesson defects, so the strict gate refused both.
+- Definition admission now binds the named definiendum to its definiens. Concept Canonicalization
+  merges only `equivalent`; its conservative medium-reasoning DeepSeek route passed exact alias and
+  formula-input controls on both providers. Identity: `concept-canonicalization-c9f1b792acf4`.
+- Artifact `d67d6fef-6c1a-42a5-989a-a1afb01e0bbf` recorded one true merge, two related distinctions,
+  and no quarantine. Its seven-Concept graph had no false formula-input identity, but enrichment's
+  correct Forecast revision/update merge exposed provenance loss: the definition survived only as
+  audit text and hydration relabeled every passage as a mention. No bank was started.
+- Semantic merge records now retain complete typed absorbed grounding. Same-origin source nodes
+  union exact-deduped passages; unlike origins remain typed audit evidence, anchors cannot be
+  absorbed, and hydration preserves roles without a physical schema change. Identity:
+  `graph-enrichment-7acf2b563308`.
+- The repair passed 862 application and 207 LiteLLM tests, the reset-backed repository gate including
+  all Postgres suites, schema parity, all 11 typechecks, zero-error lint, and whitespace. Pre-repair
+  enrichment's 36 calls / 100,641 tokens / $0.015763842 are negative-control evidence.
+- After the required reset, fresh core run `185c0cf0-cd6d-4a48-8265-a518fc35f020` admitted three core
+  Concepts and supplement run `62736274-1f86-48fa-b3a7-3b6f20416ed4` admitted five; exact inspection
+  confirmed their named definitions. Build refused the core run because the model used undefined
+  `quarantine` for a safely deferred prerequisite, not an identity-or-meaning conflict. Authority is
+  local test-database plus live-provider only. **Safe to continue:** yes, to a domain-neutral contract
+  repair and fresh pair, not publication or a lucky rerun.
 
 ### Open findings
 
-- U4's local verifier remains rejected for one material false acceptance and broken LiteLLM success
-  logging; do not rerun it or pick a second local candidate. The activated remote assignment is
-  qualified for source material support and the exact Concept-identity schema, not general
-  generation or source-less grounding.
-- Never publish artifact `1a59ce72-bf74-4552-a994-c2df3737d58a` or build negative-control artifact
-  `edd91f19-2780-4fd8-ac7e-5ee5d7f12dc0`. Enrich current graph
-  `cb834545-b02e-4aae-8906-123f9514586e` under `graph-enrichment-eddd447accc5`; inspect it before
-  generating one new bank, and do not reuse either incomplete bank as passing evidence.
-- Matching and impostor remain preserved but unqualified. They do not satisfy readiness in this plan;
-  Source Expedition snapshots now exclude them structurally. A future plan may qualify them
-  independently after the option-select Source Expedition works.
+- U4's local verifier remains rejected for one material false acceptance and broken LiteLLM logging;
+  do not rerun it or pick another. The remote assignment is qualified for source support and exact
+  Concept identity, not general generation or source-less grounding.
+- Never publish or luckily rerun core run `185c0cf0-cd6d-4a48-8265-a518fc35f020`. Define
+  `quarantine` as the existing unresolved identity-or-meaning-conflict state in the prompt and tool
+  schema, bump identity, and re-extract both sources. The old supplement run is inspection evidence.
+- Matching and impostor remain preserved but unqualified and structurally excluded from Source
+  Expedition readiness. A future plan may qualify them after option-select works.

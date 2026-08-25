@@ -326,7 +326,7 @@ test("only affected operation hashes change and Topic has twenty conceptual stag
     "default Synthetic changes with the Grounding audit contract"
   );
   assert.equal(studyItemBankConfigHash(), "study-item-bank-21e87c60d969");
-  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-eddd447accc5");
+  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-7acf2b563308");
   assert.notEqual(
     graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG),
     "graph-enrichment-2af0ada6d7e6",

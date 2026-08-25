@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { AnchorProjectionNode, NodeIdentityRelationship, SourceMentionedEnrichmentNode } from "@lrnki/domain-core";
+import type { AnchorProjectionNode, NodeIdentityRelationship, SourceMentionedEnrichmentNode, SourceMentionGroundingPassage } from "@lrnki/domain-core";
 import type { NodeEmbeddingPort, NodeMergeAdjudicationPort } from "@lrnki/ports";
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import { candidatePairsByDomain, cosineSimilarity, deduplicateDerivedNodes, type DedupConfig, type DedupNodeContext } from "./deduplicateDerivedNodes";
@@ -59,6 +59,24 @@ function enrichment(id: string, label: string, domain: string, aliases: string[]
     declaredDomain: domain,
     aliases,
     groundingPassages: []
+  };
+}
+
+function sourceGrounding(
+  passageType: SourceMentionGroundingPassage["passageType"],
+  evidenceQuote: string,
+  sourceBlockId: string
+): SourceMentionGroundingPassage {
+  return {
+    passageType,
+    text: evidenceQuote,
+    groundingOrigin: "source_mentioned",
+    sourceResourceId: "source-1",
+    sourceBlockId,
+    evidenceQuote,
+    headingPath: ["Diagnostic"],
+    locator: {},
+    verbatimCheck: { disposition: "verified", sourceResourceId: "source-1", sourceBlockId }
   };
 }
 
@@ -121,7 +139,11 @@ test("AE3: a pair far above threshold is still routed to the adjudicator (no aut
 });
 
 test("AE1: a merge removes the absorbed node, aliases the canonical, unions evidence, and records provenance", async () => {
-  const nodes = [anchor("a1", "Ownership", "rust"), enrichment("z9", "Ownership (Rust)", "rust", ["owning"])];
+  const absorbed = {
+    ...enrichment("z9", "Ownership (Rust)", "rust", ["owning"]),
+    groundingPassages: [sourceGrounding("mention", "the owner frees memory", "ownership-block")]
+  };
+  const nodes = [anchor("a1", "Ownership", "rust"), absorbed];
   const ctx = contextMap([
     ["a1", { label: "Ownership", aliases: [], evidence: ["who owns a value"] }],
     ["z9", { label: "Ownership (Rust)", aliases: ["owning"], evidence: ["the owner frees memory"] }]
@@ -151,6 +173,63 @@ test("AE1: a merge removes the absorbed node, aliases the canonical, unions evid
   assert.ok(merge.proposingScore > 0.99);
   assert.equal(merge.canonicalSelectionReason, "anchor_over_enrichment");
   assert.ok(merge.rationale.startsWith("equivalent"));
+});
+
+test("entity fusion unions typed source grounding and retains the absorbed provenance snapshot", async () => {
+  const canonical = {
+    ...enrichment("e1", "Forecast update", "harbor dispatch"),
+    groundingPassages: [
+      sourceGrounding("mention", "A forecast update triggers recalculation.", "block-update"),
+      sourceGrounding("mention", "Dispatch pauses while the forecast is reviewed.", "block-pause")
+    ]
+  };
+  const absorbedDefinition = sourceGrounding(
+    "definition",
+    "A forecast revision is the identified issue in the forecast used for one planned transit time.",
+    "block-revision"
+  );
+  const absorbed = {
+    ...enrichment("e2", "Forecast revision", "harbor dispatch"),
+    groundingPassages: [absorbedDefinition, absorbedDefinition]
+  };
+  const nodes = [canonical, absorbed];
+  const ctx = contextMap([
+    ["e1", { label: canonical.canonicalLabel, aliases: [], evidence: canonical.groundingPassages.map((passage) => passage.evidenceQuote) }],
+    ["e2", { label: absorbed.canonicalLabel, aliases: [], evidence: [absorbedDefinition.evidenceQuote] }]
+  ]);
+  const vectors = new Map<string, number[]>([
+    [embedTextOf(ctx.get("e1")!), [1, 0]],
+    [embedTextOf(ctx.get("e2")!), [1, 0]]
+  ]);
+
+  const result = await deduplicateDerivedNodes({
+    nodes,
+    contextByNodeId: ctx,
+    embedding: embeddingStub(vectors),
+    adjudicator: adjudicatorStub(() => "equivalent"),
+    config
+  });
+
+  assert.equal(result.nodes.length, 1);
+  const survivor = result.nodes[0];
+  assert.ok(survivor.nodeKind === "enrichment" && survivor.groundingOrigin === "source_mentioned");
+  assert.deepEqual(
+    survivor.groundingPassages.map((passage) => [passage.passageType, passage.sourceBlockId, passage.evidenceQuote]),
+    [
+      ["definition", "block-revision", absorbedDefinition.evidenceQuote],
+      ["mention", "block-update", "A forecast update triggers recalculation."],
+      ["mention", "block-pause", "Dispatch pauses while the forecast is reviewed."]
+    ],
+    "the definition leads the exact typed union and its duplicate is removed"
+  );
+  assert.deepEqual(result.absorbedGroundingByCanonical.get("e1"), [absorbedDefinition.evidenceQuote]);
+  const merge = result.merges[0];
+  assert.equal(merge.canonicalDerivedNodeId, "e1");
+  assert.equal(merge.absorbedGrounding.groundingOrigin, "source_mentioned");
+  if (merge.absorbedGrounding.groundingOrigin !== "source_mentioned") assert.fail("expected source grounding snapshot");
+  assert.equal(merge.absorbedGrounding.groundingPassages.length, 2, "the immutable audit snapshot retains the absorbed node exactly");
+  assert.equal(merge.absorbedGrounding.groundingPassages[0].passageType, "definition");
+  assert.equal(merge.absorbedGrounding.groundingPassages[0].verbatimCheck.disposition, "verified");
 });
 
 test("AE2: a non-equivalent relationship leaves both nodes and records no merge", async () => {

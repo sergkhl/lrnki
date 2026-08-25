@@ -581,6 +581,98 @@ test("U3: a genuinely defining rescued passage is kept when the judge is wired",
   assert.equal(rescued.groundingPassages.filter((passage) => passage.passageType === "definition").length, 1);
 });
 
+test("semantic dedup persists an absorbed source definition on the surviving source-mentioned node", async () => {
+  const updateQuote = "A forecast update triggers recalculation for the planned transit time.";
+  const pauseQuote = "Dispatch pauses while the forecast update is reviewed.";
+  const definitionQuote = "A forecast revision is the identified issue in the forecast used for one planned transit time.";
+  const update: NonCoreRescueCandidate = {
+    runId: "run-1",
+    declaredDomain: "x",
+    candidateKey: "forecast-update",
+    canonicalLabel: "Forecast update",
+    normalizedLabel: "forecast update",
+    aliases: [],
+    tier: "reject",
+    definitions: [],
+    mentions: [
+      { sourceResourceId: "s1", sourceBlockId: "blk-update", evidenceQuote: updateQuote, blockText: updateQuote, headingPath: [], locator: {} },
+      { sourceResourceId: "s1", sourceBlockId: "blk-pause", evidenceQuote: pauseQuote, blockText: pauseQuote, headingPath: [], locator: {} }
+    ]
+  };
+  const revision: NonCoreRescueCandidate = {
+    runId: "run-2",
+    declaredDomain: "x",
+    candidateKey: "forecast-revision",
+    canonicalLabel: "Forecast revision",
+    normalizedLabel: "forecast revision",
+    aliases: [],
+    tier: "optional",
+    definitions: [
+      { sourceResourceId: "s1", sourceBlockId: "blk-revision", evidenceQuote: definitionQuote, blockText: definitionQuote, headingPath: [], locator: {} }
+    ],
+    mentions: []
+  };
+  const keepDefinitions: DefinitionPassageQualityJudgmentPort = {
+    model: "kg-independent-judge",
+    async judgeDefinitions(input) {
+      return input.passages.map(() => ({ establishesMeaning: true, category: "establishes_meaning", judgedSpan: "", rationale: "defines the named subject" }));
+    }
+  };
+  const nodeEmbedding: NodeEmbeddingPort = {
+    model: "stub-embedding",
+    async embed(texts) {
+      return texts.map(() => [1, 0]);
+    }
+  };
+  const nodeMergeAdjudicator: NodeMergeAdjudicationPort = {
+    model: "stub-adjudicator",
+    async adjudicate(input) {
+      const labels = new Set([input.a.label, input.b.label]);
+      const equivalent = labels.has("Forecast update") && labels.has("Forecast revision");
+      return {
+        relationship: equivalent ? "equivalent" : "unrelated_or_unclear",
+        rationale: equivalent ? "mutually substitutable forecast-change labels" : "distinct concepts"
+      };
+    }
+  };
+  const ports = buildNodePorts({ rescue: [update, revision] });
+
+  const layer = await runGraphEnrichment({
+    enrichmentId: "e1",
+    graphVersionId: "v1",
+    graphStore: ports.graphStore as GraphVersionStorePort,
+    prerequisiteOrdering: ports.prerequisiteOrdering,
+    sourceMentionedNodesAvailable: true,
+    rescuedDefinitionQualityJudge: keepDefinitions,
+    nodeEmbedding,
+    nodeMergeAdjudicator,
+    difficulty: ports.difficulty,
+    enrichmentStore: ports.enrichmentStore as EnrichmentRunStorePort,
+    newNodeId: ports.newNodeId
+  });
+
+  const sourceNodes = layer.derivedNodes.filter(
+    (node) => node.nodeKind === "enrichment" && node.groundingOrigin === "source_mentioned"
+  );
+  assert.equal(sourceNodes.length, 1, "the equivalent rescue identities collapse once");
+  const survivor = sourceNodes[0];
+  assert.ok(survivor.nodeKind === "enrichment" && survivor.groundingOrigin === "source_mentioned");
+  assert.equal(survivor.canonicalLabel, "Forecast update", "the higher-evidence node stays canonical");
+  assert.deepEqual(
+    survivor.groundingPassages.map((passage) => [passage.passageType, passage.sourceBlockId, passage.evidenceQuote]),
+    [
+      ["definition", "blk-revision", definitionQuote],
+      ["mention", "blk-update", updateQuote],
+      ["mention", "blk-pause", pauseQuote]
+    ]
+  );
+  const trace = ports.getTrace();
+  assert.ok(trace);
+  assert.equal(trace.nodeMerges.length, 1);
+  assert.equal(trace.nodeMerges[0].absorbedGrounding.groundingOrigin, "source_mentioned");
+  assert.ok(ports.orderedLabels.every((labels) => labels.includes("Forecast update") && !labels.includes("Forecast revision")));
+});
+
 test("mints an llm_grounded node for an anchor and never publishes it asserted", async () => {
   const ports = buildNodePorts({ proposals: [{ proposedLabel: "Stack allocation", rationale: "r" }] });
   const layer = await runNodes(ports);

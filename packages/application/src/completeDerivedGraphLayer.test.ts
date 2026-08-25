@@ -125,7 +125,20 @@ function mergeRecord(canonical: string, absorbed: string): NodeMergeRecord {
     absorbedLabel: "Absorbed",
     absorbedAliases: [],
     absorbedNodeKind: "enrichment",
-    absorbedEvidence: ["absorbed quote"],
+    absorbedGrounding: {
+      groundingOrigin: "source_mentioned",
+      groundingPassages: [{
+        passageType: "mention",
+        text: "absorbed quote",
+        groundingOrigin: "source_mentioned",
+        sourceResourceId: "s1",
+        sourceBlockId: "b1",
+        evidenceQuote: "absorbed quote",
+        headingPath: [],
+        locator: {},
+        verbatimCheck: { disposition: "verified", sourceResourceId: "s1", sourceBlockId: "b1" }
+      }]
+    },
     proposingSignal: "embedding_cosine",
     proposingScore: 0.95,
     rationale: "same concept",

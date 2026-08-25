@@ -12,8 +12,8 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-25-001 — Qualify the Curated-Source Learner Workflow](./2026-08-25-001-qualify-curated-source-learner-workflow.md)
-   — **In progress; U0–U6 complete and U7 revised graph published.** Enrich and inspect graph
-   `cb834545-b02e-4aae-8906-123f9514586e`, generate one fresh bank, then qualify, automatically
-   adopt/read, exercise Support Path, and repeat the external-source path.
+   — **In progress; U0–U6 complete and U7 evidence fusion repaired.** Correct the model-facing
+   quarantine contract, re-extract the diagnostic source pair, then rebuild, enrich, inspect, and
+   admit exactly one fresh bank before adoption, Support Path, and external-source qualification.
 
 <!-- Hygiene and retention rules: AGENTS.md → Documentation workflow. -->

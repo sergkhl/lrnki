@@ -1,7 +1,9 @@
 import type {
+  AbsorbedNodeGrounding,
   CanonicalSelectionReason,
   DerivedGraphNode,
-  NodeMergeRecord
+  NodeMergeRecord,
+  SourceMentionGroundingPassage
 } from "@lrnki/domain-core";
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import type { NodeEmbeddingPort, NodeMergeAdjudicationPort } from "@lrnki/ports";
@@ -65,13 +67,16 @@ const PROPOSING_SIGNAL = "embedding_cosine" as const;
 
 export type DeduplicateResult = {
   // The collapsed node set: absorbed enrichment nodes removed, each canonical node's
-  // aliases extended with the absorbed surface labels (R6).
+  // aliases extended with the absorbed surface labels. When source-mentioned nodes
+  // collapse into another source-mentioned node, their complete typed passages are
+  // unioned onto the survivor (R6).
   nodes: DerivedGraphNode[];
   // One record per absorbed node (R5), with full propose + decide + canonical-selection
   // provenance.
   merges: NodeMergeRecord[];
-  // Absorbed verbatim evidence keyed by canonical derived-node id, threaded into the
-  // canonical node's prerequisite-judge context at runtime (R6).
+  // A runtime-only text projection of each typed absorbed-grounding snapshot, keyed by
+  // canonical derived-node id and threaded into its prerequisite-judge context (R6).
+  // The immutable merge record, not this projection, owns persisted provenance.
   absorbedGroundingByCanonical: Map<string, string[]>;
 };
 
@@ -288,6 +293,7 @@ function applyClusters(
   const evidenceCount = (id: string): number => contextByNodeId.get(id)?.evidence.length ?? 0;
   const absorbedIds = new Set<string>();
   const aliasAdditionsByCanonical = new Map<string, string[]>();
+  const sourceGroundingAdditionsByCanonical = new Map<string, SourceMentionGroundingPassage[]>();
   const absorbedGroundingByCanonical = new Map<string, string[]>();
   const merges: NodeMergeRecord[] = [];
 
@@ -305,16 +311,33 @@ function applyClusters(
       absorbedIds.add(member.derivedNodeId);
       const reason = canonicalSelectionReason(canonical, member, evidenceCount);
       const edge = bestIncidentEdge(member.derivedNodeId, mergedEdges);
-      const absorbedContext = contextByNodeId.get(member.derivedNodeId);
-      const absorbedEvidence = absorbedContext?.evidence ?? [];
+      if (member.nodeKind !== "enrichment") {
+        throw new Error("deduplicateDerivedNodes: canonical selection attempted to absorb an anchor");
+      }
+      const absorbedGrounding = groundingSnapshot(member);
       // Canonical absorbs the surface label + aliases of the merged node (R6).
       const aliasAdds = aliasAdditionsByCanonical.get(canonical.derivedNodeId) ?? [];
       aliasAdds.push(member.canonicalLabel, ...member.aliases);
       aliasAdditionsByCanonical.set(canonical.derivedNodeId, aliasAdds);
-      // Absorbed evidence threaded into the canonical's judge context (R6).
+      // Compatible source grounding becomes current grounding on a source-mentioned
+      // canonical. Passage role + source provenance survive intact; definition passages
+      // lead the stable union so downstream bounded readers do not bury them behind
+      // mentions. Unlike origins remain audit-retained without masquerading as the
+      // canonical node's native grounding representation.
+      if (
+        canonical.nodeKind === "enrichment" &&
+        canonical.groundingOrigin === "source_mentioned" &&
+        absorbedGrounding.groundingOrigin === "source_mentioned"
+      ) {
+        const additions = sourceGroundingAdditionsByCanonical.get(canonical.derivedNodeId) ?? [];
+        additions.push(...absorbedGrounding.groundingPassages);
+        sourceGroundingAdditionsByCanonical.set(canonical.derivedNodeId, additions);
+      }
+      // The prerequisite/difficulty context still sees every absorbed origin. This is a
+      // mechanically derived text view; the typed snapshot below owns provenance.
       const grounding = absorbedGroundingByCanonical.get(canonical.derivedNodeId) ?? [];
-      grounding.push(...absorbedEvidence);
-      absorbedGroundingByCanonical.set(canonical.derivedNodeId, grounding);
+      grounding.push(...groundingTexts(absorbedGrounding));
+      absorbedGroundingByCanonical.set(canonical.derivedNodeId, dedupeTexts(grounding));
       merges.push({
         declaredDomain: canonical.declaredDomain,
         canonicalDerivedNodeId: canonical.derivedNodeId,
@@ -324,7 +347,7 @@ function applyClusters(
         absorbedLabel: member.canonicalLabel,
         absorbedAliases: member.aliases,
         absorbedNodeKind: member.nodeKind,
-        absorbedEvidence,
+        absorbedGrounding,
         proposingSignal: PROPOSING_SIGNAL,
         proposingScore: edge?.score ?? 0,
         rationale: edge?.rationale ?? "",
@@ -337,12 +360,57 @@ function applyClusters(
     .filter((node) => !absorbedIds.has(node.derivedNodeId))
     .map((node) => {
       const adds = aliasAdditionsByCanonical.get(node.derivedNodeId);
-      if (!adds || adds.length === 0) return node;
-      const aliases = dedupeAliases(node.canonicalLabel, [...node.aliases, ...adds]);
-      return { ...node, aliases };
+      const aliases = adds?.length
+        ? dedupeAliases(node.canonicalLabel, [...node.aliases, ...adds])
+        : node.aliases;
+      const groundingAdds = sourceGroundingAdditionsByCanonical.get(node.derivedNodeId);
+      if (node.nodeKind === "enrichment" && node.groundingOrigin === "source_mentioned" && groundingAdds?.length) {
+        return {
+          ...node,
+          aliases,
+          groundingPassages: unionSourceGrounding(node.groundingPassages, groundingAdds)
+        };
+      }
+      return aliases === node.aliases ? node : { ...node, aliases };
     });
 
   return { nodes: collapsed, merges, absorbedGroundingByCanonical };
+}
+
+function groundingSnapshot(node: Extract<DerivedGraphNode, { nodeKind: "enrichment" }>): AbsorbedNodeGrounding {
+  return node.groundingOrigin === "source_mentioned"
+    ? { groundingOrigin: "source_mentioned", groundingPassages: node.groundingPassages }
+    : { groundingOrigin: "llm_grounded", groundingBundle: node.groundingBundle };
+}
+
+function groundingTexts(grounding: AbsorbedNodeGrounding): string[] {
+  return grounding.groundingOrigin === "source_mentioned"
+    ? grounding.groundingPassages.map((passage) => passage.evidenceQuote)
+    : [
+        ...grounding.groundingBundle.definitions.map((passage) => passage.text),
+        ...grounding.groundingBundle.mentions.map((passage) => passage.text)
+      ];
+}
+
+function unionSourceGrounding(
+  canonical: SourceMentionGroundingPassage[],
+  absorbed: SourceMentionGroundingPassage[]
+): SourceMentionGroundingPassage[] {
+  const seen = new Set<string>();
+  const unique = [...canonical, ...absorbed].filter((passage) => {
+    const key = [passage.passageType, passage.sourceResourceId, passage.sourceBlockId, passage.evidenceQuote].join("\u0000");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return [
+    ...unique.filter((passage) => passage.passageType === "definition"),
+    ...unique.filter((passage) => passage.passageType === "mention")
+  ];
+}
+
+function dedupeTexts(values: string[]): string[] {
+  return [...new Set(values)];
 }
 
 // Canonical wins: an anchor over any enrichment node; among same-kind, more evidence,

@@ -1052,10 +1052,26 @@ export type CanonicalSelectionReason =
   | "higher_evidence_count"
   | "stable_id_tiebreak";
 
+// The complete grounding snapshot of an enrichment node absorbed by semantic
+// deduplication. Identity collapse must not flatten evidence to strings: source
+// passages retain their passage role, source ids, locator, and verbatim result;
+// generated grounding retains its bundle-level model, rationale, and anchor
+// references. The surviving node owns current learner grounding, while this
+// snapshot keeps the removed node's provenance replayable in the immutable trace.
+export type AbsorbedNodeGrounding =
+  | {
+      groundingOrigin: "source_mentioned";
+      groundingPassages: SourceMentionGroundingPassage[];
+    }
+  | {
+      groundingOrigin: "llm_grounded";
+      groundingBundle: GeneratedGroundingBundle;
+    };
+
 // One recorded derived-layer semantic merge (plan U3/U4, R5/R6). Provenance for a
 // collapsed near-duplicate pair: the surviving canonical node, a SNAPSHOT of the
 // absorbed node (its derived_graph_nodes row never persists, so the label/aliases/kind/
-// evidence are captured here for Admin Lab), the proposing signal + score, the deciding
+// typed grounding are captured here), the proposing signal + score, the deciding
 // rationale, and the canonical-selection reason. The absorbed node is always an
 // enrichment node — an anchor is never absorbed (KTD6). Lives on the Derived Graph Layer
 // only; published Concept identity and IRIs are untouched (R7).
@@ -1067,8 +1083,8 @@ export type NodeMergeRecord = {
   absorbedDerivedNodeId: string;
   absorbedLabel: string;
   absorbedAliases: string[];
-  absorbedNodeKind: "anchor" | "enrichment";
-  absorbedEvidence: string[];
+  absorbedNodeKind: "enrichment";
+  absorbedGrounding: AbsorbedNodeGrounding;
   proposingSignal: NodeMergeProposingSignal;
   proposingScore: number;
   rationale: string;
