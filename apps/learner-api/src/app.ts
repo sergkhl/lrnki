@@ -108,6 +108,7 @@ function challengeRefusalStatus(refused: string): 404 | 409 | 422 {
 export type LearnerAppOptions = Readonly<{
   learnerKnowledgeAvailability?: LearnerKnowledgeAvailability;
   wakeTopicGeneration?: () => void;
+  wakeScaffoldGeneration?: () => void;
 }>;
 
 export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, options: LearnerAppOptions = {}) {
@@ -117,6 +118,7 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, o
   const learnerKnowledgeAvailability = options.learnerKnowledgeAvailability
     ?? CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY;
   const wakeTopicGeneration = options.wakeTopicGeneration ?? wakeTopicGenerationSupervisor;
+  const wakeScaffoldGeneration = options.wakeScaffoldGeneration ?? wakeScaffoldGenerationSupervisor;
   const sourceExpeditions = createLearnerSourceExpeditions(sql, learnerKnowledgeAvailability);
   // The Recall Challenge deep module, bound once at the composition root (KTD1).
   const recallChallenges = createLearnerRecallChallenge(sql, sourceExpeditions);
@@ -453,7 +455,8 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, o
     // --- Learner-Scoped Scaffold Detours (plan 2026-07-12-002 U5) --------------------------
     // Request-or-restore a detour for an advertised term. The use-case verifies the active
     // expedition, the source block, parent membership, and the exact advertised term from
-    // server-owned neutral content before upserting; a determinate create wakes the supervisor.
+    // server-owned neutral content before upserting. Exact reuse publishes synchronously; only a
+    // result that explicitly queued generated work wakes the supervisor.
     .post("/scaffold/request", auth, zValidator("json", z.object({
       enrichmentId: z.string(),
       source: z.discriminatedUnion("kind", [
@@ -468,10 +471,11 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, o
       );
       if (!result.created) {
         const status = result.refused === "generated_support_step_unavailable" ||
-          result.refused === "reference_support_step_unavailable" ? 409 : 422;
+          result.refused === "reference_support_step_unavailable" ||
+          result.refused === "expedition_inactive" ? 409 : 422;
         return c.json({ created: false as const, reason: result.refused }, status);
       }
-      wakeScaffoldGenerationSupervisor();
+      if (result.generationRequested) wakeScaffoldGeneration();
       return c.json({ created: true as const, detourId: result.detourId, status: result.status });
     })
 
@@ -484,7 +488,7 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, o
           learnerKnowledgeAvailability
         }
       );
-      if (result.retried) wakeScaffoldGenerationSupervisor();
+      if (result.retried) wakeScaffoldGeneration();
       return result.retried || !result.refused ? c.json(result) : c.json(result, 409);
     })
 

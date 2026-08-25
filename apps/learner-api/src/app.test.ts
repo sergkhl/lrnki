@@ -243,11 +243,10 @@ maybeDb("paused Synthetic Topic routes expose one capability and perform no writ
   }
 });
 
-maybeDb("recall challenge end-to-end: create, Last Stand, recovery win, idempotent replay, response_log untouched", async () => {
+maybeDb("exact-reference Support Path and recall challenge share qualified neutral evidence without generated work", async () => {
   const {
     createDatabaseClient,
     PostgresConceptLessonStore,
-    PostgresResponseLogStore,
     PostgresStudyItemBankStore
   } = await import("@lrnki/infrastructure-postgres");
   const { qualifiedSourceExpeditionAssetConfigHash } = await import("@lrnki/application");
@@ -262,7 +261,12 @@ maybeDb("recall challenge end-to-end: create, Last Stand, recovery win, idempote
   const authClientSql = createDatabaseClient(databaseUrl as string);
   let learner = "";
   try {
-    const app = createLearnerApp(sql as unknown as DatabaseClient, authClientSql as unknown as DatabaseClient);
+    let scaffoldWakes = 0;
+    const app = createLearnerApp(
+      sql as unknown as DatabaseClient,
+      authClientSql as unknown as DatabaseClient,
+      { wakeScaffoldGeneration: () => { scaffoldWakes += 1; } }
+    );
     // Register through the real Better Auth credential route — the same one the rigs and the
     // sign-in UI use — and carry its session cookie. Google is never driven by any test.
     const signUp = await app.request("/auth/sign-up/email", {
@@ -283,12 +287,15 @@ maybeDb("recall challenge end-to-end: create, Last Stand, recovery win, idempote
       });
 
     // Seed a minimal fully qualified Source Expedition: a two-stop source-backed trail with
-    // one current source-cited lesson and option-select activity per stop. The learner has
-    // answered the prerequisite item latest-correct (the challenge eligibility rule).
+    // one current source-cited lesson and exact-reference option-select activity per stop.
     const sourceResourceId = randomUUID();
     const sourceDocumentId = randomUUID();
     const sourceBlockId = randomUUID();
-    const sourceText = "A source-backed definition establishes the tested concept.";
+    const lessonTexts = [
+      "Source prerequisite establishes the invariant.",
+      "Source summit applies that invariant."
+    ];
+    const sourceText = `${lessonTexts.join(" ")} Diagnostic glossary gap labels supplementary material that is not modeled as a trail node.`;
     await sql`
       INSERT INTO source_resources
         (source_resource_id, content_hash, content_type, object_key, declared_domain, title)
@@ -333,7 +340,6 @@ maybeDb("recall challenge end-to-end: create, Last Stand, recovery win, idempote
       provenance: "source" as const,
       sourceResourceId,
       sourceBlockId,
-      evidenceQuote: sourceText,
       matchKind: "exact" as const
     };
     await new PostgresConceptLessonStore(sql).persist({
@@ -350,16 +356,18 @@ maybeDb("recall challenge end-to-end: create, Last Stand, recovery win, idempote
         canonicalLabel: index === 0 ? "Source prerequisite" : "Source summit",
         sections: [{
           kind: "definition" as const,
-          text: sourceText,
+          text: lessonTexts[index],
           groundingProvenance: "source_cep" as const,
-          citation
+          citation: { ...citation, evidenceQuote: lessonTexts[index] }
         }],
         explorableTerms: []
       })),
       absent: []
     });
-    const correctOptionId = randomUUID();
-    const wrongOptionId = randomUUID();
+    const correctOptionIds = [randomUUID(), randomUUID()];
+    const wrongOptionIds = [randomUUID(), randomUUID()];
+    const correctOptionId = correctOptionIds[0];
+    const wrongOptionId = wrongOptionIds[0];
     const studyItemIds = [randomUUID(), randomUUID()];
     const studyItemId = studyItemIds[0];
     await new PostgresStudyItemBankStore(sql).persist({
@@ -374,20 +382,24 @@ maybeDb("recall challenge end-to-end: create, Last Stand, recovery win, idempote
         groundingProvenance: "source_cep" as const,
         generatingModel: "test-model",
         configHash: qualifiedConfigHash,
-        explorableTerms: [],
+        explorableTerms: index === 1
+          ? ["Source prerequisite", "Diagnostic glossary gap"]
+          : [],
         itemType: "option_select" as const,
-        question: "Which claim follows the source?",
-        explanation: "The cited answer follows the source.",
+        question: index === 1
+          ? "Which source statement defines Source summit? Explore Source prerequisite or Diagnostic glossary gap for related context."
+          : "Which source statement defines Source prerequisite?",
+        explanation: lessonTexts[index],
         options: [
           {
-            optionId: index === 0 ? correctOptionId : randomUUID(),
-            text: sourceText,
+            optionId: correctOptionIds[index],
+            text: lessonTexts[index],
             isCorrect: true,
             provenance: "source" as const,
-            citation
+            citation: { ...citation, evidenceQuote: lessonTexts[index] }
           },
           {
-            optionId: index === 0 ? wrongOptionId : randomUUID(),
+            optionId: wrongOptionIds[index],
             text: "Wrong A",
             isCorrect: false,
             provenance: "generated" as const
@@ -400,20 +412,153 @@ maybeDb("recall challenge end-to-end: create, Last Stand, recovery win, idempote
     });
     const adoption = await authed("/expedition/choose", { enrichmentId });
     assert.equal(adoption.status, 200);
-    await new PostgresResponseLogStore(sql).append([{
-      responseId: randomUUID(),
-      learnerStateRef: learner,
+
+    // An advertised term with no exact eligible neutral node refuses before any detour write or
+    // supervisor wake. The exact term then publishes READY synchronously and pins the precise
+    // qualified lesson/item identities selected from the same active Source Expedition snapshot.
+    const missingReference = await authed("/scaffold/request", {
+      enrichmentId,
+      source: { kind: "study_item", studyItemId: studyItemIds[1] },
+      term: "Diagnostic glossary gap"
+    });
+    assert.equal(missingReference.status, 409);
+    assert.deepEqual(await missingReference.json(), {
+      created: false,
+      reason: "generated_support_step_unavailable"
+    });
+    const [{ refusedDetours }] = await sql<{ refusedDetours: number }[]>`
+      SELECT count(*)::int AS "refusedDetours"
+      FROM learner_scaffold_detours
+      WHERE learner_state_ref = ${learner}`;
+    assert.equal(refusedDetours, 0);
+    assert.equal(scaffoldWakes, 0);
+
+    const exactReference = await authed("/scaffold/request", {
+      enrichmentId,
+      source: { kind: "study_item", studyItemId: studyItemIds[1] },
+      term: "Source prerequisite"
+    });
+    assert.equal(exactReference.status, 200);
+    const exactReferenceBody = await exactReference.json() as {
+      created: true;
+      detourId: string;
+      status: string;
+    };
+    assert.equal(exactReferenceBody.status, "ready");
+    assert.equal(scaffoldWakes, 0);
+    const [published] = await sql<{
+      status: string;
+      latestOperationId: string | null;
+      referenceSteps: number;
+      generatedSteps: number;
+      referencedNodeId: string;
+      referencedLessonId: string;
+      referencedItemId: string;
+    }[]>`
+      SELECT d.status,
+             d.latest_operation_id AS "latestOperationId",
+             count(*) FILTER (WHERE s.kind = 'reference')::int AS "referenceSteps",
+             count(*) FILTER (WHERE s.kind = 'generated')::int AS "generatedSteps",
+             max(s.referenced_derived_node_id::text) AS "referencedNodeId",
+             max(s.referenced_concept_lesson_id::text) AS "referencedLessonId",
+             max(s.referenced_study_item_id::text) AS "referencedItemId"
+      FROM learner_scaffold_detours d
+      JOIN learner_scaffold_steps s ON s.detour_id = d.detour_id
+      WHERE d.detour_id = ${exactReferenceBody.detourId}
+      GROUP BY d.detour_id`;
+    assert.deepEqual({
+      status: published.status,
+      latestOperationId: published.latestOperationId,
+      referenceSteps: published.referenceSteps,
+      generatedSteps: published.generatedSteps,
+      referencedNodeId: published.referencedNodeId,
+      referencedItemId: published.referencedItemId
+    }, {
+      status: "ready",
+      latestOperationId: null,
+      referenceSteps: 1,
+      generatedSteps: 0,
+      referencedNodeId: nodeIds[0],
+      referencedItemId: studyItemIds[0]
+    });
+    const [referenceLesson] = await sql<{ concept_lesson_id: string }[]>`
+      SELECT concept_lesson_id
+      FROM concept_lessons
+      WHERE enrichment_id = ${enrichmentId}
+        AND derived_node_id = ${nodeIds[0]}
+        AND superseded_at IS NULL`;
+    assert.equal(published.referencedLessonId, referenceLesson.concept_lesson_id);
+
+    // Hide/restore uses the same aggregate and pin, remains synchronous, and never duplicates.
+    assert.deepEqual(await (await authed("/scaffold/hide", {
+      detourId: exactReferenceBody.detourId
+    })).json(), { hidden: true });
+    const hiddenSession = await (await authed(`/expedition/${enrichmentId}`)).json() as {
+      session: { detours: unknown[] };
+    };
+    assert.equal(hiddenSession.session.detours.length, 0);
+    const restoredResponse = await authed("/scaffold/request", {
+      enrichmentId,
+      source: { kind: "study_item", studyItemId: studyItemIds[1] },
+      term: "Source prerequisite"
+    });
+    const restored = await restoredResponse.json() as { detourId: string; status: string };
+    assert.equal(restored.detourId, exactReferenceBody.detourId);
+    assert.equal(restored.status, "ready");
+    assert.equal(scaffoldWakes, 0);
+    const [{ stepCount }] = await sql<{ stepCount: number }[]>`
+      SELECT count(*)::int AS "stepCount"
+      FROM learner_scaffold_steps
+      WHERE detour_id = ${exactReferenceBody.detourId}`;
+    assert.equal(stepCount, 1);
+
+    // Reference study records ordinary neutral evidence for the exact pin. It completes the
+    // prerequisite and Support Path while leaving the parent node unmastered; no scaffold-scoped
+    // response can contaminate neutral identity or vice versa.
+    assert.equal((await authed("/study/lesson-read", {
+      enrichmentId,
+      derivedNodeId: nodeIds[0]
+    })).status, 200);
+    const referenceGrade = await authed("/scaffold/reference-option-select", {
+      scaffoldStepId: (await sql<{ scaffold_step_id: string }[]>`
+        SELECT scaffold_step_id
+        FROM learner_scaffold_steps
+        WHERE detour_id = ${exactReferenceBody.detourId}`)[0].scaffold_step_id,
+      chosenOptionId: correctOptionId
+    });
+    assert.equal(referenceGrade.status, 200);
+    assert.equal((await referenceGrade.json() as { correct: boolean }).correct, true);
+    const responseRows = await sql<{
+      scope: string;
+      studyItemId: string | null;
+      derivedNodeId: string | null;
+      scaffoldStepId: string | null;
+    }[]>`
+      SELECT CASE WHEN scaffold_step_id IS NULL THEN 'neutral' ELSE 'scaffold' END AS scope,
+             study_item_id AS "studyItemId", derived_node_id AS "derivedNodeId",
+             scaffold_step_id AS "scaffoldStepId"
+      FROM response_log
+      WHERE learner_state_ref = ${learner}`;
+    assert.deepEqual([...responseRows], [{
       scope: "neutral",
       studyItemId,
       derivedNodeId: nodeIds[0],
-      signalType: "graded",
-      judgedOutcome: "correct",
-      gradedScore: 1,
-      responseSource: "human",
-      graderIdentity: "auto",
-      batchId: null,
-      submittedAnswer: null
+      scaffoldStepId: null
     }]);
+    const supportSession = await (await authed(`/expedition/${enrichmentId}`)).json() as {
+      session: {
+        detours: { complete: boolean; steps: { complete: boolean }[] }[];
+        expeditionPath: { derivedNodeId: string; state: string }[];
+      };
+    };
+    assert.equal(supportSession.session.detours[0].complete, true);
+    assert.equal(supportSession.session.detours[0].steps[0].complete, true);
+    const stateByNode = Object.fromEntries(
+      supportSession.session.expeditionPath.map((step) => [step.derivedNodeId, step.state])
+    );
+    assert.equal(stateByNode[nodeIds[0]], "mastered");
+    assert.equal(stateByNode[nodeIds[1]], "frontier");
+
     const responseLogBaseline = async () =>
       (await sql<{ count: string }[]>`SELECT COUNT(*) AS count FROM response_log WHERE learner_state_ref = ${learner}`)[0].count;
     const logBefore = await responseLogBaseline();

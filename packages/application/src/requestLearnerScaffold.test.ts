@@ -77,8 +77,21 @@ function makePorts(over: {
   belongs?: boolean;
   learnerKnowledgeAvailability?: LearnerKnowledgeAvailability;
   session?: ScaffoldOpeningStudySession;
+  referencePublishAccepted?: boolean;
 } = {}) {
   const upserted: { parentDerivedNodeId: string; term: string; normalizedTerm: string }[] = [];
+  const publishedReferences: {
+    expectedAssets: {
+      assetSetIdentity: string;
+      currentConceptLessonIds: string[];
+      currentStudyItemIds: string[];
+    };
+    reference: {
+      referencedDerivedNodeId: string;
+      referencedConceptLessonId: string;
+      referencedStudyItemId: string;
+    };
+  }[] = [];
   const state = { sessionReads: 0, restartCalls: 0 };
   const ports = {
     sourceExpeditions: {
@@ -93,7 +106,10 @@ function makePorts(over: {
           enrichmentId: "e",
           assetSetIdentity: "qualified",
           trailNodeIds: new Set(over.belongs === false ? [] : ["parent", "reference"]),
-          qualifiedConceptLessonIds: new Set(over.lesson ? [over.lesson.conceptLessonId] : []),
+          qualifiedConceptLessonIds: new Set([
+            "lesson-reference",
+            ...(over.lesson ? [over.lesson.conceptLessonId] : [])
+          ]),
           qualifiedStudyItemIds: new Set(["i1", "item-reference"])
         };
       }
@@ -107,6 +123,26 @@ function makePorts(over: {
         upserted.push({ parentDerivedNodeId: input.parentDerivedNodeId, term: input.term, normalizedTerm: input.normalizedTerm });
         return { detourId: "d1", status: "generating" } as ScaffoldDetour;
       },
+      upsertReadyReference: async (input: {
+        expectedAssets: {
+          assetSetIdentity: string;
+          currentConceptLessonIds: string[];
+          currentStudyItemIds: string[];
+        };
+        reference: {
+          referencedDerivedNodeId: string;
+          referencedConceptLessonId: string;
+          referencedStudyItemId: string;
+        };
+      }) => {
+        publishedReferences.push({
+          expectedAssets: input.expectedAssets,
+          reference: input.reference
+        });
+        return over.referencePublishAccepted === false
+          ? undefined
+          : { detourId: "d-reference", status: "ready" } as ScaffoldDetour;
+      },
       restartGenerating: async (i: { detourId: string; learnerStateRef: string }) => {
         state.restartCalls += 1;
         return i.learnerStateRef === "owner" ? ({ detourId: i.detourId, status: "generating" } as ScaffoldDetour) : undefined;
@@ -117,6 +153,7 @@ function makePorts(over: {
   return {
     ports,
     upserted,
+    publishedReferences,
     get sessionReads() { return state.sessionReads; },
     get restartCalls() { return state.restartCalls; }
   };
@@ -128,7 +165,12 @@ test("requestLearnerScaffold — an advertised study-item term creates one pendi
     { learnerStateRef: "owner", enrichmentId: "e", source: { kind: "study_item", studyItemId: "i1" }, term: "affine type" },
     ports
   );
-  assert.deepEqual(result, { created: true, detourId: "d1", status: "generating" });
+  assert.deepEqual(result, {
+    created: true,
+    detourId: "d1",
+    status: "generating",
+    generationRequested: true
+  });
   assert.equal(upserted.length, 1);
   assert.equal(upserted[0].parentDerivedNodeId, "parent");
   assert.equal(upserted[0].normalizedTerm, "affine type");
@@ -163,7 +205,7 @@ test("requestLearnerScaffold — a study item from another enrichment is source_
   assert.deepEqual(result, { created: false, refused: "source_not_found" });
 });
 
-test("the current policy creates an exact-reference detour and performs no generated fallback", async () => {
+test("the current policy publishes an exact-reference detour ready with no generated fallback", async () => {
   const harness = makePorts({
     learnerKnowledgeAvailability: CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY,
     session: exactReferenceSession()
@@ -172,9 +214,26 @@ test("the current policy creates an exact-reference detour and performs no gener
     { learnerStateRef: "owner", enrichmentId: "e", source: { kind: "study_item", studyItemId: "i1" }, term: "affine type" },
     harness.ports
   );
-  assert.deepEqual(result, { created: true, detourId: "d1", status: "generating" });
+  assert.deepEqual(result, {
+    created: true,
+    detourId: "d-reference",
+    status: "ready",
+    generationRequested: false
+  });
   assert.equal(harness.sessionReads, 1);
-  assert.equal(harness.upserted.length, 1);
+  assert.equal(harness.upserted.length, 0);
+  assert.deepEqual(harness.publishedReferences, [{
+    expectedAssets: {
+      assetSetIdentity: "qualified",
+      currentConceptLessonIds: ["lesson-reference"],
+      currentStudyItemIds: ["i1", "item-reference"]
+    },
+    reference: {
+      referencedDerivedNodeId: "reference",
+      referencedConceptLessonId: "lesson-reference",
+      referencedStudyItemId: "item-reference"
+    }
+  }]);
 });
 
 test("the current policy refuses a non-reference term before creating a detour", async () => {
@@ -192,6 +251,21 @@ test("the current policy refuses a non-reference term before creating a detour",
   assert.deepEqual(result, { created: false, refused: "generated_support_step_unavailable" });
   assert.equal(harness.sessionReads, 1);
   assert.equal(harness.upserted.length, 0);
+});
+
+test("an ownership or qualified-asset race fails closed after exact resolution", async () => {
+  const harness = makePorts({
+    learnerKnowledgeAvailability: CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY,
+    session: exactReferenceSession(),
+    referencePublishAccepted: false
+  });
+  const result = await requestLearnerScaffold(
+    { learnerStateRef: "owner", enrichmentId: "e", source: { kind: "study_item", studyItemId: "i1" }, term: "affine type" },
+    harness.ports
+  );
+  assert.deepEqual(result, { created: false, refused: "expedition_inactive" });
+  assert.equal(harness.upserted.length, 0);
+  assert.equal(harness.publishedReferences.length, 1, "the atomic persistence recheck observed the race");
 });
 
 test("the current policy refuses failed generated-detour retry before touching the store", async () => {
@@ -229,7 +303,12 @@ test("requestLearnerScaffold — concurrent repeated requests return one identit
   );
   const results = await Promise.all([request(), request(), request()]);
   for (const result of results) {
-    assert.deepEqual(result, { created: true, detourId: "d-durable", status: "ready" });
+    assert.deepEqual(result, {
+      created: true,
+      detourId: "d-durable",
+      status: "ready",
+      generationRequested: false
+    });
   }
   assert.equal(upsertCalls, 3, "every press reaches the store; the STORE guarantees one row");
 });

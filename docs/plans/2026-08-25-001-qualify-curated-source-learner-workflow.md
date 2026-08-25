@@ -7,12 +7,12 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0–U5 complete; U6 exact-reference Support Path next
+**Status:** In progress — U0–U6 complete; U7 end-to-end readiness qualification next
 
-**NEXT:** Implement U6 through the existing reference Support Step seam: reuse only an exact node,
-qualified lesson, and qualified option from a ready Source Expedition; refuse before any generation
-write or wake when that tuple is unavailable. Prove pinning, grading identity, isolation, restore,
-and source ownership before continuing to U7.
+**NEXT:** Execute U7 starting only from `diagnostic-manifest.json`: run the harbor core alone, add
+its supplement through Source Registration, and carry the resulting complete Source Expedition
+through automatic qualification, adoption, learner read, and exact-reference Support Path. Inspect
+every visible payload beside evidence, then repeat the smallest representative external-source path.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
 Curated Sources and automatically admits only source-backed learner assets. Anchor-less Synthetic
@@ -552,15 +552,40 @@ The plan is complete only when all of the following are true:
   external-source evidence, not deployed/browser/native/device evidence, and it does not prove a
   complete expedition; U7 owns that end-to-end gate. **Safe to continue:** yes, to U6.
 
+### U6 — exact-reference-only Support Path — 2026-08-26 — complete
+
+- One request use-case now prefers exact qualified neutral reuse and publishes it directly as a
+  ready reference. The store atomically rechecks active Source Expedition ownership, asset-set
+  identity, every qualified current lesson/item row, and the same-layer/same-domain pin; an
+  ownership or asset race writes nothing. Only an actual generated queue result requests a wake.
+- Mixed historical detours retain every generated or superseded row for audit, while the Study
+  Session projects only enabled step kinds and reference pins present in its just-opened qualified
+  snapshot. Direct publication fences obsolete claims without deleting their operation identity.
+- The reset-backed workspace gate passed 852 application and 116 Postgres tests, 26 learner-API
+  tests, 57 Learner App suites / 320 tests, all 11 typechecks, schema parity, API build, lint with
+  zero errors, and whitespace checks. Its first pass exposed U5's missing explicit progress copy for
+  `source-material-claim-support`; the owning mapping was added and the complete gate reran green.
+
+#### Real-use quality evaluation
+
+- A local production-composition diagnostic over a two-stop, source-cited qualified asset set
+  inspected the admitted block, both exact lesson units/options, immutable pin, wire projection,
+  response row, and node states. An advertised non-node term returned unavailable with zero detour;
+  the exact term published ready, hid/restored one identity, graded the pinned neutral item, completed
+  only its referenced node/path, and left the parent frontier.
+- The detour retained `latestOperationId = null`, one reference row, zero generated rows, and zero
+  supervisor wakes for refusal, publication, and restore. This proves local API/persistence/
+  projection mechanics and no generation attempt; it makes no neural-content, deployed, browser,
+  native, emulator/simulator, or physical-device claim. **Safe to continue:** yes, to U7.
+
 ### Open findings
 
 - U4's local verifier remains rejected for one material false acceptance and broken LiteLLM success
   logging; do not rerun it or pick a second local candidate. The activated remote assignment is
   qualified only for source material support, not general generation or source-less grounding.
 - The final external U5 candidate remained unavailable because three nodes had no admitted lesson.
-  This proves safe refusal, not complete readiness; run U6 against ready diagnostic source assets,
-  then use U7's harbor-plus-supplement path to prove a complete automatic expedition before the
-  representative external-source repetition.
+  This proves safe refusal, not complete readiness; U7 must use the harbor-plus-supplement path to
+  prove a complete automatic expedition before the representative external-source repetition.
 - Matching and impostor remain preserved but unqualified. They do not satisfy readiness in this plan;
   Source Expedition snapshots now exclude them structurally. A future plan may qualify them
   independently after the option-select Source Expedition works.

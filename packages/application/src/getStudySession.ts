@@ -58,6 +58,8 @@ export async function getStudySession(input: {
     ...challengeScope,
     assetSetIdentity: opened.assets.expectedAssets.assetSetIdentity
   };
+  const qualifiedConceptLessonIds = new Set(opened.assets.expectedAssets.currentConceptLessonIds);
+  const qualifiedStudyItemIds = new Set(opened.assets.expectedAssets.currentStudyItemIds);
 
   const [lessonReads, rows, verdicts, layerPurpose, detours, referenceActivities, challenges, wonScopes, exposure] = await Promise.all([
     input.lessonReadStore ? input.lessonReadStore.listForLearner(input.learnerStateRef) : Promise.resolve([]),
@@ -66,7 +68,14 @@ export async function getStudySession(input: {
     input.layerPurposeStore ? input.layerPurposeStore.get(input.enrichmentId) : Promise.resolve(undefined),
     input.scaffoldStore
       ? input.scaffoldStore.listActiveForLearnerEnrichment(input.learnerStateRef, input.enrichmentId)
-          .then((rows) => rows.filter((detour) => scaffoldDetourIsLearnerAvailable(detour, input.learnerKnowledgeAvailability)))
+          .then((rows) => rows
+            .map((detour) => learnerAvailableScaffoldDetour(
+              detour,
+              input.learnerKnowledgeAvailability,
+              qualifiedConceptLessonIds,
+              qualifiedStudyItemIds
+            ))
+            .filter((detour) => detour !== undefined))
       : Promise.resolve([]),
     input.scaffoldReferenceRead ? input.scaffoldReferenceRead.listForLearnerEnrichment(challengeScope) : Promise.resolve([]),
     input.challengeStore ? input.challengeStore.listForLearnerEnrichment(qualifiedChallengeScope) : Promise.resolve([]),
@@ -108,14 +117,28 @@ export async function getStudySession(input: {
   });
 }
 
-function scaffoldDetourIsLearnerAvailable(
+function learnerAvailableScaffoldDetour(
   detour: Awaited<ReturnType<ScaffoldDetourStorePort["listActiveForLearnerEnrichment"]>>[number],
-  availability: LearnerKnowledgeAvailability
-): boolean {
+  availability: LearnerKnowledgeAvailability,
+  qualifiedConceptLessonIds: ReadonlySet<string>,
+  qualifiedStudyItemIds: ReadonlySet<string>
+): Awaited<ReturnType<ScaffoldDetourStorePort["listActiveForLearnerEnrichment"]>>[number] | undefined {
   const generatedAvailable = learnerKnowledgeCapabilityIsAvailable(availability, "generatedSupportSteps");
   const referenceAvailable = learnerKnowledgeCapabilityIsAvailable(availability, "referenceSupportSteps");
-  if (detour.status === "generating") return generatedAvailable || referenceAvailable;
-  if (detour.status === "failed") return generatedAvailable;
-  if (detour.status !== "ready" || detour.steps.length === 0) return false;
-  return detour.steps.every((step) => step.kind === "reference" ? referenceAvailable : generatedAvailable);
+  // Exact references now publish synchronously. A generating/failed aggregate therefore belongs
+  // only to the held generated path and cannot appear merely because references are available.
+  if (detour.status === "generating" || detour.status === "failed") {
+    return generatedAvailable ? detour : undefined;
+  }
+  if (detour.status !== "ready" || detour.steps.length === 0) return undefined;
+
+  // Preserve every historical row in the store while projecting only step kinds enabled now.
+  // Reference pins additionally must belong to this just-opened qualified Source Expedition
+  // snapshot; superseded/changed pins remain auditable but cannot become learner-ready content.
+  const steps = detour.steps.filter((step) => step.kind === "generated"
+    ? generatedAvailable
+    : referenceAvailable
+      && qualifiedConceptLessonIds.has(step.referencedConceptLessonId)
+      && qualifiedStudyItemIds.has(step.referencedStudyItemId));
+  return steps.length > 0 ? { ...detour, steps } : undefined;
 }

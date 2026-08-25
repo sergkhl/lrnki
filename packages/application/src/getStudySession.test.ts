@@ -407,3 +407,72 @@ test("the current policy projects reference detours and suppresses stored genera
   assert.ok(session);
   assert.deepEqual(session.detours.map((detour) => detour.detourId), ["d-ref"]);
 });
+
+test("the current policy projects only the current qualified pin from a mixed historical detour", async () => {
+  const detour: ScaffoldDetour = {
+    detourId: "d-mixed",
+    learnerStateRef: "L1",
+    enrichmentId: "e",
+    parentDerivedNodeId: "ownership",
+    term: "Variable scope",
+    normalizedTerm: "variable scope",
+    status: "ready",
+    latestOperationId: "historical-generation",
+    claimToken: null,
+    steps: [{
+      scaffoldStepId: "step-generated-old",
+      ordinal: 0,
+      kind: "generated",
+      payload: {} as never,
+      groundingBundle: {} as never,
+      lessonReadAt: null
+    }, {
+      scaffoldStepId: "step-reference-old",
+      ordinal: 1,
+      kind: "reference",
+      referencedDerivedNodeId: "scope",
+      referencedConceptLessonId: "lesson-scope-old",
+      referencedStudyItemId: "os-scope-old"
+    }, {
+      scaffoldStepId: "step-reference-current",
+      ordinal: 2,
+      kind: "reference",
+      referencedDerivedNodeId: "scope",
+      referencedConceptLessonId: scopeLesson.conceptLessonId,
+      referencedStudyItemId: optionItem.studyItemId
+    }]
+  };
+  const scaffoldStore = {
+    async listActiveForLearnerEnrichment() { return [detour]; }
+  } as unknown as ScaffoldDetourStorePort;
+  const scaffoldReferenceRead: ScaffoldReferenceActivityReadPort = {
+    async listForLearnerEnrichment() {
+      return [{
+        scaffoldStepId: "step-reference-current",
+        detourId: detour.detourId,
+        referencedDerivedNodeId: "scope",
+        lesson: scopeLesson,
+        item: optionItem
+      }];
+    },
+    async getForLearnerStep() { throw new Error("not used"); }
+  };
+  const session = await getStudySession({
+    enrichmentId: "e",
+    learnerStateRef: "L1",
+    sourceExpeditions: sourceExpeditions({
+      detailById: { e: detail() },
+      items: [optionItem],
+      lessons: [scopeLesson]
+    }),
+    responseLog: responseLog([]),
+    verdictStore: verdictStore([]),
+    scaffoldStore,
+    scaffoldReferenceRead,
+    learnerKnowledgeAvailability: CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY
+  });
+  assert.ok(session);
+  assert.equal(session.detours.length, 1);
+  assert.deepEqual(session.detours[0].steps.map((step) => step.scaffoldStepId), ["step-reference-current"]);
+  assert.equal(session.detours[0].totalStepCount, 1);
+});

@@ -18,7 +18,8 @@ import type { SourceExpeditionModule } from "./sourceExpedition";
 // server NEVER trusts a client-sent term: it verifies the active ready expedition, resolves the
 // source block from server-owned neutral content, confirms parent membership, and confirms the
 // term is one the current asset actually advertised (its `explorableTerms`). Only then does it
-// idempotently upsert the detour; the API wakes the supervisor after a determinate create. Every
+// idempotently publishes an exact qualified reference or queues generated work when that capability
+// is available. The result explicitly tells the API whether a supervisor wake is required. Every
 // refusal is a reason CODE (ADR-0033 keeps learner copy at the surface).
 
 // The source block a term was advertised from: a Concept Lesson section (keyed by its node) or a
@@ -37,7 +38,12 @@ export type RequestScaffoldRefusal =
   | "reference_support_step_unavailable";
 
 export type RequestLearnerScaffoldResult =
-  | { created: true; detourId: string; status: ScaffoldDetourStatus }
+  | {
+      created: true;
+      detourId: string;
+      status: ScaffoldDetourStatus;
+      generationRequested: boolean;
+    }
   | { created: false; refused: RequestScaffoldRefusal };
 
 type RequestScaffoldPorts = {
@@ -106,22 +112,60 @@ export async function requestLearnerScaffold(
   // proved these are distinct exact rendered substrings, so an exact membership test is sufficient.
   if (!resolved.advertisedTerms.includes(term)) return { created: false, refused: "term_not_advertised" };
 
-  // Current production publishes only an exact pinned reference. Prove that outcome against the
-  // same finished Study Session the generator will reopen before creating or waking a detour; an
-  // absent/colliding term returns a stable refusal with no queue write and therefore no neural call.
-  if (!learnerKnowledgeCapabilityIsAvailable(ports.learnerKnowledgeAvailability, "generatedSupportSteps")) {
-    if (!learnerKnowledgeCapabilityIsAvailable(ports.learnerKnowledgeAvailability, "referenceSupportSteps")) {
-      return { created: false, refused: "reference_support_step_unavailable" };
-    }
+  // Exact neutral reuse is a direct publication path, never a generation job. Resolve against the
+  // same qualified Study Session snapshot, then let the store atomically recheck source ownership,
+  // current asset identity, and the pin while creating/restoring READY. This also prefers reuse in
+  // environments where generated support is enabled: an exact answer never needs a model call.
+  const referenceAvailable = learnerKnowledgeCapabilityIsAvailable(
+    ports.learnerKnowledgeAvailability,
+    "referenceSupportSteps"
+  );
+  if (referenceAvailable) {
     const session = await ports.readStudySession({
       enrichmentId: input.enrichmentId,
       learnerStateRef: input.learnerStateRef
     });
     const parent = session?.detail.nodes.find((node) => node.derivedNodeId === resolved.parentDerivedNodeId);
-    if (!session || !parent) return { created: false, refused: "reference_support_step_unavailable" };
-    if (resolveExactScaffoldReference(term, session, parent).kind !== "reference") {
-      return { created: false, refused: "generated_support_step_unavailable" };
+    if (session && parent) {
+      const exact = resolveExactScaffoldReference(term, session, parent);
+      if (exact.kind === "reference") {
+        const detour = await ports.scaffoldStore.upsertReadyReference({
+          learnerStateRef: input.learnerStateRef,
+          enrichmentId: input.enrichmentId,
+          parentDerivedNodeId: resolved.parentDerivedNodeId,
+          term,
+          normalizedTerm: normalizeConceptLabel(term),
+          expectedAssets: {
+            assetSetIdentity: source.assetSetIdentity,
+            currentConceptLessonIds: [...source.qualifiedConceptLessonIds],
+            currentStudyItemIds: [...source.qualifiedStudyItemIds]
+          },
+          reference: {
+            referencedDerivedNodeId: exact.pin.derivedNodeId,
+            referencedConceptLessonId: exact.pin.conceptLessonId,
+            referencedStudyItemId: exact.pin.studyItemId
+          }
+        });
+        if (!detour) return { created: false, refused: "expedition_inactive" };
+        return {
+          created: true,
+          detourId: detour.detourId,
+          status: detour.status,
+          generationRequested: false
+        };
+      }
     }
+  }
+
+  // No exact qualified reference exists. Generated support may take over only when its single
+  // availability authority says so; current production refuses before any store write or wake.
+  if (!learnerKnowledgeCapabilityIsAvailable(ports.learnerKnowledgeAvailability, "generatedSupportSteps")) {
+    return {
+      created: false,
+      refused: referenceAvailable
+        ? "generated_support_step_unavailable"
+        : "reference_support_step_unavailable"
+    };
   }
 
   const detour = await ports.scaffoldStore.upsertPending({
@@ -131,7 +175,12 @@ export async function requestLearnerScaffold(
     term,
     normalizedTerm: normalizeConceptLabel(term)
   });
-  return { created: true, detourId: detour.detourId, status: detour.status };
+  return {
+    created: true,
+    detourId: detour.detourId,
+    status: detour.status,
+    generationRequested: detour.status === "generating"
+  };
 }
 
 // Retry a FAILED detour (R16, F4): reuse the detour identity and return it to `generating` for a

@@ -62,6 +62,20 @@ async function seedReferenceAssets(sql: Sql, input: { enrichmentId: string; refN
   return { conceptLessonId, studyItemId };
 }
 
+async function seedActiveSourceExpedition(
+  sql: Sql,
+  input: { learnerStateRef: string; enrichmentId: string; assetSetIdentity: string }
+) {
+  await sql`
+    INSERT INTO learner_expeditions (
+      learner_expedition_id, learner_state_ref, kind, title, declared_domain, status,
+      enrichment_id, asset_set_identity, active
+    ) VALUES (
+      ${randomUUID()}, ${input.learnerStateRef}, 'source', 'Qualified source',
+      'software engineering', 'ready', ${input.enrichmentId}, ${input.assetSetIdentity}, true
+    )`;
+}
+
 async function claimDetour(sql: Sql, store: PostgresLearnerScaffoldStore, detourId: string): Promise<string> {
   await sql`UPDATE learner_scaffold_detours SET status = 'hidden' WHERE status = 'generating' AND detour_id <> ${detourId}`;
   const claimed = await store.claimNextGenerating({ staleBefore: new Date(Date.now() + 60_000), maxAttempts: 3 });
@@ -142,6 +156,112 @@ maybe("upsertPending is idempotent per (learner, enrichment, parent, term); hide
     assert.equal(restored.steps[0].scaffoldStepId, step.scaffoldStepId, "the published step id is preserved");
     assert.ok(restored.steps[0].kind === "generated");
     assert.deepEqual(restored.steps[0].groundingBundle, step.kind === "generated" ? step.groundingBundle : undefined, "the admitted grounding bundle is restored byte-for-byte beside the payload");
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("upsertReadyReference publishes once, restores directly, and preserves historical generated rows", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const { enrichmentId, parentNodeId, refNodeId } = await seedSubstrate(sql);
+    const assets = await seedReferenceAssets(sql, { enrichmentId, refNodeId });
+    const learner = await seedLearner(sql, `L-${randomUUID()}`);
+    const assetSetIdentity = `qualified-${randomUUID()}`;
+    await seedActiveSourceExpedition(sql, { learnerStateRef: learner, enrichmentId, assetSetIdentity });
+    const store = new PostgresLearnerScaffoldStore(sql);
+    const key = {
+      learnerStateRef: learner,
+      enrichmentId,
+      parentDerivedNodeId: parentNodeId,
+      term: "Reference",
+      normalizedTerm: "reference"
+    };
+
+    // Start with an old generated payload under the same request identity. Direct publication
+    // must fence that lifecycle without deleting the historical learner artifact.
+    const pending = await store.upsertPending(key);
+    const claimToken = await claimDetour(sql, store, pending.detourId);
+    const generated = generatedStep(0);
+    assert.equal(await store.publishReady({ detourId: pending.detourId, claimToken, steps: [generated] }), true);
+
+    const request = () => store.upsertReadyReference({
+      ...key,
+      expectedAssets: {
+        assetSetIdentity,
+        currentConceptLessonIds: [assets.conceptLessonId],
+        currentStudyItemIds: [assets.studyItemId]
+      },
+      reference: {
+        referencedDerivedNodeId: refNodeId,
+        referencedConceptLessonId: assets.conceptLessonId,
+        referencedStudyItemId: assets.studyItemId
+      }
+    });
+    const [first, second, third] = await Promise.all([request(), request(), request()]);
+    assert.ok(first && second && third);
+    assert.equal(first.detourId, pending.detourId);
+    assert.equal(second.detourId, pending.detourId);
+    assert.equal(third.detourId, pending.detourId);
+    assert.equal(first.status, "ready");
+
+    const stored = await store.getById(pending.detourId);
+    assert.ok(stored);
+    assert.equal(stored.steps.filter((step) => step.kind === "generated").length, 1);
+    assert.equal(stored.steps.filter((step) => step.kind === "reference").length, 1,
+      "concurrent exact requests append one immutable pin");
+    assert.equal(stored.steps[0].scaffoldStepId, generated.scaffoldStepId,
+      "the historical generated payload is retained at its original identity");
+
+    assert.equal(await store.hide({ detourId: pending.detourId, learnerStateRef: learner }), true);
+    const restored = await request();
+    assert.ok(restored);
+    assert.equal(restored.detourId, pending.detourId);
+    assert.equal(restored.status, "ready");
+    assert.equal(restored.steps.length, 2, "restore neither drops history nor duplicates the pin");
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("upsertReadyReference fails atomically when source ownership, identity, or current assets disagree", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const { enrichmentId, parentNodeId, refNodeId } = await seedSubstrate(sql);
+    const assets = await seedReferenceAssets(sql, { enrichmentId, refNodeId });
+    const learner = await seedLearner(sql, `L-${randomUUID()}`);
+    const assetSetIdentity = `qualified-${randomUUID()}`;
+    await seedActiveSourceExpedition(sql, { learnerStateRef: learner, enrichmentId, assetSetIdentity });
+    const store = new PostgresLearnerScaffoldStore(sql);
+    const base = {
+      learnerStateRef: learner,
+      enrichmentId,
+      parentDerivedNodeId: parentNodeId,
+      term: "Reference",
+      normalizedTerm: "reference",
+      expectedAssets: {
+        assetSetIdentity,
+        currentConceptLessonIds: [assets.conceptLessonId],
+        currentStudyItemIds: [assets.studyItemId]
+      },
+      reference: {
+        referencedDerivedNodeId: refNodeId,
+        referencedConceptLessonId: assets.conceptLessonId,
+        referencedStudyItemId: assets.studyItemId
+      }
+    };
+
+    assert.equal(await store.upsertReadyReference({
+      ...base,
+      expectedAssets: { ...base.expectedAssets, assetSetIdentity: "stale" }
+    }), undefined);
+    await sql`UPDATE concept_lessons SET superseded_at = now() WHERE concept_lesson_id = ${assets.conceptLessonId}`;
+    assert.equal(await store.upsertReadyReference(base), undefined);
+    const [{ count }] = await sql<{ count: number }[]>`
+      SELECT count(*)::int AS count
+      FROM learner_scaffold_detours
+      WHERE learner_state_ref = ${learner} AND enrichment_id = ${enrichmentId}`;
+    assert.equal(count, 0, "every failed recheck rolls back before the aggregate exists");
   } finally {
     await sql.end();
   }

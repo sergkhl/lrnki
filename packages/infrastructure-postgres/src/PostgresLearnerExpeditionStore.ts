@@ -136,7 +136,7 @@ export class PostgresLearnerExpeditionStore implements LearnerExpeditionStorePor
     | { adopted: false; refused: "asset_set_changed" }
   > {
     return this.sql.begin(async (tx) => {
-      if (!await this.currentAssetsMatch(tx, input.enrichmentId, input.expectedAssets)) {
+      if (!await currentSourceExpeditionAssetsMatch(tx, input.enrichmentId, input.expectedAssets)) {
         return { adopted: false as const, refused: "asset_set_changed" as const };
       }
       await tx`
@@ -192,7 +192,7 @@ export class PostgresLearnerExpeditionStore implements LearnerExpeditionStorePor
         FOR UPDATE`;
       if (!targets[0]) return { activated: false as const, refused: "not_found" as const };
       if (targets[0].asset_set_identity !== input.expectedAssets.assetSetIdentity ||
-          !await this.currentAssetsMatch(tx, input.enrichmentId, input.expectedAssets)) {
+          !await currentSourceExpeditionAssetsMatch(tx, input.enrichmentId, input.expectedAssets)) {
         return { activated: false as const, refused: "asset_set_changed" as const };
       }
       await tx`
@@ -207,53 +207,6 @@ export class PostgresLearnerExpeditionStore implements LearnerExpeditionStorePor
           AND learner_expedition_id = ${input.learnerExpeditionId}`;
       return { activated: true as const };
     });
-  }
-
-  private async currentAssetsMatch(
-    tx: Sql | TransactionSql,
-    enrichmentId: string,
-    expected: SourceExpeditionAssetExpectation
-  ): Promise<boolean> {
-    const enrichments = await tx<{ enrichment_id: string }[]>`
-      SELECT enrichment_id
-      FROM graph_enrichments
-      WHERE enrichment_id = ${enrichmentId}
-        AND graph_version_id IS NOT NULL
-        AND status = 'succeeded'
-      FOR SHARE`;
-    if (!enrichments[0]) return false;
-
-    const lessonRows = await tx<{ concept_lesson_id: string }[]>`
-      SELECT concept_lesson_id
-      FROM concept_lessons
-      WHERE enrichment_id = ${enrichmentId} AND superseded_at IS NULL
-      ORDER BY concept_lesson_id
-      FOR SHARE`;
-    const itemRows = await tx<{ study_item_id: string }[]>`
-      SELECT study_item_id
-      FROM study_items
-      WHERE enrichment_id = ${enrichmentId}
-        AND item_type = 'option_select'
-        AND superseded_at IS NULL
-      ORDER BY study_item_id
-      FOR SHARE`;
-    // Qualification snapshots only the learner-visible floored trail. Extra current inspection
-    // assets (off-trail lessons/options and the held-out matching/impostor families) neither grant
-    // readiness nor invalidate it. Every expected id must still be present and current; replacing
-    // a visible generation updates/supersedes that exact row and is detected under these locks.
-    const expectedLessonIds = new Set(expected.currentConceptLessonIds);
-    const expectedItemIds = new Set(expected.currentStudyItemIds);
-    return sameIds(
-      lessonRows
-        .map((row) => row.concept_lesson_id)
-        .filter((conceptLessonId) => expectedLessonIds.has(conceptLessonId)),
-      expected.currentConceptLessonIds
-    ) && sameIds(
-      itemRows
-        .map((row) => row.study_item_id)
-        .filter((studyItemId) => expectedItemIds.has(studyItemId)),
-      expected.currentStudyItemIds
-    );
   }
 
   // ONE staleness predicate, shared verbatim by claim and fail-exhausted (only the
@@ -453,6 +406,53 @@ type LearnerExpeditionRow = {
   created_at: string;
   updated_at: string;
 };
+
+// One persistence-level race check shared by Source Expedition adoption/activation and direct
+// exact-reference Support Path publication. Qualification snapshots only the learner-visible
+// floored trail. Extra current inspection assets (off-trail lessons/options and held-out families)
+// neither grant readiness nor invalidate it; every expected visible id must still be current.
+export async function currentSourceExpeditionAssetsMatch(
+  tx: Sql | TransactionSql,
+  enrichmentId: string,
+  expected: SourceExpeditionAssetExpectation
+): Promise<boolean> {
+  const enrichments = await tx<{ enrichment_id: string }[]>`
+    SELECT enrichment_id
+    FROM graph_enrichments
+    WHERE enrichment_id = ${enrichmentId}
+      AND graph_version_id IS NOT NULL
+      AND status = 'succeeded'
+    FOR SHARE`;
+  if (!enrichments[0]) return false;
+
+  const lessonRows = await tx<{ concept_lesson_id: string }[]>`
+    SELECT concept_lesson_id
+    FROM concept_lessons
+    WHERE enrichment_id = ${enrichmentId} AND superseded_at IS NULL
+    ORDER BY concept_lesson_id
+    FOR SHARE`;
+  const itemRows = await tx<{ study_item_id: string }[]>`
+    SELECT study_item_id
+    FROM study_items
+    WHERE enrichment_id = ${enrichmentId}
+      AND item_type = 'option_select'
+      AND superseded_at IS NULL
+    ORDER BY study_item_id
+    FOR SHARE`;
+  const expectedLessonIds = new Set(expected.currentConceptLessonIds);
+  const expectedItemIds = new Set(expected.currentStudyItemIds);
+  return sameIds(
+    lessonRows
+      .map((row) => row.concept_lesson_id)
+      .filter((conceptLessonId) => expectedLessonIds.has(conceptLessonId)),
+    expected.currentConceptLessonIds
+  ) && sameIds(
+    itemRows
+      .map((row) => row.study_item_id)
+      .filter((studyItemId) => expectedItemIds.has(studyItemId)),
+    expected.currentStudyItemIds
+  );
+}
 
 function sameIds(actual: string[], expected: string[]): boolean {
   const sortedExpected = [...expected].sort((left, right) => left.localeCompare(right));

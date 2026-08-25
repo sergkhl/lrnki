@@ -2,13 +2,12 @@
 
 ## TODO
 
-- **Curated-source learner workflow — in progress; U0–U5 complete and U6 exact-reference Support
-  Path next.** Follow
-  [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md). Lessons
-  require extractive fields and unanimous support; source options copy one code-selected lesson unit
-  exactly and need no semantic answer-key call. A fresh external OpenStax gate passed for admission
-  precision while safely remaining unavailable on three lesson absences. Reuse only an exact
-  qualified lesson/option tuple for Support Path and refuse without generation when none exists.
+- **Curated-source learner workflow — in progress; U0–U6 complete and U7 end-to-end readiness
+  qualification next.** Follow
+  [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md). Exact
+  qualified Support Path references publish ready without a generation attempt, and missing reuse
+  creates or wakes nothing. Run the harbor core then its registered supplement through the complete
+  automatic learner journey, inspect every visible asset, and repeat the smallest external path.
 
 ## COMPLETED
 

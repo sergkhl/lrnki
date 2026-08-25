@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { GeneratedGroundingBundle, ScaffoldDetour, ScaffoldNodePayload, ScaffoldStep } from "@lrnki/domain-core";
-import type { GeneratedScaffoldStepForAudit, ScaffoldDetourStorePort, ScaffoldReferenceActivity, ScaffoldReferenceActivityReadPort } from "@lrnki/ports";
+import type { GeneratedScaffoldStepForAudit, ScaffoldDetourStorePort, ScaffoldReferenceActivity, ScaffoldReferenceActivityReadPort, SourceExpeditionAssetExpectation } from "@lrnki/ports";
 import type { Sql, TransactionSql } from "postgres";
+import { currentSourceExpeditionAssetsMatch } from "./PostgresLearnerExpeditionStore";
 import { hydrateConceptLessonRows, hydrateStudyItemRows, type LessonRow, type StudyItemRow } from "./PostgresLearnerLoopStores";
 
 // Learner-Scoped Scaffold Detour persistence (plan 2026-07-12-002 U2, KTD2, ADR-0037). The
@@ -113,6 +114,132 @@ export class PostgresLearnerScaffoldStore implements ScaffoldDetourStorePort {
       }
       steps = await this.stepsFor(tx, row.detour_id);
       return toDetour(row, steps);
+    });
+  }
+
+  async upsertReadyReference(input: {
+    learnerStateRef: string;
+    enrichmentId: string;
+    parentDerivedNodeId: string;
+    term: string;
+    normalizedTerm: string;
+    expectedAssets: SourceExpeditionAssetExpectation;
+    reference: {
+      referencedDerivedNodeId: string;
+      referencedConceptLessonId: string;
+      referencedStudyItemId: string;
+    };
+  }): Promise<ScaffoldDetour | undefined> {
+    const lessonIds = [...new Set(input.expectedAssets.currentConceptLessonIds)];
+    const itemIds = [...new Set(input.expectedAssets.currentStudyItemIds)];
+    if (
+      lessonIds.length === 0
+      || itemIds.length === 0
+      || !lessonIds.includes(input.reference.referencedConceptLessonId)
+      || !itemIds.includes(input.reference.referencedStudyItemId)
+    ) return undefined;
+
+    return this.sql.begin(async (tx) => {
+      // Recheck the exact active Source Expedition snapshot inside the publication transaction.
+      // The application already qualified the snapshot; these locks close the authorize→write
+      // race without teaching this generic store how that identity is derived.
+      if (!await currentSourceExpeditionAssetsMatch(tx, input.enrichmentId, input.expectedAssets)) {
+        return undefined;
+      }
+      const [owned] = await tx<{ learner_expedition_id: string }[]>`
+        SELECT learner_expedition_id
+        FROM learner_expeditions
+        WHERE learner_state_ref = ${input.learnerStateRef}
+          AND enrichment_id = ${input.enrichmentId}
+          AND kind = 'source'
+          AND status = 'ready'
+          AND active
+          AND asset_set_identity = ${input.expectedAssets.assetSetIdentity}
+        FOR SHARE`;
+      if (!owned) return undefined;
+
+      const [validPin] = await tx<{ valid: boolean }[]>`
+        SELECT EXISTS (
+          SELECT 1
+          FROM derived_graph_nodes parent
+          JOIN derived_graph_nodes target
+            ON target.derived_node_id = ${input.reference.referencedDerivedNodeId}
+           AND target.enrichment_id = ${input.enrichmentId}
+           AND target.declared_domain = parent.declared_domain
+          JOIN concept_lessons cl
+            ON cl.concept_lesson_id = ${input.reference.referencedConceptLessonId}
+           AND cl.derived_node_id = target.derived_node_id
+           AND cl.enrichment_id = ${input.enrichmentId}
+           AND cl.superseded_at IS NULL
+          JOIN study_items si
+            ON si.study_item_id = ${input.reference.referencedStudyItemId}
+           AND si.derived_node_id = target.derived_node_id
+           AND si.enrichment_id = ${input.enrichmentId}
+           AND si.item_type = 'option_select'
+           AND si.superseded_at IS NULL
+          WHERE parent.derived_node_id = ${input.parentDerivedNodeId}
+            AND parent.enrichment_id = ${input.enrichmentId}
+        ) AS valid`;
+      if (!validPin?.valid) return undefined;
+
+      await tx`
+        INSERT INTO learner_scaffold_detours (
+          detour_id, learner_state_ref, enrichment_id, parent_derived_node_id,
+          term, normalized_term, status
+        ) VALUES (
+          ${randomUUID()}, ${input.learnerStateRef}, ${input.enrichmentId},
+          ${input.parentDerivedNodeId}, ${input.term}, ${input.normalizedTerm}, 'ready'
+        )
+        ON CONFLICT (learner_state_ref, enrichment_id, parent_derived_node_id, normalized_term)
+        DO NOTHING`;
+      const [row] = await tx<DetourRow[]>`
+        SELECT detour_id, learner_state_ref, enrichment_id, parent_derived_node_id, term,
+               normalized_term, status, latest_operation_id, claim_token, created_at, updated_at
+        FROM learner_scaffold_detours
+        WHERE learner_state_ref = ${input.learnerStateRef}
+          AND enrichment_id = ${input.enrichmentId}
+          AND parent_derived_node_id = ${input.parentDerivedNodeId}
+          AND normalized_term = ${input.normalizedTerm}
+        FOR UPDATE`;
+
+      const [existing] = await tx<{ scaffold_step_id: string }[]>`
+        SELECT scaffold_step_id
+        FROM learner_scaffold_steps
+        WHERE detour_id = ${row.detour_id}
+          AND kind = 'reference'
+          AND referenced_derived_node_id = ${input.reference.referencedDerivedNodeId}
+          AND referenced_concept_lesson_id = ${input.reference.referencedConceptLessonId}
+          AND referenced_study_item_id = ${input.reference.referencedStudyItemId}
+        LIMIT 1`;
+      if (!existing) {
+        const [ordinal] = await tx<{ next_ordinal: number }[]>`
+          SELECT COALESCE(MAX(ordinal) + 1, 0)::int AS next_ordinal
+          FROM learner_scaffold_steps
+          WHERE detour_id = ${row.detour_id}`;
+        await tx`
+          INSERT INTO learner_scaffold_steps (
+            scaffold_step_id, detour_id, ordinal, kind, referenced_derived_node_id,
+            referenced_concept_lesson_id, referenced_study_item_id
+          ) VALUES (
+            ${randomUUID()}, ${row.detour_id}, ${ordinal.next_ordinal}, 'reference',
+            ${input.reference.referencedDerivedNodeId},
+            ${input.reference.referencedConceptLessonId},
+            ${input.reference.referencedStudyItemId}
+          )`;
+      }
+
+      // Direct reference publication fences any obsolete in-flight generated attempt. Its
+      // operation id and immutable generated rows remain as historical audit evidence.
+      await tx`
+        UPDATE learner_scaffold_detours
+        SET status = 'ready', claim_token = NULL, claimed_at = NULL, updated_at = now()
+        WHERE detour_id = ${row.detour_id}`;
+      const [ready] = await tx<DetourRow[]>`
+        SELECT detour_id, learner_state_ref, enrichment_id, parent_derived_node_id, term,
+               normalized_term, status, latest_operation_id, claim_token, created_at, updated_at
+        FROM learner_scaffold_detours
+        WHERE detour_id = ${row.detour_id}`;
+      return toDetour(ready, await this.stepsFor(tx, ready.detour_id));
     });
   }
 

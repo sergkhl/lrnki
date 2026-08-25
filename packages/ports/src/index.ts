@@ -1094,8 +1094,8 @@ export interface ResponseLogStorePort {
 // aggregate store owns request identity, lifecycle, claim/fence data, and the ordered steps.
 // Content lives ON the step (payload-on-step); a reference step points at a neutral node. All
 // writes are scoped to the owning learner. The generation module (U3) drives claim/publish/
-// fail; the API (U5) drives create/hide/restore/lesson-read; the projection (U4) reads the
-// active detours.
+// fail; the API drives direct reference publication or generated create/hide/restore/lesson-read;
+// the projection reads the active detours.
 export interface ScaffoldDetourStorePort {
   // Idempotent create-or-restore for (learner, enrichment, parent, normalizedTerm) (R5/R13).
   // Creates a fresh `generating` aggregate when none exists; restores a hidden detour to
@@ -1108,6 +1108,25 @@ export interface ScaffoldDetourStorePort {
     term: string;
     normalizedTerm: string;
   }): Promise<ScaffoldDetour>;
+  // Atomic exact-reference publication. The caller supplies the active Source Expedition
+  // snapshot it qualified and the one neutral lesson/item pin selected from that snapshot.
+  // The adapter rechecks source ownership, snapshot identity, current asset rows, and the
+  // same-layer/same-domain pin before it writes. A concurrent ownership/asset change returns
+  // undefined with no detour or step write. Existing generated/reference rows remain immutable;
+  // an absent current pin is appended once and the aggregate is restored directly to `ready`.
+  upsertReadyReference(input: {
+    learnerStateRef: string;
+    enrichmentId: string;
+    parentDerivedNodeId: string;
+    term: string;
+    normalizedTerm: string;
+    expectedAssets: SourceExpeditionAssetExpectation;
+    reference: {
+      referencedDerivedNodeId: string;
+      referencedConceptLessonId: string;
+      referencedStudyItemId: string;
+    };
+  }): Promise<ScaffoldDetour | undefined>;
   getById(detourId: string): Promise<ScaffoldDetour | undefined>;
   // Active (non-hidden) detours for one learner's expedition — the U4 projection input.
   listActiveForLearnerEnrichment(learnerStateRef: string, enrichmentId: string): Promise<ScaffoldDetour[]>;
