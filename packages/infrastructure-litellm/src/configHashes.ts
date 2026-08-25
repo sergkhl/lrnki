@@ -3,6 +3,7 @@ import {
   DEFINITION_PASSAGE_DISPOSITION_POLICY,
   SOURCE_CITATION_MATCH_CLASSIFICATION_POLICY,
   SOURCE_LESSON_EXTRACTIVE_ADMISSION_POLICY,
+  SOURCE_LESSON_PASSAGE_ROLE_POLICY,
   SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS,
   SOURCE_OPTION_EXACT_REFERENCE_ADMISSION_POLICY,
   type ConceptCanonicalizationMode,
@@ -233,6 +234,7 @@ export function studyItemBankConfigHash(routing?: TopicExpeditionModelRouting): 
   return operationConfigHash(entry.configSeed, effectiveStudyItemBankDescriptors(routing), {
     sourceCitationMatchClassificationPolicy: SOURCE_CITATION_MATCH_CLASSIFICATION_POLICY,
     sourceLessonExtractiveAdmissionPolicy: SOURCE_LESSON_EXTRACTIVE_ADMISSION_POLICY,
+    sourceLessonPassageRolePolicy: SOURCE_LESSON_PASSAGE_ROLE_POLICY,
     sourceOptionExactReferenceAdmissionPolicy: SOURCE_OPTION_EXACT_REFERENCE_ADMISSION_POLICY,
     sourceMaterialClaimSupportAcceptanceDraws: SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS
   });

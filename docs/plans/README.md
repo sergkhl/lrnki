@@ -12,8 +12,8 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-25-001 — Qualify the Curated-Source Learner Workflow](./2026-08-25-001-qualify-curated-source-learner-workflow.md)
-   — **In progress; U0–U6 complete and U7 fresh typed graph qualified.** Generate and inspect exactly
-   one bank for the fresh diagnostic enrichment before adoption, Support Path, and external-source
-   qualification.
+   — **In progress; U0–U6 complete and U7 lesson-role repair qualified, rescue carrier FIX_FIRST.**
+   Prevent the demoted diagnostic carrier from re-entering through source-mentioned rescue; do not
+   adopt or rerun the safely unavailable current bank.
 
 <!-- Hygiene and retention rules: AGENTS.md → Documentation workflow. -->

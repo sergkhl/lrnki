@@ -562,6 +562,81 @@ test("a node whose lesson grounds an option-select that passes the guard persist
   ], "lesson and option support own separate brackets; exact-reference truth is deterministic");
 });
 
+test("a false-accepting verifier cannot promote a mention into a definition lesson or item", async () => {
+  const mention = "A revision names the forecast used for one scheduled decision.";
+  const node = sourceMentionedNode({
+    id: "node-forecast",
+    label: "Decision forecast",
+    passageType: "mention",
+    quote: mention,
+    blockId: "mention-1"
+  });
+  const lessonStore = capturingLessonStore();
+  const itemStore = capturingStore();
+  let supportCalls = 0;
+  let itemGenerationCalls = 0;
+  const forbiddenItemGeneration: StudyItemGenerationPort = {
+    model: "must-not-run",
+    async generateOptionSelect() {
+      itemGenerationCalls += 1;
+      throw new Error("option-select generation must not run");
+    },
+    async generateMatching() {
+      itemGenerationCalls += 1;
+      throw new Error("matching generation must not run");
+    },
+    async generateImpostor() {
+      itemGenerationCalls += 1;
+      throw new Error("impostor generation must not run");
+    }
+  };
+  const result = await generateStudyItemBank({
+    enrichmentId: "enr-1",
+    configHash: "cfg-1",
+    graphStore: graphStoreReturning(snapshotWith([])),
+    enrichmentStore: enrichmentStoreReturning(layerWith([node])),
+    conceptLessonGeneration: lessonGenerationReturning({
+      lessons: {
+        "node-forecast": {
+          sections: [{
+            kind: "definition",
+            text: mention,
+            citation: { passageId: "mention-1", evidenceQuote: mention }
+          }],
+          explorableTerms: []
+        }
+      }
+    }),
+    sourceAssetQualification: {
+      sourceEvidenceRead: {
+        async readSourceEvidence() { return []; }
+      },
+      sourceSupportVerifier: {
+        model: "false-accepting-source-support",
+        async verify() {
+          supportCalls += 1;
+          return { disposition: "supported", reason: "Incorrectly accepted." };
+        }
+      }
+    },
+    answerKeyVerification: keyVerifierPassing(),
+    matchingAssignmentVerification: matchingVerifierPassing(),
+    conceptLessonStore: lessonStore.store,
+    studyItemGeneration: forbiddenItemGeneration,
+    studyItemBankStore: itemStore.store,
+    newConceptLessonId: () => "candidate-lesson"
+  });
+
+  assert.equal(supportCalls, 0, "the typed passage-role floor runs before neural spend");
+  assert.equal(itemGenerationCalls, 0);
+  assert.deepEqual(result.lessons, []);
+  assert.deepEqual(result.studyItems, []);
+  assert.equal(result.lessonAbsent.length, 1);
+  assert.equal(lessonStore.candidateLessons.length, 1);
+  assert.equal(lessonStore.candidateLessons[0]?.sections[0]?.groundingProvenance, "generated");
+  assert.equal(lessonStore.candidateLessons[0]?.sections[0]?.citation, undefined);
+});
+
 test("a source graph with an unavailable support verifier persists its candidate and calls no item generator", async () => {
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
   const lessonStore = capturingLessonStore();
@@ -1214,25 +1289,39 @@ test("a rescued node with a verified DEFINITION passage yields source_mentioned 
   assert.ok(persisted.every((item) => item.groundingProvenance === "source_mentioned"), "rescued definitions ground source_mentioned items, not generated");
 });
 
-test("a rescued mention-only node still yields source_mentioned items (no regression, U4)", async () => {
+test("a rescued mention-only node still yields source_mentioned items through an example", async () => {
   const m = "Borrowing lets you reference a value without taking ownership.";
   const cite = "reference a value without taking ownership";
   const { store, persisted } = capturingStore();
+  const lessonStore = capturingLessonStore();
   await generateStudyItemBank({
     enrichmentId: "enr-1",
     configHash: "cfg-1",
     graphStore: graphStoreReturning(snapshotWith([])),
     enrichmentStore: enrichmentStoreReturning(layerWith([sourceMentionedNode({ id: "node-borrow", label: "Borrowing", passageType: "mention", quote: m, blockId: "m-1" })])),
-    conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-borrow": goodLessonDraft("m-1", m) } }),
+    conceptLessonGeneration: lessonGenerationReturning({
+      lessons: {
+        "node-borrow": {
+          sections: [{
+            kind: "examples",
+            text: m,
+            citation: { passageId: "m-1", evidenceQuote: m }
+          }],
+          explorableTerms: []
+        }
+      }
+    }),
     answerKeyVerification: keyVerifierPassing(),
     matchingAssignmentVerification: matchingVerifierPassing(),
-    conceptLessonStore: capturingLessonStore().store,
-    studyItemGeneration: generationReturning({ optionSelect: { "node-borrow": osDraft(cite, ["Stack", "Register", "Cache"], lessonPassageId("node-borrow", 1)) } }),
+    conceptLessonStore: lessonStore.store,
+    studyItemGeneration: generationReturning({ optionSelect: { "node-borrow": osDraft(cite, ["Stack", "Register", "Cache"], lessonPassageId("node-borrow", 0)) } }),
     studyItemBankStore: store
   });
 
   assert.ok(persisted.length >= 1);
   assert.ok(persisted.every((item) => item.groundingProvenance === "source_mentioned"));
+  assert.equal(lessonStore.lessons[0]?.sections[0]?.kind, "examples");
+  assert.equal(lessonStore.lessons[0]?.sections[0]?.groundingProvenance, "source_mentioned");
 });
 
 test("a minted llm_grounded node on a source graph remains an inspection-only candidate", async () => {

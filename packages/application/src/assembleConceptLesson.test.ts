@@ -103,6 +103,67 @@ test("an uncited substantive section is source-cited when its text verifies agai
   assert.ok(definition.citation && definition.citation.provenance === "source");
 });
 
+test("a mention passage cannot be promoted to a definition by an explicit citation", () => {
+  const mention = "A revision names the forecast used for one scheduled decision.";
+  const grounding: NodeGrounding = {
+    provenance: "source_mentioned",
+    passages: [{
+      passageId: "mention-1",
+      kind: "mention",
+      text: mention,
+      sourceResourceId: "res-1",
+      sourceBlockId: "mention-1"
+    }],
+    definesLiteral: null
+  };
+  const result = assemble({
+    explorableTerms: [],
+    sections: [{
+      kind: "definition",
+      text: mention,
+      citation: { passageId: "mention-1", evidenceQuote: mention }
+    }]
+  }, grounding);
+
+  assert.equal(result.kind, "lesson");
+  if (result.kind !== "lesson") return;
+  const definition = result.lesson.sections[0]!;
+  assert.equal(definition.kind, "definition");
+  assert.equal(definition.groundingProvenance, "generated");
+  assert.equal(definition.citation, undefined);
+});
+
+test("an uncited definition cannot infer provenance from a mention, while an example can", () => {
+  const mention = "A revision names the forecast used for one scheduled decision.";
+  const grounding: NodeGrounding = {
+    provenance: "source_mentioned",
+    passages: [{
+      passageId: "mention-1",
+      kind: "mention",
+      text: mention,
+      sourceResourceId: "res-1",
+      sourceBlockId: "mention-1"
+    }],
+    definesLiteral: null
+  };
+  const definition = assemble({
+    explorableTerms: [],
+    sections: [{ kind: "definition", text: mention }]
+  }, grounding);
+  const example = assemble({
+    explorableTerms: [],
+    sections: [{ kind: "examples", text: mention }]
+  }, grounding);
+
+  assert.equal(definition.kind, "lesson");
+  assert.equal(example.kind, "lesson");
+  if (definition.kind !== "lesson" || example.kind !== "lesson") return;
+  assert.equal(definition.lesson.sections[0]?.groundingProvenance, "generated");
+  assert.equal(definition.lesson.sections[0]?.citation, undefined);
+  assert.equal(example.lesson.sections[0]?.groundingProvenance, "source_mentioned");
+  assert.equal(example.lesson.sections[0]?.citation?.provenance, "source");
+});
+
 // Covers AE1, R3, R4. A node with no notation/formula grounding produces gist, intuition,
 // definition, examples, applications and NO formulas section — no placeholder.
 test("a node with no formula grounding produces no formulas section and no placeholder", () => {

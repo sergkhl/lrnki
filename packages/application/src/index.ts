@@ -55,6 +55,7 @@ export {
   type ScaffoldContentField
 } from "./auditScaffoldContent";
 export { generateStudyItemBank } from "./generateStudyItemBank";
+export { SOURCE_LESSON_PASSAGE_ROLE_POLICY } from "./assembleConceptLesson";
 export {
   composeScaffoldDetours,
   type ScaffoldDetourView,

@@ -2,10 +2,10 @@
 
 ## TODO
 
-- **Curated-source learner workflow — in progress; U0–U6 complete and U7 fresh typed graph qualified.**
+- **Curated-source learner workflow — U0–U6 complete; U7 lesson-role repair qualified, rescue carrier FIX_FIRST.**
   Follow [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md).
-  Generate and inspect exactly one bank for the fresh diagnostic enrichment before adoption, Support
-  Path, and external-source qualification.
+  Prevent the demoted diagnostic carrier from re-entering through source-mentioned rescue; do not
+  adopt or rerun the safely unavailable current bank.
 
 ## COMPLETED
 

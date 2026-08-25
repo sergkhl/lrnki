@@ -50,8 +50,24 @@ export type AssembleConceptLessonResult =
 export const SOURCE_EXTRACTIVE_DEFINITION_LESSON_GENERATOR =
   "source-extractive-definition-v1";
 
+// Definition is a semantic passage role established by source extraction / rescue admission, not
+// a presentation label the lesson generator may promote. This policy identity is folded into the
+// Study Item Bank config hash so artifacts assembled before the role check cannot qualify under the
+// current source-asset contract.
+export const SOURCE_LESSON_PASSAGE_ROLE_POLICY =
+  "source_lesson_definition_requires_definition_passage_v1" as const;
+
 function isSourcePassage(passage: GroundingPassage): passage is Extract<GroundingPassage, { sourceResourceId: string }> {
   return "sourceResourceId" in passage;
+}
+
+function passageCanGroundSection(
+  section: ConceptLessonSectionDraft,
+  passage: GroundingPassage
+): boolean {
+  // A mention can support a quoted example or formula, but it cannot become the meaning of the
+  // named subject merely because the generator labels the copied sentence `definition`.
+  return section.kind !== "definition" || passage.kind === "definition";
 }
 
 // Re-derive a section's authoritative provenance + citation from the cited grounding passage.
@@ -93,13 +109,20 @@ function deriveSectionGrounding(
     // even when the model forgot the passage id. This is still a provable match; synthesized
     // teaching aids such as gist/intuition/applications remain uncited.
     if (SUBSTANTIVE_KINDS.includes(section.kind)) {
-      const inferred = grounding.passages.find((candidate) => evidenceQuoteMatches(candidate.text, section.text));
+      const inferred = grounding.passages.find((candidate) =>
+        passageCanGroundSection(section, candidate) &&
+        evidenceQuoteMatches(candidate.text, section.text)
+      );
       if (inferred) return citeVerifiedPassage(inferred, section.text, grounding);
     }
     return { provenance: "generated" };
   }
   const passage = grounding.passages.find((candidate) => candidate.passageId === section.citation!.passageId);
-  if (!passage || !evidenceQuoteMatches(passage.text, section.citation.evidenceQuote)) {
+  if (
+    !passage ||
+    !passageCanGroundSection(section, passage) ||
+    !evidenceQuoteMatches(passage.text, section.citation.evidenceQuote)
+  ) {
     // Unverifiable or dangling citation → synthesized. Never leak it as a source quote (R8).
     return { provenance: "generated" };
   }

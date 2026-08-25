@@ -7,12 +7,12 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0–U6 complete; U7 fresh typed graph qualified
+**Status:** In progress — U0–U6 complete; U7 lesson-role repair qualified, rescue carrier FIX_FIRST
 
-**NEXT:** Generate exactly one Study Item Bank for inspected enrichment
-`c06a62c8-2962-4648-93e6-726a0cea7f7a`; inspect every trail lesson, option key/explanation,
-distractor, rejection, and absence beside its admitted passage. Only a passing bank may be
-adopted/read, exercised through exact-reference Support Path, and repeated on an external source.
+**NEXT:** Prevent a demoted Curated Source carrier from re-entering as a `source_mentioned` rescue;
+use the diagnostic protocol title plus a real prerequisite as negative/positive controls, bind the
+policy into Graph Enrichment identity, and generate one fresh enrichment only after automation
+passes. Do not adopt, open Support Path, or rerun the current bank.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
 Curated Sources and automatically admits only source-backed learner assets. Anchor-less Synthetic
@@ -571,30 +571,17 @@ The plan is complete only when all of the following are true:
 
 ### U7 — complete-journey real-use qualification — 2026-08-26 — in progress
 
-- Earlier core/combined banks were never adopted: exact inspection found citation, carrier/subject,
-  and missing-lesson defects, so the strict gate refused both.
-- Definition admission, exact semantic identity, typed evidence fusion, and Concept Admission tier
-  semantics are repaired. Only `equivalent` merges; `quarantine` is an evidenced conflict, not the
-  reject option. Identities: extraction `349d7d8bf354`, canonicalization `c9f1b792acf4`, enrichment
-  `7acf2b563308`; failed candidates were not rerun for luck.
-- Fresh core run `2e39c43c-8f4d-4d18-9ece-0a2afa4f536b` admitted the three intended protocol Concepts;
-  supplement run `58a80d11-883f-4397-9cd1-bbf7acd9cbbb` admitted tide margin, adequate margin, and
-  movement authorization. All six core profiles have exact named definitions and zero quarantine.
-- Artifact `176671df-f653-43d8-a349-e7577175f3ac` kept adequate/tide margin distinct and cleanly built
-  graph `cc478c10-6857-452d-a9de-011757ffbb56`: six source Concepts, 28 passages, five assertions.
-- Enrichment `c06a62c8-2962-4648-93e6-726a0cea7f7a` has six anchors, 13 source-mentioned nodes, zero
-  LLM-grounded nodes, 20 certain/12 uncertain edges, and six confidently floored nodes. Its sole
-  safety-override/interlock merge retains the typed absorbed snapshot and all five canonical passages.
-- Extraction used 74 calls / 147,230 tokens / $0.0174940416; canonicalization used 2 / 2,079 /
-  $0.00022112 and enrichment 58 / 140,750 / $0.0206374634. Automation passed 209 LiteLLM and 862
-  application tests plus typecheck/lint/reset gate. Local DB/provider evidence is safe for one bank.
+- Identities extraction `349d7d8bf354`, canonicalization `c9f1b792acf4`, and enrichment
+  `7acf2b563308` produced two clean six-core runs, artifact `176671df-f653-43d8-a349-e7577175f3ac`,
+  graph `cc478c10-6857-452d-a9de-011757ffbb56`, and typed enrichment `c06a62c8-2962-4648-93e6-726a0cea7f7a` with zero LLM-grounded nodes.
+- Its first `21e87c60d969` bank was a valid negative control: 12 lessons / 7 absences / 16 items / 41 rejections and 210 calls / 322,113 tokens / $0.0206015216. A Forecast-revision mention was falsely promoted as the definition of Channel-depth forecast; nothing was adopted.
+- Lesson assembly now requires typed Definition Passage evidence for a `definition`, before neural spend, while mention-backed examples remain eligible. The load-bearing bank identity is `9674922fd8c3`; 865 application and 209 LiteLLM tests, affected typechecks, lint with zero errors, and whitespace pass.
+- The one replacement bank retained 11 lessons / 8 absences / 16 items / 41 rejections. All 15 lesson citations match immutable blocks, all 11 definitions match typed definition evidence, and all 11 option keys/explanations exactly equal their selected lesson unit with one key and four unique options. Channel-depth forecast has zero lesson/item plus one explicit absence; Forecast revision remains correctly taught.
+- The 13-stop trail still has five explicit lesson gaps and qualification returns `lesson_missing`; no adoption or Support Path ran. Replacement spend isolated by attempt delta is 219 calls / 342,063 tokens / $0.0234629196 over 546,273 ms. A visible carrier rescue is a separate material false acceptance, so U7 remains `FIX_FIRST`.
 
 ### Open findings
 
-- U4's local verifier remains rejected for one material false acceptance and broken LiteLLM logging;
-  do not rerun it or pick another. The remote assignment is qualified for source support and exact
-  Concept identity, not general generation or source-less grounding.
-- Generate one bank for enrichment `c06a62c8-2962-4648-93e6-726a0cea7f7a`; inspect every trail asset
-  and absence before adoption. Every prior run, graph, enrichment, or bank is stale evidence.
-- Matching and impostor remain preserved but unqualified and structurally excluded from Source
-  Expedition readiness. A future plan may qualify them after option-select works.
+- Fix the established carrier/referent problem at source-mentioned rescue: `Harbor Dispatch Core Protocol` was correctly demoted from core yet re-entered as a visible rescued lesson. Then reassess five safe absences—channel entry authorization, safety override, Harbor Control authority, reservation registry, and tide-margin dependency—through normal Curated Source evidence, never by relaxing qualification.
+- U4's local verifier remains rejected; the remote assignment is qualified for source support and exact Concept identity, not general generation or source-less grounding.
+- Matching/impostor stay preserved but unqualified; the replacement Tide-margin impostor reveal itself makes a false dispatch-token claim, confirming exclusion.
+- Same-ID bank regeneration makes the cost report aggregate prior LiteLLM spend even after telemetry cleanup. Use the recorded attempt delta above and make reporting attempt/config-scoped before the final cost claim.
