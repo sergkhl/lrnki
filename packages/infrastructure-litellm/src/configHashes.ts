@@ -1,4 +1,5 @@
 import {
+  ADMISSION_LABEL_NON_CONCEPT_POLICY,
   SOURCE_LESSON_EXTRACTIVE_ADMISSION_POLICY,
   SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS,
   SOURCE_OPTION_EXACT_REFERENCE_ADMISSION_POLICY,
@@ -176,7 +177,9 @@ export const allNeuralOperationDescriptors: readonly AnyNeuralStageDescriptor[] 
 
 export function extractionConfigHash(): string {
   const entry = neuralOperationRegistry.extraction;
-  return operationConfigHash(entry.configSeed, entry.descriptors);
+  return operationConfigHash(entry.configSeed, entry.descriptors, {
+    admissionLabelNonConceptPolicy: ADMISSION_LABEL_NON_CONCEPT_POLICY
+  });
 }
 
 export function conceptCanonicalizationConfigHash(input: {

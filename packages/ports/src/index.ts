@@ -185,15 +185,14 @@ export interface DefinitionPassageQualityJudgmentPort {
   }): Promise<DefinitionPassageQualityJudgment[]>; // one per input passage, index-aligned
 }
 
-// Concept-vs-proposition admission judge (ADR-0005). A bounded, forced-tool LLM
+// Concept-vs-non-concept admission judge (ADR-0005). A bounded, forced-tool LLM
 // judgment over ONE admitted-`core` label, run on an independent model family
 // (`kg-independent-judge`) so the judge is not the admission extractor grading its
-// own homework. It answers the semantic question the deterministic lexical veto got
-// wrong: does this label NAME a concept, or ASSERT a claim about one? Used only
-// to DOWNGRADE a `core` candidate whose label is a proposition; it never promotes
-// or resurrects. The adapter grounds its verdict fail-closed (an ungrounded
-// positive is returned as `concept`), so the application stage reads `labelKind`
-// and demotes only on a confident, source-grounded positive.
+// own homework. It answers whether the label names a durable concept, asserts a
+// claim, or names the source artifact carrying the taught concepts. Used only to
+// DOWNGRADE a `core` candidate; it never promotes or resurrects. The adapter
+// grounds every non-concept verdict fail-closed, so an ungrounded positive is
+// returned as `concept`; an unavailable call fails the owning Extraction Run.
 export interface AdmissionLabelJudgmentPort {
   readonly model: string;
   judge(input: {

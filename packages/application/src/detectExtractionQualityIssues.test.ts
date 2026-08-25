@@ -54,6 +54,26 @@ test("flags proposition-label demotions and out-of-domain illustration rejects",
   assert.ok(issues.some((issue) => issue.issueType === "possible_out_of_domain_illustration" && issue.candidateKey === "foreign" && issue.severity === "info"));
 });
 
+test("flags source-artifact labels separately from proposition labels", () => {
+  const issues = detectExtractionQualityIssues(run({
+    candidates: [
+      candidate({
+        candidateKey: "carrier",
+        label: "Procedure Handbook",
+        tier: "optional",
+        boundaryReasonCodes: ["source_artifact_label_judged"]
+      })
+    ],
+    evidenceProfiles: []
+  }));
+
+  const issue = issues.find((candidateIssue) => candidateIssue.issueType === "source_artifact_label");
+  assert.equal(issue?.candidateKey, "carrier");
+  assert.equal(issue?.stage, "admission_label_judge");
+  assert.equal(issue?.severity, "warning");
+  assert.ok(!issues.some((candidateIssue) => candidateIssue.issueType === "possible_proposition_label"));
+});
+
 test("flags a demoted hollow-definition core distinctly from the ungroundable issue", () => {
   const issues = detectExtractionQualityIssues(run({
     candidates: [candidate({ candidateKey: "alpha", label: "Alpha", tier: "optional", modelTier: "core", boundaryReasonCodes: ["core_demoted_hollow_definition"] })],

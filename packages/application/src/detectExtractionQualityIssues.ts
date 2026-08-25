@@ -56,6 +56,17 @@ export function detectExtractionQualityIssues(run: ExtractionRunResult): Extract
         rationale: "The admission-label judge demoted this candidate because its label appears to assert a proposition rather than name a Concept."
       });
     }
+    if (candidate.admission.boundaryReasonCodes.includes("source_artifact_label_judged")) {
+      issues.push({
+        stage: "admission_label_judge",
+        candidateKey: candidate.candidateKey,
+        conceptLabel: candidate.canonicalLabel,
+        issueType: "source_artifact_label",
+        severity: "warning",
+        evidenceQuotes: candidateEvidenceQuotes(candidate),
+        rationale: "The admission-label judge demoted this candidate because it names the source artifact carrying concepts rather than a durable Concept taught by the source."
+      });
+    }
     if (candidate.admission.tier === "reject" && candidate.admission.sourceRole === "out_of_domain_illustration") {
       issues.push({
         stage: "admission",

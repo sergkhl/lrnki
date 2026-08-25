@@ -477,21 +477,29 @@ function groundedAdmissionLabelJudgment(
   result: AdmissionLabelJudgment,
   evidenceQuotes: string[]
 ): AdmissionLabelJudgment {
-  if (result.labelKind !== "proposition_or_claim") {
+  if (result.labelKind === "concept") {
     return { labelKind: "concept", underlyingNounPhrase: "", groundingSpan: "", rationale: result.rationale };
   }
   const span = result.groundingSpan.trim();
-  const nounPhrase = result.underlyingNounPhrase.trim();
   const spanGrounded = span.length > 0 && evidenceQuotes.some((quote) => evidenceQuoteMatches(quote, span));
+  if (result.labelKind === "source_artifact" && spanGrounded) {
+    return {
+      labelKind: "source_artifact",
+      underlyingNounPhrase: "",
+      groundingSpan: span,
+      rationale: result.rationale
+    };
+  }
+  const nounPhrase = result.underlyingNounPhrase.trim();
   const nounPhraseGrounded = nounPhrase.length > 0 && evidenceQuotes.some((quote) => evidenceQuoteMatches(quote, nounPhrase));
-  if (spanGrounded && nounPhraseGrounded) {
+  if (result.labelKind === "proposition_or_claim" && spanGrounded && nounPhraseGrounded) {
     return { labelKind: "proposition_or_claim", underlyingNounPhrase: nounPhrase, groundingSpan: span, rationale: result.rationale };
   }
   return {
     labelKind: "concept",
     underlyingNounPhrase: "",
     groundingSpan: "",
-    rationale: `${result.rationale} [ungrounded proposition verdict kept core: spanGrounded=${spanGrounded}; nounPhraseGrounded=${nounPhraseGrounded}]`
+    rationale: `${result.rationale} [ungrounded ${result.labelKind} verdict kept core: spanGrounded=${spanGrounded}; nounPhraseGrounded=${nounPhraseGrounded}]`
   };
 }
 

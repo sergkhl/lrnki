@@ -134,7 +134,7 @@ test("definition judge rejects a definition of a qualified variant", async () =>
 // --- Concept-vs-proposition admission judge (ADR-0005) --------------------
 
 function admissionAdapterReturning(result: {
-  labelKind: "concept" | "proposition_or_claim";
+  labelKind: "concept" | "proposition_or_claim" | "source_artifact";
   underlyingNounPhrase: string;
   groundingSpan: string;
   rationale: string;
@@ -200,6 +200,44 @@ test("admission judge coerces an ungrounded proposition verdict back to concept 
   assert.equal(result.underlyingNounPhrase, "");
 });
 
+test("admission judge preserves a source-grounded source-artifact verdict", async () => {
+  const evidenceQuote = "This handbook defines the terms used by the operating procedure.";
+  const adapter = admissionAdapterReturning({
+    labelKind: "source_artifact",
+    underlyingNounPhrase: "ignored",
+    groundingSpan: "This handbook defines the terms",
+    rationale: "the label names the carrier"
+  });
+
+  const result = await adapter.judge({
+    declaredDomain: "operations",
+    label: "Procedure Handbook",
+    aliases: [],
+    evidenceQuotes: [evidenceQuote]
+  });
+  assert.equal(result.labelKind, "source_artifact");
+  assert.equal(result.underlyingNounPhrase, "");
+  assert.equal(result.groundingSpan, "This handbook defines the terms");
+});
+
+test("admission judge coerces an ungrounded source-artifact verdict back to concept", async () => {
+  const adapter = admissionAdapterReturning({
+    labelKind: "source_artifact",
+    underlyingNounPhrase: "",
+    groundingSpan: "This absent document span",
+    rationale: "the label names the carrier"
+  });
+
+  const result = await adapter.judge({
+    declaredDomain: "operations",
+    label: "Procedure Handbook",
+    aliases: [],
+    evidenceQuotes: ["The procedure coordinates independent actions."]
+  });
+  assert.equal(result.labelKind, "concept");
+  assert.match(result.rationale, /ungrounded source_artifact verdict kept core/);
+});
+
 test("admission judge grounding tolerates markdown and typographic-quote noise", async () => {
   const adapter = admissionAdapterReturning({
     labelKind: "proposition_or_claim",
@@ -222,6 +260,10 @@ test("admission label validator rejects a verdict missing labelKind (fail-closed
   );
   assert.equal(
     admissionLabelJudgmentValidator.safeParse({ labelKind: "concept", underlyingNounPhrase: "", groundingSpan: "", rationale: "x" }).success,
+    true
+  );
+  assert.equal(
+    admissionLabelJudgmentValidator.safeParse({ labelKind: "source_artifact", underlyingNounPhrase: "", groundingSpan: "source span", rationale: "x" }).success,
     true
   );
 });

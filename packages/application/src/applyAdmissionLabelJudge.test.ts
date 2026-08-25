@@ -48,6 +48,12 @@ const propositionVerdict: AdmissionLabelJudgment = {
   groundingSpan: "operator set is the bottleneck to performance",
   rationale: "asserts a claim"
 };
+const sourceArtifactVerdict: AdmissionLabelJudgment = {
+  labelKind: "source_artifact",
+  underlyingNounPhrase: "",
+  groundingSpan: "This handbook defines the concepts used by the procedure.",
+  rationale: "names the handbook carrying the concepts"
+};
 
 test("demotes a core candidate judged a proposition to optional with the underlying noun phrase", async () => {
   const judge = judgePort(() => propositionVerdict);
@@ -64,10 +70,33 @@ test("keeps a core candidate judged a concept as core", async () => {
   assert.deepEqual(result.admission.boundaryReasonCodes, []);
 });
 
-test("fails closed to core when the judge transport throws (preserve recall)", async () => {
+test("demotes a grounded source artifact without pretending its subject is an alias", async () => {
+  const artifact = candidate("core", {
+    canonicalLabel: "Procedure Handbook",
+    mentions: [{
+      blockId: "block-1",
+      evidenceQuote: "This handbook defines the concepts used by the procedure."
+    }]
+  });
+  const [result] = await applyAdmissionLabelJudge({
+    candidates: [artifact],
+    declaredDomain: "operations",
+    judge: judgePort(() => sourceArtifactVerdict)
+  });
+
+  assert.equal(result.admission.tier, "optional");
+  assert.ok(result.admission.boundaryReasonCodes.includes("source_artifact_label_judged"));
+  assert.ok(!result.admission.boundaryReasonCodes.some((code) =>
+    code.startsWith("proposition_underlying_noun_phrase:")
+  ));
+});
+
+test("fails the admission unit when the non-concept judge is unavailable", async () => {
   const judge = judgePort(() => { throw new Error("boom"); });
-  const [result] = await applyAdmissionLabelJudge({ candidates: [candidate()], declaredDomain: "machine learning", judge });
-  assert.equal(result.admission.tier, "core");
+  await assert.rejects(
+    applyAdmissionLabelJudge({ candidates: [candidate()], declaredDomain: "machine learning", judge }),
+    /boom/
+  );
 });
 
 test("only judges core candidates; optional/reject/quarantine are untouched", async () => {

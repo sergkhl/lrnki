@@ -1,4 +1,5 @@
 export { runExtractionOverSources, type ExtractionSourceUnit } from "./runExtractionOverSources";
+export { ADMISSION_LABEL_NON_CONCEPT_POLICY } from "./applyAdmissionLabelJudge";
 export { buildGraphVersion } from "./buildGraphVersion";
 export {
   canonicalizeConcepts,

@@ -4,8 +4,9 @@ import { mapWithConcurrency } from "./mapWithConcurrency";
 //
 // Every neural judge in the application package applies a measured gate over
 // deterministic output, and they all depend on the same cross-cutting guarantee:
-// *a failed judge call is a pass-through; a drop/demote happens only on a confident
-// verdict.* This module owns that envelope once so it is no longer re-proven in six
+// *a failed judge call never becomes a verdict; a drop/demote happens only on a confident
+// verdict.* Each consumer may pass through, flag, or fail its enclosing operation on
+// unavailable. This module owns that routing once so it is no longer re-proven in six
 // hand-written `catch` blocks.
 //
 // GUARANTEE (the load-bearing invariant, tested once in gateByJudgment.test.ts):
@@ -33,7 +34,8 @@ export async function gateByJudgment<T, V, R>(
     judge: (item: T, index: number) => Promise<V>;
     // Domain decision on a CONFIDENT verdict. Unreachable when `judge` throws.
     onVerdict: (item: T, verdict: V, index: number) => R;
-    // Pass-through outcome (optionally flagged) when the judge call is unavailable.
+    // Consumer-owned availability outcome; it may pass through, flag, or throw to fail
+    // the enclosing operation, but it never receives a semantic verdict.
     onUnavailable: (item: T, error: unknown, index: number) => R;
   }
 ): Promise<R[]> {

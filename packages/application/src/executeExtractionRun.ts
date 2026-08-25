@@ -77,7 +77,7 @@ export async function executeExtractionRun(input: {
     // Stage 2 — precision-first Concept Admission (separate prompt, never collapsed).
     // `admitSource` owns the whole-source admission decision: fail-closed cross-atom
     // resolution (R13 split atoms), the deterministic per-atom boundary, and the neural
-    // concept-vs-proposition downgrade (ADR-0005). Tier reconciliation against CEP
+    // concept-vs-non-concept downgrade (ADR-0005). Tier reconciliation against CEP
     // completeness runs AFTER extraction (`reconcileUngroundableCores`).
     // One wall-clock bracket for the admission phase. The nested admission-label-judge
     // LLM call (inside admitSource) is attributed its own LiteLLM spend tag; U7 surfaces

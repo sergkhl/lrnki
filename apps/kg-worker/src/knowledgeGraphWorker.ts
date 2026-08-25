@@ -211,9 +211,9 @@ function buildContext() {
     // re-grading itself; deterministic decoding for stable re-derivation. Guards
     // only the optional typed assertions inside a Concept Evidence Profile.
     assertionEntailmentJudge: createAssertionEntailmentJudgmentPort(deterministicClient),
-    // Concept-vs-proposition admission judge (ADR-0005). Same independent
+    // Concept-vs-non-concept admission judge (ADR-0005). Same independent
     // production judge (kg-independent-judge) and deterministic decoding;
-    // downgrade-only stage that replaces the removed looksLikePropositionLabel veto.
+    // grounded downgrade-only stage for propositions and source artifacts.
     admissionLabelJudge: createAdmissionLabelJudgmentPort(deterministicClient),
     // Definition-Passage quality judge (ADR-0007 extension). Same independent
     // production judge (kg-independent-judge) and deterministic decoding; runs after

@@ -175,14 +175,13 @@ export function deepStripNullBytes<T>(value: T): T {
   return value;
 }
 
-// Whether a label NAMES a concept or ASSERTS a proposition about one is a SEMANTIC
-// judgment, not a provable property, so it is decided by the measured neural
-// concept-vs-proposition admission judge (ADR-0005, `AdmissionLabelJudgment`),
+// Whether a label names a durable concept, asserts a proposition, or names its
+// source carrier is a SEMANTIC judgment, not a provable surface property. The
+// measured neural admission-label judge owns it (ADR-0005, `AdmissionLabelJudgment`),
 // never a hardcoded lexical matcher (AGENTS rule 16). The earlier deterministic
 // `looksLikePropositionLabel` veto was removed: its closed copula/verb/participle
-// list both missed real propositions (no listed verb, e.g. "Operator Set as
-// Bottleneck to Performance") and would wrongly demote legitimate concepts
-// ("Right to Be Forgotten"). Source-grounding of the canonical label stays
+// list both missed real propositions and would wrongly demote legitimate concepts.
+// Source-grounding of the canonical label stays
 // deterministic in `applyAdmissionPolicy` because it IS a provable substring
 // property.
 
@@ -412,20 +411,16 @@ export type ExtractionQualityIssue = {
   rationale: string;
 };
 
-// Concept-vs-proposition admission judgment (ADR-0005). One bounded LLM judgment
+// Concept-vs-non-concept admission judgment (ADR-0005). One bounded LLM judgment
 // over a single admitted-`core` label, replacing the brittle deterministic
-// `looksLikePropositionLabel` lexical veto (AGENTS rule 16): "is this label a
-// proposition?" is a semantic judgment, not a provable property, so a hardcoded
-// copula/verb list both missed real propositions (no listed verb) and would
-// wrongly demote legitimate concepts ('Right to Be Forgotten'). The judge is
-// DOWNGRADE-ONLY — it demotes a `core` label whose surface asserts a full claim
-// to `optional`, naming the underlying noun phrase the concept reduces to; it
-// never resurrects an `optional` candidate. Fail closed = preserve recall: the
-// application boundary keeps `core` unless `labelKind` is `proposition_or_claim`
-// AND both `groundingSpan` and `underlyingNounPhrase` are source-grounded under
-// the deterministic evidence normalizer, so the judge can never demote on text
-// absent from the candidate's cited evidence.
-export type AdmissionLabelKind = "concept" | "proposition_or_claim";
+// non-concept?" is a semantic judgment, not a provable surface property. The
+// judge is DOWNGRADE-ONLY: it demotes a claim label or a source carrier mistaken
+// for the concepts it contains, and never resurrects an optional candidate.
+// Every non-concept veto must ground its span in candidate evidence; propositions
+// additionally ground the noun phrase they reduce to. An unavailable or
+// ungrounded verdict preserves core recall; an unavailable judge fails the owning
+// Extraction Run before any candidate artifact is persisted.
+export type AdmissionLabelKind = "concept" | "proposition_or_claim" | "source_artifact";
 
 export type AdmissionLabelJudgment = {
   labelKind: AdmissionLabelKind;

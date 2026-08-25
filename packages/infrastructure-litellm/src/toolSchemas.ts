@@ -466,16 +466,15 @@ export const definitionPassageQualityJudgmentSchema: JsonSchema = toForcedToolSc
 
 // --- Admission label judgment: submit_admission_label_judgment ------------
 // One bounded judgment over a single admitted-`core` label (ADR-0005). The model
-// decides whether the label NAMES a concept or ASSERTS a proposition/claim about
-// one, and (when a proposition) names the underlying noun phrase it reduces to.
-// `groundingSpan` is the minimal verbatim sub-quote that shows the predication;
-// the application boundary fails closed to `concept` when the span or the noun
-// phrase is not source-grounded, so the judge cannot demote on absent text.
+// decides whether the label names a concept, asserts a proposition, or names the
+// source artifact carrying the concepts. `groundingSpan` is the minimal verbatim
+// sub-quote supporting either non-concept verdict. The application boundary fails
+// closed to `concept` when required grounding is absent.
 
 export const admissionLabelJudgmentValidator = z.object({
-  labelKind: z.enum(["concept", "proposition_or_claim"]).describe("'concept' when the label is a noun phrase naming a durable unit of domain knowledge (even a long multi-word one). 'proposition_or_claim' ONLY when the label asserts a full predication about a concept — a subject + relation + object statement such as '<Subject> as <Claimed Role>' or '<Subject> limited by <Constraint>'. A long nominal label is still a concept."),
-  underlyingNounPhrase: z.string().describe("When proposition_or_claim, the noun-phrase concept the label reduces to (for example '<Subject>' from '<Subject> as <Claimed Role>'), copied verbatim from the label/evidence. Empty string when labelKind is concept."),
-  groundingSpan: z.string().describe("When proposition_or_claim, the minimal verbatim sub-quote (copied exactly from one provided evidence quote) showing the label asserts a predication. Empty string when labelKind is concept."),
+  labelKind: z.enum(["concept", "proposition_or_claim", "source_artifact"]).describe("'concept' when the label names a durable unit of domain knowledge. 'proposition_or_claim' when it asserts a full predication about a concept. 'source_artifact' when it names the source work, document, section, dataset, or other carrier as a carrier rather than a subject the source teaches. A named protocol, method, or standard remains a concept when the evidence teaches the thing itself rather than a document about other subjects."),
+  underlyingNounPhrase: z.string().describe("When proposition_or_claim, the noun-phrase concept the label reduces to, copied verbatim from the label/evidence. Empty string for concept and source_artifact."),
+  groundingSpan: z.string().describe("For proposition_or_claim or source_artifact, the minimal verbatim sub-quote copied from one provided evidence quote that proves the non-concept classification. Empty string for concept."),
   rationale: z.string().min(1).describe("One terse sentence.")
 }).strict();
 

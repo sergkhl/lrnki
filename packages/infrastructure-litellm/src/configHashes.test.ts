@@ -11,6 +11,7 @@ import {
   allNeuralOperationDescriptors,
   conceptCanonicalizationConfigHash,
   effectiveStudyItemBankDescriptors,
+  extractionConfigHash,
   graphEnrichmentConfigHash,
   neuralOperationRegistry,
   scaffoldGenerationConfigHash,
@@ -62,6 +63,15 @@ test("Concept Canonicalization identity is complete and excludes execution-only 
     operationConfigHash(entry.configSeed, [], appIdentity, { additionalModels: ["kg-node-embedding"] }),
     semantic,
     "the adjudicator descriptor and Model Assignment are part of identity"
+  );
+});
+
+test("Extraction identity includes the application-owned non-concept availability policy", () => {
+  const entry = neuralOperationRegistry.extraction;
+  assert.notEqual(
+    operationConfigHash(entry.configSeed, entry.descriptors),
+    extractionConfigHash(),
+    "prompt identity alone must not hide the fail-operation availability policy"
   );
 });
 

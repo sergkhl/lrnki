@@ -2,12 +2,12 @@
 
 ## TODO
 
-- **Curated-source learner workflow — in progress; U0–U6 complete and U7 core diagnostic inspected
-  and repaired.** Follow
-  [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md). The core
-  refused safely; exact Definition Passage fallback now preserves truthful single-span attribution
-  and the raw neural draft remains inspectable. Register the harbor supplement, inspect the combined
-  automatic journey, and repeat the smallest representative external-source path.
+- **Curated-source learner workflow — in progress; U0–U6 complete and U7 combined diagnostic
+  stopped and repaired.** Follow
+  [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md). The
+  grounded admission judge now demotes a source artifact without rejecting a taught protocol.
+  Reset only the disposable database, rebuild core plus supplement under the new extraction
+  identity, inspect the combined journey, and then repeat the representative external source.
 
 ## COMPLETED
 

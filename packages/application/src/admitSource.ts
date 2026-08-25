@@ -15,8 +15,8 @@ import { applyAdmissionPolicy } from "./applyAdmissionPolicy";
 //   2. the per-atom deterministic boundary (`applyAdmissionPolicy`): verbatim-verifies
 //      positive criterion evidence, source-grounds the atomic label, derives the
 //      effective tier fail-closed;
-//   3. the neural concept-vs-proposition downgrade (`applyAdmissionLabelJudge`):
-//      downgrade-only, fail-closed = preserve recall.
+//   3. the neural concept-vs-non-concept downgrade (`applyAdmissionLabelJudge`):
+//      grounded downgrade-only; an unavailable judge fails this admission unit.
 //
 // This is the PRE-CEP admission decision. Tier reconciliation against CEP
 // completeness (an ungroundable core demoted to optional) is NOT an admission
@@ -61,8 +61,8 @@ export async function admitSource(input: {
     }
   }
 
-  // Step 3 — neural concept-vs-proposition downgrade (downgrade-only, fail-closed =
-  // preserve recall).
+  // Step 3 — neural concept-vs-non-concept downgrade. Only grounded verdicts demote;
+  // an unavailable judge fails the admission unit rather than preserving unsafe core recall.
   return applyAdmissionLabelJudge({
     candidates: policyCandidates,
     declaredDomain: input.declaredDomain,

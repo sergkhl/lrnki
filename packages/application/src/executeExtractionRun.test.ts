@@ -157,7 +157,7 @@ function harness(
   extract: ConceptConditionedEvidenceProfileExtractionPort["extract"],
   selectedCandidates = candidates,
   admit: (candidate: DiscoveredCandidate) => AdmissionProposal = admission,
-  options: { document?: StructuredDocument; evidenceNeighborhoodConfig?: { maxEvidenceBlocksPerConcept: number; siblingCap: number; adjacencyRadius: number }; definitionPassageQualityJudge?: DefinitionPassageQualityJudgmentPort; reporter?: RunProgressReporterPort; onDiscovery?: () => void } = {}
+  options: { document?: StructuredDocument; evidenceNeighborhoodConfig?: { maxEvidenceBlocksPerConcept: number; siblingCap: number; adjacencyRadius: number }; admissionLabelJudge?: AdmissionLabelJudgmentPort; definitionPassageQualityJudge?: DefinitionPassageQualityJudgmentPort; reporter?: RunProgressReporterPort; onDiscovery?: () => void } = {}
 ) {
   let persisted: ExtractionRunResult | undefined;
   let persistedArtifact: ArtifactEnvelope<ExtractionRunResult> | undefined;
@@ -180,7 +180,7 @@ function harness(
       admission: { admit: async () => selectedCandidates.map(admit) },
       evidenceProfileExtraction: { extract },
       assertionEntailmentJudge: entailEverything,
-      admissionLabelJudge: everythingIsAConcept,
+      admissionLabelJudge: options.admissionLabelJudge ?? everythingIsAConcept,
       definitionPassageQualityJudge: options.definitionPassageQualityJudge ?? keepAllDefinitions,
       store,
       reporter: options.reporter
@@ -244,6 +244,28 @@ test("produces one complete CEP per admitted concept and marks the run succeeded
   assert.equal(framework?.mentions.length, 1);
   assert.equal(result.maxMentionsPerConceptPerSource, 6);
   assert.ok(result.candidates.every((candidate) => !candidate.admission.boundaryReasonCodes.includes("core_demoted_ungroundable")));
+});
+
+test("an unavailable non-concept judge fails the Extraction Run and persists no artifact", async () => {
+  const { reporter, calls } = recordingReporter();
+  const unavailableJudge: AdmissionLabelJudgmentPort = {
+    model: "test-admission-judge",
+    judge: async () => { throw new Error("admission label judge unavailable"); }
+  };
+  const testHarness = harness(
+    async (input) => definitionFor[input.subject.candidateKey],
+    candidates,
+    admission,
+    { admissionLabelJudge: unavailableJudge, reporter }
+  );
+
+  await assert.rejects(testHarness.run(), /admission label judge unavailable/);
+  assert.equal(testHarness.persisted(), undefined);
+  assert.equal(testHarness.artifact(), undefined);
+  assert.ok(calls.some((call) =>
+    call.method === "completeStage" && call.stage === STAGE_TAGS.admission && call.ok === false
+  ));
+  assert.ok(calls.some((call) => call.method === "completeOperation" && call.status === "failed"));
 });
 
 // --- Definition-Passage quality judge wiring (ADR-0007 extension, U5) -------
