@@ -7,12 +7,12 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0–U6 complete; U7 fresh core rebuilt and attribution repaired
+**Status:** In progress — U0–U6 complete; U7 completion-source gaps made explicit
 
-**NEXT:** Register and extract the harbor supplement, extend fresh core graph
-`bb3c1e23-e010-416f-9c35-77d58c01ffd3`, and inspect the combined graph before generation. Then use
-Study Item Bank identity `study-item-bank-21e87c60d969` for qualification, automatic adoption,
-learner read, and exact-reference Support Path before repeating one external-source journey.
+**NEXT:** Register the revised harbor supplement, extend combined graph
+`12743f40-7e92-4028-8556-fcd516c710f5`, and inspect the new extraction and enrichment before one
+Study Item Bank run. Then qualify, automatically adopt/read, exercise exact-reference Support Path,
+and repeat one external-source journey.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
 Curated Sources and automatically admits only source-backed learner assets. Anchor-less Synthetic
@@ -581,15 +581,20 @@ The plan is complete only when all of the following are true:
   identity `study-item-bank-21e87c60d969` invalidate the pre-repair bank.
 - The repair passed 858 application tests, 205 infrastructure-LiteLLM tests, four affected
   typechecks, focused lint with zero errors, and whitespace checks. This is local test-database plus
-  live-provider evidence only. **Safe to continue:** yes, to the fresh supplement extension.
+  live-provider evidence only.
+- The first fresh combined bank correctly remained unavailable: five low-difficulty mention nodes
+  were floored, but `Forecast Revision` and `Movement authorization` survived with explicit lesson
+  absences. The strict whole-trail gate stayed unchanged; the project-authored completion source now
+  defines those two terms instead of pruning required prerequisites or rerunning the same input for
+  luck. **Safe to continue:** yes, with the revised source bytes only.
 
 ### Open findings
 
 - U4's local verifier remains rejected for one material false acceptance and broken LiteLLM success
   logging; do not rerun it or pick a second local candidate. The activated remote assignment is
   qualified only for source material support, not general generation or source-less grounding.
-- Extend the fresh core with the supplement under the current extraction identity, inspect the
-  combined graph before asset generation, and do not reuse its invalidated core-only bank.
+- Register only the revised supplement bytes, extend the inspected combined graph, and do not reuse
+  either earlier incomplete Study Item Bank as passing evidence.
 - Matching and impostor remain preserved but unqualified. They do not satisfy readiness in this plan;
   Source Expedition snapshots now exclude them structurally. A future plan may qualify them
   independently after the option-select Source Expedition works.

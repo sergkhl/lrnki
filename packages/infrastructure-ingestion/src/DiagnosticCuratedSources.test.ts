@@ -73,6 +73,8 @@ test("the harbor diagnostic models one prerequisite completed by a second Curate
   const supplement = readFileSync(path.join(repoRoot, harbor[1].path), "utf8");
   assert.match(core, /does not define how tide margin is\s+calculated/i);
   assert.match(supplement, /Tide margin<\/strong> is the predicted minimum water depth/i);
+  assert.match(supplement, /forecast revision<\/strong> is the identified issue/i);
+  assert.match(supplement, /Movement authorization<\/strong> is Harbor Control's explicit permission/i);
 });
 
 test("the tracked source-support matrix preserves the fixed diagnostics and real-source controls", async () => {

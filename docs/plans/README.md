@@ -12,8 +12,8 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-25-001 — Qualify the Curated-Source Learner Workflow](./2026-08-25-001-qualify-curated-source-learner-workflow.md)
-   — **In progress; U0–U6 complete and U7 fresh core rebuilt and attribution repaired.** Extend the
-   inspected core with the supplement, inspect the combined graph, then qualify/adopt/read it under
-   the current bank identity before the representative external source.
+   — **In progress; U0–U6 complete and U7 completion-source gaps made explicit.** Register the
+   revised supplement that defines the two surviving missing prerequisites, inspect the extended
+   graph, then qualify/adopt/read it before the representative external source.
 
 <!-- Hygiene and retention rules: AGENTS.md → Documentation workflow. -->
