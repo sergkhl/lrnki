@@ -20,7 +20,7 @@ import { passthroughStageBracket, type StageBracket } from "./runProgressReporte
 //     never decides, and a very-high-similarity pair is still routed to the adjudicator.
 //
 // Fail-closed everywhere (R13): an embedding failure skips that domain (no merge,
-// surfaced); an adjudicator throw degrades that pair to keep_distinct. The pass runs
+// surfaced); an adjudicator throw leaves that pair unmerged. The pass runs
 // only when BOTH ports are provided (opt-in like node minting); omitting either leaves
 // the node set identical.
 //
@@ -129,7 +129,7 @@ export async function deduplicateDerivedNodes(input: {
   const pairs = candidatePairsByDomain(nodes, vectorByNodeId, config.similarityThreshold, config.maxPairsPerNode);
 
   // DECIDE — adjudicate each proposed pair. Bounded concurrency, results collected in
-  // deterministic pair order. A throw degrades the pair to keep_distinct (fail-closed),
+  // deterministic pair order. A throw leaves the pair unmerged (fail-closed),
   // surfaced via onUnavailable; the adjudicator never auto-merges on score alone (AE3).
   // One `node-merge-adjudication` bracket spans the whole concurrent batch (KTD3): a single
   // open/close pair per dedup run, so the persisted duration is the batch's wall-clock and
@@ -144,7 +144,7 @@ export async function deduplicateDerivedNodes(input: {
           a: { label: a?.label ?? "", aliases: a?.aliases ?? [], evidence: (a?.evidence ?? []).slice(0, config.maxEvidencePerNode) },
           b: { label: b?.label ?? "", aliases: b?.aliases ?? [], evidence: (b?.evidence ?? []).slice(0, config.maxEvidencePerNode) }
         });
-        return { pair, merge: decision.decision === "merge", rationale: decision.rationale };
+        return { pair, merge: decision.relationship === "equivalent", rationale: decision.rationale };
       } catch (error) {
         input.onUnavailable?.({ kind: "adjudication", aId: pair.aId, bId: pair.bId, reason: reasonOf(error) });
         return { pair, merge: false, rationale: "" };

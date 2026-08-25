@@ -118,6 +118,7 @@ function mergeDecision(declaredDomain: string, survivor: ConceptIdentityRef, abs
     survivorNormalizedLabel: survivor.normalizedLabel,
     proposingSignal: "embedding_cosine",
     proposingScore: 0.9,
+    decidingRelationship: "equivalent",
     rationale: "near-duplicate same-domain identity",
     decidingModel: "fake-judge"
   };
@@ -390,7 +391,8 @@ test("AE3: a case-B quarantine decision refuses the build and publishes nothing"
       identityRef("economics", "tradetwo", "Trade Two", true)
     ],
     survivorNormalizedLabel: null,
-    proposingSignal: "embedding_cosine", proposingScore: 0.95, rationale: "collision",
+    proposingSignal: "embedding_cosine", proposingScore: 0.95,
+    decidingRelationship: "equivalent", rationale: "collision",
     decidingModel: "fake-judge"
   };
   const captured = quarantine.members.map((member, index) => ({
@@ -452,6 +454,7 @@ test("applied identity decisions are written to refinement_decisions (KTD3)", as
   assert.deepEqual(identityRows[0].provenance, {
     proposingSignal: "embedding_cosine",
     proposingScore: 0.9,
+    decidingRelationship: "equivalent",
     decidingModel: "fake-judge",
     artifactId: "canon-1",
     configHash: "canonicalization-test-v1"

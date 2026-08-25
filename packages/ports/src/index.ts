@@ -52,6 +52,7 @@ import type {
   PublishedConceptIdentity,
   RefinementDecisionRecord,
   RejectedStudyItem,
+  RecordedNodeIdentityRelationship,
   RescueDurabilityJudgment,
   RescuedNodeLabeling,
   RunCandidate,
@@ -374,13 +375,12 @@ export interface NodeEmbeddingPort {
 }
 
 // Merge-adjudication DECISION for semantic deduplication (plan U2, AGENTS rule 20). A
-// SEPARATE mechanism from the embedding proposer: it decides whether two proposed
-// near-duplicate nodes are two surface forms of the SAME domain concept (`merge`) or
-// genuinely distinct (`keep_distinct`). A measured cross-family LLM judge; raw cosine
-// never decides. Decision-only (no scores). The adapter validates tool arguments and
-// returns the typed decision; fail-closed semantics (transport/validation failure →
-// the application stage treats the pair as keep-distinct) live in the dedup stage (U3),
-// matching how applyRescueDurabilityJudge owns its fail-open grounding decision.
+// SEPARATE mechanism from the embedding proposer: it classifies the relationship between
+// two proposed near-duplicate nodes. Only semantic equivalence authorizes a merge; every
+// related-but-distinct or unclear classification preserves both nodes. A measured
+// cross-family LLM judge; raw cosine never decides. The adapter validates tool arguments;
+// fail-closed semantics (transport/validation failure → no merge) live in the application
+// stage, matching how applyRescueDurabilityJudge owns its fail-open grounding decision.
 export interface NodeMergeAdjudicationPort {
   readonly model: string;
   adjudicate(input: {
@@ -1474,6 +1474,7 @@ export interface ConceptIdentityDecisionView {
   survivorLabel: string | null;
   absorbedLabels: string[];
   proposingScore: number;
+  decidingRelationship: RecordedNodeIdentityRelationship;
   rationale: string;
   decidingModel: string;
 }

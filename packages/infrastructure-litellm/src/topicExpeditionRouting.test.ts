@@ -289,8 +289,8 @@ test("all three admission consumers resolve the same neutral topology and genera
   }
   assert.equal(
     effectiveModel(descriptorFor(neuralOperationRegistry.conceptCanonicalization.descriptors, "node-merge-adjudication.prompt")),
-    "kg-independent-judge",
-    "Concept Canonicalization keeps its source-family judgment assignment"
+    "kg-source-material-support-verifier",
+    "Concept Canonicalization uses the qualified flat-schema medium-reasoning assignment"
   );
 });
 
@@ -326,7 +326,7 @@ test("only affected operation hashes change and Topic has twenty conceptual stag
     "default Synthetic changes with the Grounding audit contract"
   );
   assert.equal(studyItemBankConfigHash(), "study-item-bank-21e87c60d969");
-  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-99aeeb9577ac");
+  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-eddd447accc5");
   assert.notEqual(
     graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG),
     "graph-enrichment-2af0ada6d7e6",
@@ -347,7 +347,7 @@ test("only affected operation hashes change and Topic has twenty conceptual stag
       mode: "semantic",
       config: DEFAULT_CONCEPT_CANONICALIZATION_CONFIG
     }),
-    "concept-canonicalization-ce3969a22bea"
+    "concept-canonicalization-c9f1b792acf4"
   );
   assert.equal(TOPIC_EXPEDITION_STAGE_TOTAL, 20);
   assert.equal(TOPIC_EXPEDITION_STAGE_PROFILE.enrichment.length, 9);

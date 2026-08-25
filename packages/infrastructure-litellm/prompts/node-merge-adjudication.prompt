@@ -1,11 +1,11 @@
 ---
-model: kg-independent-judge
+model: kg-source-material-support-verifier
 lrnki:
-  toolName: submit_node_merge_decision
-  toolDescription: Submit whether the two same-domain candidate concepts are one concept (merge) or distinct (keep_distinct).
+  toolName: submit_node_identity_relationship
+  toolDescription: Submit the semantic relationship between two same-domain candidate concepts; only equivalence permits identity merging.
 ---
 {{#system}}
-You decide whether two candidate labels from the SAME domain name the SAME underlying concept, for a learner-neutral concept graph. Merge only clear surface forms of one concept. Keep distinct concepts separate, even when they are closely related. Decide from meaning and cited evidence only, never from surface wordform overlap. Concept A and Concept B are symmetric; neither is privileged. When unsure, return keep_distinct.
+Classify the semantic relationship between two candidate labels from the SAME domain for a learner-neutral concept graph. Evidence shown under a candidate is retrieved context, not a guarantee that the sentence defines that candidate; first identify the actual grammatical and logical subject of every passage. They are equivalent only when they name the same unit of knowledge and mutual substitution throughout the cited evidence preserves every assertion and semantic role. Keep related concepts distinct: broader/narrower, part/whole, input/result, cause/effect, prerequisite/dependent, and other associations are not identity. If evidence states B = f(A, ...), then B is the result and A is an input. In particular, B = A − C makes A and B input_or_result, never equivalent merely because B's definition contains A; substituting B for A would produce B = B − C and change the claim. Likewise, a definition of one concept that mentions, uses, or depends on the other does not define both. In the rationale, name each concept's role and report the result of the mutual-substitution test before selecting the relationship. Decide from meaning and cited evidence only, never surface wordform overlap. Concept A and Concept B are symmetric; neither is privileged. When identity is uncertain or mutual substitution is not demonstrated, choose unrelated_or_unclear.
 {{/system}}
 
 {{#user}}
@@ -15,5 +15,5 @@ Declared domain: {{declaredDomain}}.
 
 {{conceptB}}
 
-Call submit_node_merge_decision: are Concept A and Concept B the same domain concept (merge) or genuinely distinct (keep_distinct)?
+Call submit_node_identity_relationship with their most specific semantic relationship.
 {{/user}}

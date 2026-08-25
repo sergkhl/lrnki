@@ -1009,18 +1009,32 @@ export type MintingDurabilityJudgment = {
   rationale: string;
 };
 
-// Merge-adjudication decision for semantic dedup (plan U2, AGENTS rule 20). The
+// Semantic relationship judgment for node identity (plan U2, AGENTS rule 20). The
 // DECIDE half of the propose/decide split: given two same-domain near-duplicate
-// candidates the embedding proposer surfaced, a cross-family LLM judge decides whether
-// they are two surface forms of the SAME domain concept (`merge`) or genuinely distinct
-// (`keep_distinct`). Decision-only — no score; the proposing cosine score is recorded
-// separately on the merge record. Mirrors the advisory shape of RescueDurabilityJudgment;
-// the dedup stage owns the fail-closed default (transport/validation failure →
-// keep_distinct, no merge — R13).
-export type NodeMergeDecision = "merge" | "keep_distinct";
+// candidates the embedding proposer surfaced, a cross-family LLM judge classifies
+// their relationship. Only `equivalent` authorizes a merge; every other relationship
+// preserves both concepts. Asking for the relationship rather than a merge action keeps
+// the model from turning a strong association (notably an input and computed result)
+// into identity. No score is returned; the proposing cosine is recorded separately.
+export type NodeIdentityRelationship =
+  | "equivalent"
+  | "broader_or_narrower"
+  | "part_or_whole"
+  | "input_or_result"
+  | "cause_or_effect"
+  | "prerequisite_or_dependent"
+  | "associated_distinct"
+  | "unrelated_or_unclear";
+
+// Immutable artifacts produced under the former binary contract recorded only that a
+// pair was distinct, not which non-equivalence relationship applied. The read boundary
+// preserves that honest absence explicitly; new adjudications can never emit it.
+export type RecordedNodeIdentityRelationship =
+  | NodeIdentityRelationship
+  | "legacy_binary_distinct";
 
 export type NodeMergeAdjudication = {
-  decision: NodeMergeDecision;
+  relationship: NodeIdentityRelationship;
   rationale: string;
 };
 
@@ -1105,6 +1119,7 @@ export type ConceptIdentityDecision = {
   survivorNormalizedLabel: string | null;
   proposingSignal: NodeMergeProposingSignal;
   proposingScore: number;
+  decidingRelationship: RecordedNodeIdentityRelationship;
   rationale: string;
   decidingModel: string;
 };

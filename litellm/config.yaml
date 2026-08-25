@@ -294,11 +294,12 @@ model_list:
       mode: "chat"
       max_input_tokens: 1048576
 
-  # Source-material claim support primary. This is deliberately separate from the reasoning-disabled
-  # independent judge above: source support needs bounded semantic comparison, and its flat forced-
-  # tool result avoids the nested array/object decoder failure that required reasoning-off for
-  # existing judge schemas. DeepInfra FP8 is exact-pinned and medium reasoning is part of assignment
-  # identity. The explicit Io Net group below is the only fallback; each provider stays attributable.
+  # Flat-schema source semantic verifier primary. This is deliberately separate from the
+  # reasoning-disabled independent judge above: source-material support and Concept identity need
+  # bounded semantic comparison, and their flat forced-tool results avoid the nested array/object
+  # decoder failure that required reasoning-off for existing judge schemas. DeepInfra FP8 is
+  # exact-pinned and medium reasoning is part of assignment identity. The explicit Io Net group
+  # below is the only fallback; each provider stays attributable.
   - model_name: "openrouter/deepseek/deepseek-v4-flash-0731-source-support"
     litellm_params:
       model: "openrouter/deepseek/deepseek-v4-flash-0731"
@@ -322,11 +323,11 @@ model_list:
       mode: "chat"
       max_input_tokens: 1048576
 
-  # Source-material support availability fallback. Io Net passed the exact forced named-tool,
-  # reasoning, provider-attribution, supported-control, missing-mechanism, and distributive-scope
-  # probes. Its smaller declared input limit remains visible in conservative Model Assignment
-  # identity and is separately qualified by the complete tracked matrix before release evidence is
-  # accepted. OpenRouter-internal fallback remains disabled so no unmeasured endpoint can enter.
+  # Flat-schema source semantic verifier availability fallback. Io Net passed the source-support
+  # matrix and the exact Concept-identity forced tool's input/result negative plus equivalence
+  # positive controls with medium reasoning. Its smaller declared input limit remains visible in
+  # conservative Model Assignment identity. OpenRouter-internal fallback remains disabled so no
+  # unmeasured endpoint can enter.
   - model_name: "openrouter/deepseek/deepseek-v4-flash-0731-source-support-io-net-backup"
     litellm_params:
       model: "openrouter/deepseek/deepseek-v4-flash-0731"
@@ -629,8 +630,8 @@ router_settings:
     # quality parity, so the incumbent stays.
     kg-prerequisite-ordering: openrouter/openai/gpt-oss-120b
     # Independent source-family judge (ADR-0007/0005): concept-vs-proposition admission,
-    # optional-assertion entailment, Concept Canonicalization merge adjudication, source-mentioned
-    # rescue judgments, and Study Item Key Verification. Generated-layer judgments use the
+    # optional-assertion entailment, source-mentioned rescue judgments, and Study Item Key
+    # Verification. Generated-layer judgments use the
     # operation-neutral MiMo alias above so DeepSeek never grades its own generated nodes.
     # ONE Model Assignment, deliberately: the provider-only fallback is attributable through
     # LiteLLM SpendLogs and does not mix model revision, quantization, or inference behavior. Moving
@@ -640,8 +641,9 @@ router_settings:
     # (The off-core oracle triangle and label aligner were retired after the admission-precision fix;
     # see ADR-0013.)
     kg-independent-judge: openrouter/deepseek/deepseek-v4-flash-0731
-    # Precision-first learner-asset support route. The exact primary and explicit fallback are
-    # qualification-gated; OpenRouter may not choose an undeclared provider behind either group.
+    # Precision-first flat source semantic-verification route, shared by learner-asset support and
+    # Concept identity. The exact primary and explicit fallback are qualification-gated; OpenRouter
+    # may not choose an undeclared provider behind either group.
     kg-source-material-support-verifier: openrouter/deepseek/deepseek-v4-flash-0731-source-support
     # Topic owns only learner-asset generation/judgment and prerequisite ordering. Source-less node
     # production, Grounding Admission, and generated-layer judgment use the neutral aliases above.

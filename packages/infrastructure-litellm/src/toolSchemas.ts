@@ -512,18 +512,31 @@ export const mintingDurabilityJudgmentValidator = z.object({
 
 export const mintingDurabilityJudgmentSchema: JsonSchema = toForcedToolSchema(mintingDurabilityJudgmentValidator);
 
-// --- Node merge adjudication: submit_node_merge_decision (U2, R3/R4) ----------
+// --- Node identity relationship: submit_node_identity_relationship (U2, R3/R4) ---
 // The DECIDE half of semantic dedup (AGENTS rule 20). Embedding cosine PROPOSED that
-// two same-domain nodes may be near-duplicates; this judge decides whether they are two
-// surface forms of the SAME domain concept or genuinely distinct. Decision-only output
-// (the proposing score is recorded separately, never re-derived here). Domain-neutral
-// rubric — no fixture labels, no lexical patterns (AGENTS rules 16/17). The two sides
-// are presented symmetrically with neither privileged; the application stage defaults a
-// transport/validation failure to keep_distinct (fail-closed, no merge — R13).
+// two same-domain nodes may be near-duplicates; this judge classifies their semantic
+// relationship. Only `equivalent` authorizes a merge in the application. The proposing
+// score is recorded separately and never re-derived here. Domain-neutral rubric — no
+// fixture labels, no lexical patterns (AGENTS rules 16/17). The two sides are presented
+// symmetrically with neither privileged; transport/validation failure yields no judgment
+// and therefore no merge (fail closed — R13).
 
 export const nodeMergeAdjudicationValidator = z.object({
-  decision: z.enum(["merge", "keep_distinct"]).describe("'merge' ONLY when the two labels denote the SAME underlying unit of domain knowledge — two surface forms of one concept (for example a singular/possessive/abbreviated variant, or a paraphrase that a learner would not study as a separate idea). 'keep_distinct' when they are genuinely different concepts, even if lexically or topically close (a concept and a specialization of it, a part and its whole, two siblings, a general idea and one mechanism within it). Decide from the concepts' MEANING and the cited evidence, never from surface wordform overlap; when unsure, prefer 'keep_distinct' (merging is the irreversible-feeling action that fragments or fuses a learner's graph)."),
-  rationale: z.string().min(1).describe("One terse sentence naming what makes the two the same concept or distinct.")
+  // ORDER IS BEHAVIORAL: the reasoning-disabled DeepSeek forced-tool decoder selected
+  // the first enum even while its rationale concluded input/result. The exact negative
+  // and positive controls passed once conservative outcomes preceded the irreversible
+  // identity outcome. Keep `equivalent` last; config hashing and the adapter test lock it.
+  relationship: z.enum([
+    "unrelated_or_unclear",
+    "associated_distinct",
+    "broader_or_narrower",
+    "part_or_whole",
+    "input_or_result",
+    "cause_or_effect",
+    "prerequisite_or_dependent",
+    "equivalent"
+  ]).describe("Classify the concepts' semantic relationship. Evidence placement does not certify that a passage defines the candidate it is shown under: identify the passage's actual subject first. Use 'equivalent' ONLY when both labels denote the same underlying unit of knowledge AND mutual substitution in every cited assertion preserves meaning and semantic role. Use the most specific non-equivalent relation when one is broader/narrower, part/whole, an input/operand versus its computed result, a cause/effect, or a prerequisite/dependent. If B = f(A, ...), B is a result and A an input; specifically, B = A - C makes A and B 'input_or_result', because substitution would change the equation. Use 'associated_distinct' for another clear non-identity relation and 'unrelated_or_unclear' when no relation is established, identity is uncertain, or mutual substitution is not demonstrated. Decide from meaning and evidence, never word overlap."),
+  rationale: z.string().min(1).describe("One terse sentence naming each concept's semantic role and stating whether mutual substitution preserves or changes the cited claims.")
 }).strict();
 
 export const nodeMergeAdjudicationSchema: JsonSchema = toForcedToolSchema(nodeMergeAdjudicationValidator);

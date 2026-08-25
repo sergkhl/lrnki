@@ -436,6 +436,7 @@ export async function buildGraphVersion(input: {
         provenance: {
           proposingSignal: decision.proposingSignal,
           proposingScore: decision.proposingScore,
+          decidingRelationship: decision.decidingRelationship,
           decidingModel: decision.decidingModel,
           artifactId: canonicalizationArtifact.artifactId,
           configHash: canonicalizationArtifact.configHash

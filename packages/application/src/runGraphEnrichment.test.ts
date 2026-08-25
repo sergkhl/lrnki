@@ -705,7 +705,7 @@ test("U2 integration: a dedup-on run's timeline uses fine names, never `dedup`",
   };
   const nodeMergeAdjudicator: NodeMergeAdjudicationPort = {
     model: "stub-adjudicator",
-    async adjudicate() { return { decision: "keep_distinct", rationale: "" }; }
+    async adjudicate() { return { relationship: "unrelated_or_unclear", rationale: "unclear" }; }
   };
   await run(ports, { reporter, nodeEmbedding, nodeMergeAdjudicator });
   const entered = calls.filter((c) => c.startsWith("enter:")).map((c) => c.slice("enter:".length));

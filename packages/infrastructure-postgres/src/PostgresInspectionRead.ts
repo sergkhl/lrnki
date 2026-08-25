@@ -334,7 +334,11 @@ type IdentityDecisionRow = {
     survivorNormalizedLabel?: string | null;
     members?: { normalizedLabel: string; canonicalLabel: string }[];
   } | null;
-  provenance: { proposingScore?: number; decidingModel?: string } | null;
+  provenance: {
+    proposingScore?: number;
+    decidingRelationship?: ConceptIdentityDecisionView["decidingRelationship"];
+    decidingModel?: string;
+  } | null;
 };
 
 // Pure stitch of identity-decision rows into the inspection view (plan U4). Exported so
@@ -353,6 +357,8 @@ export function assembleIdentityDecisions(rows: IdentityDecisionRow[]): ConceptI
       survivorLabel: row.outcome === "merge" ? survivor?.canonicalLabel ?? null : null,
       absorbedLabels: members.filter((member) => member.normalizedLabel !== survivorNormalizedLabel).map((member) => member.canonicalLabel),
       proposingScore: Number(row.provenance?.proposingScore ?? 0),
+      decidingRelationship: row.provenance?.decidingRelationship ??
+        (row.outcome === "distinct" ? "legacy_binary_distinct" : "equivalent"),
       rationale: row.rationale,
       decidingModel: row.provenance?.decidingModel ?? ""
     };

@@ -2,7 +2,8 @@ import type {
   ConceptCanonicalizationUnavailable,
   ConceptIdentityDecision,
   ConceptIdentityRef,
-  ConceptIdentityResolutionOutcome
+  ConceptIdentityResolutionOutcome,
+  NodeIdentityRelationship
 } from "@lrnki/domain-core";
 import type { NodeEmbeddingPort, NodeMergeAdjudicationPort } from "@lrnki/ports";
 import { cosineSimilarity, DEFAULT_DEDUP_CONFIG } from "./deduplicateDerivedNodes";
@@ -120,8 +121,8 @@ export async function resolveConceptIdentity(input: {
 
   const pairs = candidatePairsByDomain(representatives, vectorByKey, config.similarityThreshold, config.maxPairsPerNode);
 
-  // DECIDE — adjudicate each proposed pair with bounded concurrency. A throw degrades
-  // the pair to keep_distinct (fail-closed), surfaced via onUnavailable.
+  // DECIDE — adjudicate each proposed pair with bounded concurrency. A throw leaves
+  // the pair without a decision (fail-closed, no merge), surfaced via unavailable.
   const refByKey = new Map(representatives.map((member) => [member.key, member] as const));
   const decided = pairs.length === 0
     ? []
@@ -135,7 +136,7 @@ export async function resolveConceptIdentity(input: {
               a: { label: a.canonicalLabel, aliases: a.aliases, evidence: a.definitions.slice(0, config.maxEvidencePerNode) },
               b: { label: b.canonicalLabel, aliases: b.aliases, evidence: b.definitions.slice(0, config.maxEvidencePerNode) }
             });
-            return { pair, merge: decision.decision === "merge", rationale: decision.rationale } satisfies DecidedPair;
+            return { pair, relationship: decision.relationship, rationale: decision.rationale } satisfies DecidedPair;
           } catch (error) {
             unavailable.push({
               kind: "adjudication",
@@ -229,7 +230,7 @@ export function candidatePairsByDomain(
 
 type DecidedPair = {
   pair: { aKey: string; bKey: string; declaredDomain: string; score: number };
-  merge: boolean;
+  relationship: NodeIdentityRelationship;
   rationale: string;
 };
 
@@ -241,7 +242,7 @@ export function classifyDecisions(
   refByKey: Map<string, Representative>,
   decidingModel: string
 ): ConceptIdentityDecision[] {
-  const mergedEdges = decided.filter((decision) => decision.merge);
+  const mergedEdges = decided.filter((decision) => decision.relationship === "equivalent");
 
   // Union-find over merged edges.
   const parent = new Map<string, string>();
@@ -297,7 +298,9 @@ export function classifyDecisions(
     if (publishedMembers.length >= 2) {
       // Case B: two-or-more already-published members — a published-identity collision the
       // build must refuse rather than re-key (R7, KTD4). No survivor; quarantine the cluster.
-      decisions.push(decision("quarantine", declaredDomain, members.map(toRef), null, score, rationale, decidingModel));
+      decisions.push(
+        decision("quarantine", declaredDomain, members.map(toRef), null, score, "equivalent", rationale, decidingModel)
+      );
       continue;
     }
     // Case A (1 published) / Case C (0 published): canonicalize automatically.
@@ -310,6 +313,7 @@ export function classifyDecisions(
         [survivor, ...members.filter((member) => member.key !== survivor.key)].map(toRef),
         survivor.normalizedLabel,
         score,
+        "equivalent",
         rationale,
         decidingModel
       )
@@ -317,11 +321,20 @@ export function classifyDecisions(
   }
 
   // Record every adjudicated-distinct pair (R4), in deterministic pair order.
-  for (const distinct of decided.filter((decision) => !decision.merge)) {
+  for (const distinct of decided.filter((decision) => decision.relationship !== "equivalent")) {
     const a = refByKey.get(distinct.pair.aKey)!;
     const b = refByKey.get(distinct.pair.bKey)!;
     decisions.push(
-      decision("distinct", distinct.pair.declaredDomain, [toRef(a), toRef(b)], null, distinct.pair.score, distinct.rationale, decidingModel)
+      decision(
+        "distinct",
+        distinct.pair.declaredDomain,
+        [toRef(a), toRef(b)],
+        null,
+        distinct.pair.score,
+        distinct.relationship,
+        distinct.rationale,
+        decidingModel
+      )
     );
   }
   return decisions;
@@ -343,6 +356,7 @@ function decision(
   members: ConceptIdentityRef[],
   survivorNormalizedLabel: string | null,
   proposingScore: number,
+  decidingRelationship: NodeIdentityRelationship,
   rationale: string,
   decidingModel: string
 ): ConceptIdentityDecision {
@@ -353,6 +367,7 @@ function decision(
     survivorNormalizedLabel,
     proposingSignal: PROPOSING_SIGNAL,
     proposingScore,
+    decidingRelationship,
     rationale,
     decidingModel
   };

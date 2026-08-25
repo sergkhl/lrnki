@@ -72,7 +72,7 @@ test("assembleIdentityDecisions maps merge, distinct, and quarantine rows", () =
         { normalizedLabel: "ownership", canonicalLabel: "Ownership" },
         { normalizedLabel: "owner", canonicalLabel: "Owner" }
       ] },
-      provenance: { proposingScore: 0.91, decidingModel: "gpt-oss-120b" }
+      provenance: { proposingScore: 0.91, decidingRelationship: "equivalent", decidingModel: "gpt-oss-120b" }
     },
     {
       outcome: "distinct", rationale: "demand ≠ demography",
@@ -80,7 +80,7 @@ test("assembleIdentityDecisions maps merge, distinct, and quarantine rows", () =
         { normalizedLabel: "demand", canonicalLabel: "Demand" },
         { normalizedLabel: "demography", canonicalLabel: "Demography" }
       ] },
-      provenance: { proposingScore: 0.72, decidingModel: "gpt-oss-120b" }
+      provenance: { proposingScore: 0.72, decidingRelationship: "broader_or_narrower", decidingModel: "gpt-oss-120b" }
     },
     {
       outcome: "quarantine", rationale: "two published collide",
@@ -88,16 +88,18 @@ test("assembleIdentityDecisions maps merge, distinct, and quarantine rows", () =
         { normalizedLabel: "tradeone", canonicalLabel: "Trade One" },
         { normalizedLabel: "tradetwo", canonicalLabel: "Trade Two" }
       ] },
-      provenance: { proposingScore: 0.95, decidingModel: "gpt-oss-120b" }
+      provenance: { proposingScore: 0.95, decidingRelationship: "equivalent", decidingModel: "gpt-oss-120b" }
     }
   ]);
 
   assert.equal(views.length, 3);
   assert.deepEqual(views[0], {
     outcome: "merge", declaredDomain: "rust programming", survivorLabel: "Ownership",
-    absorbedLabels: ["Owner"], proposingScore: 0.91, rationale: "owner ≈ ownership", decidingModel: "gpt-oss-120b"
+    absorbedLabels: ["Owner"], proposingScore: 0.91, decidingRelationship: "equivalent",
+    rationale: "owner ≈ ownership", decidingModel: "gpt-oss-120b"
   });
   assert.equal(views[1].survivorLabel, null, "a distinct decision has no survivor");
+  assert.equal(views[1].decidingRelationship, "broader_or_narrower");
   assert.deepEqual(views[1].absorbedLabels, ["Demand", "Demography"]);
   assert.equal(views[2].outcome, "quarantine");
   assert.deepEqual(views[2].absorbedLabels, ["Trade One", "Trade Two"]);

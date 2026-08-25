@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { AnchorProjectionNode, NodeMergeDecision, SourceMentionedEnrichmentNode } from "@lrnki/domain-core";
+import type { AnchorProjectionNode, NodeIdentityRelationship, SourceMentionedEnrichmentNode } from "@lrnki/domain-core";
 import type { NodeEmbeddingPort, NodeMergeAdjudicationPort } from "@lrnki/ports";
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import { candidatePairsByDomain, cosineSimilarity, deduplicateDerivedNodes, type DedupConfig, type DedupNodeContext } from "./deduplicateDerivedNodes";
@@ -76,18 +76,18 @@ function embeddingStub(vectorByText: Map<string, number[]>, throwIfTextIncludes?
   };
 }
 
-// Adjudicator stub recording its calls; `decide` returns the canned decision per pair.
+// Adjudicator stub recording its calls; `decide` returns the canned relationship per pair.
 function adjudicatorStub(
-  decide: (a: { label: string }, b: { label: string }) => NodeMergeDecision | "throw"
+  decide: (a: { label: string }, b: { label: string }) => NodeIdentityRelationship | "throw"
 ): NodeMergeAdjudicationPort & { calls: number } {
   const stub = {
     calls: 0,
     model: "stub-adjudicator",
     async adjudicate(input: { a: { label: string }; b: { label: string } }) {
       stub.calls += 1;
-      const decision = decide(input.a, input.b);
-      if (decision === "throw") throw new Error("adjudicator unavailable");
-      return { decision, rationale: `${decision}: ${input.a.label} / ${input.b.label}` };
+      const relationship = decide(input.a, input.b);
+      if (relationship === "throw") throw new Error("adjudicator unavailable");
+      return { relationship, rationale: `${relationship}: ${input.a.label} / ${input.b.label}` };
     }
   };
   return stub;
@@ -113,10 +113,10 @@ test("AE3: a pair far above threshold is still routed to the adjudicator (no aut
     ["e2", { label: "Alpha prime", aliases: [], evidence: [] }]
   ]);
   const vectors = new Map<string, number[]>([["Alpha", [1, 0]], ["Alpha prime", [1, 0]]]); // cosine 1.0
-  const adjudicator = adjudicatorStub(() => "keep_distinct");
+  const adjudicator = adjudicatorStub(() => "unrelated_or_unclear");
   const result = await deduplicateDerivedNodes({ nodes, contextByNodeId: ctx, embedding: embeddingStub(vectors), adjudicator, config });
   assert.equal(adjudicator.calls, 1, "score 1.0 still consults the adjudicator");
-  assert.equal(result.merges.length, 0, "keep_distinct ⇒ no merge");
+  assert.equal(result.merges.length, 0, "non-equivalence ⇒ no merge");
   assert.equal(result.nodes.length, 2);
 });
 
@@ -130,7 +130,7 @@ test("AE1: a merge removes the absorbed node, aliases the canonical, unions evid
     [embedTextOf(ctx.get("a1")!), [1, 0]],
     [embedTextOf(ctx.get("z9")!), [1, 0]]
   ]);
-  const adjudicator = adjudicatorStub(() => "merge");
+  const adjudicator = adjudicatorStub(() => "equivalent");
   const result = await deduplicateDerivedNodes({ nodes, contextByNodeId: ctx, embedding: embeddingStub(vectors), adjudicator, config });
 
   assert.equal(result.nodes.length, 1, "absorbed node removed");
@@ -150,22 +150,22 @@ test("AE1: a merge removes the absorbed node, aliases the canonical, unions evid
   assert.equal(merge.proposingSignal, "embedding_cosine");
   assert.ok(merge.proposingScore > 0.99);
   assert.equal(merge.canonicalSelectionReason, "anchor_over_enrichment");
-  assert.ok(merge.rationale.startsWith("merge"));
+  assert.ok(merge.rationale.startsWith("equivalent"));
 });
 
-test("AE2: keep_distinct leaves both nodes and records no merge", async () => {
+test("AE2: a non-equivalent relationship leaves both nodes and records no merge", async () => {
   const nodes = [enrichment("e1", "Stack", "d"), enrichment("e2", "Heap", "d")];
   const ctx = contextMap([
     ["e1", { label: "Stack", aliases: [], evidence: [] }],
     ["e2", { label: "Heap", aliases: [], evidence: [] }]
   ]);
   const vectors = new Map<string, number[]>([["Stack", [1, 0]], ["Heap", [1, 0]]]);
-  const result = await deduplicateDerivedNodes({ nodes, contextByNodeId: ctx, embedding: embeddingStub(vectors), adjudicator: adjudicatorStub(() => "keep_distinct"), config });
+  const result = await deduplicateDerivedNodes({ nodes, contextByNodeId: ctx, embedding: embeddingStub(vectors), adjudicator: adjudicatorStub(() => "associated_distinct"), config });
   assert.equal(result.nodes.length, 2);
   assert.equal(result.merges.length, 0);
 });
 
-test("AE5/R13: an adjudicator throw fails closed to keep_distinct (no merge, nodes unchanged, surfaced)", async () => {
+test("AE5/R13: an adjudicator throw fails closed to no merge (nodes unchanged, surfaced)", async () => {
   const nodes = [enrichment("e1", "Alpha", "d"), enrichment("e2", "Alpha2", "d")];
   const ctx = contextMap([
     ["e1", { label: "Alpha", aliases: [], evidence: [] }],
@@ -210,7 +210,7 @@ test("R13 (propose side): an embedding failure skips only that domain", async ()
     nodes,
     contextByNodeId: ctx,
     embedding: embeddingStub(vectors, "FAILME"),
-    adjudicator: adjudicatorStub(() => "merge"),
+    adjudicator: adjudicatorStub(() => "equivalent"),
     config,
     onUnavailable: (event) => {
       if (event.kind === "embedding") embeddingFailures += 1;
@@ -234,7 +234,7 @@ test("KTD6: enrichment↔enrichment ties break by evidence count then stable id"
     [embedTextOf(ctx.get("e1")!), [1, 0]],
     [embedTextOf(ctx.get("e2")!), [1, 0]]
   ]);
-  const result = await deduplicateDerivedNodes({ nodes, contextByNodeId: ctx, embedding: embeddingStub(vectors), adjudicator: adjudicatorStub(() => "merge"), config });
+  const result = await deduplicateDerivedNodes({ nodes, contextByNodeId: ctx, embedding: embeddingStub(vectors), adjudicator: adjudicatorStub(() => "equivalent"), config });
   assert.equal(result.nodes[0].derivedNodeId, "e2", "more-evidence node is canonical");
   assert.equal(result.merges[0].canonicalSelectionReason, "higher_evidence_count");
 
@@ -247,7 +247,7 @@ test("KTD6: enrichment↔enrichment ties break by evidence count then stable id"
     [embedTextOf(ctxTie.get("e1")!), [1, 0]],
     [embedTextOf(ctxTie.get("e2")!), [1, 0]]
   ]);
-  const tie = await deduplicateDerivedNodes({ nodes, contextByNodeId: ctxTie, embedding: embeddingStub(vectorsTie), adjudicator: adjudicatorStub(() => "merge"), config });
+  const tie = await deduplicateDerivedNodes({ nodes, contextByNodeId: ctxTie, embedding: embeddingStub(vectorsTie), adjudicator: adjudicatorStub(() => "equivalent"), config });
   assert.equal(tie.nodes[0].derivedNodeId, "e1", "lower id wins the tie");
   assert.equal(tie.merges[0].canonicalSelectionReason, "stable_id_tiebreak");
 });
@@ -266,7 +266,7 @@ test("union-find: A~B and B~C collapse to one canonical with two records", async
     ["C", [0.8, 0.6]]
   ]);
   const transitiveConfig: DedupConfig = { ...config, similarityThreshold: 0.85 };
-  const result = await deduplicateDerivedNodes({ nodes, contextByNodeId: ctx, embedding: embeddingStub(vectors), adjudicator: adjudicatorStub(() => "merge"), config: transitiveConfig });
+  const result = await deduplicateDerivedNodes({ nodes, contextByNodeId: ctx, embedding: embeddingStub(vectors), adjudicator: adjudicatorStub(() => "equivalent"), config: transitiveConfig });
   assert.equal(result.nodes.length, 1, "single canonical survives");
   assert.equal(result.merges.length, 2, "one record per absorbed node, no duplicates");
   const canonicalIds = new Set(result.merges.map((merge) => merge.canonicalDerivedNodeId));
@@ -287,7 +287,7 @@ test("two anchors in one cluster are refused (published-identity collision, R7)"
     ["C", [0.8, 0.6]]
   ]);
   const transitiveConfig: DedupConfig = { ...config, similarityThreshold: 0.85 };
-  const result = await deduplicateDerivedNodes({ nodes, contextByNodeId: ctx, embedding: embeddingStub(vectors), adjudicator: adjudicatorStub(() => "merge"), config: transitiveConfig });
+  const result = await deduplicateDerivedNodes({ nodes, contextByNodeId: ctx, embedding: embeddingStub(vectors), adjudicator: adjudicatorStub(() => "equivalent"), config: transitiveConfig });
   assert.equal(result.nodes.length, 3, "no node absorbed when a cluster holds two anchors");
   assert.equal(result.merges.length, 0);
 });
@@ -311,7 +311,7 @@ test("U2: one node-embedding + one node-merge-adjudication bracket, no overlap, 
     nodes,
     contextByNodeId: ctx,
     embedding: embeddingStub(vectors),
-    adjudicator: adjudicatorStub(() => "keep_distinct"),
+    adjudicator: adjudicatorStub(() => "unrelated_or_unclear"),
     config,
     stage
   });
@@ -343,7 +343,7 @@ test("U2: an embedding failure does not strand the embedding bracket", async () 
     nodes,
     contextByNodeId: ctx,
     embedding: embeddingStub(new Map(), "FAILME"),
-    adjudicator: adjudicatorStub(() => "merge"),
+    adjudicator: adjudicatorStub(() => "equivalent"),
     config,
     stage
   });

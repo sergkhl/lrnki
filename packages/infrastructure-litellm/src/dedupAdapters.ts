@@ -66,7 +66,7 @@ export const nodeMergeAdjudicationDescriptor: NeuralStageDescriptor<
     conceptA: renderSide("Concept A", input.a),
     conceptB: renderSide("Concept B", input.b)
   }),
-  mapResult: (result) => ({ decision: result.decision, rationale: result.rationale })
+  mapResult: (result) => ({ relationship: result.relationship, rationale: result.rationale })
 };
 
 export function createNodeMergeAdjudicationPort(

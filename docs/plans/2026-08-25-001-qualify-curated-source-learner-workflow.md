@@ -7,12 +7,12 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0–U6 complete; U7 term-definition binding repaired
+**Status:** In progress — U0–U6 complete; U7 revised graph published
 
-**NEXT:** Harden Concept Canonicalization against related input/result fusion, then inspect and use
-fresh revised-supplement run `57a2b5aa-fd0b-49e2-a5df-17a2ae5ae821` to extend graph
-`12743f40-7e92-4028-8556-fcd516c710f5`. Only after the extended graph passes inspection, generate
-one bank, qualify/adopt/read it, exercise exact-reference Support Path, and repeat the external path.
+**NEXT:** Enrich inspected graph `cb834545-b02e-4aae-8906-123f9514586e`, inspect every derived node,
+grounding passage, and prerequisite decision, then generate exactly one Study Item Bank. Only after
+that bank passes qualification may the workflow adopt/read it, exercise exact-reference Support
+Path, and repeat the smallest representative path on an external Curated Source.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
 Curated Sources and automatically admits only source-backed learner assets. Anchor-less Synthetic
@@ -98,14 +98,19 @@ likewise distinguishes works and their titles from subjects and subject terms. T
 extends the existing grounded semantic admission judge to demote source artifacts; it does not infer
 artifact identity from fixture words or transfer the carrier's contents to its label.
 
-### Definiendum confused with a term inside its definition
+### Definiendum and semantic-equivalence conflation
 
 The reproduced definition-extraction defect treated an input named inside a formula as though that
 formula defined the input. Conventional term-definition extraction binds a *definiendum* (the term
 being defined) to its *definiens* (the meaning supplied for that term), rather than classifying the
 sentence alone; see the [DEFT task](https://aclanthology.org/2020.semeval-1.41/) and the component
 annotation in [Storrer and Wellinghoff](https://aclanthology.org/L06-1066/). The existing independent
-semantic gate now verifies that relation; no lexical definition pattern is introduced.
+semantic gate now verifies that relation; no lexical definition pattern is introduced. Downstream,
+only mutually substitutable identities may merge: SKOS distinguishes high-confidence
+[exact matches](https://www.w3.org/TR/skos-reference/skos.html#exactMatch) from broader, narrower,
+related, and other non-identity relations. The forced enum also reproduced recognized
+[answer-choice position bias](https://aclanthology.org/2024.findings-naacl.130/). The bounded repair
+uses mutual substitution, medium reasoning, conservative enum order, and exact provider controls; no lexical veto.
 
 ### Transport authority leaking into application policy
 
@@ -551,45 +556,45 @@ The plan is complete only when all of the following are true:
 
 ### U7 — complete-journey real-use qualification — 2026-08-26 — in progress
 
-- Earlier core/supplement attempts were never adopted: inspection found one multi-span lesson under
-  single-span attribution, one source title promoted as its subject, and overstated citation fidelity.
-  Extractive lesson fallback, grounded `source_artifact` demotion, and block-derived citation match
-  classes repaired those boundaries; unavailable source-artifact judgment fails the run closed.
-- After resetting only disposable `lrnki_test`, the fresh core produced four document anchors plus
-  four source-mentioned prerequisites and zero LLM-grounded nodes. Its seven-stop floored trail
-  persisted five source-supported lessons/options plus three explicit lesson absences; production
-  qualification refused `lesson_missing`, proving the intended core-only negative control. The full
-  journey recorded about $0.0304; no readiness evaluation or adoption call followed the refusal.
-- The first fresh combined bank correctly remained unavailable: five low-difficulty mention nodes
-  were floored, but `Forecast Revision` and `Movement authorization` survived with explicit lesson
-  absences. The strict whole-trail gate stayed unchanged; the project-authored completion source now
-  defines those two terms rather than pruning prerequisites or rerunning unchanged input for luck.
-- Revised-source canonicalization artifact `1a59ce72-bf74-4552-a994-c2df3737d58a` remains unpublished:
-  it falsely merged `Predicted minimum channel depth` into `Tide Margin`. The upstream Definition
-  Passage gate had accepted the result's formula as a definition of its input. Its forced-tool
-  contract now owns one verdict category and explicitly binds the named definiendum to its definiens;
-  formula input/component/result relations are non-defining for the named candidate.
-- The exact live counterexample returned `defines_different_subject`, while the same passage remained
-  a positive definition of `Tide margin`. Fresh production-composition run
-  `57a2b5aa-fd0b-49e2-a5df-17a2ae5ae821` (`source-extraction-2b15b67d6238`) persisted three grounded
-  wrong-subject vetoes as deduplicated mentions beside four kept definitions, succeeded non-degraded
-  in 193.911 seconds, and was inspected directly. Its 25 successful calls used 53,354 tokens and
-  about $0.007312 estimated spend; all 12 independent-judge calls resolved to the configured
-  DeepInfra FP8, reasoning-disabled DeepSeek assignment. No graph used the invalid artifact.
-- Current automation passed 860 application and 206 infrastructure-LiteLLM tests, four affected
-  typechecks, focused lint with zero errors, config-identity regressions, and whitespace checks.
-  This is local test-database plus live-provider evidence only. **Safe to continue:** yes, after the
-  canonicalization equivalence boundary passes its own negative control.
+- Earlier core/combined banks were never adopted: exact inspection found citation, carrier/subject,
+  and missing-lesson defects; the strict gate refused both. The completion source defines the gaps.
+- The Definition Passage contract now binds the named definiendum to its definiens. Fresh run
+  `57a2b5aa-fd0b-49e2-a5df-17a2ae5ae821` (`source-extraction-2b15b67d6238`) kept four definitions,
+  moved three wrong-subject passages to mentions, and passed exact negative/positive inspection.
+- Concept Canonicalization now records one relationship taxonomy and merges only `equivalent`.
+  The relationship reaches immutable artifacts, refinement provenance, inspection, and Admin Lab;
+  old binary artifacts read as `legacy_binary_distinct` without invented detail.
+- A reasoning-disabled DeepSeek control reproduced forced-enum position bias: the rationale correctly
+  concluded input/result while the first-listed enum said `equivalent`. Conservative enum order plus
+  the flat medium-reasoning route made both DeepInfra and direct Io Net return `input_or_result` for
+  the exact negative and `equivalent` for the alias positive. Current identities are
+  `concept-canonicalization-c9f1b792acf4` and `graph-enrichment-eddd447accc5`.
+- Negative-control artifact `edd91f19-2780-4fd8-ac7e-5ee5d7f12dc0` kept the 0.9358-cosine formula
+  input distinct and remains unbuilt because its run predates the upstream repair. Current artifact
+  `d67d6fef-6c1a-42a5-989a-a1afb01e0bbf` recorded one true merge, two related distinctions, and no
+  quarantine/unavailable result. Invalid artifact `1a59ce72-bf74-4552-a994-c2df3737d58a` is unbuilt.
+- Published disposable graph `cb834545-b02e-4aae-8906-123f9514586e` has seven Concepts and no false
+  `Predicted minimum channel depth` identity. Revised evidence is confined to `Adequate Margin`,
+  `Tide Margin`, and new `movement authorization`; their full profiles contain 2/2/2 definitions
+  and 7/10/3 mentions; the build made no LLM call.
+- Both canonicalizations made nine calls / 9,899 tokens for $0.000686198; all seven judgments were
+  DeepInfra FP8 medium-reasoning DeepSeek. Io Net controls added 2,332 tokens / $0.000534674, while
+  the generated-layer Xiaomi override also passed both controls with 2,068 unbilled tokens.
+  Automation passed 860 application, 207 LiteLLM, and 116 Postgres tests (101 DB tests skipped
+  outside the reset route), all 11 typechecks, full lint with zero errors, and whitespace. Authority
+  is local disposable-database plus live-provider only. **Safe to continue:** yes, to enrichment;
+  its changed identity requires fresh evidence.
 
 ### Open findings
 
 - U4's local verifier remains rejected for one material false acceptance and broken LiteLLM success
   logging; do not rerun it or pick a second local candidate. The activated remote assignment is
-  qualified only for source material support, not general generation or source-less grounding.
-- Never publish canonicalization artifact `1a59ce72-bf74-4552-a994-c2df3737d58a`. Repair and validate
-  the input/result equivalence boundary, then canonicalize fresh run
-  `57a2b5aa-fd0b-49e2-a5df-17a2ae5ae821` against graph `12743f40-7e92-4028-8556-fcd516c710f5`;
-  do not reuse either incomplete Study Item Bank as passing evidence.
+  qualified for source material support and the exact Concept-identity schema, not general
+  generation or source-less grounding.
+- Never publish artifact `1a59ce72-bf74-4552-a994-c2df3737d58a` or build negative-control artifact
+  `edd91f19-2780-4fd8-ac7e-5ee5d7f12dc0`. Enrich current graph
+  `cb834545-b02e-4aae-8906-123f9514586e` under `graph-enrichment-eddd447accc5`; inspect it before
+  generating one new bank, and do not reuse either incomplete bank as passing evidence.
 - Matching and impostor remain preserved but unqualified. They do not satisfy readiness in this plan;
   Source Expedition snapshots now exclude them structurally. A future plan may qualify them
   independently after the option-select Source Expedition works.

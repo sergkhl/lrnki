@@ -4,8 +4,10 @@ import {
   type ConceptCanonicalizationArtifact,
   type ConceptCanonicalizationUnavailable,
   type ConceptIdentityDecision,
+  type ConceptIdentityResolutionOutcome,
   type GraphSnapshot,
   type PublishedConceptIdentity,
+  type RecordedNodeIdentityRelationship,
   type RunForBuild
 } from "@lrnki/domain-core";
 import type {
@@ -341,6 +343,7 @@ function validateDecision(
   ) {
     throw new Error(`Malformed Concept Canonicalization artifact: decisions[${index}] outcome.`);
   }
+  const outcome: ConceptIdentityResolutionOutcome = decision.outcome;
   const declaredDomain = requiredString(decision.declaredDomain, `decisions[${index}].declaredDomain`);
   if (!Array.isArray(decision.members) || decision.members.length < 2) {
     throw new Error(
@@ -392,7 +395,7 @@ function validateDecision(
 
   const publishedMembers = members.filter((member) => member.published);
   let survivorNormalizedLabel: string | null;
-  if (decision.outcome === "merge") {
+  if (outcome === "merge") {
     survivorNormalizedLabel = requiredString(
       decision.survivorNormalizedLabel,
       `decisions[${index}].survivorNormalizedLabel`
@@ -417,12 +420,12 @@ function validateDecision(
       );
     }
     survivorNormalizedLabel = null;
-    if (decision.outcome === "distinct" && members.length !== 2) {
+    if (outcome === "distinct" && members.length !== 2) {
       throw new Error(
         `Malformed Concept Canonicalization artifact: decisions[${index}] distinct must have two members.`
       );
     }
-    if (decision.outcome === "quarantine" && publishedMembers.length < 2) {
+    if (outcome === "quarantine" && publishedMembers.length < 2) {
       throw new Error(
         `Malformed Concept Canonicalization artifact: decisions[${index}] quarantine requires two published members.`
       );
@@ -443,12 +446,17 @@ function validateDecision(
     );
   }
   return {
-    outcome: decision.outcome,
+    outcome,
     declaredDomain,
     members,
     survivorNormalizedLabel,
     proposingSignal: "embedding_cosine",
     proposingScore,
+    decidingRelationship: recordedRelationship(
+      decision.decidingRelationship,
+      outcome,
+      `decisions[${index}].decidingRelationship`
+    ),
     rationale: requiredString(decision.rationale, `decisions[${index}].rationale`),
     decidingModel: requiredString(decision.decidingModel, `decisions[${index}].decidingModel`)
   };
@@ -610,4 +618,40 @@ function finiteNumber(value: unknown, path: string): number {
     throw new Error(`Malformed Concept Canonicalization artifact: ${path} must be finite.`);
   }
   return value;
+}
+
+const RECORDED_NODE_IDENTITY_RELATIONSHIPS = new Set<RecordedNodeIdentityRelationship>([
+  "equivalent",
+  "broader_or_narrower",
+  "part_or_whole",
+  "input_or_result",
+  "cause_or_effect",
+  "prerequisite_or_dependent",
+  "associated_distinct",
+  "unrelated_or_unclear",
+  "legacy_binary_distinct"
+]);
+
+function recordedRelationship(
+  value: unknown,
+  outcome: ConceptIdentityResolutionOutcome,
+  path: string
+): RecordedNodeIdentityRelationship {
+  // Old immutable artifacts used a binary merge/keep-distinct judgment. A merge or
+  // quarantine therefore meant equivalence under that contract; a distinct decision
+  // did not retain enough information to recover its more specific relationship.
+  if (value === undefined) return outcome === "distinct" ? "legacy_binary_distinct" : "equivalent";
+  if (
+    typeof value !== "string" ||
+    !RECORDED_NODE_IDENTITY_RELATIONSHIPS.has(value as RecordedNodeIdentityRelationship)
+  ) {
+    throw new Error(`Malformed Concept Canonicalization artifact: ${path}.`);
+  }
+  if ((outcome === "merge" || outcome === "quarantine") && value !== "equivalent") {
+    throw new Error(`Malformed Concept Canonicalization artifact: ${path} must be equivalent for ${outcome}.`);
+  }
+  if (outcome === "distinct" && value === "equivalent") {
+    throw new Error(`Malformed Concept Canonicalization artifact: ${path} cannot be equivalent for distinct.`);
+  }
+  return value as RecordedNodeIdentityRelationship;
 }

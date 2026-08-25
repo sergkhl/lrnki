@@ -2,11 +2,10 @@
 
 ## TODO
 
-- **Curated-source learner workflow — in progress; U0–U6 complete and U7 term-definition binding
-  repaired.** Follow
-  [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md). Harden the
-  input/result equivalence boundary, then inspect and extend the graph from the fresh revised-source
-  run before qualification, automatic adoption/read, Support Path, and the external-source repeat.
+- **Curated-source learner workflow — in progress; U0–U6 complete and U7 revised graph published.**
+  Follow [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md).
+  Enrich and inspect graph `cb834545-b02e-4aae-8906-123f9514586e`, generate one fresh bank, then
+  qualify, automatically adopt/read, exercise Support Path, and repeat the external-source path.
 
 ## COMPLETED
 

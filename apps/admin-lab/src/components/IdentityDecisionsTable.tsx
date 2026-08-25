@@ -34,6 +34,7 @@ export function IdentityDecisionsTable({ decisions }: { decisions: ConceptIdenti
                 <TableHead>Outcome</TableHead>
                 <TableHead>Domain</TableHead>
                 <TableHead>Concepts</TableHead>
+                <TableHead>Relationship</TableHead>
                 <TableHead className="text-right">Cosine</TableHead>
                 <TableHead>Rationale</TableHead>
               </TableRow>
@@ -56,6 +57,9 @@ export function IdentityDecisionsTable({ decisions }: { decisions: ConceptIdenti
                     ) : (
                       <span className="text-muted-foreground">{decision.absorbedLabels.join(" ⇄ ")}</span>
                     )}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {decision.decidingRelationship.replaceAll("_", " ")}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{decision.proposingScore.toFixed(2)}</TableCell>
                   <TableCell className="max-w-[28ch] truncate text-xs text-muted-foreground italic" title={decision.rationale}>

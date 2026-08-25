@@ -6,6 +6,7 @@ import {
   type BuildEvidenceProfile,
   type ConceptCanonicalizationArtifact,
   type GraphSnapshot,
+  type NodeIdentityRelationship,
   type PublishedConceptIdentity,
   type RunForBuild
 } from "@lrnki/domain-core";
@@ -105,7 +106,7 @@ function embedding(vectors: number[][] | Error): NodeEmbeddingPort & { calls: st
 }
 
 function adjudicator(
-  result: "merge" | "keep_distinct" | Error
+  result: NodeIdentityRelationship | Error
 ): NodeMergeAdjudicationPort & { calls: unknown[] } {
   const calls: unknown[] = [];
   return {
@@ -114,7 +115,7 @@ function adjudicator(
     async adjudicate(input) {
       calls.push(input);
       if (result instanceof Error) throw result;
-      return { decision: result, rationale: `${result} because the meanings were inspected.` };
+      return { relationship: result, rationale: `${result} because the meanings were inspected.` };
     }
   };
 }
@@ -141,7 +142,7 @@ test("semantic Concept Canonicalization preserves ordered runs and persists one 
     ]
   });
   const embed = embedding([[1, 0], [1, 0]]);
-  const judge = adjudicator("merge");
+  const judge = adjudicator("equivalent");
 
   const artifact = await canonicalizeConcepts({
     artifactId: "canon-semantic",
@@ -166,6 +167,7 @@ test("semantic Concept Canonicalization preserves ordered runs and persists one 
   );
   assert.equal(artifact.payload.decisions.length, 1);
   assert.equal(artifact.payload.decisions[0].outcome, "merge");
+  assert.equal(artifact.payload.decisions[0].decidingRelationship, "equivalent");
   assert.equal(artifact.payload.decisions[0].survivorNormalizedLabel, "barter");
   assert.equal("configHash" in artifact.payload.decisions[0], false);
   assert.equal(artifact.configHash, "canonicalization-config-1");
@@ -216,7 +218,7 @@ test("embedding failure is bounded and recorded without a semantic decision", as
     graphStore: deps.graphStore,
     canonicalizationStore: deps.store,
     embedding: embedding(new Error(longReason)),
-    adjudicator: adjudicator("merge")
+    adjudicator: adjudicator("equivalent")
   });
 
   assert.deepEqual(artifact.payload.decisions, []);
@@ -250,7 +252,7 @@ test("adjudication failure is unavailable, not a false distinct decision", async
   assert.deepEqual(artifact.payload.unavailable.map((item) => item.kind), ["adjudication"]);
 });
 
-test("an actual keep-distinct judgment is recorded as semantic distinct", async () => {
+test("an input/result judgment remains distinct even at cosine 1.0", async () => {
   const deps = dependencies({
     runs: [
       run("run-a", "barter", "Barter", "barter"),
@@ -267,10 +269,11 @@ test("an actual keep-distinct judgment is recorded as semantic distinct", async 
     graphStore: deps.graphStore,
     canonicalizationStore: deps.store,
     embedding: embedding([[1, 0], [1, 0]]),
-    adjudicator: adjudicator("keep_distinct")
+    adjudicator: adjudicator("input_or_result")
   });
 
   assert.deepEqual(artifact.payload.decisions.map((decision) => decision.outcome), ["distinct"]);
+  assert.equal(artifact.payload.decisions[0].decidingRelationship, "input_or_result");
   assert.deepEqual(artifact.payload.unavailable, []);
 });
 
@@ -306,10 +309,11 @@ test("merging two captured published identities records quarantine", async () =>
     graphStore: deps.graphStore,
     canonicalizationStore: deps.store,
     embedding: embedding([[1, 0], [1, 0]]),
-    adjudicator: adjudicator("merge")
+    adjudicator: adjudicator("equivalent")
   });
 
   assert.deepEqual(artifact.payload.decisions.map((decision) => decision.outcome), ["quarantine"]);
+  assert.equal(artifact.payload.decisions[0].decidingRelationship, "equivalent");
   assert.equal(artifact.payload.decisions[0].members.filter((member) => member.published).length, 2);
 });
 
@@ -412,6 +416,49 @@ test("stored artifact reads fail closed on wrong type and malformed decision inv
       valid.artifactId
     ),
     /at least two members/
+  );
+
+  const legacyDistinct = {
+    outcome: "distinct",
+    declaredDomain: "economics",
+    members: [
+      {
+        declaredDomain: "economics", normalizedLabel: "input", canonicalLabel: "Input",
+        aliases: [], definitions: ["Input feeds the calculation."], published: false
+      },
+      {
+        declaredDomain: "economics", normalizedLabel: "result", canonicalLabel: "Result",
+        aliases: [], definitions: ["Result is calculated from Input."], published: false
+      }
+    ],
+    survivorNormalizedLabel: null,
+    proposingSignal: "embedding_cosine",
+    proposingScore: 0.95,
+    rationale: "legacy binary judgment kept the pair distinct",
+    decidingModel: "legacy-judge"
+  };
+  const loadedLegacy = await loadConceptCanonicalizationArtifact(
+    storeReturning({ ...valid, payload: { ...valid.payload, decisions: [legacyDistinct] } }),
+    valid.artifactId
+  );
+  assert.equal(
+    loadedLegacy.payload.decisions[0].decidingRelationship,
+    "legacy_binary_distinct",
+    "a pre-taxonomy immutable artifact remains readable without inventing a relationship"
+  );
+
+  await assert.rejects(
+    () => loadConceptCanonicalizationArtifact(
+      storeReturning({
+        ...valid,
+        payload: {
+          ...valid.payload,
+          decisions: [{ ...legacyDistinct, decidingRelationship: "equivalent" }]
+        }
+      }),
+      valid.artifactId
+    ),
+    /cannot be equivalent for distinct/
   );
 });
 
