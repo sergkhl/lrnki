@@ -423,181 +423,84 @@ The plan is complete only when all of the following are true:
 
 ### U0 — accepted contract and diagnostic Curated Sources — 2026-08-25 — complete
 
-- The owner selected the precision-first source-backed successor: supplied Curated Sources are the
-  current workflow start; future source discovery/generation reuses Source Registration; no human
-  approval enters runtime; `source_mentioned` prerequisites and exact-reference Support Steps stay
-  available; LLM-grounded prerequisites, generated Support Steps, and anchor-less Synthetic Topic
-  Generation stay held out without deleting their implementation.
-- Repository inspection confirmed the missing Source Expedition term/type, client-authoritative
-  source adoption, partial-asset candidate ranking, unguarded direct Study Session read, current-only
-  lesson/item stores, exact reference-step identities, and the independent lesson/distractor/matching/
-  impostor defects retained by the prior source-backed diagnostic. This is current source inspection,
-  not a runtime or database claim.
-- Added four project-authored diagnostic Curated Sources in Markdown, HTML, and plaintext plus a
-  separate manifest. The harbor pair models a mentioned-but-undefined prerequisite supplied later by
-  a second normally registered source. The suite supplements rather than replaces the real-source
-  matrix and contains no expected neural graph oracle.
-- `pnpm --filter @lrnki/infrastructure-ingestion typecheck` passed. The full package test command
-  passed 12/12, including unique fixture registration, native parser selection, non-empty located
-  blocks, and the harbor cross-source boundary. `jq empty fixtures/diagnostic-manifest.json` and
-  `git diff --check` passed.
-- The first parser assertion used a line-sensitive phrase match and failed on ordinary Markdown
-  wrapping; the assertion was corrected to permit whitespace. Typecheck then exposed optional
-  locator fields; the test now narrows them before comparison. Neither excluded failure is counted
-  as evidence.
-- No model call, source registration, database write/reset, Compose mutation, generated graph,
-  learner asset, browser/native/device action, deployment, or release action occurred. Semantic
-  usefulness remains unqualified until U3–U7.
+- Accepted supplied Curated Sources as the current entry, future acquisition through Source
+  Registration, no human runtime, source-mentioned prerequisites, and exact-reference Support
+  Steps. LLM-grounded prerequisites, generated Support Steps, and Synthetic Topic Generation remain
+  implemented but held out.
+- Added four project-authored Markdown/HTML/text diagnostic sources and a separate manifest; the
+  harbor pair exercises later source-supplied prerequisite completion without defining a neural
+  graph oracle or replacing the real-source matrix.
+- Ingestion typecheck, 12 fixture tests, manifest parsing, and whitespace passed after two excluded
+  test-harness corrections. No model call, database/source write, or learner/deployed evidence was
+  claimed.
 
 ### U1 — one availability policy for trusted learner knowledge — 2026-08-25 — complete
 
-- Replaced the one-capability Synthetic Topic policy with one application-owned, source-typed
-  learner-knowledge availability value covering all six accepted paths. The current value keeps
-  Source Expedition adoption, source-mentioned prerequisites, and exact-reference Support Steps
-  available while returning stable held-out reasons for Synthetic Topic Generation, LLM-grounded
-  prerequisites, and generated Support Steps. Only the superseded policy definition and its test
-  were deleted; every producer, artifact type, stored row, and historical implementation remains.
-- API composition, the worker, both process-lived supervisors, Journal/catalog/Study Session
-  projection, Support Path request/retry, and Scaffold Generation now consume that policy. A
-  held-out graph cannot be cataloged, chosen, activated, or projected; paused topic mutations and
-  generated-step mutations refuse before a write or wake. Source-mentioned rescue is structurally
-  independent from the LLM-grounded proposal/admission tuple, and its focused test proves a rescued
-  node is retained while zero Source-less Grounding Admission operations open.
-- Exact eligible Support Path requests still enqueue and publish the existing pinned reference with
-  zero neural calls. A request without an exact eligible reference now returns
-  `generated_support_step_unavailable` before queue creation; stored generated artifacts are
-  preserved but filtered from learner projection. Reference grading continues through the existing
-  neutral activity path; only generated-step grade/read/retry routes are held out.
-- Local automated evidence passed: 820 application tests; eight kg-worker tests; 22 hermetic
-  learner-API tests with four database cases correctly skipped without `TEST_DATABASE_URL`; the
-  reset-backed `pnpm test:db` route including all 26 learner-API database tests; and all 57 learner
-  app suites / 320 tests. Application, kg-worker, learner-API, and learner-app typechecks plus
-  targeted ESLint passed. The learner-app runner emitted its existing late Expo logger warning but
-  exited zero after every suite passed; that warning is not counted as positive evidence.
-- This unit intentionally made no model call: its acceptance question is that held-out producers
-  make none, while source-backed/reference paths remain reachable. The focused no-call counters and
-  database no-write assertions establish that local application boundary only. No fresh learner
-  asset was semantically qualified, and no browser/native, simulator/emulator, physical-device,
-  deployed, production, or release evidence was produced.
+- One source-typed application policy now governs all six learner-knowledge capabilities across API,
+  worker, supervisors, Journal/catalog/Study Session, Support Path, and Scaffold Generation. Held-
+  out entry points refuse before a write or wake; every producer, artifact, and historical row
+  remains.
+- Source Expedition adoption, verified source-mentioned prerequisites, and exact pinned references
+  remain reachable. LLM-grounded graphs, Synthetic Topic requests, and generated Support Steps return
+  stable unavailable reasons; generated artifacts remain inspectable but unprojected.
+- The reset-backed repository gate, 820 application tests, eight worker tests, 26 database API tests,
+  57 learner-app suites / 320 tests, four typechecks, lint, and no-call/no-write controls passed. This
+  proves local availability mechanics only, not content usefulness or deployed/device behavior.
 
 ### U2 — deep Source Expedition qualification and adoption — 2026-08-25 — complete
 
-- Added the source-owned expedition kind and one application module that derives authoritative
-  summit title, Declared Domain, trusted prerequisite-closed trail, current qualified assets, and an
-  opaque exact asset-set identity. Client adoption and activation now send identifiers only. Source
-  adoption is idempotent, switches the active expedition atomically, creates no generation operation,
-  and wakes no Topic supervisor.
-- A versioned qualification wrapper makes every legacy lesson/item bank fail closed. The module
-  rejects missing or changed assets, incomplete trails, LLM-grounded nodes, and unverified
-  source-mentioned nodes. Only current qualified option-select items cross learner boundaries;
-  matching and impostor artifacts remain stored and inspectable but neither render nor grade.
-- Catalog, Journal, owned/direct Study Session reads, activation, neutral grading/checking, verdicts,
-  lesson reads, exact-reference Support Path, and Recall Challenges now consume the same Source
-  Expedition authority. Recall lineups carry the exact asset identity and become unreadable after
-  regeneration. Rejected verdict/lesson-read HTTP mutations now report their refusal as well as
-  making no write.
-- Persistence compares the locked current lesson/item identities before adoption or activation and
-  refuses a concurrent generation change without a partial active switch. The regenerated Drizzle
-  baseline passed `pnpm db:check` (58 tables). Seven focused module tests and the reset-backed
-  repository `pnpm test:db` gate passed, including 111 Postgres tests, 26 learner-API tests, and 57
-  learner-app suites / 320 tests. All 11 workspace typechecks passed; ESLint passed with zero errors
-  and 13 retained warnings; whitespace checks passed.
-- A read-only local real-use inspection through the production learner-API composition found two
-  positive-control candidates in the disposable test database. Each resolved to a two-stop
-  document-anchored trail, one source-cited substantive lesson per stop, only four-choice
-  option-select activities, and an exact two-lesson/two-item snapshot. These are project-authored
-  persisted fixtures: they prove composition and qualification behavior only, not neural quality,
-  real external source usefulness, deployed behavior, or release readiness. No model call occurred.
-- The first full database run exposed an invalid anchor-role fixture and was excluded; after the
-  fixture used the schema-owned anchor role, the focused API journey and full database gate passed.
-  The first inline inspection also failed before database access because root evaluation could not
-  resolve workspace aliases; only the successful package-bound rerun is evidence.
+- One source-owned module derives authoritative presentation, the prerequisite-closed source trail,
+  current qualified assets, and opaque snapshot identity; identifier-only adoption is idempotent,
+  atomic, generation-free, and wakes no Topic supervisor.
+- The versioned wrapper rejects legacy/changed/missing assets, incomplete trails, LLM-grounded nodes,
+  and unverified source-mentioned nodes. Catalog, Journal, Study Session, activation, learner writes,
+  Recall, and exact-reference Support Path share that authority. Matching/impostor remain stored but
+  neither render nor grade.
+- Seven module tests, `pnpm db:check`, the reset-backed repository gate, 111 Postgres tests, 26 API
+  tests, 57 learner-app suites / 320 tests, all 11 typechecks, lint, and whitespace passed after two
+  excluded fixture/runner corrections.
+- A read-only production-composition inspection found two exact two-stop/two-lesson/two-option
+  project-authored positive controls. It proves qualification composition and race identity only;
+  no model call or real-external/deployed usefulness claim was made.
 
 ### U3 — domain-neutral material-claim projection and evaluation harness — 2026-08-25 — complete
 
-- Added one versioned, source-owned projection over every learner-visible Concept Lesson section
-  field and option-select question/key, explanation, and distractor. Compile-time owner maps force a
-  decision for every payload field. Exact strings and qualifiers remain typed in each claim; a
-  mechanical rendering is the only verifier statement. All admitted source citations for the node
-  form its evidence pool, while `directEvidenceKeys` prevents generated bullets, diagrams, and
-  explanations from masquerading as directly cited prose.
-- Added an exact immutable resource/block read and a narrow claim-versus-source verification port.
-  Source support, each distractor's invalidity, and key uniqueness have separate disposition and
-  reason types. The answer-key path reuses one existing cross-family call per item, orders candidates
-  by text alone, and sends no key bit, option id, Derived Node id, or generator position. Missing or
-  unresolved evidence, abstention, non-activation, and transport failure remain distinguishable.
-- Added a schema-versioned report joining raw candidate payloads, projected claims, cited quotes,
-  resolved full blocks, asset/config/model identity, independent decisions, operation timelines,
-  calls, tokens, cost, and same-row positive controls. The production CLI is read-only, binds no
-  verifier or learner mutation port, accepts only a qualified U2 candidate, and refuses output
-  outside gitignored `tmp/`. Deterministic tests use project-authored expiring-authority examples;
-  no diagnostic-fixture term entered production code or a prompt.
-- Automated evidence passed: the application package's 833 tests; the reset-backed `CI=1 pnpm
-  test:db` repository gate, including the exact resource/block-pair read and all learner surfaces;
-  all 11 workspace typechecks; and ESLint with zero errors and the same 13 retained warnings. The
-  operation-evidence test proves calls/tokens/cost roll up when rows exist; unavailable cost remains
-  explicit `null`, never zero. Whitespace checks passed.
-- The first CLI attempt was rejected before database access because pnpm forwarded a conventional
-  literal `--`; the parser now ignores that separator. The successful rerun is the evidence below.
-  That inspection made no neural call, source registration, learner adoption/activation,
-  learner-state write, Compose action, browser/native/device action, deployment, or release action.
+- One versioned source-owned projection covers every lesson material field and option-select
+  question/key, explanation, and distractor. Compile-time owner maps preserve exact qualifiers;
+  typed direct evidence keeps generated aids from posing as quotations.
+- Exact immutable block reads feed separate source-support, distractor-invalidity, and key-uniqueness
+  decisions. The reused one-call answer-key verifier receives text-ordered candidates without key,
+  option, node, or generator-position leakage; missing/unresolved evidence and every unavailable
+  state remain distinct.
+- The read-only, gitignored-output report joins raw payloads, evidence, decisions, asset/model/config
+  identity, operation timing/spend, and positive controls. The 833 application tests, reset-backed
+  repository gate, all 11 typechecks, lint, and whitespace passed after one excluded CLI-separator
+  failure and repair.
 
 #### Real-use quality evaluation
 
-- **Milestone:** U3 evaluation mechanics over a structurally qualified Source Expedition.
-- **Fixture and source type:** a project-authored two-stop, text-source candidate retained in the
-  disposable `lrnki_test` database after the reset-backed gate.
-- **Real model calls used:** no; non-activation is the behavior under inspection.
-- **Result:** PASS for projection/report mechanics, not semantic learner-asset usefulness.
-- **Useful output observed:** the gitignored report joined two current lessons, two current
-  option-select items, 12 exact claims, one resolved source block/quote, six source-support
-  decisions, six distractor-invalidity decisions, two key-uniqueness decisions, and exact asset/
-  graph/config/model identity. Both verifier identities were null, every decision said
-  `not_evaluated` for non-activation, and the evaluation call positive control was exactly zero.
-- **Defects observed:** the disposable fixture retained no operation timeline/spend rows, so actual
-  calls/tokens/cost were correctly null; it is project-authored structural evidence and cannot
-  establish semantic support, distractor quality, external-source usefulness, or model fitness.
-- **Changes made after inspection:** only the CLI separator repair described above.
-- **Remaining caveats:** U4 must qualify or reject one real source-support verifier; U5 must then
-  apply accepted decisions to persistence/readiness and run real external-source quality gates.
-- **Safe to continue downstream:** yes, to U4's bounded non-authoritative experiment only.
+- **Milestone/fixture:** U3 mechanics over a project-authored two-stop text-source candidate in the
+  disposable test database; **real model calls:** no; **result:** PASS for report mechanics only.
+- The report joined two lessons, two options, 12 exact claims, one resolved block, all three decision
+  families, exact identities, and zero evaluator calls. Missing timeline/spend remained `null`.
+- This cannot establish semantic support, distractor quality, model fitness, or external-source
+  usefulness. Only the CLI separator was repaired; continuation was limited to U4.
 
 ### U4 — bounded local factual-consistency verifier experiment — 2026-08-25 — complete
 
-- The one permitted candidate was
-  [`lytang/MiniCheck-DeBERTa-v3-Large` at immutable revision
-  `60c4e0825ae044a6193ba811c5712c37548636a0`](https://huggingface.co/lytang/MiniCheck-DeBERTa-v3-Large/tree/60c4e0825ae044a6193ba811c5712c37548636a0).
-  The metadata preflight found a public, ungated MIT artifact with native
-  `document + claim -> {unsupported, supported}` semantics,
-  `DebertaV2ForSequenceClassification`, two labels, a 512-token maximum, and one
-  1,740,304,440-byte safetensors file whose downloaded SHA-256 matched
-  `8528d6a1399182054c3d2918f58bb67785de50ffde97f5ecdb215eabfb73297d`. No second
-  candidate was selected or downloaded.
-- The exact local runtime was Text Embeddings Inference 1.9.3 using Candle, float32, no
-  quantization, and automatic truncation disabled. Its native `/predict` pair contract reproduced
-  the model card's two controls at supported probabilities 0.97864676 and 0.011379601. TEI's
-  `/rerank` correctly returned HTTP 424 because the artifact is a two-label classifier, not the
-  one-score reranker that endpoint requires.
-- An isolated LiteLLM 1.88.1 custom pass-through transported the classifier payload and response and
-  returned `x-litellm-call-id` plus the selected upstream endpoint. It did not qualify attribution:
-  after every HTTP 200, LiteLLM's asynchronous pass-through success logger misclassified the native
-  `/predict` list as Vertex prediction output and raised `TypeError: list indices must be integers or
-  slices, not str`. Therefore no successful spend/usage logging claim is available for this route.
-- The fixed pre-activation matrix exercised 43 source/claim pairs: 19 supported controls and 24
-  unsupported controls spanning the four project-authored diagnostic sources plus held-out Rust
-  Book and OpenStax Biology evidence. It required zero material false acceptance and allowed at most
-  25% false rejection under the sparse-coverage policy. The classifier made three false rejections
-  (15.789%) but falsely accepted one carrier/referent swap with supported probability 0.8887313: a
-  claim assigned the one-parental/one-new-strand property to conservative replication even though
-  the supplied passage assigned it to semi-conservative replication. The semantic kill gate failed.
-- The candidate was not activated for any harm class. No source-support adapter, LiteLLM route,
-  config identity, Model Assignment, application behavior, or persisted learner asset changed. The
-  isolated services were stopped and disposable runtime/model state was removed; complete generated
-  request, response, score, timing, call-id, and transport evidence remains in gitignored evaluation
-  output. This is local measured-module rejection evidence only, not deployed or production proof.
-- No application code changed, so no behavior suite was promoted as evidence. The direct official-
-  example controls, checksum, endpoint refusal, isolated gateway probe, and fixed matrix answer U4's
-  bounded questions. Documentation whitespace and cap checks passed before commit.
+- The sole candidate was public MIT
+  [`lytang/MiniCheck-DeBERTa-v3-Large` revision
+  `60c4e0825ae044a6193ba811c5712c37548636a0`](https://huggingface.co/lytang/MiniCheck-DeBERTa-v3-Large/tree/60c4e0825ae044a6193ba811c5712c37548636a0):
+  a 1,740,304,440-byte two-label DeBERTa artifact whose safetensors SHA-256 matched
+  `8528d6a1399182054c3d2918f58bb67785de50ffde97f5ecdb215eabfb73297d`.
+- TEI 1.9.3/Candle/float32/no truncation reproduced both official `/predict` controls; `/rerank`
+  correctly refused the classifier. LiteLLM 1.88.1 transported it with call identity but crashed its
+  asynchronous success logger on every HTTP 200, so attribution/spend was not qualified.
+- The fixed 43-case diagnostic plus held-out Rust/OpenStax matrix had three false rejections
+  (15.789%) and one forbidden carrier/referent false acceptance (0.8887313 supported probability),
+  failing the zero-false-acceptance kill gate.
+- Nothing was activated or reassigned. Services and disposable model state were removed; complete
+  local output remains gitignored. This is measured local rejection evidence only.
 
 ### U5 — source-backed lesson and option-select admission — 2026-08-25 — in progress
 
