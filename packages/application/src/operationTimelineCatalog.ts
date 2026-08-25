@@ -72,6 +72,7 @@ export const OPERATION_TIMELINE_CATALOG: Record<OperationType, readonly Operatio
     llm(STAGE_TAGS.studyItemGeneration),
     llm(STAGE_TAGS.matchingGeneration),
     llm(STAGE_TAGS.impostorGeneration),
+    llm(STAGE_TAGS.sourceMaterialClaimSupport),
     llm(STAGE_TAGS.optionSelectKeyVerification),
     llm(STAGE_TAGS.impostorKeyVerification),
     llm(STAGE_TAGS.matchingAssignmentVerification),

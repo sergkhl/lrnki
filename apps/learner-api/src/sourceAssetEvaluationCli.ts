@@ -5,7 +5,12 @@ import {
   CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY,
   evaluateQualifiedSourceExpedition
 } from "@lrnki/application";
-import { LiteLlmSpendLogsReadAdapter } from "@lrnki/infrastructure-litellm";
+import {
+  createAnswerKeyVerificationPort,
+  createNeuralClients,
+  createSourceMaterialClaimSupportVerificationPort,
+  LiteLlmSpendLogsReadAdapter
+} from "@lrnki/infrastructure-litellm";
 import {
   createDatabaseClient,
   PostgresEnrichmentInspectionRead,
@@ -54,11 +59,14 @@ async function main(): Promise<void> {
       throw new Error(`No structurally qualified Source Expedition candidate was found${detail}.`);
     }
 
-    // U3 diagnostic posture: omission is activation. Neither verifier is bound here, so report
-    // generation performs no neural call and cannot admit, adopt, or activate learner assets.
+    const { deterministicClient } = createNeuralClients();
+    // Read-only post-generation evaluation reuses the exact production ports. It cannot mutate,
+    // adopt, or activate learner assets; the resulting model decisions remain report evidence.
     const report = await evaluateQualifiedSourceExpedition({
       qualification: selected,
       sourceEvidenceRead: new PostgresInspectionRead(sql),
+      sourceSupportVerifier: createSourceMaterialClaimSupportVerificationPort(deterministicClient),
+      answerKeyVerifier: createAnswerKeyVerificationPort(deterministicClient),
       operationEvidence: {
         timelineRead: new PostgresOperationTimelineRead(sql),
         journeyLineageRead: new PostgresJourneyLineageRead(sql),

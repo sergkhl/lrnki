@@ -56,13 +56,18 @@ test("source-support adapter uses the dedicated alias and renders the exact clai
     toolDescription: string;
     parameters: unknown;
     tags: string[];
+    maxRetries: number;
     messages: { content: string }[];
   };
   assert.equal(call.model, adapter.model);
   assert.equal(call.toolName, "submit_source_material_claim_support");
   assert.deepEqual(call.parameters, sourceMaterialClaimSupportSchema);
   assert.deepEqual(call.tags, [STAGE_TAGS.sourceMaterialClaimSupport]);
+  assert.equal(call.maxRetries, 3, "the source gate can cross one provider minute-limit window");
   assert.match(call.messages[0]?.content ?? "", /sole authority/);
+  assert.match(call.messages[0]?.content ?? "", /collective versus distributive/);
+  assert.match(call.messages[0]?.content ?? "", /missing domain rule or definition/);
+  assert.match(call.messages[0]?.content ?? "", /throughout.*require explicit evidence/);
   assert.match(call.messages[1]?.content ?? "", /The lease grants permanent authority/);
   assert.match(call.messages[1]?.content ?? "", /A lease grants temporary authority until its stated expiry time/);
   assert.match(call.messages[1]?.content ?? "", /directly cited/);

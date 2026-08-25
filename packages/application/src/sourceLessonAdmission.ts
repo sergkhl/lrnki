@@ -11,7 +11,9 @@ import { SUBSTANTIVE_KINDS } from "./assembleConceptLesson";
 import { validateLessonExplorableTerms } from "./explorableTerms";
 import {
   evaluateProjectedSourceSupport,
+  SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS,
   type ProjectedSourceSupportEvaluation,
+  type SourceAssetEvaluationStage,
   type SourceSupportDecision,
   type SourceSupportNodeContext
 } from "./sourceAssetEvaluation";
@@ -41,18 +43,26 @@ export async function admitSourceConceptLessons(input: {
   baseConfigHash: string;
   sourceEvidenceRead: SourceEvidenceReadPort;
   sourceSupportVerifier?: SourceMaterialClaimSupportVerificationPort;
+  sourceSupportStage?: SourceAssetEvaluationStage;
 }): Promise<SourceLessonAdmissionResult> {
   const candidates = [...input.candidates];
   const projection = projectSourceMaterialClaims({
     lessons: candidates,
     optionSelectItems: []
   });
-  const evaluation = await evaluateProjectedSourceSupport({
+  const evaluateSourceSupport = () => evaluateProjectedSourceSupport({
     projection,
     nodes: input.nodes,
     sourceEvidenceRead: input.sourceEvidenceRead,
     sourceSupportVerifier: input.sourceSupportVerifier
   });
+  const supportClaimCount = projection.claims.filter((claim) => claim.purpose === "source_support").length;
+  const evaluation = input.sourceSupportVerifier && input.sourceSupportStage && supportClaimCount > 0
+    ? await input.sourceSupportStage(
+        evaluateSourceSupport,
+        supportClaimCount * SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS
+      )
+    : await evaluateSourceSupport();
   const decisionByClaimKey = new Map(
     evaluation.decisions.map((decision) => [decision.claimKey, decision] as const)
   );
@@ -156,7 +166,7 @@ function lessonAbsenceReason(
   if (decisions.some((decision) => decision?.reasonCode === "source_support_verifier_unavailable")) {
     return "source-support verification was unavailable; the candidate remains inspection-only";
   }
-  if (decisions.every((decision) =>
+  if (decisions.some((decision) =>
     decision?.reasonCode === "source_support_verifier_not_activated"
   )) {
     return "source-support verifier is not activated; the candidate remains inspection-only";

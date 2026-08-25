@@ -25,7 +25,7 @@ import {
 // persist both lessons and option-select items under this wrapper after its named evidence gates run.
 // Keeping the base operation hash inside the value preserves exact Model Assignment/config identity.
 export const SOURCE_EXPEDITION_ASSET_QUALIFICATION_CONTRACT =
-  "source-expedition-learner-assets-v1";
+  "source-expedition-learner-assets-v2";
 
 export function qualifiedSourceExpeditionAssetConfigHash(baseConfigHash: string): string {
   if (!baseConfigHash.trim()) throw new Error("Source Expedition asset qualification needs a base config hash.");

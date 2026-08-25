@@ -7,13 +7,12 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0–U4 complete; U5 mechanics and source-support gate complete, external live gate next
+**Status:** In progress — U0–U5 complete; U6 exact-reference Support Path next
 
-**NEXT:** Activate the qualified source-support port in the Study Item Bank composition, operation
-identity, and timeline, then run one fresh external Curated Source operation through lesson and
-option admission with payload-versus-evidence inspection. Do not admit on abstention, widen the
-provider route, reuse U4's rejected local verifier, or proceed to U6 until the exact production
-consumers pass without a material false acceptance.
+**NEXT:** Implement U6 through the existing reference Support Step seam: reuse only an exact node,
+qualified lesson, and qualified option from a ready Source Expedition; refuse before any generation
+write or wake when that tuple is unavailable. Prove pinning, grading identity, isolation, restore,
+and source ownership before continuing to U7.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
 Curated Sources and automatically admits only source-backed learner assets. Anchor-less Synthetic
@@ -503,90 +502,65 @@ The plan is complete only when all of the following are true:
 - Nothing was activated or reassigned. Services and disposable model state were removed; complete
   local output remains gitignored. This is measured local rejection evidence only.
 
-### U5 — source-backed lesson and option-select admission — 2026-08-25 — in progress
+### U5 — source-backed lesson and option-select admission — 2026-08-26 — complete
 
-- **Lesson-admission batch:** the U3 claim projection now carries typed payload-field locations, and
-  one shared evaluator owns exact block resolution, source-reader failure, verifier absence/failure,
-  and per-claim decisions for both diagnostic reporting and admission. The report schema is version
-  2. A pure lesson owner retains a section body only after accepted support, filters each optional
-  list item independently, treats a diagram as an indivisible caption/spec pair, revalidates
-  Explorable Terms against retained bodies, and emits explicit absence when no substantive section
-  survives. It never rewrites model text or manufactures a citation.
-- Source-backed Study Item Bank generation now persists only settled lessons as current query
-  assets under the qualification wrapper. Exact pre-settlement lessons retain their base identity in
-  the immutable `concept_lesson_bank` artifact as `candidateLessons`, including when no lesson is
-  admitted. An absent verifier therefore produces current absences, zero downstream item-generation
-  calls, and inspection-only candidates. Null-version synthetic generation remains mechanically
-  unchanged and production-held by U1.
-- Both production roots must now supply exact source evidence and the Concept Lesson redundancy
-  judge; the kg-worker's previously omitted judge is wired. The qualified support port is not yet
-  bound into either root, so no operation identity changed. A qualification wrapper, rather than
-  citation styling, proves semantic admission; a supported paraphrase may remain honestly
-  `generated` and uncited.
-- **Option-admission batch:** guarded source candidates now cross one strict owner that first
-  requires source grounding plus a source-cited key, then accepted support for the exact
-  question/key and explanation, then affirmative key truth, falsity of every distractor for that
-  question, and uniqueness. Failed source support short-circuits answer-key spend; no abstention or
-  transport failure admits. Accepted payloads change only to the qualification config identity.
-- Exact rejected option payloads retain their base identity as `candidateStudyItems` in the
-  immutable Study Item Bank artifact while per-node rejection remains queryable. Matching and
-  impostor generation, relational rows, artifacts, and Admin Lab inspection remain intact, but
-  Source Expedition identity, atomic race checks, rendering, authorization, and grading consider
-  only qualified floored-trail lessons and option-select items.
-- Automated evidence passed: 844 application tests; eight kg-worker tests; 26 learner-API tests in
-  the reset-backed run; the complete `CI=1 pnpm test:db` repository gate, including transactional
-  lesson/option candidate-artifact coverage and all 57 learner-app suites / 320 tests; all 11
-  typechecks; targeted ESLint; and whitespace checks. The application gate first
-  exposed four obsolete expectations that uncited or LLM-grounded content on a non-null source graph
-  remained playable; they were corrected to the accepted U1/U5 inspection-only boundary. That
-  excluded run is not evidence.
-- **Source-support qualification batch:** the U4 matrix is now a tracked 43-case fixture whose 51
-  quotes resolve uniquely through native parsers to complete blocks. The exact production port uses
-  one strict flat forced tool and the new `kg-source-material-support-verifier` alias: DeepSeek V4
-  Flash 0731, DeepInfra FP8 only, medium reasoning, temperature 0/seed 7, and no fallback.
-- All 129 repeated live draws passed: 57/57 supported controls, 72/72 safe rejections, zero false
-  acceptances, false rejections, unclear results, or unavailable calls. This includes three correct
-  rejections of the held-out DNA carrier/referent swap that killed MiniCheck. LiteLLM attributed all
-  129 calls to DeepInfra: 150,868 tokens and $0.00853934. The assignment is qualified for this one
-  harm class but remains unactivated until the fresh external exact-consumer gate passes.
-- The qualification batch also passed 848 application, 39 domain, 13 ingestion, 196 LiteLLM, and
-  eight worker tests; all 11 workspace typechecks; targeted ESLint with one unchanged warning; and
-  tracked/untracked whitespace plus machine-specific-data checks. No database gate was implicated.
+- One application evaluator now resolves exact evidence, rejects every unavailable/abstaining
+  decision, and requires three unanimous source-support draws. Source lesson fields additionally
+  must be formatting-normalized substrings of an admitted block; unsupported fields are omitted and
+  a lesson without a substantive survivor is explicit absence. Raw candidates remain immutable and
+  inspectable under the base identity; only settled assets receive the version-2 qualification
+  identity.
+- Source options now use one code-owned exact-reference contract. The keyed option must equal the
+  application-selected learner-visible lesson unit byte for byte, the explanation must equal that
+  key, and all four normalized option texts must be unique. Those facts settle key uniqueness and
+  distractor invalidity deterministically with no answer-key call; source support for the exact
+  question/key and explanation remains mandatory. Matching and impostor remain stored and
+  inspectable but excluded from Source Expedition identity and readiness.
+- Both production compositions activate the dedicated `kg-source-material-support-verifier` port.
+  Its assignment is DeepSeek V4 Flash 0731 with medium reasoning over an attributable FP8 provider
+  route (DeepInfra primary, separately qualified Io Net fallback), temperature 0, seed 7, a flat
+  forced tool, bounded 429 retry handling, and operation/config identity. The tracked 46-case matrix
+  passed 138/138 draws through that complete route before activation.
+- Two earlier fresh OpenStax candidates were correctly unavailable but inspection found material
+  false acceptance in generated lesson prose and then ambiguity in a semantic option question.
+  Both were `FIX_FIRST`: extractive lesson admission and the exact-reference option contract replaced
+  the unsafe behavior. Neither candidate was adopted or reused as passing evidence.
+- Current automated evidence: 850 application and 202 infrastructure-LiteLLM tests, eight worker and
+  22 passing/four skipped learner-API tests, 13 ingestion tests, affected typechecks, and whitespace
+  checks pass. Report schema 4 and Study Item Bank hash `study-item-bank-43d67784c2ba` bind the final
+  policies and prompt identity.
 
 #### Real-use quality evaluation
 
-- **Milestone:** fail-closed material-claim settlement for source-backed Concept Lessons and
-  option-select candidates.
-- **Fixture and source type:** 33 existing raw lessons from the registered external Rust Book
-  Curated Source, read with their current derived graph and immutable source blocks.
-- **Real model calls used:** no; verifier non-activation and candidate preservation were the changed
-  behavior under inspection.
-- **Result:** PASS for safe refusal and inspection retention, not learner-content usefulness.
-- **Useful output observed:** all 35 referenced evidence rows resolved; 275 projected claims split
-  into 61 missing-evidence rejections and 214 explicit verifier-not-activated outcomes; all 33
-  candidates were byte-for-byte preserved, all 33 settled as absent, and zero lessons/verifier calls
-  were admitted. Direct samples retained exact lesson prose beside source quotes without upgrading
-  either to qualified knowledge.
-- **Defects observed:** none in the refusal boundary. The first scratch runner location could not
-  resolve workspace package exports and was excluded; the package-relative read-only rerun passed.
-- **Changes made after inspection:** none.
-- **Option inspection:** 31 existing external Rust option candidates were read beside 37 resolved
-  evidence references. Seven failed the structural source-key boundary; the remaining 24 produced
-  48 explicit support-verifier-not-activated decisions. All 31 candidates were byte-for-byte
-  preserved, all 31 became explicit rejection, and both source-support and answer-key calls stayed
-  zero. The 26 matching and 32 impostor rows remained unchanged and inspection-only.
-- **Remaining caveats:** these inspections prove safe refusal only and reused prior external
-  artifacts. The separately qualified source-support assignment has not yet run through either
-  production consumer; U5 still needs one fresh external Curated Source operation.
-- **Safe to continue downstream:** yes, to U5's production activation and fresh external gate only.
+- **Milestone/source/model:** fresh production-composition enrichment and Study Item Bank over the
+  published, successful, non-degraded OpenStax Biology 2e §14.3 HTML Curated Source (CC BY 4.0), with
+  the activated DeepSeek FP8/medium source-support assignment.
+- **Result:** PASS for U5 admission precision and safe incompleteness. The fresh graph contained 11
+  source-trail nodes, 12 certain/one uncertain edge, and zero LLM-grounded nodes. It admitted eight
+  extractive lessons and eight exact-reference options, recorded three lesson absences and 25 typed
+  rejections, and kept the expedition unavailable with `lesson_missing`.
+- **Payload/evidence inspection:** all six referenced blocks resolved; every one of eight lesson
+  fields mechanically matched an admitted block; all 24 projected support claims passed 3/3 draws;
+  and all eight keys plus 24 distractors passed the exact-reference contract with zero answer-key
+  calls. The independent replay repeated all 72 support draws successfully.
+- **Route/cost evidence:** the operation's 93 source-support calls and replay's 72 calls were all
+  successful on DeepInfra with zero retries: 244,195 tokens and $0.010548184 total. The full source
+  journey through the Study Item Bank recorded 210 calls, 368,059 tokens, and $0.0358067234, with
+  estimates explicitly retained where the provider did not report spend.
+- **Defects and changes:** the two pre-final material defects above caused the extractive and
+  exact-reference root fixes. The final candidate had no material false acceptance. This is local
+  external-source evidence, not deployed/browser/native/device evidence, and it does not prove a
+  complete expedition; U7 owns that end-to-end gate. **Safe to continue:** yes, to U6.
 
 ### Open findings
 
 - U4's local verifier remains rejected for one material false acceptance and broken LiteLLM success
-  logging; do not rerun it or pick a second local candidate. The separately qualified DeepSeek
-  assignment remains unactivated until exact lesson/option consumers pass a fresh external source.
-- Projection, settlement, and the repeated diagnostic gate are qualified. They do not establish
-  generated-asset usefulness; the fresh external Curated Source gate remains mandatory.
+  logging; do not rerun it or pick a second local candidate. The activated remote assignment is
+  qualified only for source material support, not general generation or source-less grounding.
+- The final external U5 candidate remained unavailable because three nodes had no admitted lesson.
+  This proves safe refusal, not complete readiness; run U6 against ready diagnostic source assets,
+  then use U7's harbor-plus-supplement path to prove a complete automatic expedition before the
+  representative external-source repetition.
 - Matching and impostor remain preserved but unqualified. They do not satisfy readiness in this plan;
   Source Expedition snapshots now exclude them structurally. A future plan may qualify them
   independently after the option-select Source Expedition works.

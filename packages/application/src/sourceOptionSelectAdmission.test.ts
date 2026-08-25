@@ -10,7 +10,9 @@ import type {
   SourceMaterialClaimSupportVerificationPort
 } from "@lrnki/ports";
 import { admitSourceOptionSelectItems } from "./sourceOptionSelectAdmission";
+import { SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS } from "./sourceAssetEvaluation";
 import { qualifiedSourceExpeditionAssetConfigHash } from "./sourceExpedition";
+import { sourceOptionExactReferenceQuestion } from "./sourceOptionExactReference";
 
 const citation = {
   provenance: "source" as const,
@@ -50,11 +52,11 @@ function candidate(): OptionSelectItem {
     configHash: "base-config",
     explorableTerms: [],
     itemType: "option_select",
-    question: "When does the permit remain valid through noon?",
-    explanation: "The signed exception is required for noon validity.",
+    question: sourceOptionExactReferenceQuestion("Conditional permit"),
+    explanation: "The permit remains valid through noon only when the signed exception is present.",
     options: [
       { optionId: "wrong-3", text: "Whenever it is unsigned", isCorrect: false, provenance: "generated" },
-      { optionId: "key", text: "When the signed exception is present", isCorrect: true, provenance: "source", citation },
+      { optionId: "key", text: "The permit remains valid through noon only when the signed exception is present.", isCorrect: true, provenance: "source", citation },
       { optionId: "wrong-2", text: "Only after noon", isCorrect: false, provenance: "generated" },
       { optionId: "wrong-1", text: "Under every condition", isCorrect: false, provenance: "generated" }
     ]
@@ -137,21 +139,14 @@ test("source option admission requires every support, distractor, and unique-key
     raw,
     "admission changes only the qualification identity"
   );
-  assert.equal(result.sourceSupport.calls, 2);
-  assert.equal(result.optionTruth.calls, 1);
+  assert.equal(result.sourceSupport.calls, 2 * SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS);
+  assert.equal(result.optionTruth.calls, 0);
   assert.ok(result.sourceSupport.decisions.every((decision) => decision.disposition === "accepted"));
   assert.ok(result.optionTruth.distractorInvalidity.every((decision) => decision.disposition === "accepted"));
   assert.equal(result.optionTruth.keyUniqueness[0]?.reasonCode, "unique_key_verified");
-  assert.deepEqual(requests[0]?.candidates.map((entry) => entry.text), [
-    "Only after noon",
-    "Under every condition",
-    "When the signed exception is present",
-    "Whenever it is unsigned"
-  ]);
-  assert.doesNotMatch(
-    JSON.stringify(requests[0]),
-    /isCorrect|optionId|derivedNodeId|wrong-1|wrong-2|wrong-3|"key"/
-  );
+  assert.deepEqual(requests, []);
+  assert.ok(result.optionTruth.distractorInvalidity.every((decision) => decision.verifierModel === null));
+  assert.equal(result.optionTruth.keyUniqueness[0]?.verifierModel, null);
 });
 
 test("an unsupported explanation preserves the exact candidate and records a concrete rejection", async () => {
@@ -176,7 +171,8 @@ test("an unsupported explanation preserves the exact candidate and records a con
   assert.deepEqual(raw, candidate(), "settlement never patches the rejected payload");
 });
 
-test("one true distractor rejects both distractor invalidity and key uniqueness", async () => {
+test("a semantic verifier cannot overturn exact-reference uniqueness", async () => {
+  const requests: Parameters<AnswerKeyVerificationPort["verify"]>[0][] = [];
   const result = await admitSourceOptionSelectItems({
     candidates: [candidate()],
     lessons: [lesson()],
@@ -184,16 +180,13 @@ test("one true distractor rejects both distractor invalidity and key uniqueness"
     baseConfigHash: "base-config",
     sourceEvidenceRead,
     sourceSupportVerifier: sourceVerifier(),
-    answerKeyVerifier: answerVerifier((text) =>
-      text === "When the signed exception is present" || text === "Only after noon"
-        ? "claim_true"
-        : "claim_false"
-    )
+    answerKeyVerifier: answerVerifier(() => "claim_true", requests)
   });
 
-  assert.deepEqual(result.studyItems, []);
-  assert.match(result.rejected[0]?.reason ?? "", /distractor_valid_for_question/);
-  assert.match(result.rejected[0]?.reason ?? "", /multiple_true_answers/);
+  assert.equal(result.studyItems.length, 1);
+  assert.deepEqual(result.rejected, []);
+  assert.equal(result.optionTruth.calls, 0);
+  assert.deepEqual(requests, []);
 });
 
 test("an absent support verifier fails closed before qualified persistence", async () => {
@@ -213,7 +206,8 @@ test("an absent support verifier fails closed before qualified persistence", asy
   assert.match(result.rejected[0]?.reason ?? "", /source_support_verifier_not_activated/);
 });
 
-test("answer-key transport failure is an explicit non-admission", async () => {
+test("answer-key transport is outside exact-reference admission", async () => {
+  let calls = 0;
   const result = await admitSourceOptionSelectItems({
     candidates: [candidate()],
     lessons: [lesson()],
@@ -223,10 +217,45 @@ test("answer-key transport failure is an explicit non-admission", async () => {
     sourceSupportVerifier: sourceVerifier(),
     answerKeyVerifier: {
       model: "answer-key-test",
-      async verify() { throw new Error("verifier unavailable"); }
+      async verify() {
+        calls += 1;
+        throw new Error("verifier unavailable");
+      }
+    }
+  });
+
+  assert.equal(result.studyItems.length, 1);
+  assert.deepEqual(result.rejected, []);
+  assert.equal(calls, 0);
+});
+
+test("a key that does not exactly copy the selected lesson text fails before neural spend", async () => {
+  const raw = candidate();
+  raw.options = raw.options.map((option) => option.isCorrect
+    ? { ...option, text: "When the signed exception is present" }
+    : option
+  );
+  raw.explanation = "When the signed exception is present";
+  let answerCalls = 0;
+  const result = await admitSourceOptionSelectItems({
+    candidates: [raw],
+    lessons: [lesson()],
+    nodes,
+    baseConfigHash: "base-config",
+    sourceEvidenceRead,
+    sourceSupportVerifier: sourceVerifier(),
+    answerKeyVerifier: {
+      model: "answer-key-test",
+      async verify() {
+        answerCalls += 1;
+        throw new Error("must not run");
+      }
     }
   });
 
   assert.deepEqual(result.studyItems, []);
-  assert.match(result.rejected[0]?.reason ?? "", /answer_key_verifier_unavailable/);
+  assert.equal(result.sourceSupport.calls, 0);
+  assert.equal(result.optionTruth.calls, 0);
+  assert.equal(answerCalls, 0);
+  assert.match(result.rejected[0]?.reason ?? "", /must exactly repeat the code-selected source-backed lesson text/);
 });

@@ -12,9 +12,9 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-25-001 — Qualify the Curated-Source Learner Workflow](./2026-08-25-001-qualify-curated-source-learner-workflow.md)
-   — **In progress; U0–U4 complete and U5 mechanics/source-support gate complete, external live gate
-   next.** DeepSeek FP8/medium passed all 129 fixed-matrix draws; it remains unactivated while raw
-   candidates stay inspectable and matching/impostor stay excluded. Wire the qualified port through
-   exact production ownership and inspect one fresh external operation next.
+   — **In progress; U0–U5 complete and U6 exact-reference Support Path next.** Source-backed lessons
+   now require extractive fields plus unanimous support, while exact-reference options settle key
+   identity mechanically with no answer-key call. The activated DeepSeek FP8/medium route passed its
+   fixed matrix and a fresh external OpenStax consumer gate; incomplete expeditions still fail closed.
 
 <!-- Hygiene and retention rules: AGENTS.md → Documentation workflow. -->

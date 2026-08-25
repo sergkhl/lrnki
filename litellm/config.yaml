@@ -294,11 +294,11 @@ model_list:
       mode: "chat"
       max_input_tokens: 1048576
 
-  # Source-material claim support candidate. This is deliberately a separate Model Assignment
-  # from the reasoning-disabled independent judge above: source support needs bounded semantic
-  # comparison, and its flat forced-tool result avoids the nested array/object decoder failure that
-  # required reasoning-off for existing judge schemas. DeepInfra FP8 is exact-pinned, medium
-  # reasoning is part of assignment identity, and no provider or LiteLLM fallback may blur the gate.
+  # Source-material claim support primary. This is deliberately separate from the reasoning-disabled
+  # independent judge above: source support needs bounded semantic comparison, and its flat forced-
+  # tool result avoids the nested array/object decoder failure that required reasoning-off for
+  # existing judge schemas. DeepInfra FP8 is exact-pinned and medium reasoning is part of assignment
+  # identity. The explicit Io Net group below is the only fallback; each provider stays attributable.
   - model_name: "openrouter/deepseek/deepseek-v4-flash-0731-source-support"
     litellm_params:
       model: "openrouter/deepseek/deepseek-v4-flash-0731"
@@ -321,6 +321,34 @@ model_list:
     model_info:
       mode: "chat"
       max_input_tokens: 1048576
+
+  # Source-material support availability fallback. Io Net passed the exact forced named-tool,
+  # reasoning, provider-attribution, supported-control, missing-mechanism, and distributive-scope
+  # probes. Its smaller declared input limit remains visible in conservative Model Assignment
+  # identity and is separately qualified by the complete tracked matrix before release evidence is
+  # accepted. OpenRouter-internal fallback remains disabled so no unmeasured endpoint can enter.
+  - model_name: "openrouter/deepseek/deepseek-v4-flash-0731-source-support-io-net-backup"
+    litellm_params:
+      model: "openrouter/deepseek/deepseek-v4-flash-0731"
+      api_key: os.environ/OPENROUTER_API_KEY
+      input_cost_per_token: 0.000000219
+      output_cost_per_token: 0.00000049
+      cache_read_input_token_cost: 0.000000114
+      extra_body:
+        reasoning:
+          effort: "medium"
+        provider:
+          require_parameters: true
+          quantizations:
+            - "fp8"
+          only:
+            - "io-net/fp8"
+          order:
+            - "io-net/fp8"
+          allow_fallbacks: false
+    model_info:
+      mode: "chat"
+      max_input_tokens: 262100
 
   # Production extractor (AGENTS rule 5). Forced tool_choice verified across all six
   # extraction roles 2026-07-10. `reasoning.enabled: false` is required: with reasoning
@@ -549,6 +577,7 @@ router_settings:
     - kg-topic-expedition-prerequisite-ordering: ["openrouter/openai/gpt-oss-120b-topic-expedition-parasail-backup"]
     - kg-grounding-verification-planner: ["openrouter/openai/gpt-oss-120b-topic-expedition-parasail-backup"]
     - kg-grounding-factuality-challenger: ["openrouter/openai/gpt-oss-120b-topic-expedition-parasail-backup"]
+    - kg-source-material-support-verifier: ["openrouter/deepseek/deepseek-v4-flash-0731-source-support-io-net-backup"]
   # disable_cooldowns: true
   # default_litellm_params:
   #   temperature: 0.5
@@ -611,8 +640,8 @@ router_settings:
     # (The off-core oracle triangle and label aligner were retired after the admission-precision fix;
     # see ADR-0013.)
     kg-independent-judge: openrouter/deepseek/deepseek-v4-flash-0731
-    # Precision-first learner-asset support candidate. Activation remains gated by the tracked
-    # repeated diagnostic matrix and a fresh external Curated Source operation.
+    # Precision-first learner-asset support route. The exact primary and explicit fallback are
+    # qualification-gated; OpenRouter may not choose an undeclared provider behind either group.
     kg-source-material-support-verifier: openrouter/deepseek/deepseek-v4-flash-0731-source-support
     # Topic owns only learner-asset generation/judgment and prerequisite ordering. Source-less node
     # production, Grounding Admission, and generated-layer judgment use the neutral aliases above.

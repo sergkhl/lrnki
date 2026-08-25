@@ -15,6 +15,7 @@ const MODEL = "openrouter/deepseek/deepseek-v4-flash-0731";
 const PRIMARY = MODEL;
 const BACKUP = "openrouter/deepseek/deepseek-v4-flash-0731-parasail-backup";
 const SOURCE_SUPPORT = "openrouter/deepseek/deepseek-v4-flash-0731-source-support";
+const SOURCE_SUPPORT_BACKUP = "openrouter/deepseek/deepseek-v4-flash-0731-source-support-io-net-backup";
 
 function deployment(input: {
   name: string;
@@ -185,8 +186,8 @@ test("neutral DeepSeek generation aliases are primary-only while the source judg
     .sort();
   assert.deepEqual(
     deepSeekGroups,
-    [BACKUP, PRIMARY, SOURCE_SUPPORT].sort(),
-    "the reasoning-off primary/backup and separate source-support assignment own this revision"
+    [BACKUP, PRIMARY, SOURCE_SUPPORT, SOURCE_SUPPORT_BACKUP].sort(),
+    "the reasoning-off primary/backup and exact source-support routes own this revision"
   );
 
   const identities = aliases.map((alias) => modelAssignmentIdentity(alias, proxy));
@@ -225,7 +226,7 @@ test("neutral DeepSeek generation aliases are primary-only while the source judg
 
   const supportRoute = modelRoutingBehaviorIdentity("kg-source-material-support-verifier", proxy);
   assert.equal(supportRoute.primary.modelGroup, SOURCE_SUPPORT);
-  assert.deepEqual(supportRoute.fallbacks, []);
+  assert.deepEqual(supportRoute.fallbacks.map((fallback) => fallback.modelGroup), [SOURCE_SUPPORT_BACKUP]);
   assert.deepEqual(supportRoute.primary.deployments[0]?.behavior, {
     litellmParams: {
       model: MODEL,
@@ -242,6 +243,36 @@ test("neutral DeepSeek generation aliases are primary-only while the source judg
     },
     modelInfo: { mode: "chat", max_input_tokens: 1048576 }
   });
+  assert.deepEqual(supportRoute.fallbacks[0]?.deployments[0]?.behavior, {
+    litellmParams: {
+      model: MODEL,
+      extra_body: {
+        reasoning: { effort: "medium" },
+        provider: {
+          require_parameters: true,
+          quantizations: ["fp8"],
+          only: ["io-net/fp8"],
+          order: ["io-net/fp8"],
+          allow_fallbacks: false
+        }
+      }
+    },
+    modelInfo: { mode: "chat", max_input_tokens: 262100 }
+  });
+  const supportAssignment = modelAssignmentIdentity("kg-source-material-support-verifier", proxy);
+  assert.equal(supportAssignment.assignments.length, 2,
+    "the conservative assignment identity exposes the fallback's smaller context limit");
+  assert.deepEqual(
+    supportAssignment.assignments.map((assignment) => assignment.quantization),
+    [{ value: "fp8" }, { value: "fp8" }]
+  );
+  assert.deepEqual(
+    supportAssignment.assignments.map((assignment) => assignment.inferenceBehavior.litellmParams),
+    [
+      { extra_body: { reasoning: { effort: "medium" } } },
+      { extra_body: { reasoning: { effort: "medium" } } }
+    ]
+  );
   assert.notDeepEqual(
     modelAssignmentIdentity("kg-source-material-support-verifier", proxy),
     modelAssignmentIdentity("kg-independent-judge", proxy),

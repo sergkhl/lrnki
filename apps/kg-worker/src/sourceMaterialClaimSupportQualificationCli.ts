@@ -39,7 +39,10 @@ async function main(): Promise<void> {
   const matrix = parseSourceMaterialClaimSupportQualificationMatrix(JSON.parse(matrixBytes.toString("utf8")));
   const evidenceResolution = await resolveMatrixEvidence(matrix);
   const base = resolveNeuralClientBaseOptions();
-  const verifier = createSourceMaterialClaimSupportVerificationPort(createNeuralClients().deterministicClient);
+  const verifier = createSourceMaterialClaimSupportVerificationPort(
+    createNeuralClients().deterministicClient,
+    args.model
+  );
   const routingIdentity = modelRoutingBehaviorIdentity(verifier.model);
   const assignmentIdentity = modelAssignmentIdentity(verifier.model);
   const registryEvidence = await readExactProviderRegistryEvidence(routingIdentity);
@@ -167,57 +170,74 @@ async function readAdvertisedModels(baseUrl: string, apiKey: string): Promise<Se
 async function readExactProviderRegistryEvidence(
   routing: ReturnType<typeof modelRoutingBehaviorIdentity>
 ): Promise<Record<string, unknown>> {
-  const deployment = routing.primary.deployments[0];
-  if (!deployment || routing.primary.deployments.length !== 1) {
-    throw new Error("Source-support qualification requires exactly one primary deployment.");
-  }
-  const params = record(record(deployment.behavior, "deployment behavior").litellmParams, "litellmParams");
-  const provider = record(record(params.extra_body, "extra_body").provider, "provider");
-  const only = stringArray(provider.only, "provider.only");
-  const quantizations = stringArray(provider.quantizations, "provider.quantizations");
-  if (only.length !== 1 || quantizations.length !== 1) {
-    throw new Error("Source-support qualification requires one exact provider tag and quantization.");
-  }
-  const upstreamModel = deployment.model.replace(/^openrouter\//, "");
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("OPENROUTER_API_KEY is required for exact provider preflight.");
-  const response = await fetch(`https://openrouter.ai/api/v1/models/${upstreamModel}/endpoints`, {
-    headers: { authorization: `Bearer ${apiKey}` },
-    signal: AbortSignal.timeout(30_000)
-  });
-  if (!response.ok) throw new Error(`OpenRouter endpoint registry returned HTTP ${response.status}.`);
-  const payload = await response.json() as {
-    data?: { id?: string; endpoints?: Array<Record<string, unknown>> };
-  };
-  const endpoint = payload.data?.endpoints?.find((entry) => entry.tag === only[0]);
-  if (payload.data?.id !== upstreamModel || !endpoint) {
-    throw new Error("The configured exact source-support provider route is absent from the live registry.");
-  }
-  if (endpoint.quantization !== quantizations[0]) {
-    throw new Error("The live source-support endpoint quantization differs from the configured assignment.");
-  }
-  const supportedParameters = stringArray(endpoint.supported_parameters, "endpoint.supported_parameters");
   const requiredParameters = ["reasoning", "reasoning_effort", "temperature", "seed", "tools", "tool_choice"];
-  const missing = requiredParameters.filter((parameter) => !supportedParameters.includes(parameter));
-  if (missing.length > 0) throw new Error(`The live source-support endpoint omits ${missing.join(", ")}.`);
+  const routes = [routing.primary, ...routing.fallbacks];
+  const registryByModel = new Map<string, { id?: string; endpoints?: Array<Record<string, unknown>> }>();
+  const routeEvidence = [];
+  for (const route of routes) {
+    const deployment = route.deployments[0];
+    if (!deployment || route.deployments.length !== 1) {
+      throw new Error(`Source-support route ${JSON.stringify(route.modelGroup)} requires exactly one deployment.`);
+    }
+    const params = record(record(deployment.behavior, "deployment behavior").litellmParams, "litellmParams");
+    const provider = record(record(params.extra_body, "extra_body").provider, "provider");
+    const only = stringArray(provider.only, "provider.only");
+    const quantizations = stringArray(provider.quantizations, "provider.quantizations");
+    if (only.length !== 1 || quantizations.length !== 1) {
+      throw new Error(`Source-support route ${JSON.stringify(route.modelGroup)} requires one exact provider tag and quantization.`);
+    }
+    const upstreamModel = deployment.model.replace(/^openrouter\//, "");
+    let registry = registryByModel.get(upstreamModel);
+    if (!registry) {
+      const response = await fetch(`https://openrouter.ai/api/v1/models/${upstreamModel}/endpoints`, {
+        headers: { authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(30_000)
+      });
+      if (!response.ok) throw new Error(`OpenRouter endpoint registry returned HTTP ${response.status}.`);
+      const payload = await response.json() as {
+        data?: { id?: string; endpoints?: Array<Record<string, unknown>> };
+      };
+      registry = payload.data ?? {};
+      registryByModel.set(upstreamModel, registry);
+    }
+    const endpoint = registry.endpoints?.find((entry) => entry.tag === only[0]);
+    if (registry.id !== upstreamModel || !endpoint) {
+      throw new Error(`Configured source-support route ${JSON.stringify(route.modelGroup)} is absent from the live registry.`);
+    }
+    if (endpoint.quantization !== quantizations[0]) {
+      throw new Error(`Live endpoint quantization differs for ${JSON.stringify(route.modelGroup)}.`);
+    }
+    const supportedParameters = stringArray(endpoint.supported_parameters, "endpoint.supported_parameters");
+    const missing = requiredParameters.filter((parameter) => !supportedParameters.includes(parameter));
+    if (missing.length > 0) {
+      throw new Error(`Live endpoint ${JSON.stringify(route.modelGroup)} omits ${missing.join(", ")}.`);
+    }
+    routeEvidence.push({
+      modelGroup: route.modelGroup,
+      model: registry.id,
+      endpoint: {
+        name: endpoint.name,
+        providerName: endpoint.provider_name,
+        tag: endpoint.tag,
+        quantization: endpoint.quantization,
+        status: endpoint.status,
+        contextLength: endpoint.context_length,
+        maxCompletionTokens: endpoint.max_completion_tokens,
+        supportedParameters
+      }
+    });
+  }
   return {
     verifiedAt: new Date().toISOString(),
-    model: payload.data.id,
-    endpoint: {
-      name: endpoint.name,
-      providerName: endpoint.provider_name,
-      tag: endpoint.tag,
-      quantization: endpoint.quantization,
-      status: endpoint.status,
-      maxCompletionTokens: endpoint.max_completion_tokens,
-      supportedParameters
-    },
-    requiredParameters
+    requiredParameters,
+    routes: routeEvidence
   };
 }
 
-function parseArgs(args: readonly string[]): { output?: string } {
-  const parsed: { output?: string } = {};
+function parseArgs(args: readonly string[]): { output?: string; model?: string } {
+  const parsed: { output?: string; model?: string } = {};
   for (const argument of args) {
     if (argument === "--") continue;
     if (argument.startsWith("--output=")) {
@@ -226,7 +246,13 @@ function parseArgs(args: readonly string[]): { output?: string } {
       parsed.output = output;
       continue;
     }
-    throw new Error(`Unknown argument ${JSON.stringify(argument)}. Use --output=tmp/<file>.json.`);
+    if (argument.startsWith("--model=")) {
+      const model = argument.slice("--model=".length).trim();
+      if (!model) throw new Error("--model requires an advertised LiteLLM model group or alias.");
+      parsed.model = model;
+      continue;
+    }
+    throw new Error(`Unknown argument ${JSON.stringify(argument)}. Use --output=tmp/<file>.json and optionally --model=<model>.`);
   }
   return parsed;
 }

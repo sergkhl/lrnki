@@ -21,6 +21,9 @@ export const sourceMaterialClaimSupportDescriptor: NeuralStageDescriptor<
   stageTag: STAGE_TAGS.sourceMaterialClaimSupport,
   schema: sourceMaterialClaimSupportSchema,
   validator: sourceMaterialClaimSupportValidator,
+  // Provider rate-limit recovery is transport-only: a valid semantic verdict is never rerolled.
+  // One extra attempt gives the 15s/30s/60s 429 policy enough time to cross a minute window.
+  maxRetries: 3,
   sentinelInput: {
     declaredDomain: "sentinel domain",
     subject: { canonicalLabel: "Sentinel subject", aliases: ["Sentinel alias"] },

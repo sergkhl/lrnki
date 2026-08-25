@@ -1659,6 +1659,7 @@ export interface ForcedToolFailureAttempt {
   attempt: number;
   kind: ForcedToolFailureKind;
   status?: number;
+  retryAfterMs?: number;
   code?: string;
   observedToolNames?: string[];
   schemaIssuePaths?: string[];

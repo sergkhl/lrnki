@@ -23,6 +23,7 @@ import {
 } from "./generateStudyItemBank";
 import { NON_LLM_STAGES } from "./runProgressReporter";
 import { qualifiedSourceExpeditionAssetConfigHash } from "./sourceExpedition";
+import { sourceOptionExactReferenceQuestion } from "./sourceOptionExactReference";
 import { STUDY_ITEM_BANK_STAGE_GROUP } from "./topicExpeditionStageProfile";
 
 installNodeOperationContext();
@@ -196,15 +197,40 @@ function osDraft(correctQuote: string, distractors: [string, string, string] = [
   };
 }
 
+function bindOptionDraftToInput(
+  draft: OptionSelectItemDraft,
+  input: Parameters<StudyItemGenerationPort["generateOptionSelect"]>[0]
+): OptionSelectItemDraft {
+  const correctProvenance = input.groundingProvenance === "generated" ? "generated" : "source";
+  return {
+    ...draft,
+    question: input.groundingProvenance === "generated"
+      ? `Which statement accurately describes ${input.node.canonicalLabel}?`
+      : sourceOptionExactReferenceQuestion(input.node.canonicalLabel),
+    explanation: input.correctAnswer.text,
+    options: draft.options.map((option) => option.isCorrect
+      ? {
+          ...option,
+          text: input.correctAnswer.text,
+          provenance: correctProvenance
+        }
+      : option
+    )
+  };
+}
+
 // A valid lesson draft: gist + a source-cited definition + applications, meeting the R3
 // minimum. The definition cites `passageId` with `defQuote` so the assembler verifies it
 // verbatim and the resulting source section feeds option-select's grounding (U7).
 function goodLessonDraft(passageId: string, defQuote: string): ConceptLessonDraft {
+  const words = defQuote.split(" ");
+  const leadingFragment = words.slice(0, Math.min(3, words.length)).join(" ");
+  const trailingFragment = words.slice(Math.max(0, words.length - 3)).join(" ");
   return {
     sections: [
-      { kind: "gist", text: "A one-line gist." },
-      { kind: "definition", text: "A definition restating the source.", citation: { passageId, evidenceQuote: defQuote } },
-      { kind: "applications", text: "How it connects to neighbors.", items: ["First grounded use.", "Second grounded use."] }
+      { kind: "gist", text: defQuote },
+      { kind: "definition", text: defQuote, citation: { passageId, evidenceQuote: defQuote } },
+      { kind: "applications", text: defQuote, items: [leadingFragment, trailingFragment] }
     ],
     explorableTerms: []
   };
@@ -263,7 +289,7 @@ function generationReturning(opts: {
       const draft = opts.optionSelect?.[input.node.derivedNodeId];
       if (draft === undefined) throw new Error(`no canned option-select draft for ${input.node.derivedNodeId}`);
       if (draft === "throw") throw new Error("option-select generation failed");
-      return draft;
+      return bindOptionDraftToInput(draft, input);
     },
     async generateImpostor(input) {
       opts.onGenerateImpostor?.();
@@ -291,7 +317,10 @@ function generationReturning(opts: {
 // truth or option text does, so this one predicate separates keyed lies from everything else
 // without a hard-coded roster that would silently rot as fixtures are added.
 const FIXTURE_LIE = /\b(lie|false)\b/i;
-const FIXTURE_OPTION_KEY = "Heap";
+const FIXTURE_OPTION_KEYS = new Set([
+  "Ownership is a set of rules that govern memory in Rust.",
+  "A definition restating the concept."
+]);
 
 // A key-verification stub that admits every local fixture without reading a server key. The
 // option-select fixture constructor above consistently uses one visible truth text, so this double
@@ -304,7 +333,7 @@ function keyVerifierPassing(): AnswerKeyVerificationPort {
       return input.candidates.map((candidate) => ({
         ordinal: candidate.ordinal,
         verdict: input.itemType === "option_select"
-          ? candidate.text === FIXTURE_OPTION_KEY ? "claim_true" as const : "claim_false" as const
+          ? FIXTURE_OPTION_KEYS.has(candidate.text) ? "claim_true" as const : "claim_false" as const
           : FIXTURE_LIE.test(candidate.text) ? "claim_false" as const : "unclear" as const,
         reason: "stub verdict"
       }));
@@ -352,7 +381,13 @@ function sourceAssetQualificationPassing(): GenerateStudyItemBankInput["sourceAs
           sourceTitle: "Generated test source",
           blockType: "paragraph",
           headingPath: [],
-          text: "The generated test source resolves this exact immutable block reference."
+          text: [
+            ownershipDef,
+            "Borrowing lets code reference values without taking ownership.",
+            "Lifetimes describe how long references remain valid.",
+            "Heap allocation means the memory must be requested from the memory allocator at runtime.",
+            "Borrowing lets you reference a value without taking ownership."
+          ].join("\n")
         }));
       }
     },
@@ -463,6 +498,7 @@ test("a node whose lesson grounds an option-select that passes the guard persist
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
   const { store, persisted, candidateStudyItems, persistedRejected } = capturingStore();
   const lessonStore = capturingLessonStore();
+  const { reporter, calls } = recordingReporter();
   let optionSelectInput: Parameters<StudyItemGenerationPort["generateOptionSelect"]>[0] | undefined;
   const result = await generateStudyItemBank({
     enrichmentId: "enr-1",
@@ -478,7 +514,8 @@ test("a node whose lesson grounds an option-select that passes the guard persist
       onGenerateOptionSelect(input) { optionSelectInput = input; }
     }),
     studyItemBankStore: store,
-    newConceptLessonId: () => "lesson-node-c1"
+    newConceptLessonId: () => "lesson-node-c1",
+    reporter
   });
 
   // All three stages run: the node carries option-select, matching, AND impostor items (KTD7).
@@ -500,15 +537,31 @@ test("a node whose lesson grounds an option-select that passes the guard persist
   assert.equal(lessonStore.lessons[0].conceptLessonId, "lesson-node-c1", "the application mints the stable lesson identity before persistence");
   assert.ok(lessonStore.lessons[0].sections.some((s) => s.kind === "definition" && s.groundingProvenance === "source_cep"));
   assert.deepEqual(optionSelectInput?.correctAnswer, {
-    text: "A definition restating the source.",
+    text: ownershipDef,
     citation: {
       passageId: lessonPassageId("node-c1", 1),
       evidenceQuote: ownershipDef
     }
   }, "option generation receives an exact learner-visible lesson claim with that unit's resolved evidence");
+  const settlementStageNames = new Set<string>([
+    STUDY_ITEM_BANK_STAGE_GROUP.sourceMaterialClaimSupport.stage,
+    STUDY_ITEM_BANK_STAGE_GROUP.optionSelectKeyVerification.stage
+  ]);
+  const settlementStages = calls.flatMap((call) =>
+    (call.method === "enterStage" || call.method === "completeStage") &&
+      settlementStageNames.has(call.stage)
+      ? [`${call.method}:${call.stage}`]
+      : []
+  );
+  assert.deepEqual(settlementStages, [
+    `enterStage:${STUDY_ITEM_BANK_STAGE_GROUP.sourceMaterialClaimSupport.stage}`,
+    `completeStage:${STUDY_ITEM_BANK_STAGE_GROUP.sourceMaterialClaimSupport.stage}`,
+    `enterStage:${STUDY_ITEM_BANK_STAGE_GROUP.sourceMaterialClaimSupport.stage}`,
+    `completeStage:${STUDY_ITEM_BANK_STAGE_GROUP.sourceMaterialClaimSupport.stage}`
+  ], "lesson and option support own separate brackets; exact-reference truth is deterministic");
 });
 
-test("a source graph with no activated support verifier persists its candidate and calls no item generator", async () => {
+test("a source graph with an unavailable support verifier persists its candidate and calls no item generator", async () => {
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
   const lessonStore = capturingLessonStore();
   const itemStore = capturingStore();
@@ -550,6 +603,12 @@ test("a source graph with no activated support verifier persists its candidate a
             text: ownershipDef
           }));
         }
+      },
+      sourceSupportVerifier: {
+        model: "unavailable-source-support",
+        async verify() {
+          throw new Error("source-support transport unavailable");
+        }
       }
     },
     answerKeyVerification: keyVerifierPassing(),
@@ -565,7 +624,7 @@ test("a source graph with no activated support verifier persists its candidate a
   assert.deepEqual(result.lessons, []);
   assert.deepEqual(result.studyItems, []);
   assert.equal(result.lessonAbsent[0]?.reason,
-    "source-support verifier is not activated; the candidate remains inspection-only");
+    "source-support verification was unavailable; the candidate remains inspection-only");
   assert.equal(lessonStore.candidateLessons.length, 1);
   assert.equal(lessonStore.candidateLessons[0]?.conceptLessonId, "candidate-lesson");
   assert.equal(lessonStore.candidateLessons[0]?.configHash, "cfg-1");
@@ -584,7 +643,7 @@ test("structural blueprint pre-gate rejects matching and impostor when the lesso
   const sparseLesson: ConceptLessonDraft = {
     explorableTerms: [],
     sections: [
-      { kind: "definition", text: "Ownership is a set of rules that govern memory.", citation: { passageId: "b1", evidenceQuote: ownershipDef } }
+      { kind: "definition", text: ownershipDef, citation: { passageId: "b1", evidenceQuote: ownershipDef } }
     ]
   };
   const result = await generateStudyItemBank({
@@ -605,7 +664,7 @@ test("structural blueprint pre-gate rejects matching and impostor when the lesso
   assert.deepEqual(result.rejected.map((row) => `${row.itemType}:${row.reason.startsWith("blueprint:")}`).sort(), ["impostor:true", "matching:true"]);
   const opened = new Set(calls.flatMap((call) => call.method === "enterStage" ? [call.stage] : []));
   assert.equal(opened.has(STUDY_ITEM_BANK_STAGE_GROUP.optionSelectGeneration.stage), true);
-  assert.equal(opened.has(STUDY_ITEM_BANK_STAGE_GROUP.optionSelectKeyVerification.stage), true);
+  assert.equal(opened.has(STUDY_ITEM_BANK_STAGE_GROUP.optionSelectKeyVerification.stage), false);
   assert.equal(opened.has(STUDY_ITEM_BANK_STAGE_GROUP.matchingGeneration.stage), false);
   assert.equal(opened.has(STUDY_ITEM_BANK_STAGE_GROUP.matchingAssignmentVerification.stage), false);
   assert.equal(opened.has(STUDY_ITEM_BANK_STAGE_GROUP.impostorGeneration.stage), false);
@@ -756,7 +815,7 @@ test("concurrent per-node generation persists items and rejections in input orde
     async generateOptionSelect(input) {
       await sleep(defs.get(input.node.derivedNodeId)!.delay);
       if (input.node.derivedNodeId !== "node-c1") throw new Error("option-select generation failed");
-      return osDraft("rules that govern memory");
+      return bindOptionDraftToInput(osDraft("rules that govern memory"), input);
     },
     async generateImpostor(input) {
       await sleep(defs.get(input.node.derivedNodeId)!.delay);
@@ -809,10 +868,10 @@ test("option-select, matching, and impostor stages overlap and still persist in 
   const started: string[] = [];
   const generation: StudyItemGenerationPort = {
     model: "mock-gen",
-    async generateOptionSelect() {
+    async generateOptionSelect(input) {
       started.push("option_select");
       await optionSelectGate;
-      return osDraft("rules that govern memory");
+      return bindOptionDraftToInput(osDraft("rules that govern memory"), input);
     },
     async generateMatching(input) {
       started.push("matching");
@@ -978,7 +1037,10 @@ test("an option-select guard miss gets one INFORMED retry carrying the first att
     async generateOptionSelect(input) {
       calls += 1;
       retryFeedbacks.push(input.retryFeedback);
-      return calls === 1 ? osDraft("a fact never stated in the passage") : osDraft("rules that govern memory");
+      return bindOptionDraftToInput(
+        calls === 1 ? osDraft("a fact never stated in the passage") : osDraft("rules that govern memory"),
+        input
+      );
     },
     async generateImpostor(input) {
       // A guard-passing impostor from the grounding so the node also carries an impostor item.
@@ -1256,7 +1318,7 @@ test("a vetoed impostor gets one regeneration informed by the offending candidat
       return input.candidates.map((candidate) => ({
         ordinal: candidate.ordinal,
         verdict: input.itemType === "option_select"
-          ? candidate.text === FIXTURE_OPTION_KEY ? "claim_true" as const : "claim_false" as const
+          ? FIXTURE_OPTION_KEYS.has(candidate.text) ? "claim_true" as const : "claim_false" as const
           : FIXTURE_LIE.test(candidate.text)
           // First impostor pass: the planted lie is judged TRUE of the node, which is exactly
           // the item ADR-0026 refuses to ship. Second pass: it is proven false.
@@ -1268,7 +1330,9 @@ test("a vetoed impostor gets one regeneration informed by the offending candidat
   };
   const generation: StudyItemGenerationPort = {
     model: "mock-gen",
-    async generateOptionSelect() { return osDraft("rules that govern memory"); },
+    async generateOptionSelect(input) {
+      return bindOptionDraftToInput(osDraft("rules that govern memory"), input);
+    },
     async generateImpostor(input) {
       retryFeedbacks.push(input.retryFeedback);
       return impDraftCiting(lessonPassageId("node-c1", 1), "rules that govern memory", { lieSource: "generated" });
@@ -1328,7 +1392,9 @@ test("an ambiguous matching board is vetoed, regenerated with cell-level feedbac
   };
   const generation: StudyItemGenerationPort = {
     model: "mock-gen",
-    async generateOptionSelect() { return osDraft("rules that govern memory"); },
+    async generateOptionSelect(input) {
+      return bindOptionDraftToInput(osDraft("rules that govern memory"), input);
+    },
     async generateImpostor(input) { return impDraftFrom(input.groundingPassages); },
     async generateMatching(input) {
       matchingFeedbacks.push(input.retryFeedback);
@@ -1387,12 +1453,16 @@ test("matching assignment verification unavailable admits the board unverified",
   assert.deepEqual(persistedRejected, []);
 });
 
-test("key verification unavailable drops every source option-select and impostor candidate", async () => {
+test("key verification unavailable drops an impostor but cannot affect exact-reference source options", async () => {
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
   const { store, persisted, persistedRejected } = capturingStore();
+  let optionVerificationCalls = 0;
   const verifier: AnswerKeyVerificationPort = {
     model: "mock-verifier",
-    async verify() { throw new Error("judge offline"); }
+    async verify(input) {
+      if (input.itemType === "option_select") optionVerificationCalls += 1;
+      throw new Error("judge offline");
+    }
   };
   await generateStudyItemBank({
     enrichmentId: "enr-1",
@@ -1410,16 +1480,16 @@ test("key verification unavailable drops every source option-select and impostor
     studyItemBankStore: store
   });
 
-  // Source-backed U5 admission is affirmative for key truth, every distractor's falsity, and
-  // uniqueness, so even a verbatim citation cannot turn verifier unavailability into admission.
-  // Matching remains persisted for inspection but is structurally held out of Source Expedition.
-  assert.deepEqual(typesFor(persisted, "node-c1"), ["matching"]);
+  // Exact-reference option truth is mechanical: the application owns the question and copied
+  // lesson key, and normalized distractors must differ. The semantic verifier still owns the
+  // impostor family, so its transport failure rejects that candidate only.
+  assert.deepEqual(typesFor(persisted, "node-c1"), ["matching", "option_select"]);
   const impostorRejection = persistedRejected.find((item) => item.itemType === "impostor");
   assert.ok(impostorRejection);
   assert.match(impostorRejection.reason, /^impostor key verification unavailable: judge offline/);
   const optionRejection = persistedRejected.find((item) => item.itemType === "option_select");
-  assert.ok(optionRejection);
-  assert.match(optionRejection.reason, /answer_key_verifier_unavailable: judge offline/);
+  assert.equal(optionRejection, undefined);
+  assert.equal(optionVerificationCalls, 0);
 });
 
 test("a generated-citation fallback candidate drops before source answer-key verification", async () => {
@@ -1501,7 +1571,7 @@ test("rule 18: both stages derive grounding from the same lesson passages for a 
     model: "mock-gen",
     async generateOptionSelect(input) {
       optionSelectPassages = input.groundingPassages.map((p) => ({ passageId: p.passageId, text: p.text }));
-      return osDraft("rules that govern memory");
+      return bindOptionDraftToInput(osDraft("rules that govern memory"), input);
     },
     async generateImpostor(input) {
       impostorPassages = input.groundingPassages.map((p) => ({ passageId: p.passageId, text: p.text }));

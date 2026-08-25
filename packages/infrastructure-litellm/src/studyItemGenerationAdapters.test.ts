@@ -30,7 +30,7 @@ test("generateOptionSelect assembles a draft: grounded correct + three generated
   });
 
   assert.equal(draft.itemType, "option_select");
-  assert.equal(draft.question, "Which statement accurately describes Heap?");
+  assert.equal(draft.question, "Which option exactly repeats the source-backed lesson text for Heap?");
   assert.deepEqual(draft.explorableTerms, []);
   assert.equal(draft.explanation, "Heap allocation reserves runtime memory.");
   assert.equal(draft.options.length, 4);
@@ -73,6 +73,7 @@ test("generateOptionSelect labels the correct answer 'generated' on a generated-
   assert.equal(correct.provenance, "generated");
   assert.equal(correct.text, "Ownership tracks which binding frees a value.");
   assert.equal(draft.explanation, "Ownership tracks which binding frees a value.");
+  assert.equal(draft.question, "Which statement accurately describes Ownership?");
 });
 
 test("generateImpostor assembles a draft: three cited truths + one generated impostor (sibling-sourced)", async () => {
@@ -170,6 +171,8 @@ test("Answer-Key Verification renders an owner-neutral, key-free option-select r
   const rendered = calls[0].messages.map((message) => message.content).join("\n");
   assert.match(rendered, /Learning subject: "Affine type"/);
   assert.match(rendered, /Which statement is accurate/);
+  assert.match(rendered, /Classify each \(question, candidate\) pair/);
+  assert.match(rendered, /true statement about a different subject is claim_false/);
   assert.match(rendered, /Linear type/);
   assert.equal(/derivedNodeId|isCorrect|optionId|answer key/i.test(rendered), false);
   assert.deepEqual(verdicts.map((verdict) => verdict.verdict), ["claim_true", "claim_false"]);

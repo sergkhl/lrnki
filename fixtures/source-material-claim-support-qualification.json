@@ -516,6 +516,36 @@
       "evidenceQuotes": [
         "The DNA harvested from cells grown for two generations in 14N formed two bands: one DNA band was at the intermediate position between 15N and 14N, and the other corresponded to the band of 14N DNA."
       ]
+    },
+    {
+      "id": "heldout-dna-complementarity-prediction-mechanism",
+      "source": "fixtures/html/openstax-biology-2e-14-3-dna-replication.html",
+      "harmClass": "unsupported_mechanism",
+      "expected": "unsupported",
+      "claim": "Because base pairing is specific, the sequence of a new strand can be predicted directly from its template.",
+      "evidenceQuotes": [
+        "During DNA replication, each of the two strands that make up the double helix serves as a template from which new strands are copied."
+      ]
+    },
+    {
+      "id": "heldout-dna-dispersive-fragment-reassembly",
+      "source": "fixtures/html/openstax-biology-2e-14-3-dna-replication.html",
+      "harmClass": "unsupported_mechanism",
+      "expected": "unsupported",
+      "claim": "In dispersive replication, parental and newly synthesized DNA are broken into fragments and reassembled so that every resulting double helix is a patchwork of old and new DNA.",
+      "evidenceQuotes": [
+        "In the dispersive model, both copies of DNA have double-stranded segments of parental DNA and newly synthesized DNA interspersed."
+      ]
+    },
+    {
+      "id": "heldout-dna-dispersive-collective-distributive-scope",
+      "source": "fixtures/html/openstax-biology-2e-14-3-dna-replication.html",
+      "harmClass": "collective_distributive_scope",
+      "expected": "unsupported",
+      "claim": "In the dispersive model of DNA replication, both resulting copies of DNA contain double-stranded segments of parental DNA and newly synthesized DNA interspersed throughout each strand.",
+      "evidenceQuotes": [
+        "In the dispersive model, both copies of DNA have double-stranded segments of parental DNA and newly synthesized DNA interspersed."
+      ]
     }
   ]
 }

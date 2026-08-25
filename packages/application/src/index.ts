@@ -279,8 +279,11 @@ export {
 } from "./sourceMaterialClaimSupportQualification";
 export {
   SOURCE_ASSET_EVALUATION_REPORT_SCHEMA_VERSION,
+  SOURCE_LESSON_EXTRACTIVE_ADMISSION_POLICY,
+  SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS,
   evaluateProjectedOptionSelectTruth,
   evaluateProjectedSourceSupport,
+  type SourceAssetEvaluationStage,
   evaluateQualifiedSourceExpedition,
   settleOptionSelectTruth,
   type DistractorInvalidityDecision,
@@ -294,6 +297,7 @@ export {
   type SourceAssetEvaluationReport,
   type SourceSupportDecision,
   type SourceSupportDecisionReason,
+  type SourceSupportSample,
   type SourceSupportNodeContext
 } from "./sourceAssetEvaluation";
 export {
@@ -304,6 +308,12 @@ export {
   admitSourceOptionSelectItems,
   type SourceOptionSelectAdmissionResult
 } from "./sourceOptionSelectAdmission";
+export {
+  SOURCE_OPTION_EXACT_REFERENCE_ADMISSION_POLICY,
+  sourceOptionExactReferenceContractReasons,
+  sourceOptionExactReferenceQuestion,
+  sourceOptionUsesExactReferenceContract
+} from "./sourceOptionExactReference";
 
 export {
   labelFor,

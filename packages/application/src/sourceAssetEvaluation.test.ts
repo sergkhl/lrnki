@@ -15,9 +15,11 @@ import type {
 import type { QualifiedSourceExpedition } from "./sourceExpedition";
 import {
   evaluateQualifiedSourceExpedition,
+  SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS,
   settleOptionSelectTruth
 } from "./sourceAssetEvaluation";
 import { projectSourceMaterialClaims } from "./sourceMaterialClaims";
+import { sourceOptionExactReferenceQuestion } from "./sourceOptionExactReference";
 import { answerKeyCandidates } from "./verifyStudyItemKeys";
 
 const citation = {
@@ -27,6 +29,7 @@ const citation = {
   evidenceQuote: "A permit is effective through 12:00 only when the signed exception is present.",
   matchKind: "exact" as const
 };
+const fixtureKey = "A permit is effective through 12:00 only when the signed exception is present.";
 
 function qualifiedFixture(): QualifiedSourceExpedition {
   const lesson: ConceptLesson = {
@@ -39,7 +42,7 @@ function qualifiedFixture(): QualifiedSourceExpedition {
     canonicalLabel: "Conditional permit",
     sections: [{
       kind: "definition",
-      text: "The permit lasts through 12:00 only when the signed exception is present.",
+      text: "A permit is effective through 12:00 only when the signed exception is present.",
       groundingProvenance: "source_cep",
       citation
     }],
@@ -55,11 +58,11 @@ function qualifiedFixture(): QualifiedSourceExpedition {
     configHash: "qualified:test",
     explorableTerms: [],
     itemType: "option_select",
-    question: "When is the permit effective through 12:00?",
-    explanation: "The signed exception is a required condition.",
+    question: sourceOptionExactReferenceQuestion("Conditional permit"),
+    explanation: fixtureKey,
     options: [
       { optionId: "z-wrong", text: "Whenever it is unsigned", isCorrect: false, provenance: "generated" },
-      { optionId: "a-key", text: "When the signed exception is present", isCorrect: true, provenance: "source", citation },
+      { optionId: "a-key", text: fixtureKey, isCorrect: true, provenance: "source", citation },
       { optionId: "y-wrong", text: "Only after 12:00", isCorrect: false, provenance: "generated" },
       { optionId: "x-wrong", text: "Under every condition", isCorrect: false, provenance: "generated" }
     ]
@@ -138,14 +141,14 @@ const sourceEvidenceRead = {
   }
 };
 
-test("no-activation report joins payload, evidence, decisions, identity, and positive controls with zero calls", async () => {
+test("no-activation report joins payload, evidence, identity, and deterministic exact-reference truth with zero calls", async () => {
   const report = await evaluateQualifiedSourceExpedition({
     qualification: qualifiedFixture(),
     sourceEvidenceRead,
     generatedAt: "2026-08-25T12:00:00.000Z"
   });
 
-  assert.equal(report.schemaVersion, 2);
+  assert.equal(report.schemaVersion, 4);
   assert.deepEqual(report.activation, {
     sourceSupportVerifierModel: null,
     answerKeyVerifierModel: null
@@ -166,12 +169,13 @@ test("no-activation report joins payload, evidence, decisions, identity, and pos
     decision.reasonCode === "source_support_verifier_not_activated"
   ));
   assert.ok(report.decisions.distractorInvalidity.every((decision) =>
-    decision.disposition === "not_evaluated" &&
-    decision.reasonCode === "answer_key_verifier_not_activated"
+    decision.disposition === "accepted" &&
+    decision.reasonCode === "distractor_invalid_for_question" &&
+    decision.verifierModel === null
   ));
   assert.deepEqual(
     report.decisions.keyUniqueness.map((decision) => [decision.disposition, decision.reasonCode]),
-    [["not_evaluated", "answer_key_verifier_not_activated"]]
+    [["accepted", "unique_key_verified"]]
   );
   assert.deepEqual(report.operationEvidence, {
     costTiming: null,
@@ -276,7 +280,7 @@ test("report rolls operation timelines, calls, tokens, and cost into the candida
   assert.deepEqual(report.evaluationCalls, { sourceSupport: 0, answerKey: 0, total: 0 });
 });
 
-test("activated evaluators keep source support independent and hide the server key from answer-key input", async () => {
+test("activated source support stays independent while exact-reference truth spends no answer-key call", async () => {
   const answerRequests: Parameters<AnswerKeyVerificationPort["verify"]>[0][] = [];
   const answerKeyVerifier: AnswerKeyVerificationPort = {
     model: "answer-key-test",
@@ -284,7 +288,7 @@ test("activated evaluators keep source support independent and hide the server k
       answerRequests.push(request);
       return request.candidates.map((candidate): StudyItemCandidateVerdict => ({
         ordinal: candidate.ordinal,
-        verdict: candidate.text === "When the signed exception is present" ? "claim_true" : "claim_false",
+        verdict: candidate.text === fixtureKey ? "claim_true" : "claim_false",
         reason: "test truth classification"
       }));
     }
@@ -306,25 +310,26 @@ test("activated evaluators keep source support independent and hide the server k
     generatedAt: "2026-08-25T12:00:00.000Z"
   });
 
-  assert.equal(answerRequests.length, 1, "all option truth is classified in one cross-family call");
-  assert.deepEqual(answerRequests[0]?.candidates.map((candidate) => candidate.text), [
-    "Only after 12:00",
-    "Under every condition",
-    "When the signed exception is present",
-    "Whenever it is unsigned"
-  ]);
-  const serializedRequest = JSON.stringify(answerRequests[0]);
-  assert.doesNotMatch(serializedRequest, /isCorrect|optionId|derivedNodeId|a-key|z-wrong/);
+  assert.deepEqual(answerRequests, []);
   assert.equal(report.decisions.sourceSupport.filter((decision) => decision.disposition === "rejected").length, 1);
+  assert.ok(report.decisions.sourceSupport.every((decision) =>
+    decision.disposition === "accepted"
+      ? decision.samples.length === SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS
+      : decision.samples.length === 1
+  ));
   assert.ok(report.decisions.distractorInvalidity.every((decision) => decision.disposition === "accepted"));
   assert.deepEqual(
     report.decisions.keyUniqueness.map((decision) => [decision.disposition, decision.reasonCode]),
     [["accepted", "unique_key_verified"]]
   );
+  const expectedSourceSupportCalls =
+    (report.positiveControls.sourceSupportClaimRows - 1) *
+      SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS +
+    1;
   assert.deepEqual(report.evaluationCalls, {
-    sourceSupport: report.positiveControls.sourceSupportClaimRows,
-    answerKey: 1,
-    total: report.positiveControls.sourceSupportClaimRows + 1
+    sourceSupport: expectedSourceSupportCalls,
+    answerKey: 0,
+    total: expectedSourceSupportCalls
   });
 });
 
@@ -345,7 +350,7 @@ test("distractor invalidity and key uniqueness retain distinct rejection and abs
     candidates,
     verdicts: candidates.map((candidate) => ({
       ordinal: candidate.ordinal,
-      verdict: candidate.text === "Only after 12:00" || candidate.text === "When the signed exception is present"
+      verdict: candidate.text === "Only after 12:00" || candidate.text === fixtureKey
         ? "claim_true"
         : "claim_false",
       reason: "test"
@@ -362,7 +367,7 @@ test("distractor invalidity and key uniqueness retain distinct rejection and abs
     distractorClaims,
     candidates,
     verdicts: [
-      { ordinal: ordinal("When the signed exception is present"), verdict: "claim_true", reason: "key supported" },
+      { ordinal: ordinal(fixtureKey), verdict: "claim_true", reason: "key supported" },
       { ordinal: ordinal("Only after 12:00"), verdict: "claim_false", reason: "false" },
       { ordinal: ordinal("Under every condition"), verdict: "unclear", reason: "insufficient context" },
       { ordinal: ordinal("Whenever it is unsigned"), verdict: "claim_false", reason: "false" }

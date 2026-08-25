@@ -3,7 +3,7 @@ import { requireAmbientOperationNeuralStageOwnership } from "@lrnki/domain-core/
 import { installNodeOperationContext } from "@lrnki/domain-core/operation-context-node";
 import type { ForcedToolFailureAttempt, StageErrorDetail, StageErrorReporting } from "@lrnki/ports";
 import { createLiteLlmDispatcher, liteLlmFetch, withLiteLlmDispatcher } from "./liteLlmFetch";
-import { classifyTransportFailure, LiteLlmHttpError, runWithTransportRetries } from "./liteLlmRetry";
+import { classifyTransportFailure, liteLlmHttpErrorFor, runWithTransportRetries } from "./liteLlmRetry";
 
 // Embedding transport (plan U1, ADR-0012). The first embedding client since the CEP
 // reset removed the old clustering tier. A SIBLING of LiteLlmForcedToolClient, not an
@@ -63,7 +63,7 @@ export class LiteLlmEmbeddingClient {
         ...(tags.length ? { metadata: { tags } } : {})
       })
     }, this.dispatcher));
-    if (!response.ok) throw new LiteLlmHttpError(response.status);
+    if (!response.ok) throw liteLlmHttpErrorFor(response);
     const payload = await response.json() as EmbeddingResponse;
     const rows = payload.data;
     // One vector per input, fail closed otherwise (a partial response would silently

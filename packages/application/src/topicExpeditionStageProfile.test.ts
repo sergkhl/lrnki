@@ -17,7 +17,7 @@ const descriptors = (
   group: Readonly<Record<string, GenerationStageDescriptor>>
 ): readonly GenerationStageDescriptor[] => Object.values(group);
 
-test("the Topic Expedition profile is the exact 9 + 10 composition of its producer groups", () => {
+test("the Topic Expedition profile is the exact 9 + 11 composition of its producer groups", () => {
   const composedByPhase: Record<TopicExpeditionPhase, GenerationStageDescriptor[]> = {
     enrichment: [],
     study_items: []
@@ -27,8 +27,8 @@ test("the Topic Expedition profile is the exact 9 + 10 composition of its produc
   }
 
   assert.equal(TOPIC_EXPEDITION_STAGE_PROFILE.enrichment.length, 9);
-  assert.equal(TOPIC_EXPEDITION_STAGE_PROFILE.study_items.length, 10);
-  assert.equal(TOPIC_EXPEDITION_STAGE_TOTAL, 19);
+  assert.equal(TOPIC_EXPEDITION_STAGE_PROFILE.study_items.length, 11);
+  assert.equal(TOPIC_EXPEDITION_STAGE_TOTAL, 20);
   assert.deepEqual(TOPIC_EXPEDITION_STAGE_PROFILE, composedByPhase);
   for (const phase of ["enrichment", "study_items"] as const) {
     const phaseStages: string[] = TOPIC_EXPEDITION_STAGE_PROFILE[phase].map((descriptor) => descriptor.stage);
@@ -84,6 +84,8 @@ test("profile metadata records the actual conditional, repeated, and concurrent 
   assert.equal(new Set(activityPipelines.map((descriptor) => descriptor.concurrencyGroup)).size, 1);
   assert.equal(STUDY_ITEM_BANK_STAGE_GROUP.lessonRedundancyJudgment.conditional, true);
   assert.equal(STUDY_ITEM_BANK_STAGE_GROUP.lessonRedundancyJudgment.repeatable, false);
+  assert.equal(STUDY_ITEM_BANK_STAGE_GROUP.sourceMaterialClaimSupport.conditional, true);
+  assert.equal(STUDY_ITEM_BANK_STAGE_GROUP.sourceMaterialClaimSupport.repeatable, true);
   assert.equal(STUDY_ITEM_BANK_STAGE_GROUP.conceptLessonGeneration.conditional, false);
   assert.equal(STUDY_ITEM_BANK_STAGE_GROUP.studyItemBlueprint.conditional, false);
 });

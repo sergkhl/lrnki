@@ -201,6 +201,26 @@ test("an HTTP failure records kind:http with the status, still fails closed", as
   );
 });
 
+test("a 429 preserves Retry-After as inspectable transport evidence", async () => {
+  setLiteLlmFetchForTests(async () => new Response("limited", {
+    status: 429,
+    headers: { "retry-after": "17" }
+  }));
+  await assert.rejects(
+    () => client().call({ ...baseInput, maxRetries: 0 }),
+    (error: unknown) => {
+      assert.ok(error instanceof ForcedToolExhaustionError);
+      assert.deepEqual(error.attempts[0], {
+        attempt: 0,
+        kind: "http",
+        status: 429,
+        retryAfterMs: 17_000
+      });
+      return true;
+    }
+  );
+});
+
 test("a fetch TypeError with an undici cause is classified as a network failure", async () => {
   setLiteLlmFetchForTests(async () => {
     const error = new TypeError("fetch failed");

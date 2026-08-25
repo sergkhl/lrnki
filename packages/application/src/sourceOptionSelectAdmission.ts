@@ -11,10 +11,12 @@ import type {
 import {
   evaluateProjectedOptionSelectTruth,
   evaluateProjectedSourceSupport,
+  SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS,
   type DistractorInvalidityDecision,
   type KeyUniquenessDecision,
   type ProjectedOptionSelectTruthEvaluation,
   type ProjectedSourceSupportEvaluation,
+  type SourceAssetEvaluationStage,
   type SourceSupportDecision,
   type SourceSupportNodeContext
 } from "./sourceAssetEvaluation";
@@ -24,6 +26,11 @@ import {
   type SourceMaterialClaim,
   type SourceMaterialClaimSet
 } from "./sourceMaterialClaims";
+import { lessonOptionSelectAnswer } from "./lessonGroundingShape";
+import {
+  sourceOptionExactReferenceContractReasons,
+  sourceOptionUsesExactReferenceContract
+} from "./sourceOptionExactReference";
 
 export type SourceOptionSelectAdmissionResult = {
   // Exact post-guard generator payloads. Persistence retains these in the immutable bank artifact
@@ -46,10 +53,17 @@ export async function admitSourceOptionSelectItems(input: {
   baseConfigHash: string;
   sourceEvidenceRead: SourceEvidenceReadPort;
   sourceSupportVerifier?: SourceMaterialClaimSupportVerificationPort;
+  sourceSupportStage?: SourceAssetEvaluationStage;
   answerKeyVerifier: AnswerKeyVerificationPort;
+  answerKeyStage?: SourceAssetEvaluationStage;
   relatedConceptsForNode?: (derivedNodeId: string) => { label: string; snippet: string }[];
 }): Promise<SourceOptionSelectAdmissionResult> {
   const candidates = [...input.candidates];
+  const nodeById = new Map(input.nodes.map((node) => [node.derivedNodeId, node] as const));
+  const expectedReferenceByNode = new Map(input.lessons.map((lesson) => [
+    lesson.derivedNodeId,
+    lessonOptionSelectAnswer(lesson)?.text
+  ] as const));
   const fullProjection = projectSourceMaterialClaims({
     lessons: input.lessons,
     optionSelectItems: candidates
@@ -62,43 +76,72 @@ export async function admitSourceOptionSelectItems(input: {
   };
   const structurallyEligibleIds = new Set(
     candidates
-      .filter((candidate) => sourceStructureRejectionReasons(candidate).length === 0)
+      .filter((candidate) => {
+        const node = nodeById.get(candidate.derivedNodeId);
+        return node !== undefined && sourceStructureRejectionReasons(
+          candidate,
+          node.label,
+          expectedReferenceByNode.get(candidate.derivedNodeId)
+        ).length === 0;
+      })
       .map((candidate) => candidate.studyItemId)
   );
-  const sourceSupport = await evaluateProjectedSourceSupport({
-    projection: {
-      ...projection,
-      claims: projection.claims.filter((claim) => structurallyEligibleIds.has(claim.assetId))
-    },
+  const eligibleProjection = {
+    ...projection,
+    claims: projection.claims.filter((claim) => structurallyEligibleIds.has(claim.assetId))
+  };
+  const evaluateSourceSupport = () => evaluateProjectedSourceSupport({
+    projection: eligibleProjection,
     nodes: input.nodes,
     sourceEvidenceRead: input.sourceEvidenceRead,
     sourceSupportVerifier: input.sourceSupportVerifier
   });
+  const supportClaimCount = eligibleProjection.claims.filter((claim) =>
+    claim.purpose === "source_support"
+  ).length;
+  const sourceSupport = input.sourceSupportVerifier && input.sourceSupportStage && supportClaimCount > 0
+    ? await input.sourceSupportStage(
+        evaluateSourceSupport,
+        supportClaimCount * SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS
+      )
+    : await evaluateSourceSupport();
   const sourceDecisionByClaim = new Map(
     sourceSupport.decisions.map((decision) => [decision.claimKey, decision] as const)
   );
   // Source support is the cheaper prerequisite for answer truth. Do not spend a key-verifier call
   // on a candidate that cannot be learner-visible regardless of that verdict.
-  const truthCandidates = candidates.filter((candidate) => sourceGateRejectionReasons({
-    candidate,
-    claims: projection.claims.filter((claim) => claim.assetId === candidate.studyItemId),
-    sourceDecisionByClaim
-  }).length === 0);
-  const optionTruth = await evaluateProjectedOptionSelectTruth({
+  const truthCandidates = candidates.filter((candidate) => {
+    const node = nodeById.get(candidate.derivedNodeId);
+    return node !== undefined && sourceGateRejectionReasons({
+      candidate,
+      canonicalLabel: node.label,
+      expectedReferenceText: expectedReferenceByNode.get(candidate.derivedNodeId),
+      claims: projection.claims.filter((claim) => claim.assetId === candidate.studyItemId),
+      sourceDecisionByClaim
+    }).length === 0;
+  });
+  const evaluateOptionTruth = () => evaluateProjectedOptionSelectTruth({
     items: truthCandidates,
+    lessons: input.lessons,
     projection,
     evidence: sourceSupport.evidence,
     nodes: input.nodes,
     answerKeyVerifier: input.answerKeyVerifier,
     relatedConceptsForNode: input.relatedConceptsForNode
   });
+  const needsNeuralTruth = truthCandidates.some((candidate) => {
+    const node = nodeById.get(candidate.derivedNodeId);
+    return node !== undefined && !sourceOptionUsesExactReferenceContract(candidate, node.label);
+  });
+  const optionTruth = input.answerKeyStage && truthCandidates.length > 0 && needsNeuralTruth
+    ? await input.answerKeyStage(evaluateOptionTruth, truthCandidates.length)
+    : await evaluateOptionTruth();
   const distractorDecisionByClaim = new Map(
     optionTruth.distractorInvalidity.map((decision) => [decision.claimKey, decision] as const)
   );
   const keyDecisionByItem = new Map(
     optionTruth.keyUniqueness.map((decision) => [decision.studyItemId, decision] as const)
   );
-  const nodeById = new Map(input.nodes.map((node) => [node.derivedNodeId, node] as const));
   const qualifiedConfigHash = qualifiedSourceExpeditionAssetConfigHash(input.baseConfigHash);
   const studyItems: OptionSelectItem[] = [];
   const rejected: RejectedStudyItem[] = [];
@@ -113,6 +156,8 @@ export async function admitSourceOptionSelectItems(input: {
     const claims = projection.claims.filter((claim) => claim.assetId === candidate.studyItemId);
     const reasons = sourceOptionRejectionReasons({
       candidate,
+      canonicalLabel: node.label,
+      expectedReferenceText: expectedReferenceByNode.get(candidate.derivedNodeId),
       claims,
       sourceDecisionByClaim,
       distractorDecisionByClaim,
@@ -135,6 +180,8 @@ export async function admitSourceOptionSelectItems(input: {
 
 function sourceOptionRejectionReasons(input: {
   candidate: OptionSelectItem;
+  canonicalLabel: string;
+  expectedReferenceText: string | undefined;
   claims: readonly SourceMaterialClaim[];
   sourceDecisionByClaim: ReadonlyMap<string, SourceSupportDecision>;
   distractorDecisionByClaim: ReadonlyMap<string, DistractorInvalidityDecision>;
@@ -169,10 +216,16 @@ function sourceOptionRejectionReasons(input: {
 
 function sourceGateRejectionReasons(input: {
   candidate: OptionSelectItem;
+  canonicalLabel?: string;
+  expectedReferenceText?: string;
   claims: readonly SourceMaterialClaim[];
   sourceDecisionByClaim: ReadonlyMap<string, SourceSupportDecision>;
 }): string[] {
-  const reasons = sourceStructureRejectionReasons(input.candidate);
+  const reasons = sourceStructureRejectionReasons(
+    input.candidate,
+    input.canonicalLabel,
+    input.expectedReferenceText
+  );
   if (reasons.length > 0) return reasons;
 
   const supportClaims = input.claims.filter((claim) => claim.purpose === "source_support");
@@ -191,7 +244,11 @@ function sourceGateRejectionReasons(input: {
   return reasons;
 }
 
-function sourceStructureRejectionReasons(candidate: OptionSelectItem): string[] {
+function sourceStructureRejectionReasons(
+  candidate: OptionSelectItem,
+  canonicalLabel?: string,
+  expectedReferenceText?: string
+): string[] {
   const reasons: string[] = [];
   const keyed = candidate.options.filter((option) => option.isCorrect);
   if (candidate.groundingProvenance === "generated") {
@@ -199,6 +256,15 @@ function sourceStructureRejectionReasons(candidate: OptionSelectItem): string[] 
   }
   if (keyed.length !== 1 || keyed[0]?.citation?.provenance !== "source") {
     reasons.push("key_citation: exactly one source-cited key required");
+  }
+  if (canonicalLabel === undefined) {
+    reasons.push("subject: source option-select node is unknown");
+  } else {
+    reasons.push(...sourceOptionExactReferenceContractReasons(
+      candidate,
+      canonicalLabel,
+      expectedReferenceText
+    ));
   }
   return reasons;
 }

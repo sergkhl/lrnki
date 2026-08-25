@@ -10,9 +10,11 @@ import { STAGE_TAGS } from "@lrnki/domain-core";
 import {
   allNeuralOperationDescriptors,
   conceptCanonicalizationConfigHash,
+  effectiveStudyItemBankDescriptors,
   graphEnrichmentConfigHash,
   neuralOperationRegistry,
   scaffoldGenerationConfigHash,
+  studyItemBankConfigHash,
   syntheticGenerationConfigHash
 } from "./configHashes";
 import { operationConfigHash } from "./operationConfigHash";
@@ -82,6 +84,15 @@ test("Graph Enrichment registers the complete shared admission stage family", ()
     stageTags.filter((stage) => stage === STAGE_TAGS.groundingGeneration).length,
     1,
     "the one-pass grounding generation identity is registered"
+  );
+});
+
+test("Study Item Bank identity includes the source-support acceptance policy", () => {
+  const entry = neuralOperationRegistry.studyItemBank;
+  assert.notEqual(
+    operationConfigHash(entry.configSeed, effectiveStudyItemBankDescriptors()),
+    studyItemBankConfigHash(),
+    "the source-extractive and three-draw policies must invalidate unqualified learner assets"
   );
 });
 
@@ -308,7 +319,7 @@ test("dropping any shared admission descriptor changes Graph Enrichment identity
 // when their Model Assignment is preserved. Non-behavioral refactors must not perturb them.
 test("default operation config hashes are stable across the registry derivation", () => {
   assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-928893987225");
-  assert.equal(scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG), "learner-scaffold-generation-19af7c93091f");
+  assert.equal(scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG), "learner-scaffold-generation-25c065547f8a");
   assert.equal(syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG), "synthetic-topic-generation-3286a5adf7a3");
 });
 

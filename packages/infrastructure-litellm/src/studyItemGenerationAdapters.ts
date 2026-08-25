@@ -11,6 +11,7 @@ import type {
   StudyItemType
 } from "@lrnki/domain-core";
 import { STAGE_TAGS } from "@lrnki/domain-core";
+import { sourceOptionExactReferenceQuestion } from "@lrnki/application";
 import type {
   AnswerKeyVerificationPort,
   MatchingAssignmentVerificationPort,
@@ -97,6 +98,7 @@ export const studyOptionSelectGenerationDescriptor: NeuralStageDescriptor<
   maxRetries: 4,
   templateData: (input) => ({
     ...studyItemTemplateData(input),
+    question: optionSelectQuestion(input),
     correctAnswerText: input.correctAnswer.text,
     correctAnswerPassageId: input.correctAnswer.citation.passageId,
     correctAnswerEvidenceQuote: input.correctAnswer.citation.evidenceQuote
@@ -114,13 +116,19 @@ export const studyOptionSelectGenerationDescriptor: NeuralStageDescriptor<
     ];
     return {
       itemType: "option_select",
-      question: `Which statement accurately describes ${input.node.canonicalLabel}?`,
+      question: optionSelectQuestion(input),
       explanation: input.correctAnswer.text,
       options,
       explorableTerms: []
     };
   }
 };
+
+function optionSelectQuestion(input: OptionSelectGenerationInput): string {
+  return input.groundingProvenance === "generated"
+    ? `Which statement accurately describes ${input.node.canonicalLabel}?`
+    : sourceOptionExactReferenceQuestion(input.node.canonicalLabel);
+}
 
 export const studyImpostorGenerationDescriptor: NeuralStageDescriptor<
   StudyItemGenerationInput,
@@ -242,7 +250,9 @@ function answerKeyVerificationDescriptor(stageTag: StageTag): NeuralStageDescrip
       // Rendered only for option-select, where the question frames each candidate as a
       // proposed answer. An impostor question is a meta-form ("which is FALSE?") that would
       // invert per-statement judging, so its block renders empty (D8).
-      questionBlock: input.question ? `\nThe item asks: "${input.question}" Judge each candidate as a proposed answer to it.` : "",
+      questionBlock: input.question
+        ? `\nThe item asks: "${input.question}" Classify each (question, candidate) pair. A candidate is claim_true only if it correctly answers this exact question; a true statement about a different subject is claim_false unless this question asks for that subject or relation.`
+        : "",
       candidates: renderCandidates(input.candidates),
       passages: renderPassages(input.groundingPassages),
       relatedConcepts: renderSiblings(input.relatedConcepts)

@@ -1,9 +1,12 @@
-import type {
-  ConceptCanonicalizationMode,
-  ConceptCanonicalizationConfig,
-  GraphEnrichmentConfig,
-  ScaffoldGenerationConfig,
-  SyntheticGenerationConfig
+import {
+  SOURCE_LESSON_EXTRACTIVE_ADMISSION_POLICY,
+  SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS,
+  SOURCE_OPTION_EXACT_REFERENCE_ADMISSION_POLICY,
+  type ConceptCanonicalizationMode,
+  type ConceptCanonicalizationConfig,
+  type GraphEnrichmentConfig,
+  type ScaffoldGenerationConfig,
+  type SyntheticGenerationConfig
 } from "@lrnki/application";
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import { admissionDecisionsDescriptor, admissionLabelJudgmentDescriptor, conceptDiscoveryDescriptor, coreSelectionDescriptor, definitionEntailmentDescriptor, definitionPassageQualityDescriptor, evidenceProfileExtractionDescriptor } from "./extractionAdapters";
@@ -74,6 +77,7 @@ export function effectiveStudyItemBankDescriptors(
     withModelOverride(studyOptionSelectGenerationDescriptor, routing?.generation),
     withModelOverride(studyImpostorGenerationDescriptor, routing?.generation),
     withModelOverride(studyMatchingGenerationDescriptor, routing?.generation),
+    sourceMaterialClaimSupportDescriptor,
     withModelOverride(optionSelectKeyVerificationDescriptor, routing?.independentJudge),
     withModelOverride(impostorKeyVerificationDescriptor, routing?.independentJudge),
     withModelOverride(matchingAssignmentVerificationDescriptor, routing?.independentJudge)
@@ -158,8 +162,7 @@ export type NeuralOperationName = keyof typeof neuralOperationRegistry;
 // `scaffold-content-congruence` is NOT here — its descriptor genuinely runs inside the scaffold
 // operation (the re-pick) and is registered there; the standing audit merely reuses it.
 export const measurementNeuralStageDescriptors: readonly AnyNeuralStageDescriptor[] = [
-  discoveryCoverageAuditDescriptor as AnyNeuralStageDescriptor,
-  sourceMaterialClaimSupportDescriptor as AnyNeuralStageDescriptor
+  discoveryCoverageAuditDescriptor as AnyNeuralStageDescriptor
 ];
 
 // Deduplicated (by stage config identity) inventory of every registered runtime descriptor, for
@@ -220,7 +223,11 @@ export function syntheticGenerationConfigHash(
 
 export function studyItemBankConfigHash(routing?: TopicExpeditionModelRouting): string {
   const entry = neuralOperationRegistry.studyItemBank;
-  return operationConfigHash(entry.configSeed, effectiveStudyItemBankDescriptors(routing));
+  return operationConfigHash(entry.configSeed, effectiveStudyItemBankDescriptors(routing), {
+    sourceLessonExtractiveAdmissionPolicy: SOURCE_LESSON_EXTRACTIVE_ADMISSION_POLICY,
+    sourceOptionExactReferenceAdmissionPolicy: SOURCE_OPTION_EXACT_REFERENCE_ADMISSION_POLICY,
+    sourceMaterialClaimSupportAcceptanceDraws: SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS
+  });
 }
 
 // The complete Scaffold operation identity (KTD7): every runtime descriptor plus the application

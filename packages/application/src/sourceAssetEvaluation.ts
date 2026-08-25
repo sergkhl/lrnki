@@ -1,8 +1,10 @@
 import type {
+  ConceptLesson,
   OptionSelectItem,
   StudyItemCandidateVerdict,
   StudyItemClaimVerdict
 } from "@lrnki/domain-core";
+import { evidenceQuoteMatches } from "@lrnki/domain-core";
 import type {
   AnswerKeyVerificationPort,
   JourneyLineageReadPort,
@@ -27,8 +29,16 @@ import {
   claimReasonFor,
   claimVerdictFor
 } from "./verifyStudyItemKeys";
+import { lessonOptionSelectAnswer } from "./lessonGroundingShape";
+import {
+  sourceOptionExactReferenceContractReasons,
+  sourceOptionUsesExactReferenceContract
+} from "./sourceOptionExactReference";
 
-export const SOURCE_ASSET_EVALUATION_REPORT_SCHEMA_VERSION = 2 as const;
+export const SOURCE_ASSET_EVALUATION_REPORT_SCHEMA_VERSION = 4 as const;
+export const SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS = 3 as const;
+export const SOURCE_LESSON_EXTRACTIVE_ADMISSION_POLICY =
+  "source_lesson_extractive_fields_v1" as const;
 
 export type EvaluationDisposition = "accepted" | "rejected" | "not_evaluated";
 
@@ -36,6 +46,7 @@ export type SourceSupportDecisionReason =
   | "source_support_verified"
   | "source_support_rejected"
   | "source_support_unclear"
+  | "source_lesson_field_not_extractive"
   | "source_support_verifier_not_activated"
   | "source_support_verifier_unavailable"
   | "source_evidence_read_unavailable"
@@ -68,6 +79,13 @@ export type SourceSupportDecision = {
   reasonCode: SourceSupportDecisionReason;
   reason: string;
   verifierModel: string | null;
+  samples: SourceSupportSample[];
+};
+
+export type SourceSupportSample = {
+  draw: number;
+  disposition: "supported" | "unsupported" | "unclear" | "unavailable";
+  reason: string;
 };
 
 export type DistractorInvalidityDecision = {
@@ -116,6 +134,13 @@ export type ProjectedOptionSelectTruthEvaluation = {
   keyUniqueness: KeyUniquenessDecision[];
   calls: number;
 };
+
+// Composition-owned timing boundary around one complete neural evaluation phase. Admission owns
+// which work belongs to the phase; the Study Item Bank composition owns its operation-stage name.
+export type SourceAssetEvaluationStage = <T>(
+  work: () => Promise<T>,
+  total?: number
+) => Promise<T>;
 
 // One evaluator owns evidence resolution and claim-versus-source settlement for both the read-only
 // U3 report and U5 learner admission. It never decides whether an asset is sufficient: consumers
@@ -192,6 +217,22 @@ export async function evaluateProjectedSourceSupport(input: {
       ));
       continue;
     }
+    if (claim.assetKind === "concept_lesson") {
+      const materialField = sourceLessonMaterialField(claim);
+      const appearsInAdmittedSource = evidenceRows.some((row) =>
+        row.blockText !== null && evidenceQuoteMatches(row.blockText, materialField)
+      );
+      if (!appearsInAdmittedSource) {
+        decisions.push(sourceSupportDecision(
+          claim,
+          "rejected",
+          "source_lesson_field_not_extractive",
+          "The exact learner-visible lesson field is not a formatting-normalized substring of any admitted source block.",
+          input.sourceSupportVerifier?.model ?? null
+        ));
+        continue;
+      }
+    }
     if (!input.sourceSupportVerifier) {
       decisions.push(sourceSupportDecision(
         claim,
@@ -206,47 +247,73 @@ export async function evaluateProjectedSourceSupport(input: {
     if (!node) {
       throw new Error(`Material claim references unknown derived node ${JSON.stringify(claim.derivedNodeId)}.`);
     }
-    try {
-      calls += 1;
-      const verdict = await input.sourceSupportVerifier.verify({
-        declaredDomain: node.declaredDomain,
-        subject: { canonicalLabel: node.label, aliases: [...node.aliases] },
-        claim: { claimKey: claim.claimKey, statement: claim.statement },
-        evidence: evidenceRows.map((row) => ({
-          evidenceKey: row.evidenceKey,
-          passageKind: row.passageKind,
-          blockText: row.blockText!,
-          citedQuote: row.evidenceQuote,
-          direct: claim.directEvidenceKeys.includes(row.evidenceKey)
-        }))
-      });
-      decisions.push(sourceSupportDecision(
-        claim,
-        verdict.disposition === "supported"
-          ? "accepted"
-          : verdict.disposition === "unsupported"
-            ? "rejected"
-            : "not_evaluated",
-        verdict.disposition === "supported"
-          ? "source_support_verified"
-          : verdict.disposition === "unsupported"
-            ? "source_support_rejected"
-            : "source_support_unclear",
-        nonEmptyReason(verdict.reason),
-        input.sourceSupportVerifier.model
-      ));
-    } catch (error) {
-      decisions.push(sourceSupportDecision(
-        claim,
-        "not_evaluated",
-        "source_support_verifier_unavailable",
-        errorMessage(error),
-        input.sourceSupportVerifier.model
-      ));
+    const request = {
+      declaredDomain: node.declaredDomain,
+      subject: { canonicalLabel: node.label, aliases: [...node.aliases] },
+      claim: { claimKey: claim.claimKey, statement: claim.statement },
+      evidence: evidenceRows.map((row) => ({
+        evidenceKey: row.evidenceKey,
+        passageKind: row.passageKind,
+        blockText: row.blockText!,
+        citedQuote: row.evidenceQuote,
+        direct: claim.directEvidenceKeys.includes(row.evidenceKey)
+      }))
+    };
+    const samples: SourceSupportSample[] = [];
+    for (let draw = 1; draw <= SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS; draw += 1) {
+      try {
+        calls += 1;
+        const verdict = await input.sourceSupportVerifier.verify(request);
+        samples.push({ draw, disposition: verdict.disposition, reason: nonEmptyReason(verdict.reason) });
+        // Learner admission requires unanimous support. Once one draw refuses, later draws cannot
+        // change the decision and would add cost without increasing precision.
+        if (verdict.disposition !== "supported") break;
+      } catch (error) {
+        samples.push({ draw, disposition: "unavailable", reason: errorMessage(error) });
+        break;
+      }
     }
+    const refusal = samples.find((sample) => sample.disposition !== "supported");
+    decisions.push(sourceSupportDecision(
+      claim,
+      refusal?.disposition === "unsupported"
+        ? "rejected"
+        : refusal
+          ? "not_evaluated"
+          : "accepted",
+      refusal?.disposition === "unsupported"
+        ? "source_support_rejected"
+        : refusal?.disposition === "unclear"
+          ? "source_support_unclear"
+          : refusal?.disposition === "unavailable"
+            ? "source_support_verifier_unavailable"
+            : "source_support_verified",
+      refusal?.reason ?? `${samples.length}/${SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS} support draws unanimously entailed every material part.`,
+      input.sourceSupportVerifier.model,
+      samples
+    ));
   }
 
   return { evidence, decisions, calls };
+}
+
+function sourceLessonMaterialField(claim: SourceMaterialClaim): string {
+  switch (claim.subject.kind) {
+    case "lesson_section":
+      return claim.subject.sectionText;
+    case "lesson_section_item":
+      return claim.subject.itemText;
+    case "lesson_diagram_caption":
+      return claim.subject.caption;
+    case "lesson_diagram_spec":
+      return claim.subject.spec;
+    case "option_select_question_key":
+    case "option_select_explanation":
+    case "option_select_distractor":
+      throw new Error(
+        `Concept Lesson claim ${JSON.stringify(claim.claimKey)} has non-lesson subject ${JSON.stringify(claim.subject.kind)}.`
+      );
+  }
 }
 
 // The same strict truth settlement feeds both the diagnostic report and source-item admission.
@@ -254,6 +321,7 @@ export async function evaluateProjectedSourceSupport(input: {
 // or an admission caller's assertion that an item is already sound.
 export async function evaluateProjectedOptionSelectTruth(input: {
   items: readonly OptionSelectItem[];
+  lessons: readonly ConceptLesson[];
   projection: SourceMaterialClaimSet;
   evidence: readonly JoinedSourceMaterialEvidence[];
   nodes: readonly SourceSupportNodeContext[];
@@ -262,6 +330,10 @@ export async function evaluateProjectedOptionSelectTruth(input: {
 }): Promise<ProjectedOptionSelectTruthEvaluation> {
   const evidenceByKey = new Map(input.evidence.map((row) => [row.evidenceKey, row] as const));
   const nodeById = new Map(input.nodes.map((node) => [node.derivedNodeId, node] as const));
+  const expectedReferenceByNode = new Map(input.lessons.map((lesson) => [
+    lesson.derivedNodeId,
+    lessonOptionSelectAnswer(lesson)?.text
+  ] as const));
   const distractorInvalidity: DistractorInvalidityDecision[] = [];
   const keyUniqueness: KeyUniquenessDecision[] = [];
   let calls = 0;
@@ -285,7 +357,7 @@ export async function evaluateProjectedOptionSelectTruth(input: {
       return row ? [row] : [];
     });
 
-    const unavailable = itemEvidenceKeys.length === 0
+    const evidenceUnavailable = itemEvidenceKeys.length === 0
       ? {
           distractorReason: "missing_source_evidence" as const,
           keyReason: "missing_source_evidence" as const,
@@ -297,35 +369,25 @@ export async function evaluateProjectedOptionSelectTruth(input: {
             keyReason: "unresolved_source_evidence" as const,
             detail: "At least one option-select source evidence reference did not resolve."
           }
-        : !input.answerKeyVerifier
-          ? {
-              distractorReason: "answer_key_verifier_not_activated" as const,
-              keyReason: "answer_key_verifier_not_activated" as const,
-              detail: "No answer-key verifier was activated for this operation."
-            }
-          : null;
-    if (unavailable) {
-      const disposition: EvaluationDisposition = unavailable.distractorReason === "missing_source_evidence" ||
-          unavailable.distractorReason === "unresolved_source_evidence"
-        ? "rejected"
-        : "not_evaluated";
+        : null;
+    if (evidenceUnavailable) {
       for (const claim of itemDistractorClaims) {
         distractorInvalidity.push(distractorDecision(
           claim,
           item,
-          disposition,
-          unavailable.distractorReason,
-          unavailable.detail,
-          input.answerKeyVerifier?.model ?? null
+          "rejected",
+          evidenceUnavailable.distractorReason,
+          evidenceUnavailable.detail,
+          null
         ));
       }
       keyUniqueness.push(keyDecision(
         item,
         keyedOption.text,
-        disposition,
-        unavailable.keyReason,
-        unavailable.detail,
-        input.answerKeyVerifier?.model ?? null
+        "rejected",
+        evidenceUnavailable.keyReason,
+        evidenceUnavailable.detail,
+        null
       ));
       continue;
     }
@@ -333,6 +395,59 @@ export async function evaluateProjectedOptionSelectTruth(input: {
     const node = nodeById.get(item.derivedNodeId);
     if (!node) {
       throw new Error(`Option-select item references unknown derived node ${JSON.stringify(item.derivedNodeId)}.`);
+    }
+    if (sourceOptionUsesExactReferenceContract(item, node.label)) {
+      const reasons = sourceOptionExactReferenceContractReasons(
+        item,
+        node.label,
+        expectedReferenceByNode.get(item.derivedNodeId)
+      );
+      const accepted = reasons.length === 0;
+      const detail = accepted
+        ? "Each normalized distractor differs from the exact source-backed lesson text requested by the code-owned question."
+        : `The exact-reference option contract failed: ${reasons.join("; ")}.`;
+      for (const claim of itemDistractorClaims) {
+        distractorInvalidity.push(distractorDecision(
+          claim,
+          item,
+          accepted ? "accepted" : "rejected",
+          accepted ? "distractor_invalid_for_question" : "distractor_valid_for_question",
+          detail,
+          null
+        ));
+      }
+      keyUniqueness.push(keyDecision(
+        item,
+        keyedOption.text,
+        accepted ? "accepted" : "rejected",
+        accepted ? "unique_key_verified" : "multiple_true_answers",
+        accepted
+          ? "The code-owned keyed text exactly matches the lesson reference and every normalized distractor differs."
+          : detail,
+        null
+      ));
+      continue;
+    }
+    if (!input.answerKeyVerifier) {
+      for (const claim of itemDistractorClaims) {
+        distractorInvalidity.push(distractorDecision(
+          claim,
+          item,
+          "not_evaluated",
+          "answer_key_verifier_not_activated",
+          "No answer-key verifier was activated for this operation.",
+          null
+        ));
+      }
+      keyUniqueness.push(keyDecision(
+        item,
+        keyedOption.text,
+        "not_evaluated",
+        "answer_key_verifier_not_activated",
+        "No answer-key verifier was activated for this operation.",
+        null
+      ));
+      continue;
     }
     const candidates = answerKeyCandidates(item.options);
     try {
@@ -482,6 +597,7 @@ export async function evaluateQualifiedSourceExpedition(input: {
   const sourceSupport = sourceSupportEvaluation.decisions;
   const optionTruthEvaluation = await evaluateProjectedOptionSelectTruth({
     items: qualification.assets.studyItems,
+    lessons: qualification.assets.lessons,
     projection,
     evidence: joinedEvidence,
     nodes: qualification.assets.detail.nodes,
@@ -657,9 +773,10 @@ function sourceSupportDecision(
   disposition: EvaluationDisposition,
   reasonCode: SourceSupportDecisionReason,
   reason: string,
-  verifierModel: string | null
+  verifierModel: string | null,
+  samples: SourceSupportSample[] = []
 ): SourceSupportDecision {
-  return { claimKey: claim.claimKey, assetId: claim.assetId, disposition, reasonCode, reason, verifierModel };
+  return { claimKey: claim.claimKey, assetId: claim.assetId, disposition, reasonCode, reason, verifierModel, samples };
 }
 
 function distractorDecision(

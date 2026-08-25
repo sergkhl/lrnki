@@ -54,7 +54,7 @@ test("generate issues one call with the lesson tool name, schema, and stage tag"
   assert.equal(draft.sections.find((s) => s.kind === "gist")?.citation, undefined);
 });
 
-test("the user message renders grounding passages and directional neighbor lists", async () => {
+test("source-backed generation renders grounding but withholds neighbor prose", async () => {
   const calls: Captured[] = [];
   const client = fakeClient({ sections: [], explorableTerms: [] }, calls);
   const adapter = createConceptLessonGenerationPort(client);
@@ -62,9 +62,20 @@ test("the user message renders grounding passages and directional neighbor lists
   await adapter.generate(baseInput);
   const user = calls[0].messages.map((m) => m.content).join("\n");
   assert.ok(user.includes("b1"));
-  assert.ok(user.includes("Ownership"));
-  assert.ok(user.includes("Lifetimes"));
-  assert.ok(user.includes("Slices"));
+  assert.match(user, /withheld; source grounding passages are the sole factual authority/);
+  assert.doesNotMatch(user, /Ownership|Lifetimes|Slices/);
+});
+
+test("generated grounding retains directional neighbor context", async () => {
+  const calls: Captured[] = [];
+  const client = fakeClient({ sections: [], explorableTerms: [] }, calls);
+  const adapter = createConceptLessonGenerationPort(client);
+
+  await adapter.generate({ ...baseInput, groundingProvenance: "generated" });
+  const user = calls[0].messages.map((m) => m.content).join("\n");
+  assert.match(user, /Ownership/);
+  assert.match(user, /Lifetimes/);
+  assert.match(user, /Slices/);
 });
 
 test("a partial citation (passage id without quote) is dropped rather than passed through", async () => {
@@ -101,7 +112,11 @@ test("the system prompt names no domain and asserts no section is mandatory (R4)
   const system = calls[0].messages.find((m) => (m as { role?: string }).role === "system")?.content
     ?? calls[0].messages[0].content;
   assert.ok(/never assume a section applies/i.test(system));
-  assert.ok(/default compact shape/i.test(system));
+  assert.ok(/one precise substantive section.*complete lesson/is.test(system));
+  assert.ok(/work closed-book/i.test(system));
+  assert.ok(/collective versus distributive/i.test(system));
+  assert.ok(/do not unpack a domain term or relation/i.test(system));
+  assert.ok(/diagram caption and every element/i.test(system));
   assert.ok(/at most two short sentences/i.test(system));
   assert.ok(/Every definition, examples, or formulas section must carry both citation fields/i.test(system));
   assert.ok(/neighbor's presence proves only the displayed graph relationship/i.test(system));

@@ -19,6 +19,7 @@ import {
   createGroundingGenerationPort,
   createAnswerKeyVerificationPort,
   createMatchingAssignmentVerificationPort,
+  createSourceMaterialClaimSupportVerificationPort,
   createIntrinsicDifficultyJudgmentPort,
   createLayerPurposeGenerationPort,
   createKnowledgeBoundaryProbePort,
@@ -111,7 +112,8 @@ export function createLearnerTopicExpeditionGeneration(sql: DatabaseClient): Top
           routing.independentJudge
         ),
         sourceAssetQualification: {
-          sourceEvidenceRead: new PostgresInspectionRead(sql)
+          sourceEvidenceRead: new PostgresInspectionRead(sql),
+          sourceSupportVerifier: createSourceMaterialClaimSupportVerificationPort(deterministicClient)
         },
         layerPurposeGeneration: createLayerPurposeGenerationPort(deterministicClient, routing.generation),
         layerPurposeStore: new PostgresEnrichmentLayerPurposeStore(sql),

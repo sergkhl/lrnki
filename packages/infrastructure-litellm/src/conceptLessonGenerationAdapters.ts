@@ -51,9 +51,9 @@ export const conceptLessonGenerationDescriptor: NeuralStageDescriptor<
     aliasText: input.node.aliases.length ? ` (aliases: ${input.node.aliases.join(", ")})` : "",
     groundingProvenance: input.groundingProvenance,
     passages: renderPassages(input.groundingPassages),
-    parents: renderNeighbors(input.neighbors.parents),
-    children: renderNeighbors(input.neighbors.children),
-    siblings: renderNeighbors(input.neighbors.siblings),
+    parents: renderLessonNeighbors(input),
+    children: renderLessonNeighbors(input, "children"),
+    siblings: renderLessonNeighbors(input, "siblings"),
     retryFeedbackBlock: input.retryFeedback ? `\n\nRetry feedback from the previous rejected draft:\n${input.retryFeedback}` : ""
   }),
   mapResult: (args) => {
@@ -94,4 +94,13 @@ function renderNeighbors(neighbors: NeighborGroup): string {
   return neighbors.length
     ? neighbors.map((neighbor) => `- ${neighbor.label}${neighbor.snippet ? `: "${neighbor.snippet}"` : ""}`).join("\n")
     : "(none provided)";
+}
+
+function renderLessonNeighbors(
+  input: ConceptLessonGenerationInput,
+  group: keyof ConceptLessonGenerationInput["neighbors"] = "parents"
+): string {
+  return input.groundingProvenance === "generated"
+    ? renderNeighbors(input.neighbors[group])
+    : "(withheld; source grounding passages are the sole factual authority)";
 }

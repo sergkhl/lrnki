@@ -147,6 +147,13 @@ export const STUDY_ITEM_BANK_STAGE_GROUP = {
     false,
     "activity-family-pipelines"
   ),
+  sourceMaterialClaimSupport: generationStage(
+    "study_items",
+    STAGE_TAGS.sourceMaterialClaimSupport,
+    true,
+    true,
+    "source-asset-admission"
+  ),
   optionSelectKeyVerification: generationStage(
     "study_items",
     STAGE_TAGS.optionSelectKeyVerification,

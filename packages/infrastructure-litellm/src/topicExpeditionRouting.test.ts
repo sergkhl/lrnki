@@ -55,6 +55,7 @@ import {
   createStudyItemGenerationPort
 } from "./studyItemGenerationAdapters";
 import { createConceptSetSynthesisPort } from "./syntheticGenerationAdapters";
+import { createSourceMaterialClaimSupportVerificationPort } from "./sourceMaterialClaimSupportAdapters";
 
 const routing: TopicExpeditionModelRouting = {
   generation: "kg-topic-expedition-generation",
@@ -181,6 +182,10 @@ test("Topic owns only learner-asset routing while Source-less Grounding factorie
   assert.equal(createMintingDurabilityJudgmentPort(client).model, GENERATED_NODE_JUDGE_MODEL);
   assert.equal(createIntrinsicDifficultyJudgmentPort(client).model, GENERATED_NODE_JUDGE_MODEL);
   assert.equal(
+    createSourceMaterialClaimSupportVerificationPort(client).model,
+    "kg-source-material-support-verifier"
+  );
+  assert.equal(
     createNodeMergeAdjudicationPort(client, GENERATED_NODE_JUDGE_MODEL).model,
     GENERATED_NODE_JUDGE_MODEL
   );
@@ -229,8 +234,13 @@ test("effective Topic descriptors override only declared domain, learner assets,
   ]) {
     assert.equal(studyOverrides.get(promptPath), routing.independentJudge, promptPath);
   }
+  assert.equal(
+    studyOverrides.get("source-material-claim-support.prompt"),
+    undefined,
+    "source support keeps its separately qualified Model Assignment"
+  );
   assert.equal(synthetic.length, 11);
-  assert.equal(studyItems.length, 10);
+  assert.equal(studyItems.length, 11);
 });
 
 test("all three admission consumers resolve the same neutral topology and generated-layer judgments", () => {
@@ -284,7 +294,7 @@ test("all three admission consumers resolve the same neutral topology and genera
   );
 });
 
-test("only affected operation hashes change and Topic remains nineteen stages", () => {
+test("only affected operation hashes change and Topic has twenty conceptual stages", () => {
   const resolvableRouting: TopicExpeditionModelRouting = {
     generation: "default-model",
     independentJudge: "default-model",
@@ -305,7 +315,7 @@ test("only affected operation hashes change and Topic remains nineteen stages", 
     "synthetic-topic-generation-d78aba900512",
     "Topic Synthetic changes with the Grounding audit contract"
   );
-  assert.equal(studyItemBankConfigHash(routing), "study-item-bank-a841a9e54fd7");
+  assert.equal(studyItemBankConfigHash(routing), "study-item-bank-205a5683e3e2");
   assert.equal(
     syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG),
     "synthetic-topic-generation-3286a5adf7a3"
@@ -315,7 +325,7 @@ test("only affected operation hashes change and Topic remains nineteen stages", 
     "synthetic-topic-generation-9f81ce84488e",
     "default Synthetic changes with the Grounding audit contract"
   );
-  assert.equal(studyItemBankConfigHash(), "study-item-bank-30876e730c8a");
+  assert.equal(studyItemBankConfigHash(), "study-item-bank-43d67784c2ba");
   assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-928893987225");
   assert.notEqual(
     graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG),
@@ -324,7 +334,7 @@ test("only affected operation hashes change and Topic remains nineteen stages", 
   );
   assert.equal(
     scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG),
-    "learner-scaffold-generation-19af7c93091f"
+    "learner-scaffold-generation-25c065547f8a"
   );
   assert.notEqual(
     scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG),
@@ -339,9 +349,9 @@ test("only affected operation hashes change and Topic remains nineteen stages", 
     }),
     "concept-canonicalization-ce3969a22bea"
   );
-  assert.equal(TOPIC_EXPEDITION_STAGE_TOTAL, 19);
+  assert.equal(TOPIC_EXPEDITION_STAGE_TOTAL, 20);
   assert.equal(TOPIC_EXPEDITION_STAGE_PROFILE.enrichment.length, 9);
-  assert.equal(TOPIC_EXPEDITION_STAGE_PROFILE.study_items.length, 10);
+  assert.equal(TOPIC_EXPEDITION_STAGE_PROFILE.study_items.length, 11);
 });
 
 test("the seven neutral aliases resolve the approved cross-family assignments and qualified fallbacks", () => {

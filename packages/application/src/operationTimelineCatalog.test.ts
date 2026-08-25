@@ -35,7 +35,7 @@ test("catalog LLM stages are drawn from the closed stage-tag vocabulary", () => 
   const unknownStages = [...catalogLlmStages].filter((stage) => !vocabulary.has(stage));
   assert.deepEqual(unknownStages, [], `catalog LLM stages absent from STAGE_TAGS: ${unknownStages.join(", ")}`);
   assert.equal(catalogLlmStages.has(STAGE_TAGS.discoveryCoverageAudit), false, "measurement-only audit is not an operation stage");
-  assert.equal(catalogLlmStages.has(STAGE_TAGS.sourceMaterialClaimSupport), false, "pre-activation source-support qualification is not yet an operation stage");
+  assert.equal(catalogLlmStages.has(STAGE_TAGS.sourceMaterialClaimSupport), true, "source-backed Study Item Banks own source-support spend");
   assert.equal(catalogLlmStages.has(STAGE_TAGS.scaffoldContentCongruence), true, "scaffold generation uses the shared descriptor inside its operation");
 });
 

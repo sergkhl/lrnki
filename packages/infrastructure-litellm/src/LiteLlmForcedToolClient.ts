@@ -4,7 +4,7 @@ import { installNodeOperationContext } from "@lrnki/domain-core/operation-contex
 import type { ForcedToolFailureAttempt, StageErrorDetail, StageErrorReporting } from "@lrnki/ports";
 import { ZodError, type ZodType } from "zod";
 import { createLiteLlmDispatcher, liteLlmFetch, withLiteLlmDispatcher } from "./liteLlmFetch";
-import { classifyTransportFailure, LiteLlmHttpError, runWithTransportRetries } from "./liteLlmRetry";
+import { classifyTransportFailure, liteLlmHttpErrorFor, runWithTransportRetries } from "./liteLlmRetry";
 
 export { LiteLlmHttpError } from "./liteLlmRetry";
 
@@ -84,7 +84,7 @@ export class LiteLlmForcedToolClient {
         ...(tags.length ? { metadata: { tags } } : {})
       })
     }, this.dispatcher));
-    if (!response.ok) throw new LiteLlmHttpError(response.status);
+    if (!response.ok) throw liteLlmHttpErrorFor(response);
     const payload = await response.json() as LiteLlmResponse;
     const toolCalls = payload.choices?.[0]?.message?.tool_calls ?? [];
     const calls = toolCalls.filter((call) => call?.function?.name === input.toolName);

@@ -2,13 +2,13 @@
 
 ## TODO
 
-- **Curated-source learner workflow — in progress; U0–U4 complete and U5 mechanics/source-support
-  gate complete.** Follow
-  [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md). Raw lesson
-  and option candidates survive while strict settlement admits neither abstention nor verifier
-  failure; matching/impostor remain inspectable but cannot enter Source Expedition identity. The
-  DeepSeek FP8/medium assignment passed 129/129 fixed-matrix draws; activate it through exact
-  production ownership and run U5's fresh external live gate next.
+- **Curated-source learner workflow — in progress; U0–U5 complete and U6 exact-reference Support
+  Path next.** Follow
+  [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md). Lessons
+  require extractive fields and unanimous support; source options copy one code-selected lesson unit
+  exactly and need no semantic answer-key call. A fresh external OpenStax gate passed for admission
+  precision while safely remaining unavailable on three lesson absences. Reuse only an exact
+  qualified lesson/option tuple for Support Path and refuse without generation when none exists.
 
 ## COMPLETED
 

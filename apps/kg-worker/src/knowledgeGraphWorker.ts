@@ -57,6 +57,7 @@ import {
   createStudyItemBlueprintPort,
   createAnswerKeyVerificationPort,
   createMatchingAssignmentVerificationPort,
+  createSourceMaterialClaimSupportVerificationPort,
   createConceptDiscoveryPort,
   createDiscoveryCoverageAuditPort,
   createScaffoldContentCongruencePort,
@@ -276,6 +277,7 @@ function buildContext() {
     // option-select, and persisted through its own store; option-select derives FROM it.
     conceptLessonGeneration: createConceptLessonGenerationPort(deterministicClient),
     conceptLessonRedundancyJudge: createConceptLessonRedundancyJudgmentPort(deterministicClient),
+    sourceMaterialClaimSupportVerifier: createSourceMaterialClaimSupportVerificationPort(deterministicClient),
     conceptLessonStore: new PostgresConceptLessonStore(sql),
     layerPurposeGeneration: createLayerPurposeGenerationPort(deterministicClient),
     layerPurposeStore: new PostgresEnrichmentLayerPurposeStore(sql),
@@ -976,7 +978,8 @@ async function generateStudyItemsCommand(ctx: Context, enrichmentId: string | un
     conceptLessonGeneration: ctx.conceptLessonGeneration,
     conceptLessonRedundancyJudge: ctx.conceptLessonRedundancyJudge,
     sourceAssetQualification: {
-      sourceEvidenceRead: ctx.inspectionRead
+      sourceEvidenceRead: ctx.inspectionRead,
+      sourceSupportVerifier: ctx.sourceMaterialClaimSupportVerifier
     },
     studyItemBlueprint: ctx.studyItemBlueprint,
     answerKeyVerification: ctx.answerKeyVerification,

@@ -5,9 +5,9 @@ lrnki:
   toolDescription: Submit three sibling-flavored distractors for one code-owned correct description.
 ---
 {{#system}}
-You prepare the THREE wrong alternatives for ONE four-option recognition item about a single learning node. The application owns the question and the correct description shown below. It will copy that learner-visible Concept Lesson text without alteration into the correct option and explanation while retaining its verified grounding citation. You do not select, rewrite, summarize, qualify, or otherwise generate the correct claim.
+You prepare the THREE wrong alternatives for ONE four-option recognition item about a single learning node. The application owns the exact question and the correct description shown below. It will copy that learner-visible Concept Lesson text without alteration into the correct option and explanation while retaining its verified grounding citation. You do not select, rewrite, summarize, qualify, or otherwise generate the correct claim.
 
-Write exactly THREE plausible but INCORRECT distractors for the code-owned question "Which statement accurately describes [learning node]?" Keep each distractor in the same grammatical form, domain register, specificity, and approximate length as the correct description so formatting does not reveal the answer. Neighboring topics may flavor a distractor, but each distractor must remain clearly wrong for this learning node and must never paraphrase the correct description or any grounding passage. Stay within the Declared Domain. {{> learner-copy-vocabulary}}
+Write exactly THREE plausible distractors for the code-owned question shown below. Every distractor must differ from the correct description after case-folding and whitespace normalization. Keep each distractor in the same grammatical form, domain register, specificity, and approximate length as the correct description so formatting does not reveal the answer. Neighboring topics may flavor a distractor, but no distractor may paraphrase the correct description or any grounding passage. Stay within the Declared Domain. {{> learner-copy-vocabulary}}
 {{/system}}
 
 {{#user}}
@@ -16,6 +16,9 @@ Learning node: "{{nodeLabel}}"{{aliasText}}.
 Grounding provenance: {{groundingProvenance}}.
 Grounding passages (cite the correct answer by passageId):
 {{passages}}
+
+Code-owned question (do not rewrite):
+{{question}}
 
 Code-owned correct description (do not rewrite):
 {{correctAnswerText}}

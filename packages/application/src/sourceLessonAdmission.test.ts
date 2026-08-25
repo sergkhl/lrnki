@@ -6,6 +6,7 @@ import type {
   SourceMaterialClaimSupportVerificationPort
 } from "@lrnki/ports";
 import { admitSourceConceptLessons } from "./sourceLessonAdmission";
+import { SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS } from "./sourceAssetEvaluation";
 import { qualifiedSourceExpeditionAssetConfigHash } from "./sourceExpedition";
 
 const citation = {
@@ -102,7 +103,17 @@ test("lesson admission omits unsupported optional fields and assigns qualificati
   assert.equal(result.lessons.length, 1);
   assert.deepEqual(result.absent, []);
   assert.equal(result.evaluation.calls, calls.length);
-  assert.equal(result.evaluation.calls, result.evaluation.decisions.length);
+  assert.equal(
+    result.evaluation.calls,
+    result.evaluation.decisions.reduce((sum, decision) => sum + decision.samples.length, 0)
+  );
+  assert.ok(result.evaluation.decisions.every((decision) =>
+    decision.disposition === "accepted"
+      ? decision.samples.length === SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS
+      : decision.reasonCode === "source_lesson_field_not_extractive"
+        ? decision.samples.length === 0
+        : decision.samples.length === 1
+  ));
 
   const admitted = result.lessons[0]!;
   assert.equal(admitted.configHash, qualifiedSourceExpeditionAssetConfigHash("base-config"));
@@ -113,6 +124,40 @@ test("lesson admission omits unsupported optional fields and assigns qualificati
   assert.equal(admitted.sections[1]?.citation, undefined, "support never fabricates verbatim citation provenance");
   assert.deepEqual(admitted.explorableTerms, [{ term: "retained term", sectionKind: "examples" }]);
   assert.deepEqual(candidate, candidateLesson(), "settlement does not mutate the raw candidate");
+});
+
+test("a neural false acceptance cannot admit a non-extractive source lesson field", async () => {
+  const candidate = candidateLesson();
+  candidate.sections = [{
+    kind: "definition",
+    text: "A plausible paraphrase adds a causal connection absent from the source.",
+    groundingProvenance: "source_cep",
+    citation
+  }];
+  candidate.explorableTerms = [];
+  const calls: string[] = [];
+  const result = await admitSourceConceptLessons({
+    candidates: [candidate],
+    nodes,
+    baseConfigHash: "base-config",
+    sourceEvidenceRead,
+    sourceSupportVerifier: {
+      model: "false-accepting-verifier",
+      async verify(input) {
+        calls.push(input.claim.claimKey);
+        return { disposition: "supported", reason: "Incorrectly accepted by the neural verifier." };
+      }
+    }
+  });
+
+  assert.equal(result.lessons.length, 0);
+  assert.equal(result.absent.length, 1);
+  assert.equal(result.evaluation.calls, 0, "the provable extractive floor runs before neural spend");
+  assert.deepEqual(calls, []);
+  assert.deepEqual(
+    result.evaluation.decisions.map((decision) => [decision.disposition, decision.reasonCode]),
+    [["rejected", "source_lesson_field_not_extractive"]]
+  );
 });
 
 test("an absent verifier preserves the candidate but admits no source-backed lesson", async () => {
@@ -132,7 +177,11 @@ test("an absent verifier preserves the candidate but admits no source-backed les
   }]);
   assert.equal(result.evaluation.calls, 0);
   assert.ok(result.evaluation.decisions.every((decision) =>
-    decision.disposition === "not_evaluated" &&
+    decision.disposition !== "accepted" &&
+    (decision.reasonCode === "source_support_verifier_not_activated" ||
+      decision.reasonCode === "source_lesson_field_not_extractive")
+  ));
+  assert.ok(result.evaluation.decisions.some((decision) =>
     decision.reasonCode === "source_support_verifier_not_activated"
   ));
 });

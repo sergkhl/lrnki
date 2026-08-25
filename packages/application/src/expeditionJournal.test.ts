@@ -28,7 +28,7 @@ import {
 } from "./learnerKnowledgeAvailability";
 import { deriveFlooredExpedition } from "./expeditionSections";
 
-const TOTAL = 19;
+const TOTAL = 20;
 const ALL_LEARNER_KNOWLEDGE_AVAILABLE = {
   ...CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY,
   syntheticTopicGeneration: { status: "available" },
@@ -124,7 +124,7 @@ test("a running unexpected current stage signals indeterminate", async () => {
 
 // AE2: a succeeded study_items phase clamps to its full span even when conditional
 // stages (matching/impostor and their judges) never appeared.
-test("a succeeded study_items timeline with absent conditional stages reaches full 19/19 readiness", async () => {
+test("a succeeded study_items timeline with absent conditional stages reaches full 20/20 readiness", async () => {
   const journal = await journalWithTimeline(timeline({
     operationType: "study_items",
     status: "succeeded",
@@ -140,7 +140,7 @@ test("a succeeded study_items timeline with absent conditional stages reaches fu
   assert.equal(generation.fraction, 1);
 });
 
-test("a succeeded enrichment timeline with conditional stages absent reaches its phase boundary (9/19)", async () => {
+test("a succeeded enrichment timeline with conditional stages absent reaches its phase boundary (9/20)", async () => {
   const journal = await journalWithTimeline(timeline({
     status: "succeeded",
     stages: [

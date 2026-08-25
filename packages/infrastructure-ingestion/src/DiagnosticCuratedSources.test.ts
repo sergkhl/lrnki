@@ -90,13 +90,21 @@ test("the tracked source-support matrix preserves the fixed diagnostics and real
   assert.equal(matrix.maximumFalseAcceptances, 0);
   assert.equal(matrix.maximumFalseRejectionRate, 0.25);
   assert.equal(matrix.sources.length, 6);
-  assert.equal(matrix.cases.length, 43);
-  assert.equal(new Set(matrix.cases.map((entry) => entry.id)).size, 43);
+  assert.equal(matrix.cases.length, 46);
+  assert.equal(new Set(matrix.cases.map((entry) => entry.id)).size, 46);
   assert.equal(matrix.cases.filter((entry) => entry.expected === "supported").length, 19);
-  assert.equal(matrix.cases.filter((entry) => entry.expected === "unsupported").length, 24);
+  assert.equal(matrix.cases.filter((entry) => entry.expected === "unsupported").length, 27);
   assert.deepEqual(
     [...new Set(matrix.cases.map((entry) => entry.harmClass))].sort(),
-    ["carrier_referent_swap", "context_bound_quantity", "contradiction", "omitted_material_qualifier", "supported_claim"]
+    [
+      "carrier_referent_swap",
+      "collective_distributive_scope",
+      "context_bound_quantity",
+      "contradiction",
+      "omitted_material_qualifier",
+      "supported_claim",
+      "unsupported_mechanism"
+    ]
   );
 
   const sourceByPath = new Map(matrix.sources.map((source) => [source.path, source] as const));

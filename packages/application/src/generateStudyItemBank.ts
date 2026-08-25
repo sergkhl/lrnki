@@ -111,12 +111,12 @@ export async function generateStudyItemBank(input: {
   // Required at every production composition so source-backed lesson semantics cannot diverge by
   // entry point. Transport failure remains a fail-open omission decision inside the judge seam.
   conceptLessonRedundancyJudge: ConceptLessonRedundancyJudgmentPort;
-  // Required even though source-support verification is deliberately absent today. A source graph
-  // cannot bypass settlement: exact source evidence is always resolvable, while the optional
-  // verifier's absence deterministically produces inspection-only candidates and lesson absence.
+  // Both dependencies are required at every production composition. A source graph cannot bypass
+  // exact evidence resolution or the qualified semantic settlement port; failures remain explicit
+  // inspection-only candidates and never degrade into admission.
   sourceAssetQualification: {
     sourceEvidenceRead: SourceEvidenceReadPort;
-    sourceSupportVerifier?: SourceMaterialClaimSupportVerificationPort;
+    sourceSupportVerifier: SourceMaterialClaimSupportVerificationPort;
   };
   // Layer-purpose generation (plan 2026-07-10-001 U1): one call per bank producing the
   // enrichment's plain-register capability statement. Both optional so existing callers
@@ -163,6 +163,8 @@ export async function generateStudyItemBank(input: {
       studyStage,
       STUDY_ITEM_BANK_STAGE_GROUP.lessonRedundancyJudgment.stage
     );
+    const sourceSupportStage = <T>(work: () => Promise<T>, total?: number) =>
+      studyStage(STUDY_ITEM_BANK_STAGE_GROUP.sourceMaterialClaimSupport.stage, work, total);
     const { layer, graphVersionId, snapshot } = await studyStage(NON_LLM_STAGES.load, async () => {
       const layer = await input.enrichmentStore.getLayer(input.enrichmentId);
       if (!layer) throw new Error(`generateStudyItemBank: enrichment ${input.enrichmentId} was not found.`);
@@ -319,7 +321,8 @@ export async function generateStudyItemBank(input: {
         })),
         baseConfigHash: input.configHash,
         sourceEvidenceRead: input.sourceAssetQualification.sourceEvidenceRead,
-        sourceSupportVerifier: input.sourceAssetQualification.sourceSupportVerifier
+        sourceSupportVerifier: input.sourceAssetQualification.sourceSupportVerifier,
+        sourceSupportStage
       });
   const lessons = sourceLessonAdmission?.lessons ?? candidateLessons;
   const lessonAbsent = [
@@ -585,9 +588,7 @@ export async function generateStudyItemBank(input: {
     if (graphVersionId !== null) {
       const admission = subjects.length === 0
         ? null
-        : await studyStage(
-            STUDY_ITEM_BANK_STAGE_GROUP.optionSelectKeyVerification.stage,
-            () => admitSourceOptionSelectItems({
+        : await admitSourceOptionSelectItems({
               candidates: subjects.map((subject) => subject.item),
               lessons,
               nodes: layer.derivedNodes.map((node) => ({
@@ -599,11 +600,15 @@ export async function generateStudyItemBank(input: {
               baseConfigHash: input.configHash,
               sourceEvidenceRead: input.sourceAssetQualification.sourceEvidenceRead,
               sourceSupportVerifier: input.sourceAssetQualification.sourceSupportVerifier,
+              sourceSupportStage,
               answerKeyVerifier: input.answerKeyVerification,
+              answerKeyStage: (work, total) => studyStage(
+                STUDY_ITEM_BANK_STAGE_GROUP.optionSelectKeyVerification.stage,
+                work,
+                total
+              ),
               relatedConceptsForNode: (derivedNodeId) => siblingsByNode.get(derivedNodeId) ?? []
-            }),
-            subjects.length
-          );
+            });
       return {
         items: admission?.studyItems ?? [],
         rejected: [
