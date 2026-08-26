@@ -7,10 +7,10 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0–U7 complete; U8 repository gate NEXT
+**Status:** Complete — U0–U8 complete; consolidation NEXT
 
-**NEXT:** Run U8's complete repository gate. If it stays green, consolidate the durable outcome and
-close this plan under the repository lifecycle rules.
+**NEXT:** Consolidate the durable outcome into its canonical owners, then delete this completed plan
+in a separate commit under the repository lifecycle rules.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
 Curated Sources and automatically admits only source-backed learner assets. Anchor-less Synthetic
@@ -133,7 +133,7 @@ The learner API currently accepts client-echoed title and Declared Domain, write
 and `status: "ready"`, and wakes supervisors from route code. The established deep-module repair is
 to keep authentication and transport mapping in Hono, application transitions in one use-case, and
 atomic persistence in the store. This accepts Candidate 3 from the retained
-[architecture review](../brainstorms/2026-08-19-001-architecture-deepening-review.md#candidate-3--move-topic-expedition-commands-out-of-the-hono-adapter)
+[architecture review](../brainstorms/2026-08-19-001-architecture-deepening-review.md#candidate-3-move-topic-expedition-commands-out-of-the-hono-adapter)
 for the source-backed adoption path without reopening Synthetic Topic Generation.
 
 ## Current repository facts
@@ -577,18 +577,22 @@ The plan is complete only when all of the following are true:
 ### U7 — complete-journey real-use qualification — 2026-08-26 — complete
 
 - Supplemental diagnostics exposed and fixed wrong-subject Definition support and one-way identity collapse; live negative and bidirectional positive controls settled both contracts.
-- Final enrichment `c00e5fe5-c0f0-4a1c-9191-5b3420ea67e0` / graph `fbc39076-0f5e-4c6d-8ef0-e25fa9194c55` has 22 source-backed nodes, zero LLM-grounded nodes or merges, 26 certain / nine uncertain acyclic edges, and 22 difficulty rows.
-  Direct inspection of every rescue, definition, edge, and passage found no remaining material false acceptance.
+- Final enrichment `c00e5fe5-c0f0-4a1c-9191-5b3420ea67e0` / graph `fbc39076-0f5e-4c6d-8ef0-e25fa9194c55` has 22 source-backed nodes, zero LLM-grounded nodes or merges, 26 certain / nine uncertain acyclic edges, and 22 difficulty rows; direct inspection found no remaining material false acceptance.
 - Fresh bank `acebfee04913` stored 16 lessons, six absences, 16 exact-reference options, two matching items, three impostors, and 45 rejections; only options qualify. Its 292 calls / 448,058 tokens cost $0.0259417984, with MiMo estimated and no error row.
-- Qualification now admits the greatest directly-ready subset closed under every certain prerequisite after the floor. Nine lessons/options over nine stops and five certain / two uncertain edges qualify; six missing lessons and their blocked dependents stay outside. Snapshot identity includes this scope policy.
-- Every selected lesson field and item was inspected beside evidence: each item has one source key, four distinct options, and exact lesson/key/explanation agreement. The report resolved 12/12 evidence rows and accepted 34/34 claims over 102/102 supported draws, 27/27 distractors, and 9/9 keys.
-  Its 102 DeepSeek calls used 160,585 tokens / $0.010571698 across DeepInfra and Io Net with no error row.
-- Production application composition then cataloged, adopted, activated, and opened the exact nine-stop snapshot for a disposable authenticated learner. Its key-free wire view excluded all six held nodes. Excluded `safety override` and locked `tide margin` produced no row; frontier `clearance window` published one exact reference, graded correctly, and completed.
-- The read-through recorded one expedition/reference/response/read, zero generated steps, operation id, model calls, errors, or supervisor wakes, then exact teardown left zero learner rows. Automation passes 875 application tests, 22 learner-API tests / four skips, all 11 typechecks, lint (zero errors / 12 warnings), and whitespace. Local test-database/live-provider authority only. **Safe to continue:** yes, to the external repeat.
-- A fresh current-schema OpenStax Biology 2e §14.3 journey safely remained unavailable: one core plus 11 source-mentioned nodes, zero generated grounding, 12 certain / three uncertain edges, six exact lessons/options, and 30 rejections produced only one prerequisite-closed ready stop. Missing lessons for `DNA double helix structure`, `complementary base pairing`, and `parental strand` correctly excluded their dependents; no gate was weakened. The successful operations used 232 calls / 397,061 tokens / about $0.0411603758 including BYOK estimates, with zero error row. **Safe to continue:** yes, with a more self-contained external source.
-- The compact external NIST FIPS 197 fixture produced three anchors plus three source-mentioned nodes, zero generated grounding, four certain / one uncertain edge, six lessons/options, and 12 safe family rejections. Qualification admitted five closed stops and floored only `Bit`; direct inspection found no material false acceptance. Its journey used 146 calls / 194,053 tokens / about $0.019022261 including BYOK estimates.
-- Independent evaluation resolved 5/5 cited rows and accepted 15/15 material source claims, 15/15 exact-repeat distractor decisions, and 5/5 unique keys over 45 calls / 59,947 tokens / $0.002852569 with no error row. Production composition adopted and activated the snapshot, completed `Byte` then `block`, unlocked and completed exact-reference `block cipher`, refused unsupported `permutation` without a row, made zero learner-window model calls/wakes, and cleaned every disposable learner row.
-- That read-through first exposed partial-dependency composition drift: the scaffold reader omitted lesson reads and therefore kept a newly unlocked target locked. `getStudySession` now requires the lesson-read port at every composition; the HTTP and process-lived scaffold bindings supply it. A progression-dependent DB regression passes with all 875 application and 26 learner-API tests plus both affected typechecks. **Safe to continue:** yes, to U8.
+- Qualification admits the greatest directly-ready subset closed under every certain prerequisite after the floor: nine lessons/options over nine stops and five certain / two uncertain edges; six missing lessons and their blocked dependents stay outside. Snapshot identity includes this scope policy.
+- Every selected lesson field and item was inspected beside evidence: one source key, four distinct options, and exact lesson/key/explanation agreement. The report resolved 12/12 evidence rows and accepted 34/34 claims over 102/102 supported draws, 27/27 distractors, and 9/9 keys; its DeepSeek calls used 160,585 tokens / $0.010571698 across DeepInfra and Io Net with no error row.
+- Production application composition cataloged, adopted, activated, and opened the nine-stop snapshot for a disposable learner. The key-free wire excluded all six held nodes; excluded `safety override` and locked `tide margin` wrote nothing, while frontier `clearance window` published one exact reference, graded correctly, and completed.
+- The read-through recorded one expedition/reference/response/read, zero generated steps, operation id, model calls, errors, or wakes, then exact teardown left zero learner rows. Automation passed 875 application tests, 22 learner-API tests / four skips, all 11 typechecks, lint (zero errors / 12 warnings), and whitespace. Local test-database/live-provider authority only. **Safe to continue:** yes, to the external repeat.
+- A fresh current-schema OpenStax Biology 2e §14.3 journey safely remained unavailable: one core plus 11 source-mentioned nodes, zero generated grounding, 12 certain / three uncertain edges, six exact lessons/options, and 30 rejections left one closed ready stop. Missing lessons correctly excluded dependents; no gate weakened. Its 232 calls / 397,061 tokens cost about $0.0411603758 including BYOK estimates, with zero error row. **Safe to continue:** yes, with a more self-contained external source.
+- The compact external NIST FIPS 197 fixture produced three anchors plus three source-mentioned nodes, zero generated grounding, four certain / one uncertain edge, six lessons/options, and 12 safe family rejections. Qualification admitted five closed stops and floored only `Bit`; inspection found no material false acceptance. Its 146 calls / 194,053 tokens cost about $0.019022261 including BYOK estimates.
+- Independent evaluation resolved 5/5 cited rows and accepted 15/15 material claims, 15/15 distractor decisions, and 5/5 unique keys over 45 calls / 59,947 tokens / $0.002852569 with no error row. Production composition adopted and activated the snapshot, completed `Byte` then `block`, unlocked and completed exact-reference `block cipher`, refused unsupported `permutation` without a row, made zero learner-window model calls/wakes, and cleaned every disposable learner row.
+- That read-through exposed partial-dependency composition drift: the scaffold reader omitted lesson reads and kept a newly unlocked target locked. `getStudySession` now requires the lesson-read port everywhere; a progression-dependent DB regression passes with all 875 application and 26 learner-API tests plus both affected typechecks. **Safe to continue:** yes, to U8.
+
+### U8 — repository gate — 2026-08-26 — complete
+
+- `pnpm test:db` passed its 9/9 migration-state matrix, non-application-schema reset guard, and every reset-backed workspace suite against only `lrnki_test`; the Learner App portion passed 57/57 suites and 320/320 tests.
+- `pnpm check` passed single-baseline/schema parity, all 11 workspace typechecks and tests, ESLint with zero errors / 12 warnings, the Admin Lab production build, Learner App web export, and 70/70 intercepted Playwright scenarios.
+- Coordination-document links and caps, TODO section/cardinality rules, tracked whitespace, and clean-tree checks pass. Evidence remains local/test-database, local build, and intercepted-web only; no real-backend, deployed, native, emulator/simulator, physical-device, or release claim was exercised. Reversible interfaces remain source-owned and no new ADR is warranted. **Safe to close:** yes.
 
 ### Open findings
 

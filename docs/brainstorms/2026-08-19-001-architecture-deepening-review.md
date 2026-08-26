@@ -35,7 +35,7 @@ Historical architecture reviews were checked only to avoid proposing work that h
 ## Candidate 3 — Move Topic Expedition commands out of the Hono adapter
 
 **Recommendation strength:** Accepted for the Source Expedition adoption slice — tracked by
-[plan U2](../plans/2026-08-25-001-qualify-curated-source-learner-workflow.md#u2--deep-source-expedition-qualification-and-adoption).
+[plan U2](../plans/2026-08-25-001-qualify-curated-source-learner-workflow.md#u2-deep-source-expedition-qualification-and-adoption).
 Synthetic Topic start/retry remain paused and outside that unit.
 
 ### Files

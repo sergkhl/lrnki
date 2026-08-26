@@ -2,9 +2,9 @@
 
 ## TODO
 
-- **Curated-source learner workflow — U0–U7 complete; U8 repository gate NEXT.**
+- **Curated-source learner workflow — U0–U8 complete; consolidation NEXT.**
   Follow [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md).
-  Run the complete repository gate, then consolidate and close if it stays green.
+  Consolidate the durable outcome, then delete the completed plan separately.
 
 ## COMPLETED
 
