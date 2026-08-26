@@ -2,10 +2,10 @@
 
 ## TODO
 
-- **Curated-source learner workflow — U0–U6 complete; U7 supplement extraction qualified, canonicalization NEXT.**
+- **Curated-source learner workflow — U0–U6 complete; U7 canonicalization qualified, graph build NEXT.**
   Follow [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md).
-  Canonicalize and inspect the three ordered harbor runs, then build the fresh graph only when
-  every gap and carrier identity remains sound.
+  Build and inspect the fresh Graph Version from the qualified three-run identity artifact before
+  Graph Enrichment.
 
 ## COMPLETED
 

@@ -7,11 +7,11 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0–U6 complete; U7 supplement extraction qualified, canonicalization NEXT
+**Status:** In progress — U0–U6 complete; U7 canonicalization qualified, graph build NEXT
 
-**NEXT:** Canonicalize the ordered core, tide-margin, and addendum Extraction Runs under the current
-semantic identity. Inspect every merge, distinct, quarantine, and unavailable outcome; publish a
-fresh graph only when no carrier or gap identity is corrupted.
+**NEXT:** Build a fresh Graph Version from canonicalization `e8e9b943-9b50-423f-a6ab-5f2d81fe7965`
+and its exact three-run order. Inspect every published identity, Definition Passage, assertion, and
+source membership before Graph Enrichment.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
 Curated Sources and automatically admits only source-backed learner assets. Anchor-less Synthetic
@@ -570,31 +570,31 @@ The plan is complete only when all of the following are true:
 
 ### U7 — complete-journey real-use qualification — 2026-08-26 — in progress
 
-- Baseline graph `cc478c10-6857-452d-a9de-011757ffbb56` / enrichment `fbd1b430-beb0-4b40-80ca-731480a5face` have six anchors / 12 source-mentioned / zero LLM-grounded nodes, verified passages, 27 edges, and no title carrier.
 - Post-settlement fallback now activates only when every rejected lesson decision is deterministic
-  non-extractive settlement, constructs a distinct exact artifact, and uses the same evidence/support
-  gate; unavailability and semantic rejection cannot trigger it. Bank `acebfee04913`, 871 application /
-  210 LiteLLM / eight worker tests, three typechecks, lint, and whitespace passed.
-- The baseline bank has 12 lessons / six absences / 16 items / 38 rejections, five trail gaps, 11 usable
-  options, and zero learner rows. All 26 citations and exact option contracts match immutable blocks;
-  all 144 support calls succeeded on DeepInfra with no material false acceptance.
-- The current attempt used 231 calls / 359,997 tokens / $0.0187241824 over 478.792 seconds; some
-  spend is estimated. A prior-paraphrase replay made zero neural calls and four deterministic rejects,
-  then admitted a distinct exact fallback on 3/3 draws without a lucky rerun.
+  non-extractive settlement and uses the same evidence/support gate; unavailable or semantic rejects cannot
+  trigger it. Baseline bank `acebfee04913` has 12 lessons / six absences / 16 items / 38 rejections,
+  five trail gaps, 11 usable options, zero learner rows, and no false acceptance across 144 support calls.
+- That attempt used 231 calls / 359,997 tokens / $0.0187241824 over 478.792 seconds. A prior-paraphrase
+  replay made zero neural calls, four deterministic rejects, and a distinct exact fallback on 3/3 draws.
 - Addendum extraction `4e92543a-7d86-4f25-9b9a-bb3b4ce15f48` under `bc1ef4197773` succeeded with
   14 candidates / six core / 13 profiles / 15 definitions / 34 mentions / seven assertions. All seven
-  gaps have source-matched Definition Passages: six qualified as core and Release Sequence is valid
-  optional rescue evidence. All 49 passage rows matched one of 18 immutable blocks.
+  gaps have source-matched Definition Passages: six core plus valid optional Release Sequence rescue
+  evidence. All 49 passage rows matched one of 18 immutable blocks.
 - Neither the title nor `operator handbook` became a candidate; `Channel depth inputs` was rejected.
   One loose optional `Clearance window` assertion cannot publish or ground rescue and remains inspectable.
   The run used 42 calls / 82,157 tokens / $0.0097892824 over 207.971 seconds with zero retries: 20 MiMo
   calls reached Xiaomi and 22 DeepSeek FP8 calls reached DeepInfra. MiMo quantization is undeclared,
   so its evidence remains route-sensitive; some spend is provider-estimated.
+- Canonicalization `e8e9b943-9b50-423f-a6ab-5f2d81fe7965` under `c9f1b792acf4` bound the exact ordered
+  three-run selection. All six proposed neighbor pairs were correctly distinct; zero merge, quarantine,
+  or unavailable outcome occurred, so all six new core labels retain separate identities. One Qwen
+  embedding call plus six DeepSeek FP8/DeepInfra decisions used 9,126 tokens / $0.000762242 over
+  17.915 seconds with zero retries.
 
 ### Open findings
 
-- Canonicalize the three ordered harbor runs, inspect every identity decision, then build the fresh
-  graph/enrichment/bank lineage without weaker admission.
+- Build and inspect the fresh Graph Version from the qualified canonicalization, then continue through
+  enrichment and the learner bank without weaker admission.
 - U4's local verifier remains rejected; the remote assignment is qualified for source support and exact Concept identity, not general generation or source-less grounding.
 - Matching/impostor stay preserved but unqualified; the replacement Tide-margin impostor reveal itself makes a false dispatch-token claim, confirming exclusion.
 - Same-ID bank regeneration makes the cost report aggregate prior LiteLLM spend even after telemetry cleanup. Use the recorded attempt delta above and make reporting attempt/config-scoped before the final cost claim.

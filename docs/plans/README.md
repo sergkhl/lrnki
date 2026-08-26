@@ -12,8 +12,8 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-25-001 — Qualify the Curated-Source Learner Workflow](./2026-08-25-001-qualify-curated-source-learner-workflow.md)
-   — **In progress; U0–U6 complete and U7 supplement extraction qualified, canonicalization NEXT.**
-   Canonicalize and inspect the three ordered harbor runs, then build the fresh graph only when
-   every gap and carrier identity remains sound.
+   — **In progress; U0–U6 complete and U7 canonicalization qualified, graph build NEXT.**
+   Build and inspect the fresh Graph Version from the qualified three-run identity artifact before
+   Graph Enrichment.
 
 <!-- Hygiene and retention rules: AGENTS.md → Documentation workflow. -->
