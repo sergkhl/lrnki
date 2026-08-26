@@ -2,9 +2,7 @@
 
 ## TODO
 
-- **Curated-source learner workflow — consolidated; completed-plan deletion NEXT.**
-  Follow [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md).
-  Delete the completed plan and its remaining index links separately.
+No current tasks.
 
 ## COMPLETED
 
