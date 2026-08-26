@@ -7,11 +7,11 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0–U6 complete; U7 canonicalization qualified, graph build NEXT
+**Status:** In progress — U0–U6 complete; U7 fresh graph qualified, enrichment NEXT
 
-**NEXT:** Build a fresh Graph Version from canonicalization `e8e9b943-9b50-423f-a6ab-5f2d81fe7965`
-and its exact three-run order. Inspect every published identity, Definition Passage, assertion, and
-source membership before Graph Enrichment.
+**NEXT:** Enrich Graph Version `fbc39076-0f5e-4c6d-8ef0-e25fa9194c55` under the current source-backed
+configuration. Inspect every rescue/carrier/definition disposition, merge, edge, and passage; proceed
+to the learner bank only with zero LLM-grounded nodes and no material false acceptance.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
 Curated Sources and automatically admits only source-backed learner assets. Anchor-less Synthetic
@@ -585,16 +585,16 @@ The plan is complete only when all of the following are true:
   The run used 42 calls / 82,157 tokens / $0.0097892824 over 207.971 seconds with zero retries: 20 MiMo
   calls reached Xiaomi and 22 DeepSeek FP8 calls reached DeepInfra. MiMo quantization is undeclared,
   so its evidence remains route-sensitive; some spend is provider-estimated.
-- Canonicalization `e8e9b943-9b50-423f-a6ab-5f2d81fe7965` under `c9f1b792acf4` bound the exact ordered
-  three-run selection. All six proposed neighbor pairs were correctly distinct; zero merge, quarantine,
-  or unavailable outcome occurred, so all six new core labels retain separate identities. One Qwen
-  embedding call plus six DeepSeek FP8/DeepInfra decisions used 9,126 tokens / $0.000762242 over
-  17.915 seconds with zero retries.
+- Canonicalization `e8e9b943-9b50-423f-a6ab-5f2d81fe7965` under `c9f1b792acf4` bound the exact ordered three-run selection; all six neighbor pairs stayed distinct, with zero merge, quarantine, or unavailable outcome.
+  One Qwen plus six DeepSeek FP8/DeepInfra calls used 9,126 tokens /
+  $0.000762242 over 17.915 seconds with zero retries. LLM-free graph `fbc39076-0f5e-4c6d-8ef0-e25fa9194c55`
+  published 12 Concepts / 46 passages / 10 sound assertions / three memberships / zero edges in 93 ms.
+  All 56 evidence rows matched source bytes and ownership; the loose optional assertion and carriers did not publish.
 
 ### Open findings
 
-- Build and inspect the fresh Graph Version from the qualified canonicalization, then continue through
-  enrichment and the learner bank without weaker admission.
+- Enrich and inspect the fresh Graph Version, then generate the learner bank only if its rescued
+  definitions, carrier decisions, identities, and prerequisite edges remain source-sound.
 - U4's local verifier remains rejected; the remote assignment is qualified for source support and exact Concept identity, not general generation or source-less grounding.
 - Matching/impostor stay preserved but unqualified; the replacement Tide-margin impostor reveal itself makes a false dispatch-token claim, confirming exclusion.
 - Same-ID bank regeneration makes the cost report aggregate prior LiteLLM spend even after telemetry cleanup. Use the recorded attempt delta above and make reporting attempt/config-scoped before the final cost claim.
