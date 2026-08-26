@@ -321,19 +321,16 @@ test("a surviving definition keeps the core complete when only one of two passag
   assert.equal(profile?.definitions.length, 1);
 });
 
-test("a throwing definition-quality judge demotes nothing and records kept_judge_unavailable", async () => {
+test("an unavailable definition-quality judge fails the run and persists no artifact", async () => {
   const h = harness(
     async (input) => definitionFor[input.subject.candidateKey],
     candidates,
     admission,
     { definitionPassageQualityJudge: throwingDefinitionJudge }
   );
-  const result = await h.run();
-
-  assert.equal(result.status, "succeeded");
-  assert.equal(result.candidates.find((c) => c.candidateKey === "framework")?.admission.tier, "core");
-  assert.ok(result.candidates.every((c) => !c.admission.boundaryReasonCodes.includes("core_demoted_hollow_definition")));
-  assert.ok(result.definitionQualityDispositions.every((d) => d.disposition === "kept_judge_unavailable"));
+  await assert.rejects(h.run(), /judge transport down/);
+  assert.equal(h.persisted(), undefined);
+  assert.equal(h.artifact(), undefined);
 });
 
 test("definition-quality dispositions are carried on the persisted run artifact payload", async () => {

@@ -566,17 +566,18 @@ export const CORE_DEMOTED_UNGROUNDABLE_REASON = "core_demoted_ungroundable";
 // Admin Lab), so a rename can never silently desync the `string[]` code (AGENTS rule 18).
 export const CORE_DEMOTED_HOLLOW_DEFINITION_REASON = "core_demoted_hollow_definition";
 
-// Structural verdict categories the Definition-Passage quality judge returns per
-// passage (ADR-0007 extension). DOMAIN-NEUTRAL — each names a structural shape of a
-// non-defining passage or relation, never a fixture concept (AGENTS rule 17).
-// `establishes_meaning` is the keep verdict; the other categories are veto reasons
-// the judge surfaces for the run trace and the operator.
+// Verdict categories the composed Definition-Passage gate records per passage
+// (ADR-0007 extension). DOMAIN-NEUTRAL — each names a non-defining structural shape,
+// relation, or the affirmative verifier's refusal, never a fixture concept (AGENTS
+// rule 17). `establishes_meaning` is the keep verdict; the other categories are veto
+// reasons surfaced for the run trace and operator.
 export type DefinitionPassageVetoCategory =
   | "establishes_meaning"
   | "defines_different_subject"
   | "bare_name_repetition"
   | "heading_or_title"
-  | "citation_or_bibliographic";
+  | "citation_or_bibliographic"
+  | "role_support_rejected";
 
 // One bounded LLM judgment over a single already-verbatim-verified Definition Passage
 // (ADR-0007 extension). The judge decides whether the passage ESTABLISHES the Concept's
@@ -596,10 +597,11 @@ export type DefinitionPassageQualityJudgment = {
 // The recorded disposition of one Definition Passage after quality judging (ADR-0007
 // extension). `kept` — establishes meaning (or no veto applied); `vetoed` — removed
 // from the definition role on a confident, source-grounded non-defining verdict;
-// `kept_judge_unavailable` — transport
-// failure, invalid tool args, or an ungrounded verdict, so the passage is KEPT and
-// flagged (fail-closed = preserve recall, AGENTS rule 16). Persisted on the run artifact
-// JSONB (KTD8) so the demotions are auditable and replayable for rule-14 inspection.
+// `kept_judge_unavailable` is retained only as the historical disposition written by
+// pre-precision artifacts. Current Definition-Passage admission fails the enclosing
+// operation when either semantic judge is unavailable, so an unavailable affirmative
+// verdict can never qualify a passage. Persisted on the run artifact JSONB (KTD8) so
+// historical demotions remain auditable and replayable for rule-14 inspection.
 export type DefinitionPassageDispositionKind = "kept" | "vetoed" | "kept_judge_unavailable";
 
 export type DefinitionPassageDisposition = {

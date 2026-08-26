@@ -108,7 +108,29 @@ test("a wrong-subject rescued definition becomes one deduplicated mention", asyn
   assert.equal(dispositions[0].category, "defines_different_subject");
 });
 
-test("a judge transport failure keeps every passage and flags kept_judge_unavailable (fail closed = preserve)", async () => {
+test("a proposed rescued keep rejected by affirmative role support becomes a mention", async () => {
+  const quote = "Harbor authority is the operational power assigned to Harbor Control.";
+  const node = rescuedNode({
+    canonicalLabel: "Harbor Control",
+    groundingPassages: [defPassage(quote, "b1")]
+  });
+  const judge: DefinitionPassageQualityJudgmentPort = {
+    model: "composed",
+    judgeDefinitions: async () => [{
+      establishesMeaning: false,
+      category: "role_support_rejected",
+      judgedSpan: quote,
+      rationale: "The passage defines a qualified subject."
+    }]
+  };
+
+  const { nodes, dispositions } = await applyRescuedDefinitionQualityJudge({ nodes: [node], judge });
+  const kept = nodes[0] as SourceMentionedEnrichmentNode;
+  assert.deepEqual(kept.groundingPassages.map((passage) => passage.passageType), ["mention"]);
+  assert.equal(dispositions[0].category, "role_support_rejected");
+});
+
+test("an unavailable composed judge fails instead of promoting rescued grounding", async () => {
   const node = rescuedNode({
     groundingPassages: [defPassage("Ownership defines who frees memory.", "b1"), mentionPassage("Ownership again.", "b2")]
   });
@@ -116,10 +138,10 @@ test("a judge transport failure keeps every passage and flags kept_judge_unavail
     model: "kg-independent-judge",
     judgeDefinitions: async () => { throw new Error("model unavailable"); }
   };
-  const { nodes, dispositions } = await applyRescuedDefinitionQualityJudge({ nodes: [node], judge: failing });
-  const kept = nodes[0] as SourceMentionedEnrichmentNode;
-  assert.equal(kept.groundingPassages.length, 2);
-  assert.ok(dispositions.every((d) => d.disposition === "kept_judge_unavailable"));
+  await assert.rejects(
+    applyRescuedDefinitionQualityJudge({ nodes: [node], judge: failing }),
+    /model unavailable/
+  );
 });
 
 test("mention passages are never altered by this stage", async () => {

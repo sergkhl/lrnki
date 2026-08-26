@@ -13,7 +13,8 @@ export const DEFINITION_PASSAGE_DISPOSITION_POLICY = {
   establishesMeaning: "keep_definition",
   definesDifferentSubject: "reclassify_as_mention",
   structurallyHollow: "drop",
-  judgeUnavailableOrUngrounded: "keep_definition"
+  roleSupportRejected: "reclassify_as_mention",
+  judgeUnavailable: "fail_operation"
 } as const;
 
 // Composed Definition-Passage quality stage (ADR-0007 extension). Runs AFTER the
@@ -27,9 +28,9 @@ export const DEFINITION_PASSAGE_DISPOSITION_POLICY = {
 // a complete definition, so judging them spends tokens for no disposition consequence.
 //
 // Pure transform around the port: it does NO grounding itself (the adapter already
-// grounded each verdict fail-closed); it trusts `establishesMeaning`. Fail closed: a
-// judge throw KEEPS every passage with a `kept_judge_unavailable` disposition, so a
-// transport blip never shrinks the published core (D3). When a profile started with
+// grounds negative proposals and affirmatively verifies every proposed keep); it trusts
+// `establishesMeaning`. An unavailable composed judge fails the operation, so missing
+// semantic evidence cannot promote a Definition Passage. When a profile started with
 // >=1 definition and ends with 0, its key joins `hollowDefinitionKeys`, which routes
 // the demotion to the distinct hollow reason code in `reconcileUngroundableCores`.
 export async function applyDefinitionPassageQualityJudge(input: {
@@ -50,9 +51,8 @@ export async function applyDefinitionPassageQualityJudge(input: {
   // The Measured Judge Gate (rule 16, gateByJudgment) owns the control flow: `skip`
   // expresses the `core`-only / non-empty pre-filter with no neural call (R6);
   // `onVerdict` drops vetoed passages and rebuilds the profile (preserving object
-  // identity when nothing drops); `onUnavailable` keeps every passage flagged
-  // `kept_judge_unavailable` (fail closed = preserve recall, D3) so a transport blip
-  // never shrinks the published core. Each outcome carries its per-profile `hollow`
+  // identity when nothing drops); `onUnavailable` fails the enclosing operation because
+  // this precision-first boundary has no affirmative role evidence. Each outcome carries its per-profile `hollow`
   // flag for the post-gate fold.
   const judged = await gateByJudgment(input.profiles, {
     concurrency: input.concurrency,
@@ -83,7 +83,10 @@ export async function applyDefinitionPassageQualityJudge(input: {
           survivors.push(definition);
           profileDispositions.push(dispositionFor(profile.candidateKey, definition, "kept", "establishes_meaning", verdict?.rationale ?? "no verdict: passage kept"));
         } else {
-          if (verdict.category === "defines_different_subject") reclassifiedMentions.push(definition);
+          if (
+            verdict.category === "defines_different_subject" ||
+            verdict.category === "role_support_rejected"
+          ) reclassifiedMentions.push(definition);
           profileDispositions.push(dispositionFor(profile.candidateKey, definition, "vetoed", verdict.category, verdict.rationale));
         }
       });
@@ -100,13 +103,9 @@ export async function applyDefinitionPassageQualityJudge(input: {
       };
       return { profile: next, dispositions: profileDispositions, hollow: survivors.length === 0 };
     },
-    onUnavailable: (profile) => ({
-      profile,
-      dispositions: profile.definitions.map((definition) =>
-        dispositionFor(profile.candidateKey, definition, "kept_judge_unavailable", "establishes_meaning", "judge transport failure: passage kept")
-      ),
-      hollow: false
-    })
+    onUnavailable: (_profile, error) => {
+      throw error;
+    }
   });
 
   const profiles = judged.map((result, index) => {

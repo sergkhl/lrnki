@@ -14,11 +14,13 @@ import {
   type SyntheticGenerationConfig
 } from "@lrnki/application";
 import { STAGE_TAGS } from "@lrnki/domain-core";
-import { admissionDecisionsDescriptor, admissionLabelJudgmentDescriptor, conceptDiscoveryDescriptor, coreSelectionDescriptor, definitionEntailmentDescriptor, definitionPassageQualityDescriptor, evidenceProfileExtractionDescriptor, rescueCarrierAdmissionJudgmentDescriptor } from "./extractionAdapters";
+import { admissionDecisionsDescriptor, admissionLabelJudgmentDescriptor, conceptDiscoveryDescriptor, coreSelectionDescriptor, DEFINITION_PASSAGE_ROLE_SUPPORT_POLICY, definitionEntailmentDescriptor, definitionPassageQualityDescriptor, definitionPassageRoleSupportDescriptor, evidenceProfileExtractionDescriptor, rescueCarrierAdmissionJudgmentDescriptor } from "./extractionAdapters";
 import { mintingDurabilityDescriptor, prerequisiteOrderingDescriptor, rescuedNodeLabelingDescriptor, rescueDurabilityDescriptor } from "./enrichmentAdapters";
 import {
+  NODE_MERGE_CONSENSUS_POLICY,
   GENERATED_NODE_JUDGE_MODEL,
   nodeMergeAdjudicationDescriptor,
+  nodeMergeDirectionalSupportDescriptor,
   NODE_EMBEDDING_MODEL
 } from "./dedupAdapters";
 import { missingPrerequisiteProposalDescriptor } from "./missingPrerequisiteProposalAdapters";
@@ -105,6 +107,7 @@ export const neuralOperationRegistry = {
       evidenceProfileExtractionDescriptor,
       definitionEntailmentDescriptor,
       definitionPassageQualityDescriptor(),
+      definitionPassageRoleSupportDescriptor(),
       admissionLabelJudgmentDescriptor
     ]
   },
@@ -127,8 +130,11 @@ export const neuralOperationRegistry = {
       rescueDurabilityDescriptor,
       rescuedNodeLabelingDescriptor,
       mintingDurabilityDescriptor,
+      nodeMergeAdjudicationDescriptor,
+      nodeMergeDirectionalSupportDescriptor,
       withModelOverride(nodeMergeAdjudicationDescriptor, GENERATED_NODE_JUDGE_MODEL),
       definitionPassageQualityDescriptor(STAGE_TAGS.rescueDefinitionQuality),
+      definitionPassageRoleSupportDescriptor(STAGE_TAGS.rescueDefinitionQuality),
       intrinsicDifficultyBandingDescriptor,
       intrinsicDifficultyComparisonDescriptor
     ]
@@ -184,7 +190,8 @@ export function extractionConfigHash(): string {
   const entry = neuralOperationRegistry.extraction;
   return operationConfigHash(entry.configSeed, entry.descriptors, {
     admissionLabelNonConceptPolicy: ADMISSION_LABEL_NON_CONCEPT_POLICY,
-    definitionPassageDispositionPolicy: DEFINITION_PASSAGE_DISPOSITION_POLICY
+    definitionPassageDispositionPolicy: DEFINITION_PASSAGE_DISPOSITION_POLICY,
+    definitionPassageRoleSupportPolicy: DEFINITION_PASSAGE_ROLE_SUPPORT_POLICY
   });
 }
 
@@ -212,7 +219,9 @@ export function graphEnrichmentConfigHash(config: GraphEnrichmentConfig): string
   return operationConfigHash(entry.configSeed, entry.descriptors, {
     ...graphEnrichmentBehaviorConfig(config),
     definitionPassageDispositionPolicy: DEFINITION_PASSAGE_DISPOSITION_POLICY,
+    definitionPassageRoleSupportPolicy: DEFINITION_PASSAGE_ROLE_SUPPORT_POLICY,
     rescueCarrierAdmissionPolicy: RESCUE_CARRIER_ADMISSION_POLICY,
+    nodeMergeConsensusPolicy: NODE_MERGE_CONSENSUS_POLICY,
     nodeEmbeddingModel: NODE_EMBEDDING_MODEL
   }, {
     additionalModels: [NODE_EMBEDDING_MODEL]

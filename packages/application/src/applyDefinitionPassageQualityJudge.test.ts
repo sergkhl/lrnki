@@ -116,7 +116,27 @@ test("a passage defining another subject is removed from the candidate's definit
   assert.equal(out.dispositions[0].category, "defines_different_subject");
 });
 
-test("fail-closed throw: all passages kept, complete unchanged, dispositions kept_judge_unavailable", async () => {
+test("a proposed keep rejected by affirmative role support becomes a mention", async () => {
+  const profiles = [defProfile("ownership", [{ blockId: "b1", evidenceQuote: "A related authority is defined here." }])];
+  const judge = cannedJudge(new Map([["ownership", [veto(
+    "role_support_rejected",
+    "A related authority is defined here."
+  )]]]));
+  const out = await applyDefinitionPassageQualityJudge({
+    profiles,
+    declaredDomain: "se",
+    conceptsByKey,
+    blockContextById,
+    judge
+  });
+
+  assert.equal(out.profiles[0].definitions.length, 0);
+  assert.deepEqual(out.profiles[0].mentions, profiles[0].definitions);
+  assert.equal(out.hollowDefinitionKeys.has("ownership"), true);
+  assert.equal(out.dispositions[0].category, "role_support_rejected");
+});
+
+test("an unavailable composed definition judge fails instead of promoting a passage", async () => {
   const profiles = [defProfile("ownership", [{ blockId: "b1", evidenceQuote: "Ownership frees a value at scope exit." }])];
   const judge: DefinitionPassageQualityJudgmentPort = {
     model: "throws",
@@ -124,12 +144,10 @@ test("fail-closed throw: all passages kept, complete unchanged, dispositions kep
       throw new Error("transport down");
     }
   };
-  const out = await applyDefinitionPassageQualityJudge({ profiles, declaredDomain: "se", conceptsByKey, blockContextById, judge });
-
-  assert.equal(out.profiles[0].definitions.length, 1);
-  assert.equal(out.profiles[0].complete, true);
-  assert.equal(out.hollowDefinitionKeys.size, 0);
-  assert.deepEqual(out.dispositions.map((d) => d.disposition), ["kept_judge_unavailable"]);
+  await assert.rejects(
+    applyDefinitionPassageQualityJudge({ profiles, declaredDomain: "se", conceptsByKey, blockContextById, judge }),
+    /transport down/
+  );
 });
 
 test("stage trusts the port's grounded verdict (coercion is the adapter's job)", async () => {

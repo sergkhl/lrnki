@@ -7,11 +7,11 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0–U6 complete; U7 fresh graph qualified, enrichment NEXT
+**Status:** In progress — U0–U6 complete; U7 enrichment qualified, learner bank NEXT
 
-**NEXT:** Enrich Graph Version `fbc39076-0f5e-4c6d-8ef0-e25fa9194c55` under the current source-backed
-configuration. Inspect every rescue/carrier/definition disposition, merge, edge, and passage; proceed
-to the learner bank only with zero LLM-grounded nodes and no material false acceptance.
+**NEXT:** Generate one fresh Study Item Bank from enrichment
+`c00e5fe5-c0f0-4a1c-9191-5b3420ea67e0`. Inspect every qualified learner-visible claim and keyed
+answer; accept a nontrivial playable subset, while unsupported or uncertain assets stay unavailable.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
 Curated Sources and automatically admits only source-backed learner assets. Anchor-less Synthetic
@@ -19,7 +19,8 @@ Topic Generation remains paused. Its implementation, model-grounded prerequisite
 generated Support Step implementation, matching items, and impostor items are retained for later
 qualification rather than deleted. Future search, source curation APIs, and smart-model document
 generation must hand documents to the existing Source Registration boundary; they are not part of
-this plan.
+this plan. On 2026-08-26 the owner accepted safe incompleteness: U7 needs one coherent playable
+source-backed route, not perfect graph coverage, ordering, difficulty, or neural recall.
 
 ## Goal capsule
 
@@ -39,9 +40,10 @@ this plan.
   and adoption. Callers provide learner identity plus `enrichmentId`; the module resolves
   authoritative graph and current asset facts, returns a discriminated adopted-or-unavailable
   outcome, and never accepts presentation facts from a client.
-- **Precision policy:** Coverage may be sparse. A node, item family, Support Step, or whole
-  enrichment stays inspectable but unavailable when evidence is insufficient. False absence is
-  preferable to a learner-visible unsupported claim in this iteration.
+- **Precision policy:** Coverage may be sparse. A node or item stays inspectable but unavailable when
+  evidence is insufficient. One nontrivial grounded route is enough; false absence is preferable to
+  a learner-visible unsupported claim, but harmless ordering, difficulty, wording, or recall defects
+  do not block this iteration.
 - **Runtime policy:** No human approval, moderation queue, or operator click participates in normal
   readiness. Automated evidence checks settle availability. Real-use inspection remains an
   implementation quality gate, not a production workflow step.
@@ -570,31 +572,29 @@ The plan is complete only when all of the following are true:
 
 ### U7 — complete-journey real-use qualification — 2026-08-26 — in progress
 
-- Post-settlement fallback now activates only when every rejected lesson decision is deterministic
-  non-extractive settlement and uses the same evidence/support gate; unavailable or semantic rejects cannot
-  trigger it. Baseline bank `acebfee04913` has 12 lessons / six absences / 16 items / 38 rejections,
-  five trail gaps, 11 usable options, zero learner rows, and no false acceptance across 144 support calls.
-- That attempt used 231 calls / 359,997 tokens / $0.0187241824 over 478.792 seconds. A prior-paraphrase
-  replay made zero neural calls, four deterministic rejects, and a distinct exact fallback on 3/3 draws.
-- Addendum extraction `4e92543a-7d86-4f25-9b9a-bb3b4ce15f48` under `bc1ef4197773` succeeded with
-  14 candidates / six core / 13 profiles / 15 definitions / 34 mentions / seven assertions. All seven
-  gaps have source-matched Definition Passages: six core plus valid optional Release Sequence rescue
-  evidence. All 49 passage rows matched one of 18 immutable blocks.
-- Neither the title nor `operator handbook` became a candidate; `Channel depth inputs` was rejected.
-  One loose optional `Clearance window` assertion cannot publish or ground rescue and remains inspectable.
-  The run used 42 calls / 82,157 tokens / $0.0097892824 over 207.971 seconds with zero retries: 20 MiMo
-  calls reached Xiaomi and 22 DeepSeek FP8 calls reached DeepInfra. MiMo quantization is undeclared,
-  so its evidence remains route-sensitive; some spend is provider-estimated.
-- Canonicalization `e8e9b943-9b50-423f-a6ab-5f2d81fe7965` under `c9f1b792acf4` bound the exact ordered three-run selection; all six neighbor pairs stayed distinct, with zero merge, quarantine, or unavailable outcome.
-  One Qwen plus six DeepSeek FP8/DeepInfra calls used 9,126 tokens /
-  $0.000762242 over 17.915 seconds with zero retries. LLM-free graph `fbc39076-0f5e-4c6d-8ef0-e25fa9194c55`
-  published 12 Concepts / 46 passages / 10 sound assertions / three memberships / zero edges in 93 ms.
-  All 56 evidence rows matched source bytes and ownership; the loose optional assertion and carriers did not publish.
+- Baseline bank `acebfee04913` stayed safely incomplete: 12 lessons / six absences / 16 items, five trail gaps,
+  zero false acceptance across 144 support calls, and no learner row. Its 231 calls used 359,997 tokens / $0.0187241824 over 478.792 seconds; semantic or unavailable rejects cannot trigger fallback.
+- Addendum `4e92543a-7d86-4f25-9b9a-bb3b4ce15f48`, canonicalization `e8e9b943-9b50-423f-a6ab-5f2d81fe7965`, and graph
+  `fbc39076-0f5e-4c6d-8ef0-e25fa9194c55` supply 12 Concepts / 46 passages / 10 sound assertions.
+- Rejected enrichment candidates exposed two unsafe semantic classes: wrong-subject Harbor Control
+  definitions and one-way `emergency interlock` → `safety override` class membership collapsed as identity.
+  Definition keeps require 3/3 affirmative role support; identity requires 3/3 support
+  in both substitution directions plus an independent confirmation. Unavailability publishes neither.
+- Final enrichment `c00e5fe5-c0f0-4a1c-9191-5b3420ea67e0` under `cf5536ca7609` has 12 anchors plus 10
+  source-mentioned nodes, zero LLM-grounded passages, zero merges, 26 certain / nine uncertain acyclic edges,
+  and 22 difficulty rows. All 13 rescue/carrier, 16 definition, 35 edge, and 38 passage records
+  were inspected: two carrier titles and undefined `Safety-state checks` dropped; no material false acceptance remained, and every passage passed source ownership and verbatim verification.
+- The final run used 73 successful calls / 178,662 tokens / $0.0258279918 over 273.381 seconds with
+  zero tagged provider errors: 55 DeepSeek calls reached DeepInfra, eight GPT-OSS calls DigitalOcean,
+  nine MiMo calls Xiaomi, and one Qwen embedding call OpenRouter. MiMo cost remains estimated.
+- Live controls rejected the real one-way subtype and accepted an explicit bidirectional alias on all six
+  directional draws plus confirmation. Automation passes 873 application, 216 LiteLLM, eight worker tests,
+  all 11 typechecks, config checks, and lint with zero errors / 12 warnings. Authority is local test-database plus live-provider only. **Safe to continue:** yes, to one safely incomplete learner bank.
 
 ### Open findings
 
-- Enrich and inspect the fresh Graph Version, then generate the learner bank only if its rescued
-  definitions, carrier decisions, identities, and prerequisite edges remain source-sound.
+- Generate and inspect one bank from the qualified enrichment. Do not chase harmless omissions; fix
+  only unsafe acceptance or mechanics that prevent one coherent playable route.
 - U4's local verifier remains rejected; the remote assignment is qualified for source support and exact Concept identity, not general generation or source-less grounding.
 - Matching/impostor stay preserved but unqualified; the replacement Tide-margin impostor reveal itself makes a false dispatch-token claim, confirming exclusion.
 - Same-ID bank regeneration makes the cost report aggregate prior LiteLLM spend even after telemetry cleanup. Use the recorded attempt delta above and make reporting attempt/config-scoped before the final cost claim.

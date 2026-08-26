@@ -162,18 +162,14 @@ export interface AssertionEntailmentJudgmentPort {
   }): Promise<AssertionEntailmentJudgment>;
 }
 
-// Definition-Passage quality judge (ADR-0007 extension). A bounded, forced-tool LLM
-// judgment that re-reads a core Concept's already-verbatim-verified Definition
-// Passages and decides, per passage, whether it ESTABLISHES the Concept's meaning or
-// is a hollow passage (bare name repetition, heading/title, citation/bibliographic).
-// Run on the independent cross-family alias (`kg-independent-judge`) so the
-// extractor never grades its own definitions. BATCHED per Concept (KTD4): one call
-// judges all of a Concept's definition passages, returning one judgment per passage,
-// index-aligned to the input order. Drop-only: a veto removes the hollow passage; it
-// never adds, promotes, or reorders. The adapter grounds each veto fail-closed (an
-// ungrounded `judgedSpan` is coerced to a keep), so the application stage drops only
-// on a confident, source-grounded hollow verdict and a transport blip never shrinks
-// the published core (D3, AGENTS rule 16).
+// Definition-Passage quality judge (ADR-0007 extension). A composed forced-tool gate
+// re-reads already-verbatim-verified Definition Passages. The reasoning-disabled
+// independent judge first proposes per-passage keep/veto categories in one Concept
+// batch. Every proposed keep then needs unanimous flat, medium-reasoning role support
+// from the source-support assignment; a qualified expression or related subject cannot
+// inherit the named Concept's definition role. The application may only subtract or
+// reclassify passages and fails the enclosing operation when either component is
+// unavailable, so missing affirmative evidence never promotes a Definition Passage.
 export interface DefinitionPassageQualityJudgmentPort {
   readonly model: string;
   judgeDefinitions(input: {

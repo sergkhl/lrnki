@@ -39,7 +39,9 @@ import {
   definitionEntailmentJudgmentSchema,
   definitionEntailmentJudgmentValidator,
   definitionPassageQualityJudgmentSchema,
-  definitionPassageQualityJudgmentValidator
+  definitionPassageQualityJudgmentValidator,
+  sourceMaterialClaimSupportSchema,
+  sourceMaterialClaimSupportValidator
 } from "./toolSchemas";
 
 export function renderBlocks(blocks: SourceBlock[], options: { adjacencyBlocks?: SourceBlock[] } = {}): string {
@@ -359,6 +361,18 @@ type DefinitionPassageQualityArgs = {
   }>;
 };
 
+type DefinitionPassageRoleSupportArgs = {
+  disposition: "supported" | "unsupported" | "unclear";
+  reason: string;
+};
+
+export const DEFINITION_PASSAGE_ROLE_SUPPORT_POLICY = {
+  acceptanceDraws: 3,
+  acceptance: "unanimous_supported",
+  refusal: "reclassify_as_mention",
+  unavailable: "fail_operation"
+} as const;
+
 export function definitionPassageQualityDescriptor(stageTag: StageTag = STAGE_TAGS.definitionPassageQuality): NeuralStageDescriptor<
   DefinitionPassageQualityInput,
   DefinitionPassageQualityArgs,
@@ -386,16 +400,90 @@ export function definitionPassageQualityDescriptor(stageTag: StageTag = STAGE_TA
   };
 }
 
+export function definitionPassageRoleSupportDescriptor(
+  stageTag: StageTag = STAGE_TAGS.definitionPassageQuality
+): NeuralStageDescriptor<
+  DefinitionPassageQualityInput & { passage: DefinitionPassageQualityInput["passages"][number] },
+  DefinitionPassageRoleSupportArgs,
+  DefinitionPassageRoleSupportArgs
+> {
+  return {
+    promptPath: "definition-passage-role-support.prompt",
+    stageTag,
+    schema: sourceMaterialClaimSupportSchema,
+    validator: sourceMaterialClaimSupportValidator,
+    maxRetries: 3,
+    sentinelInput: {
+      declaredDomain: "sentinel domain",
+      subject: { canonicalLabel: "Sentinel", aliases: [] },
+      passages: [],
+      passage: {
+        sourceBlockId: "b1",
+        evidenceQuote: "Sentinel means a validation placeholder.",
+        blockType: "paragraph",
+        headingPath: []
+      }
+    },
+    templateData: (input) => ({
+      declaredDomain: input.declaredDomain,
+      canonicalLabel: input.subject.canonicalLabel,
+      aliases: renderAliases(input.subject.aliases),
+      blockType: input.passage.blockType,
+      headingPath: renderHeadingPath(input.passage.headingPath),
+      evidenceQuote: input.passage.evidenceQuote
+    }),
+    mapResult: (result) => result
+  };
+}
+
 export function createDefinitionPassageQualityJudgmentPort(
   client: LiteLlmForcedToolClient,
   stageTag: StageTag = STAGE_TAGS.definitionPassageQuality
 ): DefinitionPassageQualityJudgmentPort {
   const descriptor = definitionPassageQualityDescriptor(stageTag);
+  const roleSupportDescriptor = definitionPassageRoleSupportDescriptor(stageTag);
   return {
-    model: readPromptFile(descriptor.promptPath).model,
-    judgeDefinitions(input) {
+    model: `${readPromptFile(descriptor.promptPath).model}+${readPromptFile(roleSupportDescriptor.promptPath).model}`,
+    async judgeDefinitions(input) {
       if (input.passages.length === 0) return Promise.resolve([]);
-      return executeForcedToolStage(client, descriptor, input);
+      const proposed = await executeForcedToolStage(client, descriptor, input);
+      const settled: DefinitionPassageQualityJudgment[] = [];
+      for (let index = 0; index < input.passages.length; index += 1) {
+        const verdict = proposed[index];
+        if (!verdict || !verdict.establishesMeaning) {
+          settled.push(verdict ?? {
+            establishesMeaning: false,
+            category: "role_support_rejected",
+            judgedSpan: input.passages[index]!.evidenceQuote,
+            rationale: `Definition-role proposal returned no verdict for passage index ${index}.`
+          });
+          continue;
+        }
+        const passage = input.passages[index]!;
+        let refusal: DefinitionPassageRoleSupportArgs | undefined;
+        for (let draw = 1; draw <= DEFINITION_PASSAGE_ROLE_SUPPORT_POLICY.acceptanceDraws; draw += 1) {
+          const sample = await executeForcedToolStage(client, roleSupportDescriptor, {
+            ...input,
+            passage
+          });
+          if (sample.disposition !== "supported") {
+            refusal = sample;
+            break;
+          }
+        }
+        settled.push(refusal
+          ? {
+              establishesMeaning: false,
+              category: "role_support_rejected",
+              judgedSpan: passage.evidenceQuote,
+              rationale: `Affirmative definition-role support returned ${refusal.disposition}: ${refusal.reason}`
+            }
+          : {
+              ...verdict,
+              rationale: `${DEFINITION_PASSAGE_ROLE_SUPPORT_POLICY.acceptanceDraws}/${DEFINITION_PASSAGE_ROLE_SUPPORT_POLICY.acceptanceDraws} affirmative definition-role draws supported the proposed keep. ${verdict.rationale}`
+            });
+      }
+      return settled;
     }
   };
 }

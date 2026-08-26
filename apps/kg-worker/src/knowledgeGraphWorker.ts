@@ -64,7 +64,7 @@ import {
   LiteLlmForcedToolClient,
   LiteLlmSpendLogsReadAdapter,
   LiteLlmNodeEmbeddingAdapter,
-  GENERATED_NODE_JUDGE_MODEL,
+  createConsensusNodeMergeAdjudicationPort,
   createNodeMergeAdjudicationPort,
   createClaimFactualityChallengePort,
   createClaimFactualityJudgmentPort,
@@ -268,14 +268,12 @@ function buildContext() {
     // dependency.
     mintingDurabilityJudge: createMintingDurabilityJudgmentPort(deterministicClient),
     // Semantic-dedup ports (AGENTS rule 20). Embeddings PROPOSE within-domain near-duplicate
-    // pairs. Concept Canonicalization keeps the source-family independent judge, while generated
-    // Graph layers use MiMo so DeepSeek never decides a merge over its own nodes or Grounding.
+    // pairs. Concept Canonicalization keeps the qualified flat semantic verifier. Graph layers
+    // require that verifier plus the independent generated-node judge to agree before identity
+    // collapse; either refusal or either unavailable model leaves the nodes distinct.
     nodeEmbedding,
     conceptCanonicalizationNodeMergeAdjudicator: createNodeMergeAdjudicationPort(deterministicClient),
-    generatedNodeMergeAdjudicator: createNodeMergeAdjudicationPort(
-      deterministicClient,
-      GENERATED_NODE_JUDGE_MODEL
-    ),
+    generatedNodeMergeAdjudicator: createConsensusNodeMergeAdjudicationPort(deterministicClient),
     difficulty: createIntrinsicDifficultyPort(createIntrinsicDifficultyJudgmentPort(deterministicClient), DEFAULT_ENRICHMENT_CONFIG.difficultySampleCount),
     enrichmentStore: new PostgresEnrichmentRunStore(sql),
     // Learner Study Loop (ADR-0026): option-select study-item generation stays on the

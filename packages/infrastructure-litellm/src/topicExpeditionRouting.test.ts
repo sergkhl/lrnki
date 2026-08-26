@@ -23,6 +23,7 @@ import {
   type TopicExpeditionModelRouting
 } from "./configHashes";
 import {
+  createConsensusNodeMergeAdjudicationPort,
   createNodeMergeAdjudicationPort,
   GENERATED_NODE_JUDGE_MODEL
 } from "./dedupAdapters";
@@ -189,6 +190,10 @@ test("Topic owns only learner-asset routing while Source-less Grounding factorie
     createNodeMergeAdjudicationPort(client, GENERATED_NODE_JUDGE_MODEL).model,
     GENERATED_NODE_JUDGE_MODEL
   );
+  assert.equal(
+    createConsensusNodeMergeAdjudicationPort(client).model,
+    "kg-source-material-support-verifier + bidirectional kg-source-material-support-verifier + kg-generated-node-judge"
+  );
 });
 
 test("effective Topic descriptors override only declared domain, learner assets, and ordering", () => {
@@ -277,7 +282,6 @@ test("all three admission consumers resolve the same neutral topology and genera
   );
   for (const promptPath of [
     "minting-durability.prompt",
-    "node-merge-adjudication.prompt",
     "intrinsic-difficulty-bands.prompt",
     "intrinsic-difficulty-comparison.prompt"
   ]) {
@@ -287,6 +291,18 @@ test("all three admission consumers resolve the same neutral topology and genera
       promptPath
     );
   }
+  assert.deepEqual(
+    neuralOperationRegistry.graphEnrichment.descriptors
+      .filter((descriptor) => descriptor.promptPath === "node-merge-adjudication.prompt")
+      .map((descriptor) => effectiveModel(descriptor)),
+    ["kg-source-material-support-verifier", GENERATED_NODE_JUDGE_MODEL],
+    "Graph Enrichment records both unanimous identity-deciding model assignments"
+  );
+  assert.equal(
+    effectiveModel(descriptorFor(neuralOperationRegistry.graphEnrichment.descriptors, "node-merge-directional-support.prompt")),
+    "kg-source-material-support-verifier",
+    "Graph Enrichment records the bidirectional support verifier"
+  );
   assert.equal(
     effectiveModel(descriptorFor(neuralOperationRegistry.conceptCanonicalization.descriptors, "node-merge-adjudication.prompt")),
     "kg-source-material-support-verifier",
@@ -326,7 +342,7 @@ test("only affected operation hashes change and Topic has twenty conceptual stag
     "default Synthetic changes with the Grounding audit contract"
   );
   assert.equal(studyItemBankConfigHash(), "study-item-bank-acebfee04913");
-  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-2d3d853dd755");
+  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-cf5536ca7609");
   assert.notEqual(
     graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG),
     "graph-enrichment-2af0ada6d7e6",
@@ -341,7 +357,7 @@ test("only affected operation hashes change and Topic has twenty conceptual stag
     "learner-scaffold-generation-7930b34c0fdb",
     "Scaffold changes with the Grounding audit contract"
   );
-  assert.equal(extractionConfigHash(), "source-extraction-bc1ef4197773");
+  assert.equal(extractionConfigHash(), "source-extraction-b7af520cb76b");
   assert.equal(
     conceptCanonicalizationConfigHash({
       mode: "semantic",

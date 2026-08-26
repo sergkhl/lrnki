@@ -17,10 +17,9 @@ import { gateByJudgment } from "./gateByJudgment";
 // definitional-adequacy-judged. The rescue durability judge judges concept durability and
 // fails open; it is NOT a definitional gate.
 //
-// Same independent meaning judge (`kg-independent-judge`), same definition-veto / index-aligned
-// discipline, and the SAME fail-CLOSED-as-preserve semantics as the extraction-time judge
-// (rule 16): a transport blip KEEPS every passage flagged `kept_judge_unavailable`, never
-// shrinking the rescued surface on a model outage. It reclassifies a wrong-subject
+// Same composed meaning gate as extraction: the independent judge proposes negative
+// categories, while a flat medium-reasoning verifier must affirm every proposed keep.
+// An unavailable component fails the operation rather than promoting a passage. It reclassifies a wrong-subject
 // `definition` as a deduplicated mention and drops other vetoed definitions; existing
 // `mention` passages are NEVER touched, and `llm_grounded`
 // nodes (generated grounding, no source quote) pass through untouched. A node whose
@@ -40,8 +39,8 @@ export async function applyRescuedDefinitionQualityJudge(input: {
   // grounding, no source quote) or one carrying no `definition`-typed passage passes
   // through untouched with no neural call. `onVerdict` removes vetoed definitions from
   // that role, reclassifies wrong-subject evidence as a mention, and preserves object identity when nothing
-  // drops); `onUnavailable` keeps every passage flagged `kept_judge_unavailable` so a
-  // transport blip never shrinks the rescued surface (fail closed = preserve recall).
+  // drops); `onUnavailable` fails the enclosing operation so missing affirmative evidence
+  // never reaches rescued learner grounding.
   const judged = await gateByJudgment(input.nodes, {
     concurrency: input.concurrency,
     skip: (node) =>
@@ -72,7 +71,10 @@ export async function applyRescuedDefinitionQualityJudge(input: {
         } else {
           const key = passageKey(passage);
           vetoedPassageKeys.add(key);
-          if (verdict.category === "defines_different_subject") reclassifiedPassageKeys.add(key);
+          if (
+            verdict.category === "defines_different_subject" ||
+            verdict.category === "role_support_rejected"
+          ) reclassifiedPassageKeys.add(key);
           nodeDispositions.push(dispositionFor(node.derivedNodeId, passage, "vetoed", verdict.category, verdict.rationale));
         }
       });
@@ -88,12 +90,9 @@ export async function applyRescuedDefinitionQualityJudge(input: {
       const next: SourceMentionedEnrichmentNode = { ...node, groundingPassages: survivors };
       return { node: next, dispositions: nodeDispositions };
     },
-    onUnavailable: (node) => ({
-      node,
-      dispositions: definitionPassagesOf(node).map((passage) =>
-        dispositionFor(node.derivedNodeId, passage, "kept_judge_unavailable", "establishes_meaning", "judge transport failure: passage kept")
-      )
-    })
+    onUnavailable: (_node, error) => {
+      throw error;
+    }
   });
 
   const nodes = judged.map((result) => {

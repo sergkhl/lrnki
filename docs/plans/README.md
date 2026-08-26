@@ -12,7 +12,7 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-25-001 — Qualify the Curated-Source Learner Workflow](./2026-08-25-001-qualify-curated-source-learner-workflow.md)
-   — **In progress; U0–U6 complete and U7 fresh graph qualified, enrichment NEXT.**
-   Enrich and inspect the 12-concept, three-source graph before generating a learner bank.
+   — **In progress; U0–U6 complete and U7 enrichment qualified, learner bank NEXT.** Generate and
+   inspect one safely incomplete bank, then qualify/adopt/read one coherent playable route.
 
 <!-- Hygiene and retention rules: AGENTS.md → Documentation workflow. -->

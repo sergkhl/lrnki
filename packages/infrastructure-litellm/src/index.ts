@@ -22,8 +22,11 @@ export {
   LiteLlmNodeEmbeddingAdapter,
   NODE_EMBEDDING_MODEL,
   GENERATED_NODE_JUDGE_MODEL,
+  NODE_MERGE_CONSENSUS_POLICY,
+  createConsensusNodeMergeAdjudicationPort,
   createNodeMergeAdjudicationPort,
-  nodeMergeAdjudicationDescriptor
+  nodeMergeAdjudicationDescriptor,
+  nodeMergeDirectionalSupportDescriptor
 } from "./dedupAdapters";
 export {
   conceptDiscoverySchema,
@@ -142,6 +145,8 @@ export {
   evidenceProfileExtractionDescriptor,
   definitionEntailmentDescriptor,
   definitionPassageQualityDescriptor,
+  definitionPassageRoleSupportDescriptor,
+  DEFINITION_PASSAGE_ROLE_SUPPORT_POLICY,
   admissionLabelJudgmentDescriptor,
   rescueCarrierAdmissionJudgmentDescriptor
 } from "./extractionAdapters";

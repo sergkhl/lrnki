@@ -247,6 +247,11 @@ test("the all-descriptor inventory deduplicates shared descriptors", () => {
     .map((descriptor) => descriptor.stageTag)
     .sort();
   assert.deepEqual(qualityTags, [STAGE_TAGS.definitionPassageQuality, STAGE_TAGS.rescueDefinitionQuality].sort());
+  const roleSupportTags = allNeuralOperationDescriptors
+    .filter((descriptor) => descriptor.promptPath.includes("definition-passage-role-support"))
+    .map((descriptor) => descriptor.stageTag)
+    .sort();
+  assert.deepEqual(roleSupportTags, [STAGE_TAGS.definitionPassageQuality, STAGE_TAGS.rescueDefinitionQuality].sort());
 });
 
 test("Graph Enrichment hashes every admission behavior knob but not execution fan-out", () => {
@@ -337,7 +342,7 @@ test("dropping any shared admission descriptor changes Graph Enrichment identity
 // same DeepSeek Provider Route, so an intentional route change re-baselines them together even
 // when their Model Assignment is preserved. Non-behavioral refactors must not perturb them.
 test("default operation config hashes are stable across the registry derivation", () => {
-  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-2d3d853dd755");
+  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-cf5536ca7609");
   assert.equal(scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG), "learner-scaffold-generation-25c065547f8a");
   assert.equal(syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG), "synthetic-topic-generation-3286a5adf7a3");
 });

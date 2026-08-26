@@ -2,9 +2,9 @@
 
 ## TODO
 
-- **Curated-source learner workflow — U0–U6 complete; U7 fresh graph qualified, enrichment NEXT.**
+- **Curated-source learner workflow — U0–U6 complete; U7 enrichment qualified, learner bank NEXT.**
   Follow [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md).
-  Enrich and inspect the 12-concept, three-source graph before generating a learner bank.
+  Generate and inspect one safely incomplete bank, then qualify/adopt/read one coherent playable route.
 
 ## COMPLETED
 

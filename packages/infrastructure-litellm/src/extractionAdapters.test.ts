@@ -338,11 +338,12 @@ function definitionQualityAdapterReturning(judgments: {
   category: "establishes_meaning" | "defines_different_subject" | "bare_name_repetition" | "heading_or_title" | "citation_or_bibliographic";
   judgedSpan: string;
   rationale: string;
-}[]) {
+}[], roleDisposition: "supported" | "unsupported" | "unclear" = "supported") {
   const client = {
     call: async (input: { toolName: string }) => {
-      assert.equal(input.toolName, "submit_definition_passage_quality_judgments");
-      return { judgments };
+      if (input.toolName === "submit_definition_passage_quality_judgments") return { judgments };
+      assert.equal(input.toolName, "submit_definition_passage_role_support");
+      return { disposition: roleDisposition, reason: `role ${roleDisposition}` };
     }
   } as unknown as LiteLlmForcedToolClient;
   return createDefinitionPassageQualityJudgmentPort(client);
@@ -368,6 +369,44 @@ test("definition quality judge keeps a defining passage and vetoes a grounded ho
   assert.equal(result[1].establishesMeaning, false);
   assert.equal(result[1].category, "heading_or_title");
   assert.equal(result[1].judgedSpan, "Ownership");
+});
+
+test("definition quality judge requires affirmative role support for a proposed keep", async () => {
+  const adapter = definitionQualityAdapterReturning([
+    { index: 0, category: "establishes_meaning", judgedSpan: "", rationale: "proposal keeps" },
+    { index: 1, category: "heading_or_title", judgedSpan: "Ownership", rationale: "bare heading" }
+  ], "unsupported");
+  const result = await adapter.judgeDefinitions(ownershipPassages);
+  assert.deepEqual(result[0], {
+    establishesMeaning: false,
+    category: "role_support_rejected",
+    judgedSpan: ownershipPassages.passages[0].evidenceQuote,
+    rationale: "Affirmative definition-role support returned unsupported: role unsupported"
+  });
+  assert.equal(result[1].category, "heading_or_title");
+});
+
+test("definition quality judge requires three flat medium-reasoning support draws", async () => {
+  const calls: Array<{ toolName: string; model: string; maxRetries?: number; tags?: string[]; messages?: { content: string }[] }> = [];
+  const client = {
+    call: async (input: { toolName: string; model: string; maxRetries?: number; tags?: string[]; messages?: { content: string }[] }) => {
+      calls.push(input);
+      return input.toolName === "submit_definition_passage_quality_judgments"
+        ? { judgments: [{ index: 0, category: "establishes_meaning", judgedSpan: "", rationale: "proposal" }] }
+        : { disposition: "supported", reason: "the named subject is the definiendum" };
+    }
+  } as unknown as LiteLlmForcedToolClient;
+  const adapter = createDefinitionPassageQualityJudgmentPort(client);
+  const result = await adapter.judgeDefinitions({ ...ownershipPassages, passages: [ownershipPassages.passages[0]] });
+
+  const roleCalls = calls.filter((call) => call.toolName === "submit_definition_passage_role_support");
+  assert.equal(roleCalls.length, 3);
+  assert.ok(roleCalls.every((call) => call.model === "kg-source-material-support-verifier"));
+  assert.ok(roleCalls.every((call) => call.maxRetries === 3));
+  assert.ok(roleCalls.every((call) => call.tags?.includes(STAGE_TAGS.definitionPassageQuality)));
+  assert.ok(roleCalls[0].messages?.some((message) => message.content.includes("Named subject: \"Ownership\"")));
+  assert.equal(result[0].establishesMeaning, true);
+  assert.match(result[0].rationale, /^3\/3 affirmative definition-role draws/);
 });
 
 test("definition quality judge coerces an ungrounded veto back to keep (fail closed)", async () => {
