@@ -1225,6 +1225,98 @@ test("a multi-span source synthesis falls back to one exact Definition Passage w
   assert.deepEqual(lessonStore.absent, []);
 });
 
+test("a source-cited non-extractive definition falls back after settlement without rerolling the raw candidate", async () => {
+  const sourceDefinition = "Once entry has been authorized, an emergency interlock may still halt movement. The interlock is a safety override, not evidence that the earlier authorization was invalid.";
+  const paraphrase = "A safety override is an emergency interlock that may halt authorized movement.";
+  const lessonStore = capturingLessonStore();
+  const { store, persisted } = capturingStore();
+  let lessonCalls = 0;
+  let lessonId = 0;
+
+  const result = await generateStudyItemBank({
+    enrichmentId: "enr-1",
+    configHash: "cfg-1",
+    graphStore: graphStoreReturning(snapshotWith([])),
+    enrichmentStore: enrichmentStoreReturning(layerWith([
+      sourceMentionedNode({
+        id: "node-safety",
+        label: "safety override",
+        passageType: "definition",
+        quote: sourceDefinition,
+        blockId: "safety-definition"
+      })
+    ])),
+    conceptLessonGeneration: {
+      model: "mock-lesson",
+      async generate() {
+        lessonCalls += 1;
+        return {
+          sections: [{
+            kind: "definition",
+            text: paraphrase,
+            citation: {
+              passageId: "safety-definition",
+              evidenceQuote: sourceDefinition
+            }
+          }],
+          explorableTerms: []
+        };
+      }
+    },
+    sourceAssetQualification: {
+      sourceEvidenceRead: {
+        async readSourceEvidence(references) {
+          return references.map((reference) => ({
+            ...reference,
+            sourceTitle: "Harbor safety source",
+            blockType: "paragraph",
+            headingPath: ["Safety override"],
+            text: sourceDefinition
+          }));
+        }
+      },
+      sourceSupportVerifier: {
+        model: "mock-source-support",
+        async verify() {
+          return { disposition: "supported", reason: "The exact definition is supported." };
+        }
+      }
+    },
+    answerKeyVerification: keyVerifierPassing(),
+    matchingAssignmentVerification: matchingVerifierPassing(),
+    conceptLessonStore: lessonStore.store,
+    studyItemGeneration: generationReturning({
+      optionSelect: {
+        "node-safety": osDraft(
+          sourceDefinition,
+          ["Not this definition.", "Nor this definition.", "Still not this definition."],
+          lessonPassageId("node-safety", 0)
+        )
+      }
+    }),
+    studyItemBankStore: store,
+    newConceptLessonId: () => lessonId++ === 0
+      ? "candidate-safety-lesson"
+      : "fallback-safety-lesson"
+  });
+
+  assert.equal(lessonCalls, 1, "the source-cited raw candidate is settled once, not regenerated");
+  assert.equal(result.lessons.length, 1);
+  assert.equal(result.lessons[0]?.conceptLessonId, "fallback-safety-lesson");
+  assert.equal(result.lessons[0]?.generatingModel, SOURCE_EXTRACTIVE_DEFINITION_LESSON_GENERATOR);
+  assert.equal(result.lessons[0]?.sections[0]?.text, sourceDefinition);
+  assert.deepEqual(result.lessonAbsent, []);
+  assert.equal(lessonStore.candidateLessons.length, 1);
+  assert.equal(lessonStore.candidateLessons[0]?.conceptLessonId, "candidate-safety-lesson");
+  assert.equal(lessonStore.candidateLessons[0]?.sections[0]?.text, paraphrase);
+  const option = persisted.find((item) => item.itemType === "option_select");
+  assert.equal(option?.itemType, "option_select");
+  if (option?.itemType === "option_select") {
+    assert.equal(option.options.find((entry) => entry.isCorrect)?.text, sourceDefinition);
+    assert.equal(option.explanation, sourceDefinition);
+  }
+});
+
 test("an uncited mention-only candidate remains inspectable and cannot trigger the Definition Passage fallback", async () => {
   const mention = "Borrowing lets you reference a value without taking ownership.";
   const { store, persisted, persistedRejected } = capturingStore();

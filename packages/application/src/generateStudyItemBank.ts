@@ -58,15 +58,19 @@ import {
   type VerificationRegeneration
 } from "./verifyGuardedItems";
 import { selectSiblingContext } from "./selectSiblingContext";
-import { selectNodeGrounding } from "./selectNodeGrounding";
+import { selectNodeGrounding, type NodeGrounding } from "./selectNodeGrounding";
 import { selectLessonNeighborhood } from "./selectLessonNeighborhood";
 import { lessonGroundingShape, lessonOptionSelectAnswer, type LessonGroundingShape } from "./lessonGroundingShape";
 import {
   assembleConceptLesson,
   assembleExtractiveDefinitionLesson,
+  SOURCE_EXTRACTIVE_DEFINITION_LESSON_GENERATOR,
   SUBSTANTIVE_KINDS
 } from "./assembleConceptLesson";
-import { admitSourceConceptLessons } from "./sourceLessonAdmission";
+import {
+  admitSourceConceptLessons,
+  type SourceLessonAdmissionResult
+} from "./sourceLessonAdmission";
 import { admitSourceOptionSelectItems } from "./sourceOptionSelectAdmission";
 import { qualifiedSourceExpeditionAssetConfigHash } from "./sourceExpedition";
 import { STUDY_ITEM_BANK_STAGE_GROUP } from "./topicExpeditionStageProfile";
@@ -206,6 +210,30 @@ export async function generateStudyItemBank(input: {
   }
 
   const profileByConcept = new Map(snapshot.evidenceProfiles.map((profile) => [profile.conceptId, profile] as const));
+  const sourceSupportNodes = layer.derivedNodes.map((node) => ({
+    derivedNodeId: node.derivedNodeId,
+    label: node.canonicalLabel,
+    aliases: node.aliases,
+    declaredDomain: node.declaredDomain
+  }));
+  const extractiveDefinitionLessonFor = (
+    node: DerivedGraphNode,
+    grounding: NodeGrounding
+  ): ConceptLesson | undefined => graphVersionId === null
+    ? undefined
+    : assembleExtractiveDefinitionLesson({
+        // The code-owned fallback is a distinct immutable artifact, whether it replaces an
+        // assembly failure or a later deterministic extractive-floor rejection.
+        conceptLessonId: newConceptLessonId(),
+        node: {
+          derivedNodeId: node.derivedNodeId,
+          canonicalLabel: node.canonicalLabel,
+          graphVersionId,
+          enrichmentId: layer.enrichmentId
+        },
+        configHash: input.configHash,
+        grounding
+      });
   const studyItems: StudyItem[] = [];
   const rejectedByNodeType = new Map<string, RejectedStudyItem>();
   const reject = (node: Pick<DerivedGraphNode, "derivedNodeId" | "canonicalLabel">, itemType: StudyItemType, reason: string) => {
@@ -227,21 +255,7 @@ export async function generateStudyItemBank(input: {
       return { absent: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, reason: "no usable grounding passages" } };
     }
     const conceptLessonId = newConceptLessonId();
-    const extractiveFallback = () => graphVersionId === null
-      ? undefined
-      : assembleExtractiveDefinitionLesson({
-          // The raw final neural candidate remains immutable under `conceptLessonId`; the
-          // code-owned fallback is a different artifact and therefore receives its own identity.
-          conceptLessonId: newConceptLessonId(),
-          node: {
-            derivedNodeId: node.derivedNodeId,
-            canonicalLabel: node.canonicalLabel,
-            graphVersionId,
-            enrichmentId: layer.enrichmentId
-          },
-          configHash: input.configHash,
-          grounding
-        });
+    const extractiveFallback = () => extractiveDefinitionLessonFor(node, grounding);
     try {
       const neighbors = selectLessonNeighborhood(node, layer);
       const initialDraft = await input.conceptLessonGeneration.generate({
@@ -354,25 +368,79 @@ export async function generateStudyItemBank(input: {
     ? null
     : await admitSourceConceptLessons({
         candidates: candidateLessons,
-        nodes: layer.derivedNodes.map((node) => ({
-          derivedNodeId: node.derivedNodeId,
-          label: node.canonicalLabel,
-          aliases: node.aliases,
-          declaredDomain: node.declaredDomain
-        })),
+        nodes: sourceSupportNodes,
         baseConfigHash: input.configHash,
         sourceEvidenceRead: input.sourceAssetQualification.sourceEvidenceRead,
         sourceSupportVerifier: input.sourceAssetQualification.sourceSupportVerifier,
         sourceSupportStage
       });
-  const lessons = sourceLessonAdmission?.lessons ?? candidateLessons;
+  // A source-cited paraphrase can survive assembly because its citation is honest, then lose every
+  // substantive field at the stricter extractive admission floor. That is the same lossless
+  // fallback case as a pre-admission synthesis failure, but it becomes knowable only after source
+  // settlement. Construct a distinct exact Definition Passage artifact only for that deterministic
+  // rejection; verifier unavailability or a semantic refusal never causes a same-payload reroll.
+  const postSettlementFallbackCandidates = sourceLessonAdmission
+    ? sourceLessonAdmission.absent.flatMap((absent) => {
+        const candidate = candidateLessons.find(
+          (lesson) => lesson.derivedNodeId === absent.derivedNodeId
+        );
+        if (
+          !candidate ||
+          candidate.generatingModel === SOURCE_EXTRACTIVE_DEFINITION_LESSON_GENERATOR ||
+          !needsPostSettlementExtractiveFallback(candidate, sourceLessonAdmission)
+        ) {
+          return [];
+        }
+        const node = layer.derivedNodes.find(
+          (entry) => entry.derivedNodeId === absent.derivedNodeId
+        );
+        if (!node) return [];
+        const grounding = selectNodeGrounding(node, snapshot, profileByConcept);
+        if (!grounding) return [];
+        const fallback = extractiveDefinitionLessonFor(node, grounding);
+        return fallback ? [fallback] : [];
+      })
+    : [];
+  const fallbackSourceLessonAdmission = postSettlementFallbackCandidates.length === 0
+    ? null
+    : await admitSourceConceptLessons({
+        candidates: postSettlementFallbackCandidates,
+        nodes: sourceSupportNodes,
+        baseConfigHash: input.configHash,
+        sourceEvidenceRead: input.sourceAssetQualification.sourceEvidenceRead,
+        sourceSupportVerifier: input.sourceAssetQualification.sourceSupportVerifier,
+        sourceSupportStage
+      });
+  const lessonBySettledNode = new Map(
+    (sourceLessonAdmission?.lessons ?? candidateLessons).map(
+      (lesson) => [lesson.derivedNodeId, lesson] as const
+    )
+  );
+  for (const lesson of fallbackSourceLessonAdmission?.lessons ?? []) {
+    lessonBySettledNode.set(lesson.derivedNodeId, lesson);
+  }
+  const lessons = layer.derivedNodes.flatMap((node) => {
+    const lesson = lessonBySettledNode.get(node.derivedNodeId);
+    return lesson ? [lesson] : [];
+  });
   const inspectionCandidates = sourceLessonAdmission?.candidates.map((candidate) =>
     replacedInspectionCandidateByNode.get(candidate.derivedNodeId) ?? candidate
   );
-  const lessonAbsent = [
-    ...assemblyAbsent,
-    ...(sourceLessonAdmission?.absent ?? [])
-  ];
+  const absentByNode = new Map(
+    [...assemblyAbsent, ...(sourceLessonAdmission?.absent ?? [])].map(
+      (absent) => [absent.derivedNodeId, absent] as const
+    )
+  );
+  for (const fallback of postSettlementFallbackCandidates) {
+    absentByNode.delete(fallback.derivedNodeId);
+  }
+  for (const absent of fallbackSourceLessonAdmission?.absent ?? []) {
+    absentByNode.set(absent.derivedNodeId, absent);
+  }
+  const lessonAbsent = layer.derivedNodes.flatMap((node) => {
+    const absent = absentByNode.get(node.derivedNodeId);
+    return absent ? [absent] : [];
+  });
   // Lessons keyed by node so the option-select stage derives its grounding from the in-memory
   // lesson rather than re-reading raw passages (U7, rule 18).
   const lessonByNode = new Map<string, ConceptLesson>();
@@ -635,12 +703,7 @@ export async function generateStudyItemBank(input: {
         : await admitSourceOptionSelectItems({
               candidates: subjects.map((subject) => subject.item),
               lessons,
-              nodes: layer.derivedNodes.map((node) => ({
-                derivedNodeId: node.derivedNodeId,
-                label: node.canonicalLabel,
-                aliases: node.aliases,
-                declaredDomain: node.declaredDomain
-              })),
+              nodes: sourceSupportNodes,
               baseConfigHash: input.configHash,
               sourceEvidenceRead: input.sourceAssetQualification.sourceEvidenceRead,
               sourceSupportVerifier: input.sourceAssetQualification.sourceSupportVerifier,
@@ -955,6 +1018,21 @@ function typePlanFor(blueprintByNode: ReadonlyMap<string, StudyItemBlueprint>, n
 function hasVerifiedSubstantiveSourceCitation(lesson: ConceptLesson): boolean {
   return lesson.sections.some((section) =>
     SUBSTANTIVE_KINDS.includes(section.kind) && section.citation?.provenance === "source"
+  );
+}
+
+function needsPostSettlementExtractiveFallback(
+  candidate: ConceptLesson,
+  admission: SourceLessonAdmissionResult
+): boolean {
+  const decisions = admission.evaluation.decisions.filter(
+    (decision) => decision.assetId === candidate.conceptLessonId
+  );
+  return decisions.some(
+    (decision) => decision.reasonCode === "source_lesson_field_not_extractive"
+  ) && decisions.every(
+    (decision) => decision.disposition === "accepted" ||
+      decision.reasonCode === "source_lesson_field_not_extractive"
   );
 }
 

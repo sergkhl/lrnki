@@ -7,11 +7,11 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0–U6 complete; U7 carrier-clean bank fails closed, fallback repair NEXT
+**Status:** In progress — U0–U6 complete; U7 fallback qualified, registered supplement NEXT
 
-**NEXT:** When source settlement removes every substantive section, use its typed Definition Passage
-through the existing exact extractive fallback. Prove `safety override`, then register a Curated Source
-supplement for remaining gaps; do not regenerate or adopt until the repair is committed.
+**NEXT:** Register one diagnostic Curated Source supplement that defines the seven genuine gaps and
+contains a non-exact carrier negative. Run it through normal Source Registration and a fresh lineage;
+never inject its text downstream or adopt until the complete bank qualifies.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
 Curated Sources and automatically admits only source-backed learner assets. Anchor-less Synthetic
@@ -570,30 +570,31 @@ The plan is complete only when all of the following are true:
 
 ### U7 — complete-journey real-use qualification — 2026-08-26 — in progress
 
-- Identities extraction `349d7d8bf354`, canonicalization `c9f1b792acf4`, and graph `cc478c10-6857-452d-a9de-011757ffbb56`
-  reproduced a false Channel-depth-forecast definition. Definition-role binding repaired it under
-  bank `9674922fd8c3`; the replacement left it absent.
-- Rescue now rejects an exact registered-source-title identity before relabeling and semantically
-  settles every other carrier candidate. Fresh enrichment `fbd1b430-beb0-4b40-80ca-731480a5face`
-  dropped both titles, retained `token validation`, and persisted six anchors / 12 source-mentioned /
-  zero LLM-grounded nodes with every passage verified, two inspected merges, and 27 edges.
-- Its sole bank retained 10 lessons / eight absences / 13 items / 41 typed rejections. The 13-stop
-  trail has five gaps and returns `lesson_missing` for Channel-depth forecast. One matching and two
-  impostors stay excluded; zero expedition, detour, or Support Step rows exist.
-- All 22 lesson/item citations resolve and match immutable blocks. All 10 option-select payloads
-  have one key, four normalized-unique options, and exact lesson-unit key/explanation. All 25 lesson
-  and 20 option claims passed three support draws; inspection found no material false acceptance.
-- The bank used 209 calls / 325,019 tokens / $0.0271162154 over 607.346 seconds; some spend is
-  provider-estimated. Its `safety override` source already has a typed Definition Passage, but a
-  cited paraphrase was correctly rejected as non-extractive after the earlier fallback point. This
-  is safe incompleteness and a fallback-order defect, not a source gap.
+- Extraction `349d7d8bf354`, canonicalization `c9f1b792acf4`, and graph `cc478c10-6857-452d-a9de-011757ffbb56`
+  exposed a false Channel-depth-forecast definition; definition-role binding repaired it. Rescue now
+  rejects exact registered-title identities and semantically settles other carriers. Enrichment `fbd1b430-beb0-4b40-80ca-731480a5face`
+  has six anchors / 12 source-mentioned / zero LLM-grounded nodes, verified passages, two inspected
+  merges, 27 edges, and no surviving title carrier.
+- Post-settlement fallback now activates only when every rejected lesson decision is deterministic
+  non-extractive settlement, constructs a distinct exact Definition Passage artifact, and sends it
+  through the same immutable-evidence and three-draw gate; unavailability and semantic rejection cannot
+  trigger it. Bank `acebfee04913`, 871 application / 210 LiteLLM / eight worker tests, three affected
+  typechecks, targeted lint, and whitespace passed.
+- The current bank has 12 lessons / six absences / 16 items / 38 typed rejections. Its 13-stop trail has
+  five gaps and returns `lesson_missing`; 11 option-selects are usable, two matching and three impostors
+  remain excluded, and zero learner rows exist. Release Sequence's fragmented source is one of seven gaps.
+- All 26 citations resolve and match immutable blocks; every option has one key, four unique choices,
+  and exact lesson-unit key/explanation. All 144 support calls succeeded on DeepInfra, and inspection
+  found no material false acceptance.
+- The current attempt used 231 calls / 359,997 tokens / $0.0187241824 over 478.792 seconds; some
+  spend is provider-estimated. It emitted exact `safety override` text and did not exercise fallback.
+  A replay of the immutable prior paraphrase made zero neural calls and four deterministic rejects,
+  then admitted a distinct exact fallback on 3/3 draws, proving the repair without a lucky rerun.
 
 ### Open findings
 
-- Apply the extractive Definition Passage fallback after source settlement retains no substantive
-  section; prove `safety override` becomes lossless without a weaker gate or lucky rerun.
-- Through Source Registration, add definitions for the seven genuine gaps (including the four that
-  block the trail) and a non-exact carrier negative; never inject text downstream or weaken admission.
+- Through Source Registration, add one supplement for the seven genuine gaps (including the four
+  trail blockers) and a non-exact carrier negative; never inject text downstream or weaken admission.
 - U4's local verifier remains rejected; the remote assignment is qualified for source support and exact Concept identity, not general generation or source-less grounding.
 - Matching/impostor stay preserved but unqualified; the replacement Tide-margin impostor reveal itself makes a false dispatch-token claim, confirming exclusion.
 - Same-ID bank regeneration makes the cost report aggregate prior LiteLLM spend even after telemetry cleanup. Use the recorded attempt delta above and make reporting attempt/config-scoped before the final cost claim.
