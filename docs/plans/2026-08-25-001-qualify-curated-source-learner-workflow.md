@@ -7,12 +7,11 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0–U6 complete; U7 diagnostic bank and qualified trail pass, adoption/read NEXT
+**Status:** In progress — U0–U6 complete; U7 diagnostic source-to-read passes, external repeat NEXT
 
-**NEXT:** Adopt the qualified nine-stop diagnostic candidate through production application
-composition with a fresh synthetic learner identity, open its Study Session, and exercise an exact
-reference Support Step while asserting no generation call or partial write. Then repeat the
-smallest source-to-read path on a real external Curated Source.
+**NEXT:** Repeat the smallest registration-to-read path on a real external Curated Source under the
+current qualification identity. Inspect its admitted trail and exact reference beside source
+evidence; fix only material false acceptance or a blocker to one coherent playable route.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
 Curated Sources and automatically admits only source-backed learner assets. Anchor-less Synthetic
@@ -585,12 +584,11 @@ The plan is complete only when all of the following are true:
 - Qualification now admits the greatest directly-ready subset closed under every certain prerequisite after the floor. Nine lessons/options over nine stops and five certain / two uncertain edges qualify; six missing lessons and their blocked dependents stay outside. Snapshot identity includes this scope policy.
 - Every selected lesson field and item was inspected beside evidence: each item has one source key, four distinct options, and exact lesson/key/explanation agreement. The report resolved 12/12 evidence rows and accepted 34/34 claims over 102/102 supported draws, 27/27 distractors, and 9/9 keys.
   Its 102 DeepSeek calls used 160,585 tokens / $0.010571698 across DeepInfra and Io Net with no error row.
-- Automation passes 875 application tests, 22 learner-API tests / four intentional skips, all 11
-  typechecks, lint with zero errors / 12 warnings, and whitespace. Local test-database/live-provider authority only. **Safe to continue:** yes, to adoption/read-through.
+- Production application composition then cataloged, adopted, activated, and opened the exact nine-stop snapshot for a disposable authenticated learner. Its key-free wire view excluded all six held nodes. Excluded `safety override` and locked `tide margin` produced no row; frontier `clearance window` published one exact reference, graded correctly, and completed.
+- The read-through recorded one expedition/reference/response/read, zero generated steps, operation id, model calls, errors, or supervisor wakes, then exact teardown left zero learner rows. Automation passes 875 application tests, 22 learner-API tests / four skips, all 11 typechecks, lint (zero errors / 12 warnings), and whitespace. Local test-database/live-provider authority only. **Safe to continue:** yes, to the external repeat.
 
 ### Open findings
 
-- Adopt/activate/read the nine-stop candidate and request an exact reference; excluded nodes stay absent and generation untouched.
 - Repeat the smallest read-through on an external Curated Source; U5 qualifies admission only.
 - U4's local verifier remains rejected; the remote assignment is qualified for source support and exact Concept identity, not general generation or source-less grounding.
 - Matching/impostor remain preserved but unqualified. Same-ID reports need attempt scope for product telemetry; neither blocks the option-only trail.

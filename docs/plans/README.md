@@ -12,7 +12,7 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-25-001 — Qualify the Curated-Source Learner Workflow](./2026-08-25-001-qualify-curated-source-learner-workflow.md)
-   — **In progress; U0–U6 complete and U7 diagnostic bank/qualified trail pass, adoption/read NEXT.**
-   Adopt and read the nine-stop route with exact-reference Support Path, then repeat on one external source.
+   — **In progress; U0–U6 complete and U7 diagnostic source-to-read passes, external repeat NEXT.**
+   Repeat the smallest current-identity source-to-read path on one real external Curated Source.
 
 <!-- Hygiene and retention rules: AGENTS.md → Documentation workflow. -->

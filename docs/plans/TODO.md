@@ -2,9 +2,9 @@
 
 ## TODO
 
-- **Curated-source learner workflow — U0–U6 complete; U7 bank/qualified trail pass, adoption/read NEXT.**
+- **Curated-source learner workflow — U0–U6 complete; U7 diagnostic source-to-read passes, external repeat NEXT.**
   Follow [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md).
-  Adopt/read its nine-stop route with exact-reference Support Path, then repeat on one external source.
+  Repeat the smallest current-identity source-to-read path on one real external Curated Source.
 
 ## COMPLETED
 
