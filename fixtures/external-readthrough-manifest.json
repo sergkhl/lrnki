@@ -1,0 +1,15 @@
+{
+  "$comment": "Compact external Curated Source for the source-backed learner read-through. Its six term definitions are verbatim and attributed; the framing is curation metadata, not a project-authored semantic oracle.",
+  "fixtures": [
+    {
+      "fixtureId": "nist-fips-197-block-cipher-foundations",
+      "path": "fixtures/html/nist-fips-197-block-cipher-foundations.html",
+      "contentType": "text/html",
+      "declaredDomain": "symmetric-key cryptography",
+      "title": "NIST FIPS 197, Block Cipher Foundations",
+      "source": "https://doi.org/10.6028/NIST.FIPS.197-upd1, section 2.1",
+      "license": "U.S. government work (17 U.S.C. 105)",
+      "curation": "Selected six verbatim foundational definitions that form the tested closed trail; omitted algorithm specifications and examples, and left permutation undefined to exercise safe refusal."
+    }
+  ]
+}

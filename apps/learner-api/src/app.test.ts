@@ -360,7 +360,9 @@ maybeDb("exact-reference Support Path and recall challenge share qualified neutr
           groundingProvenance: "source_cep" as const,
           citation: { ...citation, evidenceQuote: lessonTexts[index] }
         }],
-        explorableTerms: []
+        explorableTerms: index === 0
+          ? [{ term: "Source summit", sectionKind: "definition" as const }]
+          : []
       })),
       absent: []
     });
@@ -558,6 +560,24 @@ maybeDb("exact-reference Support Path and recall challenge share qualified neutr
     );
     assert.equal(stateByNode[nodeIds[0]], "mastered");
     assert.equal(stateByNode[nodeIds[1]], "frontier");
+
+    // The request composition must read the same lesson evidence as the learner-facing session.
+    // This reference is impossible before the prerequisite is mastered and therefore catches a
+    // partial composition that loads response rows but silently omits lesson reads.
+    const progressedReference = await authed("/scaffold/request", {
+      enrichmentId,
+      source: { kind: "lesson", derivedNodeId: nodeIds[0] },
+      term: "Source summit"
+    });
+    assert.equal(progressedReference.status, 200);
+    const progressedReferenceBody = await progressedReference.json() as { detourId: string; status: string };
+    assert.equal(progressedReferenceBody.status, "ready");
+    const [progressedPin] = await sql<{ referencedNodeId: string }[]>`
+      SELECT s.referenced_derived_node_id AS "referencedNodeId"
+      FROM learner_scaffold_steps s
+      WHERE s.detour_id = ${progressedReferenceBody.detourId}`;
+    assert.equal(progressedPin.referencedNodeId, nodeIds[1]);
+    assert.equal(scaffoldWakes, 0);
 
     const responseLogBaseline = async () =>
       (await sql<{ count: string }[]>`SELECT COUNT(*) AS count FROM response_log WHERE learner_state_ref = ${learner}`)[0].count;

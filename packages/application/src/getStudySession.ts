@@ -28,7 +28,9 @@ export async function getStudySession(input: {
   enrichmentId: string;
   learnerStateRef: string;
   sourceExpeditions: Pick<SourceExpeditionModule, "openOwned">;
-  lessonReadStore?: LessonReadStorePort;
+  // Lesson reads and graded responses jointly determine mastery. Requiring both stores keeps
+  // every composition from silently rebuilding a different classification over the same learner.
+  lessonReadStore: LessonReadStorePort;
   layerPurposeStore?: EnrichmentLayerPurposeStorePort;
   responseLog: ResponseLogStorePort;
   verdictStore: CalibrationVerdictStorePort;
@@ -62,7 +64,7 @@ export async function getStudySession(input: {
   const qualifiedStudyItemIds = new Set(opened.assets.expectedAssets.currentStudyItemIds);
 
   const [lessonReads, rows, verdicts, layerPurpose, detours, referenceActivities, challenges, wonScopes, exposure] = await Promise.all([
-    input.lessonReadStore ? input.lessonReadStore.listForLearner(input.learnerStateRef) : Promise.resolve([]),
+    input.lessonReadStore.listForLearner(input.learnerStateRef),
     input.responseLog.listForLearner(input.learnerStateRef),
     input.verdictStore.listForLearner(input.learnerStateRef),
     input.layerPurposeStore ? input.layerPurposeStore.get(input.enrichmentId) : Promise.resolve(undefined),

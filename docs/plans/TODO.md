@@ -2,9 +2,9 @@
 
 ## TODO
 
-- **Curated-source learner workflow — U0–U6 complete; U7 OpenStax attempt failed closed, alternate source NEXT.**
+- **Curated-source learner workflow — U0–U7 complete; U8 repository gate NEXT.**
   Follow [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md).
-  Run the smallest current-identity path on a self-contained real external Curated Source.
+  Run the complete repository gate, then consolidate and close if it stays green.
 
 ## COMPLETED
 

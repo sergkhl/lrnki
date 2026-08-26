@@ -23,6 +23,7 @@ import {
 } from "@lrnki/infrastructure-litellm";
 import {
   PostgresCalibrationVerdictStore,
+  PostgresLessonReadStore,
   PostgresLearnerScaffoldStore,
   PostgresResponseLogStore,
   PostgresRunProgressReporter
@@ -72,6 +73,7 @@ export function createLearnerScaffoldGeneration(sql: DatabaseClient): ScaffoldGe
         enrichmentId,
         learnerStateRef,
         sourceExpeditions,
+        lessonReadStore: new PostgresLessonReadStore(sql),
         responseLog,
         verdictStore,
         learnerKnowledgeAvailability: CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY

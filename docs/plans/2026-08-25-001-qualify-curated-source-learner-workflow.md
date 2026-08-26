@@ -7,11 +7,10 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0–U6 complete; U7 OpenStax attempt failed closed, alternate external source NEXT
+**Status:** In progress — U0–U7 complete; U8 repository gate NEXT
 
-**NEXT:** Run the smallest registration-to-read path on a self-contained real external Curated
-Source under the current identity. Inspect its trail and exact reference beside evidence; fix only
-material false acceptance or a blocker to one coherent playable route.
+**NEXT:** Run U8's complete repository gate. If it stays green, consolidate the durable outcome and
+close this plan under the repository lifecycle rules.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
 Curated Sources and automatically admits only source-backed learner assets. Anchor-less Synthetic
@@ -575,7 +574,7 @@ The plan is complete only when all of the following are true:
   projection mechanics and no generation attempt; it makes no neural-content, deployed, browser,
   native, emulator/simulator, or physical-device claim. **Safe to continue:** yes, to U7.
 
-### U7 — complete-journey real-use qualification — 2026-08-26 — in progress
+### U7 — complete-journey real-use qualification — 2026-08-26 — complete
 
 - Supplemental diagnostics exposed and fixed wrong-subject Definition support and one-way identity collapse; live negative and bidirectional positive controls settled both contracts.
 - Final enrichment `c00e5fe5-c0f0-4a1c-9191-5b3420ea67e0` / graph `fbc39076-0f5e-4c6d-8ef0-e25fa9194c55` has 22 source-backed nodes, zero LLM-grounded nodes or merges, 26 certain / nine uncertain acyclic edges, and 22 difficulty rows.
@@ -587,9 +586,11 @@ The plan is complete only when all of the following are true:
 - Production application composition then cataloged, adopted, activated, and opened the exact nine-stop snapshot for a disposable authenticated learner. Its key-free wire view excluded all six held nodes. Excluded `safety override` and locked `tide margin` produced no row; frontier `clearance window` published one exact reference, graded correctly, and completed.
 - The read-through recorded one expedition/reference/response/read, zero generated steps, operation id, model calls, errors, or supervisor wakes, then exact teardown left zero learner rows. Automation passes 875 application tests, 22 learner-API tests / four skips, all 11 typechecks, lint (zero errors / 12 warnings), and whitespace. Local test-database/live-provider authority only. **Safe to continue:** yes, to the external repeat.
 - A fresh current-schema OpenStax Biology 2e §14.3 journey safely remained unavailable: one core plus 11 source-mentioned nodes, zero generated grounding, 12 certain / three uncertain edges, six exact lessons/options, and 30 rejections produced only one prerequisite-closed ready stop. Missing lessons for `DNA double helix structure`, `complementary base pairing`, and `parental strand` correctly excluded their dependents; no gate was weakened. The successful operations used 232 calls / 397,061 tokens / about $0.0411603758 including BYOK estimates, with zero error row. **Safe to continue:** yes, with a more self-contained external source.
+- The compact external NIST FIPS 197 fixture produced three anchors plus three source-mentioned nodes, zero generated grounding, four certain / one uncertain edge, six lessons/options, and 12 safe family rejections. Qualification admitted five closed stops and floored only `Bit`; direct inspection found no material false acceptance. Its journey used 146 calls / 194,053 tokens / about $0.019022261 including BYOK estimates.
+- Independent evaluation resolved 5/5 cited rows and accepted 15/15 material source claims, 15/15 exact-repeat distractor decisions, and 5/5 unique keys over 45 calls / 59,947 tokens / $0.002852569 with no error row. Production composition adopted and activated the snapshot, completed `Byte` then `block`, unlocked and completed exact-reference `block cipher`, refused unsupported `permutation` without a row, made zero learner-window model calls/wakes, and cleaned every disposable learner row.
+- That read-through first exposed partial-dependency composition drift: the scaffold reader omitted lesson reads and therefore kept a newly unlocked target locked. `getStudySession` now requires the lesson-read port at every composition; the HTTP and process-lived scaffold bindings supply it. A progression-dependent DB regression passes with all 875 application and 26 learner-API tests plus both affected typechecks. **Safe to continue:** yes, to U8.
 
 ### Open findings
 
-- Use a self-contained external source that defines its prerequisites; OpenStax §14.3 safely yielded only one closed ready stop, so no read-through was possible.
 - U4's local verifier remains rejected; the remote assignment is qualified for source support and exact Concept identity, not general generation or source-less grounding.
 - Matching/impostor remain preserved but unqualified. Same-ID reports need attempt scope for product telemetry; neither blocks the option-only trail.

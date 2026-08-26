@@ -27,6 +27,14 @@ candidate verifier or generator defect, but a fixed expected neural output must 
 deterministic quality oracle. Prompt and forced-tool descriptions remain domain-neutral and must not
 name these fixture concepts or expected outcomes.
 
+## Compact external read-through source
+
+[`external-readthrough-manifest.json`](./external-readthrough-manifest.json) registers six verbatim
+foundational definitions curated from NIST FIPS 197 section 2.1. It is deliberately self-contained:
+every concept in the tested prerequisite trail is defined in it, while `permutation` remains an
+intentional unsupported-term refusal. This makes the fixture suitable for a focused external-source
+learner read-through without turning its expected neural graph into a standing deterministic oracle.
+
 ## Canonical fixture matrix
 
 Two gates (decided 2026-06-11, clarified 2026-06-16): Gate 1 exercises the

@@ -181,6 +181,10 @@ test("a refused Source Expedition returns before loading learner evidence", asyn
         return { status: "unavailable", reason: "llm_grounded_prerequisite" };
       }
     },
+    lessonReadStore: {
+      ...lessonReadStore(),
+      async listForLearner() { learnerEvidenceRead = true; return []; }
+    },
     responseLog: {
       ...responseLog([]),
       async listForLearner() { learnerEvidenceRead = true; return []; }
@@ -258,6 +262,7 @@ test("getStudySession composes server-owned recall scopes from the challenge sto
     enrichmentId: "e",
     learnerStateRef: "L1",
     sourceExpeditions: sourceExpeditions({ detailById: { e: detail() }, items: [optionItem] }),
+    lessonReadStore: lessonReadStore(),
     responseLog: responseLog([correctRow]),
     verdictStore: verdictStore([]),
     challengeStore,
@@ -398,6 +403,7 @@ test("the current policy projects reference detours and suppresses stored genera
       items: [optionItem],
       lessons: [scopeLesson]
     }),
+    lessonReadStore: lessonReadStore(),
     responseLog: responseLog([]),
     verdictStore: verdictStore([]),
     scaffoldStore,
@@ -465,6 +471,7 @@ test("the current policy projects only the current qualified pin from a mixed hi
       items: [optionItem],
       lessons: [scopeLesson]
     }),
+    lessonReadStore: lessonReadStore(),
     responseLog: responseLog([]),
     verdictStore: verdictStore([]),
     scaffoldStore,

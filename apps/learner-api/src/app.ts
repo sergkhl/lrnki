@@ -143,6 +143,7 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, o
         enrichmentId,
         learnerStateRef,
         sourceExpeditions,
+        lessonReadStore: new PostgresLessonReadStore(sql),
         responseLog: new PostgresResponseLogStore(sql),
         verdictStore: new PostgresCalibrationVerdictStore(sql),
         learnerKnowledgeAvailability

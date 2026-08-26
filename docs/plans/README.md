@@ -12,7 +12,7 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [2026-08-25-001 — Qualify the Curated-Source Learner Workflow](./2026-08-25-001-qualify-curated-source-learner-workflow.md)
-   — **In progress; U0–U6 complete and U7 OpenStax attempt failed closed, alternate source NEXT.**
-   Run the smallest current-identity path on a self-contained real external Curated Source.
+   — **In progress; U0–U7 complete and U8 repository gate NEXT.**
+   Run the complete repository gate, then consolidate and close if it stays green.
 
 <!-- Hygiene and retention rules: AGENTS.md → Documentation workflow. -->
