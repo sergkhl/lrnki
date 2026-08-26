@@ -2,9 +2,9 @@
 
 ## TODO
 
-- **Curated-source learner workflow — U0–U6 complete; U7 diagnostic source-to-read passes, external repeat NEXT.**
+- **Curated-source learner workflow — U0–U6 complete; U7 OpenStax attempt failed closed, alternate source NEXT.**
   Follow [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md).
-  Repeat the smallest current-identity source-to-read path on one real external Curated Source.
+  Run the smallest current-identity path on a self-contained real external Curated Source.
 
 ## COMPLETED
 

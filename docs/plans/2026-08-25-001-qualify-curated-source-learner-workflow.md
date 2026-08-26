@@ -7,11 +7,11 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0–U6 complete; U7 diagnostic source-to-read passes, external repeat NEXT
+**Status:** In progress — U0–U6 complete; U7 OpenStax attempt failed closed, alternate external source NEXT
 
-**NEXT:** Repeat the smallest registration-to-read path on a real external Curated Source under the
-current qualification identity. Inspect its admitted trail and exact reference beside source
-evidence; fix only material false acceptance or a blocker to one coherent playable route.
+**NEXT:** Run the smallest registration-to-read path on a self-contained real external Curated
+Source under the current identity. Inspect its trail and exact reference beside evidence; fix only
+material false acceptance or a blocker to one coherent playable route.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
 Curated Sources and automatically admits only source-backed learner assets. Anchor-less Synthetic
@@ -586,9 +586,10 @@ The plan is complete only when all of the following are true:
   Its 102 DeepSeek calls used 160,585 tokens / $0.010571698 across DeepInfra and Io Net with no error row.
 - Production application composition then cataloged, adopted, activated, and opened the exact nine-stop snapshot for a disposable authenticated learner. Its key-free wire view excluded all six held nodes. Excluded `safety override` and locked `tide margin` produced no row; frontier `clearance window` published one exact reference, graded correctly, and completed.
 - The read-through recorded one expedition/reference/response/read, zero generated steps, operation id, model calls, errors, or supervisor wakes, then exact teardown left zero learner rows. Automation passes 875 application tests, 22 learner-API tests / four skips, all 11 typechecks, lint (zero errors / 12 warnings), and whitespace. Local test-database/live-provider authority only. **Safe to continue:** yes, to the external repeat.
+- A fresh current-schema OpenStax Biology 2e §14.3 journey safely remained unavailable: one core plus 11 source-mentioned nodes, zero generated grounding, 12 certain / three uncertain edges, six exact lessons/options, and 30 rejections produced only one prerequisite-closed ready stop. Missing lessons for `DNA double helix structure`, `complementary base pairing`, and `parental strand` correctly excluded their dependents; no gate was weakened. The successful operations used 232 calls / 397,061 tokens / about $0.0411603758 including BYOK estimates, with zero error row. **Safe to continue:** yes, with a more self-contained external source.
 
 ### Open findings
 
-- Repeat the smallest read-through on an external Curated Source; U5 qualifies admission only.
+- Use a self-contained external source that defines its prerequisites; OpenStax §14.3 safely yielded only one closed ready stop, so no read-through was possible.
 - U4's local verifier remains rejected; the remote assignment is qualified for source support and exact Concept identity, not general generation or source-less grounding.
 - Matching/impostor remain preserved but unqualified. Same-ID reports need attempt scope for product telemetry; neither blocks the option-only trail.
