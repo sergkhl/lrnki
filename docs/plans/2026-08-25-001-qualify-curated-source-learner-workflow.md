@@ -7,12 +7,11 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0–U6 complete; U7 carrier boundary qualified, fresh bank NEXT
+**Status:** In progress — U0–U6 complete; U7 carrier-clean bank fails closed, fallback repair NEXT
 
-**NEXT:** Generate one Study Item Bank for enrichment
-`fbd1b430-beb0-4b40-80ca-731480a5face`; inspect every lesson, option, absence, and qualification
-beside evidence, then supply any missing definitions through a new registered Curated Source rather
-than relaxing admission. Do not adopt or open Support Path unless the whole candidate qualifies.
+**NEXT:** When source settlement removes every substantive section, use its typed Definition Passage
+through the existing exact extractive fallback. Prove `safety override`, then register a Curated Source
+supplement for remaining gaps; do not regenerate or adopt until the repair is committed.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
 Curated Sources and automatically admits only source-backed learner assets. Anchor-less Synthetic
@@ -571,16 +570,30 @@ The plan is complete only when all of the following are true:
 
 ### U7 — complete-journey real-use qualification — 2026-08-26 — in progress
 
-- Identities extraction `349d7d8bf354`, canonicalization `c9f1b792acf4`, and graph `cc478c10-6857-452d-a9de-011757ffbb56` produced two clean six-core runs. Source structure moves future extraction identity to `bc1ef4197773`; no stale extraction is relabeled.
-- Its first `21e87c60d969` bank was a valid negative control: 12 lessons / 7 absences / 16 items / 41 rejections and 210 calls / 322,113 tokens / $0.0206015216. A Forecast-revision mention was falsely promoted as the definition of Channel-depth forecast; nothing was adopted.
-- Lesson assembly now requires typed Definition Passage evidence for a `definition`, before neural spend, while mention-backed examples remain eligible. The load-bearing bank identity is `9674922fd8c3`; 865 application and 209 LiteLLM tests, affected typechecks, lint with zero errors, and whitespace pass.
-- The one replacement bank retained 11 lessons / 8 absences / 16 items / 41 rejections. All 15 lesson citations match immutable blocks, all 11 definitions match typed definition evidence, and all 11 option keys/explanations exactly equal their selected lesson unit with one key and four unique options. Channel-depth forecast has zero lesson/item plus one explicit absence; Forecast revision remains correctly taught.
-- Rescue now refuses an exact registered-source-title identity before re-labeling and applies the grounded carrier judge to every other candidate, failing the enrichment if unavailable. A direct neural probe still conflated the title with its subject; the typed collision is the guarantee, not prompt luck. The 870 application / 210 LiteLLM / eight worker tests, four typechecks, lint, and whitespace pass.
-- Fresh enrichment `fbd1b430-beb0-4b40-80ca-731480a5face` under identity `2d3d853dd755` dropped both source titles, retained `token validation`, verified every surviving source passage, and persisted six anchors / 12 source-mentioned / zero LLM-grounded nodes, two inspected collapsing merges, and 17 certain / 10 uncertain edges. It used 73 calls / 149,838 tokens / $0.0201664148 over 250,691 ms; some spend is provider-estimated. No bank, adoption, or Support Path ran.
+- Identities extraction `349d7d8bf354`, canonicalization `c9f1b792acf4`, and graph `cc478c10-6857-452d-a9de-011757ffbb56`
+  reproduced a false Channel-depth-forecast definition. Definition-role binding repaired it under
+  bank `9674922fd8c3`; the replacement left it absent.
+- Rescue now rejects an exact registered-source-title identity before relabeling and semantically
+  settles every other carrier candidate. Fresh enrichment `fbd1b430-beb0-4b40-80ca-731480a5face`
+  dropped both titles, retained `token validation`, and persisted six anchors / 12 source-mentioned /
+  zero LLM-grounded nodes with every passage verified, two inspected merges, and 27 edges.
+- Its sole bank retained 10 lessons / eight absences / 13 items / 41 typed rejections. The 13-stop
+  trail has five gaps and returns `lesson_missing` for Channel-depth forecast. One matching and two
+  impostors stay excluded; zero expedition, detour, or Support Step rows exist.
+- All 22 lesson/item citations resolve and match immutable blocks. All 10 option-select payloads
+  have one key, four normalized-unique options, and exact lesson-unit key/explanation. All 25 lesson
+  and 20 option claims passed three support draws; inspection found no material false acceptance.
+- The bank used 209 calls / 325,019 tokens / $0.0271162154 over 607.346 seconds; some spend is
+  provider-estimated. Its `safety override` source already has a typed Definition Passage, but a
+  cited paraphrase was correctly rejected as non-extractive after the earlier fallback point. This
+  is safe incompleteness and a fallback-order defect, not a source gap.
 
 ### Open findings
 
-- Generate and inspect one bank for the carrier-clean enrichment. Reassess channel entry authorization, safety override, Harbor Control authority, reservation registry, and the absorbed tide-margin dependency through normal Curated Source evidence; register a diagnostic supplement for any real definition gap. Before the final general carrier claim, add a non-exact carrier negative because the exact-title collision, not the neural probe alone, owns today's fix.
+- Apply the extractive Definition Passage fallback after source settlement retains no substantive
+  section; prove `safety override` becomes lossless without a weaker gate or lucky rerun.
+- Through Source Registration, add definitions for the seven genuine gaps (including the four that
+  block the trail) and a non-exact carrier negative; never inject text downstream or weaken admission.
 - U4's local verifier remains rejected; the remote assignment is qualified for source support and exact Concept identity, not general generation or source-less grounding.
 - Matching/impostor stay preserved but unqualified; the replacement Tide-margin impostor reveal itself makes a false dispatch-token claim, confirming exclusion.
 - Same-ID bank regeneration makes the cost report aggregate prior LiteLLM spend even after telemetry cleanup. Use the recorded attempt delta above and make reporting attempt/config-scoped before the final cost claim.

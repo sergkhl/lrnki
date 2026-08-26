@@ -2,10 +2,10 @@
 
 ## TODO
 
-- **Curated-source learner workflow — U0–U6 complete; U7 carrier boundary qualified, fresh bank NEXT.**
+- **Curated-source learner workflow — U0–U6 complete; U7 carrier-clean bank fails closed, fallback repair NEXT.**
   Follow [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md).
-  Generate and inspect one bank for the carrier-clean enrichment; supply any missing definitions
-  through Source Registration, never weaker admission.
+  Restore the exact extractive fallback after source settlement, then supply genuine definition
+  gaps through Source Registration, never weaker admission.
 
 ## COMPLETED
 
