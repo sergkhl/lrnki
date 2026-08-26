@@ -106,6 +106,63 @@ function detail(overrides: {
   };
 }
 
+function partiallyAssetReadyDetail(): DerivedGraphDetail {
+  const base = detail();
+  const missingPrerequisite = {
+    ...base.nodes[0]!,
+    derivedNodeId: "node-missing-prerequisite",
+    label: "Unready prerequisite",
+    aliases: [],
+    hasStudyItem: false
+  };
+  const blockedDependent = {
+    ...base.nodes[1]!,
+    derivedNodeId: "node-blocked-dependent",
+    label: "Blocked dependent",
+    aliases: []
+  };
+  return {
+    ...base,
+    summary: {
+      ...base.summary,
+      edgeCount: 2,
+      certainEdgeCount: 2,
+      conceptCount: 4,
+      studyItemCount: 3
+    },
+    nodes: [...base.nodes, missingPrerequisite, blockedDependent],
+    edges: [
+      ...base.edges,
+      {
+        prerequisiteDerivedNodeId: missingPrerequisite.derivedNodeId,
+        dependentDerivedNodeId: blockedDependent.derivedNodeId,
+        confidence: 0.95,
+        uncertain: false,
+        judgeModel: "test-judge"
+      }
+    ]
+  };
+}
+
+function partiallySourceReadyDetail(): DerivedGraphDetail {
+  const base = partiallyAssetReadyDetail();
+  const llmGrounded = detail({ firstOrigin: "llm_grounded" }).nodes[0]!;
+  return {
+    ...base,
+    nodes: base.nodes.map((node) =>
+      node.derivedNodeId === "node-missing-prerequisite"
+        ? {
+            ...llmGrounded,
+            derivedNodeId: node.derivedNodeId,
+            label: node.label,
+            aliases: node.aliases,
+            hasStudyItem: true
+          }
+        : node
+    )
+  };
+}
+
 const sourceCitation = {
   provenance: "source" as const,
   sourceResourceId: "source-resource",
@@ -328,6 +385,61 @@ test("qualification derives authoritative presentation and admits only qualified
   );
 });
 
+test("qualification keeps the greatest asset-ready prerequisite-closed sublayer", async () => {
+  const graph = partiallyAssetReadyDetail();
+  const { sourceExpedition } = harness({
+    graph,
+    lessons: [
+      lesson("node-prerequisite"),
+      lesson("node-summit"),
+      lesson("node-blocked-dependent")
+    ],
+    items: [
+      option("node-prerequisite"),
+      option("node-summit"),
+      option("node-blocked-dependent")
+    ]
+  });
+
+  const result = await sourceExpedition.qualify(ENRICHMENT_ID);
+  assert.equal(result.status, "available");
+  if (result.status !== "available") return;
+  assert.deepEqual(
+    result.assets.detail.nodes.map((node) => node.derivedNodeId),
+    ["node-prerequisite", "node-summit"]
+  );
+  assert.deepEqual(result.assets.detail.edges, graph.edges.slice(0, 1));
+  assert.equal(result.assets.detail.summary.conceptCount, 2);
+  assert.equal(result.assets.detail.summary.studyItemCount, 2);
+  assert.deepEqual(
+    result.assets.lessons.map((entry) => entry.derivedNodeId),
+    ["node-prerequisite", "node-summit"]
+  );
+  assert.deepEqual(
+    result.assets.studyItems.map((entry) => entry.derivedNodeId),
+    ["node-prerequisite", "node-summit"]
+  );
+  assert.equal(result.candidate.totalStopCount, 2);
+});
+
+test("qualification excludes LLM-grounded branches without suppressing an independent source-ready trail", async () => {
+  const graph = partiallySourceReadyDetail();
+  const { sourceExpedition } = harness({
+    graph,
+    lessons: graph.nodes.map((node) => lesson(node.derivedNodeId)),
+    items: graph.nodes.map((node) => option(node.derivedNodeId))
+  });
+
+  const result = await sourceExpedition.qualify(ENRICHMENT_ID);
+  assert.equal(result.status, "available");
+  if (result.status !== "available") return;
+  assert.deepEqual(
+    result.assets.detail.nodes.map((node) => node.derivedNodeId),
+    ["node-prerequisite", "node-summit"]
+  );
+  assert.deepEqual(result.assets.detail.edges, graph.edges.slice(0, 1));
+});
+
 test("adoption is authoritative, idempotent, and hides the exact owned snapshot from candidates", async () => {
   const state = harness();
   assert.equal((await state.sourceExpedition.listCandidates({ learnerStateRef: "learner-1" })).length, 1);
@@ -372,7 +484,7 @@ test("a qualified supported paraphrase need not masquerade as a verbatim source 
   assert.equal((await state.sourceExpedition.qualify(ENRICHMENT_ID)).status, "available");
 });
 
-test("LLM-grounded and unverified source-mentioned prerequisites make the whole candidate unavailable", async () => {
+test("LLM-grounded and unverified source-mentioned prerequisites make a required two-stop trail unavailable", async () => {
   const llm = harness({ graph: detail({ firstOrigin: "llm_grounded" }) });
   assert.deepEqual(await llm.sourceExpedition.qualify(ENRICHMENT_ID), {
     status: "unavailable",

@@ -247,6 +247,7 @@ export {
 } from "./learnerKnowledgeAvailability";
 export {
   SOURCE_EXPEDITION_ASSET_QUALIFICATION_CONTRACT,
+  SOURCE_EXPEDITION_TRAIL_SCOPE_POLICY,
   createSourceExpeditionModule,
   qualifiedSourceExpeditionAssetConfigHash,
   type OpenedSourceExpedition,

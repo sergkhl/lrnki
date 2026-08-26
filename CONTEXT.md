@@ -184,8 +184,8 @@ Generation layer and its study assets.
 _Avoid_: source-grounded expedition, synthetic pipeline
 
 **Source Expedition**:
-A learner-owned expedition adopted from a learner-ready source-derived Graph Enrichment layer whose
-knowledge and current study assets are backed by registered Curated Sources.
+A learner-owned expedition adopted from a learner-ready, prerequisite-closed sublayer of a
+source-derived Graph Enrichment whose knowledge and current study assets are backed by registered Curated Sources.
 _Avoid_: Topic Expedition, raw enrichment, client-approved source layer
 
 **Learner App**:

@@ -2,9 +2,9 @@
 
 ## TODO
 
-- **Curated-source learner workflow — U0–U6 complete; U7 enrichment qualified, learner bank NEXT.**
+- **Curated-source learner workflow — U0–U6 complete; U7 bank/qualified trail pass, adoption/read NEXT.**
   Follow [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md).
-  Generate and inspect one safely incomplete bank, then qualify/adopt/read one coherent playable route.
+  Adopt/read its nine-stop route with exact-reference Support Path, then repeat on one external source.
 
 ## COMPLETED
 

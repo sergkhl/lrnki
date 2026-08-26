@@ -9,10 +9,14 @@ the current expedition. The application orchestrator owns learner-specific pacin
 Derived Graph Layers, Concept Lessons, and Study Item Banks remain learner-neutral and are consumed
 through application use-cases rather than persistence adapters.
 
-An expedition is a layer-wide trail with a derived summit. Prerequisite satisfaction, not section
-order, determines which stops are playable. The trail must remain completable and paced: derivation
-cannot create an unwinnable reward scope or an unsatisfiable gate, and section boundaries represent
-recognizable milestones rather than arbitrary cuts.
+An expedition is layer-wide over its admitted trail scope and has a derived summit. A Source
+Expedition may admit the greatest learner-ready sublayer of a broader neutral Derived Graph Layer,
+but that sublayer must be predecessor-closed over every trusted prerequisite: a stop cannot remain
+when one of its required predecessors is unavailable. Excluded nodes remain inspectable and do not
+become mastered; fewer than two admitted stops is unavailable. Prerequisite satisfaction, not
+section order, determines which admitted stops are playable. The trail must remain completable and
+paced: derivation cannot create an unwinnable reward scope or an unsatisfiable gate, and section
+boundaries represent recognizable milestones rather than arbitrary cuts.
 
 Mastery uses one completion rule across projection, progress, and rewards: required lesson reading and
 all current activity segments must be complete, while an explicit known calibration may master
@@ -39,5 +43,8 @@ social presentation may not become a parallel objective. Themed copy remains dow
 ## Context
 
 Learner-specific adaptation must stay downstream of the neutral graph, but that separation alone does
-not guarantee a coherent learning game. This policy keeps delight, pacing, and recovery subordinate to
-learning progress.
+not guarantee a coherent learning game. Source-backed assets can also be safely sparse: requiring one
+missing side concept to suppress an otherwise complete prerequisite chain confuses neutral inspection
+coverage with learner readiness. Modeling feasible instructional states as prerequisite order ideals is
+the conventional constraint-preserving formulation ([Han et al., 2026](https://arxiv.org/abs/2608.05455)).
+This policy keeps delight, pacing, and recovery subordinate to learning progress.

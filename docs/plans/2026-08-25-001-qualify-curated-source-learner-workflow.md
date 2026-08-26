@@ -7,11 +7,12 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0–U6 complete; U7 enrichment qualified, learner bank NEXT
+**Status:** In progress — U0–U6 complete; U7 diagnostic bank and qualified trail pass, adoption/read NEXT
 
-**NEXT:** Generate one fresh Study Item Bank from enrichment
-`c00e5fe5-c0f0-4a1c-9191-5b3420ea67e0`. Inspect every qualified learner-visible claim and keyed
-answer; accept a nontrivial playable subset, while unsupported or uncertain assets stay unavailable.
+**NEXT:** Adopt the qualified nine-stop diagnostic candidate through production application
+composition with a fresh synthetic learner identity, open its Study Session, and exercise an exact
+reference Support Step while asserting no generation call or partial write. Then repeat the
+smallest source-to-read path on a real external Curated Source.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
 Curated Sources and automatically admits only source-backed learner assets. Anchor-less Synthetic
@@ -192,11 +193,15 @@ A learner-visible Source Expedition trail may include:
 - `source_mentioned` prerequisite nodes only when their source passages passed the existing
   verbatim floor and their lesson/item qualification passes this plan.
 
-It may not include an `llm_grounded` node. A required LLM-grounded prerequisite is not silently
-removed, bypassed, or treated as mastered: the whole candidate is unavailable until a Curated Source
-supplies evidence through normal registration and a new source-backed enrichment qualifies. Trail
-derivation must retain prerequisite closure and the existing difficulty floor without creating an
-unwinnable or falsely unlocked path.
+It may not include an `llm_grounded` node. That node and every otherwise-ready dependent requiring it
+stay outside the admitted trail; they are never bypassed or treated as mastered. The candidate is
+unavailable when fewer than two source-ready stops remain. Trail derivation retains prerequisite
+closure and the existing difficulty floor without creating an unwinnable or falsely unlocked path.
+
+Safe incompleteness follows [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md):
+after the difficulty floor, qualification admits the greatest asset-ready sublayer closed under every
+trusted prerequisite. Missing nodes and their otherwise-ready dependents remain inspectable outside
+the trail; they are never bypassed, hidden mastery, or a reason to suppress an independent complete route.
 
 ### KTD4 — Make learner-asset qualification explicit and current
 
@@ -320,9 +325,9 @@ Units are exclusive and run in order. This plan declares no parallel-safe implem
 
 1. Add the source-owned expedition kind and finished qualification/adoption outcomes. Implement one
    application module over narrow read/write dependencies; keep Hono and the learner client thin.
-2. Derive authoritative title/domain and the trusted prerequisite-closed trail. Exclude any
-   candidate with an LLM-grounded required node, incomplete current asset set, legacy qualification
-   identity, or changed asset snapshot.
+2. Derive authoritative title/domain and the trusted prerequisite-closed trail. Exclude
+   LLM-grounded or asset-incomplete nodes and their trusted dependents; reject a legacy
+   qualification identity, changed snapshot, or candidate with fewer than two ready stops.
 3. Make catalog, Journal, adoption, activation, direct Study Session entry, and supervisor wake
    behavior agree. Source adoption is idempotent and wakes no generator.
 4. Add application tests plus `pnpm test:db` coverage for ownership, active switching, concurrent
@@ -393,7 +398,7 @@ Units are exclusive and run in order. This plan declares no parallel-safe implem
 3. Repeat the smallest representative path on a real external Curated Source. Record model route,
    exact assignment/quantization, operation identities, calls/tokens/cost, fallbacks/errors, positive
    controls, absences, and usefulness. Any material false acceptance is `FIX_FIRST`.
-4. Prove automatic adoption needs no human action and incomplete enrichments remain inspectable but
+4. Prove automatic adoption needs no human action and excluded nodes/branches remain inspectable but
    absent from learner entry. Update and commit once.
 
 ### U8 — Repository gate and plan closure
@@ -419,8 +424,9 @@ The plan is complete only when all of the following are true:
 3. Every visible lesson material claim and option-select positive claim retains its material source
    scope; every visible distractor is invalid for the exact question; the key is unique and hidden
    from the verifier.
-4. Incomplete, uncertain, legacy, changed, or LLM-grounded asset sets are inspectable but cannot be
-   cataloged, adopted, opened directly, graded, or used by Support Path as ready source content.
+4. Incomplete, uncertain, legacy, changed, or LLM-grounded nodes remain inspectable but cannot become
+   trail stops, grading authority, or Support Path content; fewer than two prerequisite-closed ready
+   stops leaves the whole candidate unavailable.
 5. Exact-reference Support Steps work; generated Support Steps and Synthetic Topic Generation remain
    unavailable with no model calls or learner-visible partial writes.
 6. Diagnostic and real external source inspection both pass for the exact Model Assignments and
@@ -572,29 +578,19 @@ The plan is complete only when all of the following are true:
 
 ### U7 — complete-journey real-use qualification — 2026-08-26 — in progress
 
-- Baseline bank `acebfee04913` stayed safely incomplete: 12 lessons / six absences / 16 items, five trail gaps,
-  zero false acceptance across 144 support calls, and no learner row. Its 231 calls used 359,997 tokens / $0.0187241824 over 478.792 seconds; semantic or unavailable rejects cannot trigger fallback.
-- Addendum `4e92543a-7d86-4f25-9b9a-bb3b4ce15f48`, canonicalization `e8e9b943-9b50-423f-a6ab-5f2d81fe7965`, and graph
-  `fbc39076-0f5e-4c6d-8ef0-e25fa9194c55` supply 12 Concepts / 46 passages / 10 sound assertions.
-- Rejected enrichment candidates exposed two unsafe semantic classes: wrong-subject Harbor Control
-  definitions and one-way `emergency interlock` → `safety override` class membership collapsed as identity.
-  Definition keeps require 3/3 affirmative role support; identity requires 3/3 support
-  in both substitution directions plus an independent confirmation. Unavailability publishes neither.
-- Final enrichment `c00e5fe5-c0f0-4a1c-9191-5b3420ea67e0` under `cf5536ca7609` has 12 anchors plus 10
-  source-mentioned nodes, zero LLM-grounded passages, zero merges, 26 certain / nine uncertain acyclic edges,
-  and 22 difficulty rows. All 13 rescue/carrier, 16 definition, 35 edge, and 38 passage records
-  were inspected: two carrier titles and undefined `Safety-state checks` dropped; no material false acceptance remained, and every passage passed source ownership and verbatim verification.
-- The final run used 73 successful calls / 178,662 tokens / $0.0258279918 over 273.381 seconds with
-  zero tagged provider errors: 55 DeepSeek calls reached DeepInfra, eight GPT-OSS calls DigitalOcean,
-  nine MiMo calls Xiaomi, and one Qwen embedding call OpenRouter. MiMo cost remains estimated.
-- Live controls rejected the real one-way subtype and accepted an explicit bidirectional alias on all six
-  directional draws plus confirmation. Automation passes 873 application, 216 LiteLLM, eight worker tests,
-  all 11 typechecks, config checks, and lint with zero errors / 12 warnings. Authority is local test-database plus live-provider only. **Safe to continue:** yes, to one safely incomplete learner bank.
+- Supplemental diagnostics exposed and fixed wrong-subject Definition support and one-way identity collapse; live negative and bidirectional positive controls settled both contracts.
+- Final enrichment `c00e5fe5-c0f0-4a1c-9191-5b3420ea67e0` / graph `fbc39076-0f5e-4c6d-8ef0-e25fa9194c55` has 22 source-backed nodes, zero LLM-grounded nodes or merges, 26 certain / nine uncertain acyclic edges, and 22 difficulty rows.
+  Direct inspection of every rescue, definition, edge, and passage found no remaining material false acceptance.
+- Fresh bank `acebfee04913` stored 16 lessons, six absences, 16 exact-reference options, two matching items, three impostors, and 45 rejections; only options qualify. Its 292 calls / 448,058 tokens cost $0.0259417984, with MiMo estimated and no error row.
+- Qualification now admits the greatest directly-ready subset closed under every certain prerequisite after the floor. Nine lessons/options over nine stops and five certain / two uncertain edges qualify; six missing lessons and their blocked dependents stay outside. Snapshot identity includes this scope policy.
+- Every selected lesson field and item was inspected beside evidence: each item has one source key, four distinct options, and exact lesson/key/explanation agreement. The report resolved 12/12 evidence rows and accepted 34/34 claims over 102/102 supported draws, 27/27 distractors, and 9/9 keys.
+  Its 102 DeepSeek calls used 160,585 tokens / $0.010571698 across DeepInfra and Io Net with no error row.
+- Automation passes 875 application tests, 22 learner-API tests / four intentional skips, all 11
+  typechecks, lint with zero errors / 12 warnings, and whitespace. Local test-database/live-provider authority only. **Safe to continue:** yes, to adoption/read-through.
 
 ### Open findings
 
-- Generate and inspect one bank from the qualified enrichment. Do not chase harmless omissions; fix
-  only unsafe acceptance or mechanics that prevent one coherent playable route.
+- Adopt/activate/read the nine-stop candidate and request an exact reference; excluded nodes stay absent and generation untouched.
+- Repeat the smallest read-through on an external Curated Source; U5 qualifies admission only.
 - U4's local verifier remains rejected; the remote assignment is qualified for source support and exact Concept identity, not general generation or source-less grounding.
-- Matching/impostor stay preserved but unqualified; the replacement Tide-margin impostor reveal itself makes a false dispatch-token claim, confirming exclusion.
-- Same-ID bank regeneration makes the cost report aggregate prior LiteLLM spend even after telemetry cleanup. Use the recorded attempt delta above and make reporting attempt/config-scoped before the final cost claim.
+- Matching/impostor remain preserved but unqualified. Same-ID reports need attempt scope for product telemetry; neither blocks the option-only trail.
