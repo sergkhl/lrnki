@@ -2,10 +2,10 @@
 
 ## TODO
 
-- **Curated-source learner workflow — U0–U6 complete; U7 supplement registered, fresh extraction NEXT.**
+- **Curated-source learner workflow — U0–U6 complete; U7 supplement extraction qualified, canonicalization NEXT.**
   Follow [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md).
-  Extract and inspect the registered addendum, then build and qualify its fresh source lineage
-  without weaker admission.
+  Canonicalize and inspect the three ordered harbor runs, then build the fresh graph only when
+  every gap and carrier identity remains sound.
 
 ## COMPLETED
 

@@ -7,11 +7,11 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0–U6 complete; U7 supplement registered, fresh extraction NEXT
+**Status:** In progress — U0–U6 complete; U7 supplement extraction qualified, canonicalization NEXT
 
-**NEXT:** Extract the registered Release Definitions Addendum and inspect its payload against all 18
-immutable blocks. Then canonicalize it with the prior harbor runs and build a fresh graph lineage;
-never inject its text downstream or adopt until the complete bank qualifies.
+**NEXT:** Canonicalize the ordered core, tide-margin, and addendum Extraction Runs under the current
+semantic identity. Inspect every merge, distinct, quarantine, and unavailable outcome; publish a
+fresh graph only when no carrier or gap identity is corrupted.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
 Curated Sources and automatically admits only source-backed learner assets. Anchor-less Synthetic
@@ -570,31 +570,31 @@ The plan is complete only when all of the following are true:
 
 ### U7 — complete-journey real-use qualification — 2026-08-26 — in progress
 
-- Graph `cc478c10-6857-452d-a9de-011757ffbb56` uses definition-role binding and carrier-clean rescue.
-  Enrichment `fbd1b430-beb0-4b40-80ca-731480a5face` has six anchors / 12 source-mentioned / zero
-  LLM-grounded nodes, verified passages, two inspected merges, 27 edges, and no title carrier.
+- Baseline graph `cc478c10-6857-452d-a9de-011757ffbb56` / enrichment `fbd1b430-beb0-4b40-80ca-731480a5face` have six anchors / 12 source-mentioned / zero LLM-grounded nodes, verified passages, 27 edges, and no title carrier.
 - Post-settlement fallback now activates only when every rejected lesson decision is deterministic
-  non-extractive settlement, constructs a distinct exact Definition Passage artifact, and sends it
-  through the same immutable-evidence and three-draw gate; unavailability and semantic rejection cannot
-  trigger it. Bank `acebfee04913`, 871 application / 210 LiteLLM / eight worker tests, three affected
-  typechecks, targeted lint, and whitespace passed.
-- The current bank has 12 lessons / six absences / 16 items / 38 typed rejections. Its 13-stop trail has
-  five gaps and returns `lesson_missing`; 11 option-selects are usable, two matching and three impostors
-  remain excluded, and zero learner rows exist. Release Sequence's fragmented source is one of seven gaps.
-- All 26 citations resolve and match immutable blocks; every option has one key, four unique choices,
-  and exact lesson-unit key/explanation. All 144 support calls succeeded on DeepInfra, and inspection
-  found no material false acceptance.
+  non-extractive settlement, constructs a distinct exact artifact, and uses the same evidence/support
+  gate; unavailability and semantic rejection cannot trigger it. Bank `acebfee04913`, 871 application /
+  210 LiteLLM / eight worker tests, three typechecks, lint, and whitespace passed.
+- The baseline bank has 12 lessons / six absences / 16 items / 38 rejections, five trail gaps, 11 usable
+  options, and zero learner rows. All 26 citations and exact option contracts match immutable blocks;
+  all 144 support calls succeeded on DeepInfra with no material false acceptance.
 - The current attempt used 231 calls / 359,997 tokens / $0.0187241824 over 478.792 seconds; some
-  spend is provider-estimated. It emitted exact `safety override` text and did not exercise fallback.
-  A replay of the prior paraphrase made zero neural calls and four deterministic rejects, then admitted
-  a distinct exact fallback on 3/3 draws, proving the repair without a lucky rerun.
-- The five-source manifest registers a Markdown addendum with seven unique Definition Passages and a non-title carrier negative.
-  Fourteen ingestion tests, typecheck, lint, whitespace, and normal `lrnki_test` registration passed; 18 located blocks persisted.
+  spend is estimated. A prior-paraphrase replay made zero neural calls and four deterministic rejects,
+  then admitted a distinct exact fallback on 3/3 draws without a lucky rerun.
+- Addendum extraction `4e92543a-7d86-4f25-9b9a-bb3b4ce15f48` under `bc1ef4197773` succeeded with
+  14 candidates / six core / 13 profiles / 15 definitions / 34 mentions / seven assertions. All seven
+  gaps have source-matched Definition Passages: six qualified as core and Release Sequence is valid
+  optional rescue evidence. All 49 passage rows matched one of 18 immutable blocks.
+- Neither the title nor `operator handbook` became a candidate; `Channel depth inputs` was rejected.
+  One loose optional `Clearance window` assertion cannot publish or ground rescue and remains inspectable.
+  The run used 42 calls / 82,157 tokens / $0.0097892824 over 207.971 seconds with zero retries: 20 MiMo
+  calls reached Xiaomi and 22 DeepSeek FP8 calls reached DeepInfra. MiMo quantization is undeclared,
+  so its evidence remains route-sensitive; some spend is provider-estimated.
 
 ### Open findings
 
-- Extract and inspect the registered addendum, then build its fresh graph/enrichment/bank lineage;
-  confirm all seven gaps and the non-exact carrier negative without weaker admission.
+- Canonicalize the three ordered harbor runs, inspect every identity decision, then build the fresh
+  graph/enrichment/bank lineage without weaker admission.
 - U4's local verifier remains rejected; the remote assignment is qualified for source support and exact Concept identity, not general generation or source-less grounding.
 - Matching/impostor stay preserved but unqualified; the replacement Tide-margin impostor reveal itself makes a false dispatch-token claim, confirming exclusion.
 - Same-ID bank regeneration makes the cost report aggregate prior LiteLLM spend even after telemetry cleanup. Use the recorded attempt delta above and make reporting attempt/config-scoped before the final cost claim.
