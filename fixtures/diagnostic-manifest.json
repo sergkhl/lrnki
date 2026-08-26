@@ -20,6 +20,15 @@
       "license": "Project test fixture"
     },
     {
+      "fixtureId": "diagnostic-harbor-release-definitions",
+      "path": "fixtures/markdown/lrnki-diagnostic-harbor-release-definitions.md",
+      "contentType": "text/markdown",
+      "declaredDomain": "harbor operations",
+      "title": "North Quay Release Definitions Addendum",
+      "source": "lrnki project-authored diagnostic source",
+      "license": "Project test fixture"
+    },
+    {
       "fixtureId": "diagnostic-microgrid-reserve",
       "path": "fixtures/plaintext/lrnki-diagnostic-microgrid-reserve-procedure.txt",
       "contentType": "text/plain",

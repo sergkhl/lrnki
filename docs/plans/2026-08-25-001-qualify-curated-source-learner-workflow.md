@@ -7,10 +7,10 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0–U6 complete; U7 fallback qualified, registered supplement NEXT
+**Status:** In progress — U0–U6 complete; U7 supplement registered, fresh extraction NEXT
 
-**NEXT:** Register one diagnostic Curated Source supplement that defines the seven genuine gaps and
-contains a non-exact carrier negative. Run it through normal Source Registration and a fresh lineage;
+**NEXT:** Extract the registered Release Definitions Addendum and inspect its payload against all 18
+immutable blocks. Then canonicalize it with the prior harbor runs and build a fresh graph lineage;
 never inject its text downstream or adopt until the complete bank qualifies.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
@@ -570,11 +570,9 @@ The plan is complete only when all of the following are true:
 
 ### U7 — complete-journey real-use qualification — 2026-08-26 — in progress
 
-- Extraction `349d7d8bf354`, canonicalization `c9f1b792acf4`, and graph `cc478c10-6857-452d-a9de-011757ffbb56`
-  exposed a false Channel-depth-forecast definition; definition-role binding repaired it. Rescue now
-  rejects exact registered-title identities and semantically settles other carriers. Enrichment `fbd1b430-beb0-4b40-80ca-731480a5face`
-  has six anchors / 12 source-mentioned / zero LLM-grounded nodes, verified passages, two inspected
-  merges, 27 edges, and no surviving title carrier.
+- Graph `cc478c10-6857-452d-a9de-011757ffbb56` uses definition-role binding and carrier-clean rescue.
+  Enrichment `fbd1b430-beb0-4b40-80ca-731480a5face` has six anchors / 12 source-mentioned / zero
+  LLM-grounded nodes, verified passages, two inspected merges, 27 edges, and no title carrier.
 - Post-settlement fallback now activates only when every rejected lesson decision is deterministic
   non-extractive settlement, constructs a distinct exact Definition Passage artifact, and sends it
   through the same immutable-evidence and three-draw gate; unavailability and semantic rejection cannot
@@ -588,13 +586,15 @@ The plan is complete only when all of the following are true:
   found no material false acceptance.
 - The current attempt used 231 calls / 359,997 tokens / $0.0187241824 over 478.792 seconds; some
   spend is provider-estimated. It emitted exact `safety override` text and did not exercise fallback.
-  A replay of the immutable prior paraphrase made zero neural calls and four deterministic rejects,
-  then admitted a distinct exact fallback on 3/3 draws, proving the repair without a lucky rerun.
+  A replay of the prior paraphrase made zero neural calls and four deterministic rejects, then admitted
+  a distinct exact fallback on 3/3 draws, proving the repair without a lucky rerun.
+- The five-source manifest registers a Markdown addendum with seven unique Definition Passages and a non-title carrier negative.
+  Fourteen ingestion tests, typecheck, lint, whitespace, and normal `lrnki_test` registration passed; 18 located blocks persisted.
 
 ### Open findings
 
-- Through Source Registration, add one supplement for the seven genuine gaps (including the four
-  trail blockers) and a non-exact carrier negative; never inject text downstream or weaken admission.
+- Extract and inspect the registered addendum, then build its fresh graph/enrichment/bank lineage;
+  confirm all seven gaps and the non-exact carrier negative without weaker admission.
 - U4's local verifier remains rejected; the remote assignment is qualified for source support and exact Concept identity, not general generation or source-less grounding.
 - Matching/impostor stay preserved but unqualified; the replacement Tide-margin impostor reveal itself makes a false dispatch-token claim, confirming exclusion.
 - Same-ID bank regeneration makes the cost report aggregate prior LiteLLM spend even after telemetry cleanup. Use the recorded attempt delta above and make reporting attempt/config-scoped before the final cost claim.

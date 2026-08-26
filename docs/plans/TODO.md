@@ -2,10 +2,10 @@
 
 ## TODO
 
-- **Curated-source learner workflow — U0–U6 complete; U7 fallback qualified, registered supplement NEXT.**
+- **Curated-source learner workflow — U0–U6 complete; U7 supplement registered, fresh extraction NEXT.**
   Follow [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md).
-  Supply the seven genuine teaching-unit gaps and a carrier negative through Source Registration,
-  then qualify a fresh lineage without weaker admission.
+  Extract and inspect the registered addendum, then build and qualify its fresh source lineage
+  without weaker admission.
 
 ## COMPLETED
 

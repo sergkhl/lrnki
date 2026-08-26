@@ -12,13 +12,15 @@ representative real Curated Source inspection or act as a standing semantic orac
 |--------|--------|--------|---------------------|
 | *Harbor Dispatch Core Protocol* | Harbor operations | Markdown | Carrier versus referent, expiring authority, conditional scope, and one intentionally undefined prerequisite |
 | *North Quay Tide Margin Supplement* | Harbor operations | HTML | A second Curated Source supplies the missing prerequisite, distinguishes related quantities, and limits a threshold to one context |
+| *North Quay Release Definitions Addendum* | Harbor operations | Markdown | Later source-supplied teaching-unit completion plus a non-title operator-handbook carrier negative |
 | *Islanded Microgrid Reserve Procedure* | Microgrid operations | Plaintext | Mode-qualified rules, measurement versus measured state, emergency exception, and ordered recovery |
 | *Archive Frame Encoding* | Data serialization | Markdown | Octet, Unicode scalar, and grapheme distinctions; equal-value non-equivalence; checksum scope |
 
-The harbor pair is the source-acquisition handoff example. A run over the core protocol alone names
-Tide Margin without defining its calculation. Registering the supplement through the same Curated
-Source interface supplies that evidence; tests must not inject the supplement directly into a model
-prompt or treat the core document's mention as a definition.
+The harbor set is the source-acquisition handoff example. The core protocol alone names Tide Margin
+without defining its calculation; the first supplement supplies it. The definitions addendum models
+later source-supplied gap closure and distinguishes the operator handbook carrier from its operational
+referents. Each addition enters through the same Curated Source interface: tests must not inject its
+text directly into a model prompt or treat a mention as a definition.
 
 These files are intentionally short enough for direct artifact inspection. Their prose may expose a
 candidate verifier or generator defect, but a fixed expected neural output must not become a

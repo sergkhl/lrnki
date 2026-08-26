@@ -29,7 +29,7 @@ const parsers = new StructuredDocumentParserRegistry([
 ]);
 
 test("project-authored diagnostic Curated Sources are distinct, registered, and parse into located blocks", async () => {
-  assert.equal(manifest.fixtures.length, 4);
+  assert.equal(manifest.fixtures.length, 5);
   assert.equal(new Set(manifest.fixtures.map((fixture) => fixture.fixtureId)).size, manifest.fixtures.length);
   assert.equal(new Set(manifest.fixtures.map((fixture) => fixture.path)).size, manifest.fixtures.length);
 
@@ -66,7 +66,11 @@ test("the harbor diagnostic models one prerequisite completed by a second Curate
   const harbor = manifest.fixtures.filter((fixture) => fixture.declaredDomain === "harbor operations");
   assert.deepEqual(
     harbor.map((fixture) => fixture.fixtureId),
-    ["diagnostic-harbor-dispatch-core", "diagnostic-harbor-tide-margin"]
+    [
+      "diagnostic-harbor-dispatch-core",
+      "diagnostic-harbor-tide-margin",
+      "diagnostic-harbor-release-definitions"
+    ]
   );
 
   const core = readFileSync(path.join(repoRoot, harbor[0].path), "utf8");
@@ -75,6 +79,43 @@ test("the harbor diagnostic models one prerequisite completed by a second Curate
   assert.match(supplement, /Tide margin<\/strong> is the predicted minimum water depth/i);
   assert.match(supplement, /forecast revision<\/strong> is the identified issue/i);
   assert.match(supplement, /Movement authorization<\/strong> is Harbor Control's explicit permission/i);
+});
+
+test("the release addendum supplies seven definition passages and a non-title carrier negative", async () => {
+  const fixture = manifest.fixtures.find(
+    (entry) => entry.fixtureId === "diagnostic-harbor-release-definitions"
+  );
+  assert.ok(fixture);
+  assert.notEqual(fixture.title.toLowerCase(), "operator handbook");
+
+  const document = await parsers.parserFor(fixture.contentType).parse({
+    sourceResourceId: fixture.fixtureId,
+    bytes: new Uint8Array(readFileSync(path.join(repoRoot, fixture.path))),
+    contentType: fixture.contentType
+  });
+  const definedTerms = [
+    "channel-depth forecast",
+    "Harbor Control authority",
+    "reservation registry",
+    "release sequence",
+    "channel entry authorization",
+    "loading condition",
+    "Vessel required water depth"
+  ];
+  for (const term of definedTerms) {
+    const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const definitionPattern = new RegExp(`${escapedTerm}\\s+is\\b`, "i");
+    assert.equal(
+      document.blocks.filter((block) => definitionPattern.test(block.text.replaceAll("**", ""))).length,
+      1,
+      `${term} should have exactly one native-parser definition block`
+    );
+  }
+  assert.equal(
+    document.blocks.filter((block) => /staff use the operator handbook to consult/i.test(block.text)).length,
+    1,
+    "the non-title carrier negative should resolve to one native-parser block"
+  );
 });
 
 test("the tracked source-support matrix preserves the fixed diagnostics and real-source controls", async () => {
