@@ -65,6 +65,42 @@ fail closed. When extending a graph, pass the same `--base` to both commands. Th
 database and, in semantic mode, LiteLLM, so load the repo-root `.env` as shown above before running
 them.
 
+### Curated-source learner readiness
+
+Supplied documents enter only through Source Registration. The manifest CLI is the current operator
+adapter; a future search or curation service must supply the same provenance, Declared Domain, bytes,
+and normalized document through the source-owned
+[`SourceRegistrationStorePort`](packages/ports/src/index.ts), never inject text into a downstream
+prompt or learner-asset stage.
+
+Use one source at a time to keep model spend bounded. Registration and every worker command below
+write to the database selected by the loaded repo-root `.env`; extraction, semantic canonicalization,
+enrichment, and study-asset generation make real production-model calls. Do not point this sequence
+at production without explicit authorization.
+
+```bash
+pnpm worker:kg register-from-manifest <manifest.json>
+pnpm worker:kg list-sources
+pnpm worker:kg run-extraction <sourceResourceId>
+# Canonicalize, inspect, and publish the successful run with the commands above.
+pnpm worker:kg enrich-graph-version <graphVersionId>
+pnpm worker:kg generate-study-items <enrichmentId>
+pnpm --filter @lrnki/learner-api evaluate:source-assets -- \
+  --enrichment-id=<enrichmentId> --output=tmp/source-assets.json
+```
+
+The evaluator is read-only over learner assets, makes the production source-support calls, and writes
+its joined payload/evidence/decision/cost report only under gitignored `tmp/`. It is quality evidence,
+not a standing oracle or an activation step. The exact current readiness and asset-identity contract
+is source-owned by
+[`sourceExpedition.ts`](packages/application/src/sourceExpedition.ts); the current capability holdouts
+are source-owned by
+[`learnerKnowledgeAvailability.ts`](packages/application/src/learnerKnowledgeAvailability.ts).
+Qualified candidates appear through the learner API without an operator approval or moderation
+step, and qualification is rechecked atomically at adoption, activation, and read time. Stable
+diagnostic and external read-through inputs are documented in
+[`fixtures/README.md`](fixtures/README.md).
+
 `docker compose up -d --build` starts the stack. Compose brings the application schema to current
 through the one-shot `migrate` service after PostgreSQL becomes healthy, and starts the learner API
 only after that migration and LiteLLM both succeed.

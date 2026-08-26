@@ -25,7 +25,7 @@ Historical architecture reviews were checked only to avoid proposing work that h
 
 | Original rank | Candidate | Strength | Why it made the cut |
 | ---: | --- | --- | --- |
-| 3 | Move Topic Expedition commands out of the Hono adapter | **Accepted for Source Expedition adoption** | The active plan moves authoritative source candidate qualification/adoption behind one application seam; paused synthetic start/retry are not reopened. |
+| 3 | Move Topic Expedition commands out of the Hono adapter | **Implemented for Source Expedition adoption** | One application module owns authoritative source candidate qualification/adoption; paused synthetic start/retry were not reopened. |
 | 4 | Own navigation memory once over raw platform storage adapters | **Strong — top unplanned recommendation** | Native and web files duplicate policy, and leaked identity construction has already caused a collision defect. |
 | 5 | Deepen the Learner App's Support Path interaction lifecycle | **Worth exploring** | Important sequencing and projected-state replacement are spread across two entry paths, rendering modules, and transport-shaped wrappers. |
 | 6 | Deepen persisted Study Item and Concept Lesson loading | **Worth exploring** | Raw row shapes and current-versus-pinned selection policy leak across three Postgres implementations. |
@@ -34,9 +34,9 @@ Historical architecture reviews were checked only to avoid proposing work that h
 
 ## Candidate 3 — Move Topic Expedition commands out of the Hono adapter
 
-**Recommendation strength:** Accepted for the Source Expedition adoption slice — tracked by
-[plan U2](../plans/2026-08-25-001-qualify-curated-source-learner-workflow.md#u2-deep-source-expedition-qualification-and-adoption).
-Synthetic Topic start/retry remain paused and outside that unit.
+**Recommendation strength:** Implemented for the Source Expedition adoption slice in the
+[application module](../../packages/application/src/sourceExpedition.ts). Synthetic Topic
+start/retry remain paused and outside that module.
 
 ### Files
 

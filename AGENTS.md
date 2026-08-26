@@ -110,6 +110,12 @@ definitions and repair their references in the same change.
     qualify provider contract and reachability operationally. Undeclared or ambiguous quantization
     fails closed as route-sensitive Model Assignment identity. Every zero-row inspection assertion
     must carry a positive control over the same rows in the same query.
+    For source-backed learner readiness, `FIX_FIRST` means an unsupported learner-visible material
+    claim, an incorrect or non-unique key, leakage across a trusted prerequisite, or no coherent
+    completable route. Sparse coverage, explicit asset absence, uncertain edges, and non-material
+    ordering, difficulty, wording, or recall imperfections are safe incompleteness when they cannot
+    change source support, grading, prerequisite closure, or completion; record them without
+    weakening an admission gate.
     `DATABASE_URL` lives in the repo-root `.env`; the shell and test runner do not auto-load it, so
     `process.env.DATABASE_URL` reads empty until you do. Load it before DB-touching commands
     (`node --env-file=.env …`, `tsx --env-file=.env …`, or `set -a; . ./.env; set +a`). Never defer

@@ -2,21 +2,28 @@
 
 ## TODO
 
-- **Curated-source learner workflow — U0–U8 complete; consolidation NEXT.**
+- **Curated-source learner workflow — consolidated; completed-plan deletion NEXT.**
   Follow [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md).
-  Consolidate the durable outcome, then delete the completed plan separately.
+  Delete the completed plan and its remaining index links separately.
 
 ## COMPLETED
 
-- **Anchor-less generation is paused and the source-backed diagnostic is handed back honestly
-  (2026-08-24).** One application policy refuses every production-shaped Synthetic Topic entry while
-  preserving ready curated-source expeditions. Rust source-backed Graph Enrichment was repaired and
-  inspected; option-select now copies its keyed claim losslessly from the Concept Lesson. The full
-  learner bank remains unqualified after independent lesson, distractor, matching, and impostor
-  counterexamples. The accepted precision-first successor is the
-  [curated-source learner workflow](./2026-08-25-001-qualify-curated-source-learner-workflow.md).
-  Detailed record: commits `a19baa0`, `60bb3f5`, `ccd3512`, `08de20d`, `8249d1d`, `02798fe`, and
-  `e5e147c`.
+- **The curated-source learner workflow is qualified and source-less knowledge remains held out
+  (2026-08-24–26).** Registered Curated Sources now reach an automatically qualified
+  [Source Expedition](../../CONTEXT.md#learner-experience) through one
+  [application module](../../packages/application/src/sourceExpedition.ts). It admits a
+  predecessor-closed route of current source-backed lessons and exact-reference option-select items;
+  incomplete or LLM-grounded nodes remain inspectable and absent. Exact-reference Support Paths use
+  the same immutable asset identity without generation or a supervisor wake.
+  [Synthetic Topic and generated knowledge paths](../../packages/application/src/learnerKnowledgeAvailability.ts)
+  remain paused while their implementations and historical artifacts are preserved; matching and
+  impostor items remain inspectable but outside current Source Expedition qualification. The local
+  verifier experiment was rejected, and the remote assignment is qualified only for source support
+  and exact Concept identity, not general or source-less generation. Durable acceptance policy lives
+  in [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md), operator
+  mechanics live in the root [README](../../README.md#curated-source-learner-readiness), and the
+  detailed implementation/evidence is retained in commits `a19baa0` through `e5e147c` and
+  `a2c5ed6` through `237ba70`.
 
 - **Synthetic Topic mechanics are retained and honestly held out (2026-08-22–24).** One shared
   admission module owns bounded role-specific verification, identity context, exact-key answer
@@ -76,25 +83,25 @@
 
 ## VALIDATION
 
-### Synthetic Topic pause and source-backed diagnostic — 2026-08-24
+### Curated-source learner workflow — 2026-08-26
 
-- Local automated: authenticated test-database coverage proves both topic mutations return 409 with
-  no expedition row or supervisor wake, while every production-shaped worker/supervisor seam reads
-  the same paused policy. The final repair passed 810 application, 194 infrastructure-litellm, and
-  eight worker tests, four affected typechecks, targeted ESLint with zero errors, prompt/config
-  identity checks, documentation links/caps, and whitespace checks.
-- Local real-use: repaired enrichment `ef5f3a7b-cb71-45f5-aec6-9abe7b4221cb` rejected the reproduced
-  unsafe ownership/function claim and retained a qualified Variable Binding definition. The final
-  351.038-second Study Item run made 268 successful calls / 554,153 tokens and persisted 33 lessons,
-  one lesson absence, 89 items, and 13 rejections. All 31 option keys projected exactly from their
-  lesson unit, including “for owned values.”
-- Quality boundary: the bank remains `FIX_FIRST`. Inspection found independently invalid Move lesson
-  context, String Capacity and `drop` distractor verdicts, a qualifier-dropping Variable Binding
-  matching prompt, and a true Pointer impostor. DeepSeek and GPT-OSS accepted explicit semantic
-  counterexamples; GLM 5.3 rejected forced named-tool choice and ignored a direct JSON Schema shape
-  while also accepting the bad claim. No Model Assignment changed.
-- Authority: the pause, repository mechanics, repaired source-backed graph, and exact projection are
-  qualified only at their exercised local layers. The learner bank is not useful/adoptable evidence;
-  no deployment, production write, browser/native, simulator/emulator, physical-device, or release
-  claim was made. The accepted next work and drain criteria are in the
-  [curated-source learner plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md).
+- Local external-source real-use: a current-schema NIST FIPS 197 source produced six lessons/options
+  and a five-stop prerequisite-closed qualified route with zero LLM-grounded nodes. Independent
+  inspection accepted 15/15 material claims, 15/15 distractor decisions, and 5/5 unique keys. A
+  disposable learner adopted and activated it, completed `Byte`, `block`, and exact-reference
+  `block cipher`, refused unsupported `permutation` without a row, made zero learner-window model
+  calls or supervisor wakes, and left zero learner rows after teardown.
+- Safe incompleteness: a fresh OpenStax Biology 2e source stayed unavailable when its six qualified
+  lessons/options left only one prerequisite-closed ready stop. Missing lessons excluded their
+  dependents without weakening admission. Matching/impostor and all source-less learner knowledge
+  remain unqualified and cannot enter this route.
+- Route/cost: the NIST journey used 146 calls / 194,053 tokens / about $0.019022261 including BYOK
+  estimates; independent evaluation used 45 calls / 59,947 tokens / $0.002852569. Both had zero
+  error rows.
+- Local automated: `pnpm test:db` passed its 9/9 migration matrix, reset guard, and workspace suites;
+  `pnpm check` passed schema parity, all 11 typechecks/tests, ESLint with zero errors / 12 warnings,
+  both production web builds, and 70/70 intercepted Playwright scenarios. Coordination links/caps
+  and whitespace passed.
+- Authority: this qualifies local test-database, production-model, persisted-artifact inspection,
+  local build, and intercepted-web evidence only. It makes no production-write, real-backend,
+  deployed, native, emulator/simulator, physical-device, or release claim.

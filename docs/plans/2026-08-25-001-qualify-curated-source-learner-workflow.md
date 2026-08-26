@@ -7,10 +7,10 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** Complete — U0–U8 complete; consolidation NEXT
+**Status:** Complete — U0–U8 complete and consolidated; deletion NEXT
 
-**NEXT:** Consolidate the durable outcome into its canonical owners, then delete this completed plan
-in a separate commit under the repository lifecycle rules.
+**NEXT:** Delete this completed plan and its remaining index links in a separate commit under the
+repository lifecycle rules.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
 Curated Sources and automatically admits only source-backed learner assets. Anchor-less Synthetic
