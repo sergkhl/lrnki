@@ -2,10 +2,10 @@
 
 ## TODO
 
-- **Curated-source learner workflow — U0–U6 complete; U7 lesson-role repair qualified, rescue carrier FIX_FIRST.**
+- **Curated-source learner workflow — U0–U6 complete; U7 carrier boundary qualified, fresh bank NEXT.**
   Follow [the execution-order plan](./2026-08-25-001-qualify-curated-source-learner-workflow.md).
-  Prevent the demoted diagnostic carrier from re-entering through source-mentioned rescue; do not
-  adopt or rerun the safely unavailable current bank.
+  Generate and inspect one bank for the carrier-clean enrichment; supply any missing definitions
+  through Source Registration, never weaker admission.
 
 ## COMPLETED
 

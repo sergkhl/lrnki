@@ -89,7 +89,11 @@ export async function executeExtractionRun(input: {
         admissionProposals,
         blockText,
         declaredDomain,
-        labelJudge: input.admissionLabelJudge
+        labelJudge: input.admissionLabelJudge,
+        sourceCarrierLabels: document.blocks
+          .filter((block) => block.blockType === "title")
+          .map((block) => block.text),
+        headingPathByBlockId: new Map(document.blocks.map((block) => [block.blockId, block.headingPath] as const))
       });
   });
 

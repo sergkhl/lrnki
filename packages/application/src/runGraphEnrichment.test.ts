@@ -14,6 +14,7 @@ import type {
 import { currentOperationContext } from "@lrnki/domain-core/operation-context";
 import { installNodeOperationContext } from "@lrnki/domain-core/operation-context-node";
 import type {
+  AdmissionLabelJudgmentPort,
   DifficultyPort,
   EnrichmentRunStorePort,
   GraphVersionStorePort,
@@ -399,6 +400,10 @@ function buildNodePorts(options: {
     model: "kg-independent-judge",
     judge: async () => ({ verdict: "durable", rationale: "foundation" })
   };
+  const rescueCarrierAdmissionJudge: AdmissionLabelJudgmentPort = {
+    model: "kg-independent-judge",
+    judge: async () => ({ labelKind: "concept", underlyingNounPhrase: "", groundingSpan: "", rationale: "names a concept" })
+  };
   let persisted: DerivedGraphLayer | undefined;
   let trace: EnrichmentRunTrace | undefined;
   let persistCalls = 0;
@@ -424,6 +429,7 @@ function buildNodePorts(options: {
     newNodeId,
     proposalPort,
     mintingDurabilityJudge,
+    rescueCarrierAdmissionJudge,
     sourceLessGroundingAdmission,
     prerequisiteOrdering,
     graphStore,
@@ -438,7 +444,7 @@ function buildNodePorts(options: {
 
 function rescueCandidate(label: string): NonCoreRescueCandidate {
   return {
-    runId: "run-1", declaredDomain: "x", candidateKey: label.toLowerCase(), canonicalLabel: label, normalizedLabel: label.toLowerCase(), aliases: [], tier: "reject",
+    runId: "run-1", sourceTitle: "X source guide", declaredDomain: "x", candidateKey: label.toLowerCase(), canonicalLabel: label, normalizedLabel: label.toLowerCase(), aliases: [], tier: "reject",
     definitions: [],
     mentions: [{ sourceResourceId: "s1", sourceBlockId: "blk-r", evidenceQuote: `${label} is mentioned`, blockText: `Here ${label} is mentioned in prose`, headingPath: [], locator: {} }]
   };
@@ -452,6 +458,7 @@ function runNodes(ports: ReturnType<typeof buildNodePorts>) {
     missingPrerequisiteProposal: ports.proposalPort,
     mintingDurabilityJudge: ports.mintingDurabilityJudge,
     sourceLessGroundingAdmission: ports.sourceLessGroundingAdmission,
+    rescueCarrierAdmissionJudge: ports.rescueCarrierAdmissionJudge,
     difficulty: ports.difficulty,
     enrichmentStore: ports.enrichmentStore as EnrichmentRunStorePort,
     newNodeId: ports.newNodeId
@@ -501,6 +508,7 @@ test("source-mentioned rescue remains available when LLM-grounded minting depend
     graphStore: ports.graphStore as GraphVersionStorePort,
     prerequisiteOrdering: ports.prerequisiteOrdering,
     sourceMentionedNodesAvailable: true,
+    rescueCarrierAdmissionJudge: ports.rescueCarrierAdmissionJudge,
     difficulty: ports.difficulty,
     enrichmentStore: ports.enrichmentStore as EnrichmentRunStorePort,
     newNodeId: ports.newNodeId
@@ -520,7 +528,7 @@ test("U3: a hollow rescued definition passage is dropped before it becomes learn
   // `source_mentioned` definition — exactly the learner-facing surface generateStudyItemBank
   // turns into a `definition` study item. The U3 judge vetoes the bare name.
   const hollow: NonCoreRescueCandidate = {
-    runId: "run-1", declaredDomain: "x", candidateKey: "pointer", canonicalLabel: "Pointer", normalizedLabel: "pointer", aliases: [], tier: "optional",
+    runId: "run-1", sourceTitle: "X source guide", declaredDomain: "x", candidateKey: "pointer", canonicalLabel: "Pointer", normalizedLabel: "pointer", aliases: [], tier: "optional",
     definitions: [{ sourceResourceId: "s1", sourceBlockId: "blk-d", evidenceQuote: "Pointer", blockText: "Pointer", headingPath: [], locator: {} }],
     mentions: [{ sourceResourceId: "s1", sourceBlockId: "blk-r", evidenceQuote: "Pointer is mentioned", blockText: "Here Pointer is mentioned in prose", headingPath: [], locator: {} }]
   };
@@ -541,6 +549,7 @@ test("U3: a hollow rescued definition passage is dropped before it becomes learn
     missingPrerequisiteProposal: ports.proposalPort,
     mintingDurabilityJudge: ports.mintingDurabilityJudge,
     sourceLessGroundingAdmission: ports.sourceLessGroundingAdmission,
+    rescueCarrierAdmissionJudge: ports.rescueCarrierAdmissionJudge,
     rescuedDefinitionQualityJudge: judge,
     difficulty: ports.difficulty,
     enrichmentStore: ports.enrichmentStore as EnrichmentRunStorePort,
@@ -555,7 +564,7 @@ test("U3: a hollow rescued definition passage is dropped before it becomes learn
 
 test("U3: a genuinely defining rescued passage is kept when the judge is wired", async () => {
   const defining: NonCoreRescueCandidate = {
-    runId: "run-1", declaredDomain: "x", candidateKey: "pointer", canonicalLabel: "Pointer", normalizedLabel: "pointer", aliases: [], tier: "optional",
+    runId: "run-1", sourceTitle: "X source guide", declaredDomain: "x", candidateKey: "pointer", canonicalLabel: "Pointer", normalizedLabel: "pointer", aliases: [], tier: "optional",
     definitions: [{ sourceResourceId: "s1", sourceBlockId: "blk-d", evidenceQuote: "A pointer is a variable that stores a memory address", blockText: "A pointer is a variable that stores a memory address.", headingPath: [], locator: {} }],
     mentions: [{ sourceResourceId: "s1", sourceBlockId: "blk-r", evidenceQuote: "Pointer is mentioned", blockText: "Here Pointer is mentioned in prose", headingPath: [], locator: {} }]
   };
@@ -571,6 +580,7 @@ test("U3: a genuinely defining rescued passage is kept when the judge is wired",
     missingPrerequisiteProposal: ports.proposalPort,
     mintingDurabilityJudge: ports.mintingDurabilityJudge,
     sourceLessGroundingAdmission: ports.sourceLessGroundingAdmission,
+    rescueCarrierAdmissionJudge: ports.rescueCarrierAdmissionJudge,
     rescuedDefinitionQualityJudge: keepAll,
     difficulty: ports.difficulty,
     enrichmentStore: ports.enrichmentStore as EnrichmentRunStorePort,
@@ -587,6 +597,7 @@ test("semantic dedup persists an absorbed source definition on the surviving sou
   const definitionQuote = "A forecast revision is the identified issue in the forecast used for one planned transit time.";
   const update: NonCoreRescueCandidate = {
     runId: "run-1",
+    sourceTitle: "X source guide",
     declaredDomain: "x",
     candidateKey: "forecast-update",
     canonicalLabel: "Forecast update",
@@ -601,6 +612,7 @@ test("semantic dedup persists an absorbed source definition on the surviving sou
   };
   const revision: NonCoreRescueCandidate = {
     runId: "run-2",
+    sourceTitle: "X supplement",
     declaredDomain: "x",
     candidateKey: "forecast-revision",
     canonicalLabel: "Forecast revision",
@@ -643,6 +655,7 @@ test("semantic dedup persists an absorbed source definition on the surviving sou
     graphStore: ports.graphStore as GraphVersionStorePort,
     prerequisiteOrdering: ports.prerequisiteOrdering,
     sourceMentionedNodesAvailable: true,
+    rescueCarrierAdmissionJudge: ports.rescueCarrierAdmissionJudge,
     rescuedDefinitionQualityJudge: keepDefinitions,
     nodeEmbedding,
     nodeMergeAdjudicator,
@@ -770,6 +783,7 @@ test("a minting run hands its operation bracket to admission and uses fine timel
     missingPrerequisiteProposal: ports.proposalPort,
     mintingDurabilityJudge: ports.mintingDurabilityJudge,
     sourceLessGroundingAdmission: ports.sourceLessGroundingAdmission,
+    rescueCarrierAdmissionJudge: ports.rescueCarrierAdmissionJudge,
     difficulty: ports.difficulty,
     enrichmentStore: ports.enrichmentStore as EnrichmentRunStorePort,
     newNodeId: ports.newNodeId,

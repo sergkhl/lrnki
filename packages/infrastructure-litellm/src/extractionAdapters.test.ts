@@ -1,13 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { SourceBlock } from "@lrnki/domain-core";
+import { STAGE_TAGS, type SourceBlock } from "@lrnki/domain-core";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import {
   admissionDecisionsDescriptor,
   createAdmissionLabelJudgmentPort,
+  createRescueCarrierAdmissionJudgmentPort,
   createAssertionEntailmentJudgmentPort,
   createDefinitionPassageQualityJudgmentPort,
-  renderBlocks
+  renderBlocks,
+  rescueCarrierAdmissionJudgmentDescriptor
 } from "./extractionAdapters";
 import { renderPromptFile } from "./promptFile";
 import {
@@ -253,6 +255,46 @@ test("admission judge coerces an ungrounded source-artifact verdict back to conc
   });
   assert.equal(result.labelKind, "concept");
   assert.match(result.rationale, /ungrounded source_artifact verdict kept core/);
+});
+
+test("rescue carrier admission has its own stage identity and renders source-title plus heading provenance", async () => {
+  let call: { tags?: string[] } | undefined;
+  const client = {
+    async call(input: unknown) {
+      call = input as { tags?: string[] };
+      return {
+        labelKind: "source_artifact",
+        underlyingNounPhrase: "",
+        groundingSpan: "Harbor Dispatch Core Protocol",
+        rationale: "registered carrier title"
+      };
+    }
+  } as unknown as LiteLlmForcedToolClient;
+  const port = createRescueCarrierAdmissionJudgmentPort(client);
+  const input = {
+    declaredDomain: "harbor operations",
+    label: "Harbor Dispatch Core Protocol",
+    aliases: [],
+    evidenceQuotes: ["Harbor Dispatch Core Protocol"],
+    sourceCarrierLabels: ["Harbor Dispatch Core Protocol"],
+    evidenceContexts: [{
+      evidenceQuote: "Harbor Dispatch Core Protocol",
+      headingPath: ["Harbor Dispatch Core Protocol"],
+      passageType: "mention" as const
+    }]
+  };
+
+  const rendered = renderPromptFile(
+    rescueCarrierAdmissionJudgmentDescriptor.promptPath,
+    rescueCarrierAdmissionJudgmentDescriptor.templateData(input)
+  );
+  const user = rendered.messages.at(-1)?.content ?? "";
+  assert.match(user, /Registered source-carrier labels.*Harbor Dispatch Core Protocol/);
+  assert.match(user, /headingPath="Harbor Dispatch Core Protocol"; passageType=mention/);
+  assert.equal(rescueCarrierAdmissionJudgmentDescriptor.stageTag, STAGE_TAGS.rescueCarrierAdmission);
+  assert.equal(port.model, "kg-independent-judge");
+  assert.equal((await port.judge(input)).labelKind, "source_artifact");
+  assert.deepEqual(call?.tags, [STAGE_TAGS.rescueCarrierAdmission]);
 });
 
 test("admission judge grounding tolerates markdown and typographic-quote noise", async () => {

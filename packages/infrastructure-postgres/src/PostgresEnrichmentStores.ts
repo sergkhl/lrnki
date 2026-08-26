@@ -164,7 +164,7 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
   // touches the asserted core.
   async nonCoreRescueCandidates(graphVersionId: string): Promise<NonCoreRescueCandidate[]> {
     type CandidateRow = {
-      run_id: string; declared_domain: string; candidate_key: string; canonical_label: string;
+      run_id: string; source_title: string; declared_domain: string; candidate_key: string; canonical_label: string;
       normalized_label: string; aliases: string[]; tier: string;
       source_block_id: string; evidence_quote: string; block_text: string;
       heading_path: string[]; locator: unknown; block_source_resource_id: string;
@@ -172,7 +172,7 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
 
     // Mentions: both `optional` and `reject` tiers (the inverted definition exclusion is gone).
     const mentionRows = await this.sql<CandidateRow[]>`
-      SELECT er.run_id, sr.declared_domain, cc.candidate_key, cc.canonical_label,
+      SELECT er.run_id, sr.title AS source_title, sr.declared_domain, cc.candidate_key, cc.canonical_label,
              cc.normalized_label, cc.aliases, ad.tier,
              sb.source_block_id, ccm.evidence_quote, sb.text AS block_text,
              sb.heading_path, sb.locator, sd.source_resource_id AS block_source_resource_id
@@ -190,7 +190,7 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
 
     // Definitions: `optional` tier only (KTD3). Reuses the run-level CEP Definition Passages.
     const definitionRows = await this.sql<CandidateRow[]>`
-      SELECT er.run_id, sr.declared_domain, cc.candidate_key, cc.canonical_label,
+      SELECT er.run_id, sr.title AS source_title, sr.declared_domain, cc.candidate_key, cc.canonical_label,
              cc.normalized_label, cc.aliases, ad.tier,
              sb.source_block_id, rep.evidence_quote, sb.text AS block_text,
              sb.heading_path, sb.locator, sd.source_resource_id AS block_source_resource_id
@@ -215,6 +215,7 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
       if (!candidate) {
         candidate = {
           runId: row.run_id,
+          sourceTitle: row.source_title,
           declaredDomain: row.declared_domain,
           candidateKey: row.candidate_key,
           canonicalLabel: row.canonical_label,

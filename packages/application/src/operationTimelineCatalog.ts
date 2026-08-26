@@ -48,6 +48,7 @@ export const OPERATION_TIMELINE_CATALOG: Record<OperationType, readonly Operatio
     llm(STAGE_TAGS.conceptSetSynthesis),
     llm(STAGE_TAGS.knowledgeBoundaryProbe),
     llm(STAGE_TAGS.prerequisiteOrdering),
+    llm(STAGE_TAGS.rescueCarrierAdmission),
     llm(STAGE_TAGS.rescueDurability),
     llm(STAGE_TAGS.rescuedNodeLabeling),
     llm(STAGE_TAGS.rescueDefinitionQuality),

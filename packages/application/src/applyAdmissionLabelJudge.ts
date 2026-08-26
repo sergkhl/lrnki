@@ -24,6 +24,8 @@ export async function applyAdmissionLabelJudge(input: {
   candidates: RunCandidate[];
   declaredDomain: string;
   judge: AdmissionLabelJudgmentPort;
+  sourceCarrierLabels?: string[];
+  headingPathByBlockId?: ReadonlyMap<string, readonly string[]>;
   concurrency?: number;
 }): Promise<RunCandidate[]> {
   // The whole control flow rides the Measured Judge Gate (rule 16, gateByJudgment):
@@ -33,13 +35,20 @@ export async function applyAdmissionLabelJudge(input: {
   return gateByJudgment(input.candidates, {
     concurrency: input.concurrency,
     skip: (candidate) => (candidate.admission.tier === "core" ? undefined : candidate),
-    judge: (candidate) =>
-      input.judge.judge({
+    judge: (candidate) => {
+      const evidence = candidateEvidence(candidate);
+      return input.judge.judge({
         declaredDomain: input.declaredDomain,
         label: candidate.canonicalLabel,
         aliases: candidate.aliases,
-        evidenceQuotes: candidateEvidenceQuotes(candidate)
-      }),
+        evidenceQuotes: [...new Set(evidence.map((item) => item.evidenceQuote))],
+        sourceCarrierLabels: input.sourceCarrierLabels,
+        evidenceContexts: evidence.map((item) => ({
+          evidenceQuote: item.evidenceQuote,
+          headingPath: [...(input.headingPathByBlockId?.get(item.blockId) ?? [])]
+        }))
+      });
+    },
     onVerdict: (candidate, judgment) =>
       judgment.labelKind === "concept" ? candidate : demote(candidate, judgment),
     onUnavailable: (_candidate, error) => { throw error; }
@@ -50,15 +59,20 @@ export async function applyAdmissionLabelJudge(input: {
 // eligibility-criterion and organizing-power evidence. All passed `isVerifiable`
 // in `applyAdmissionPolicy`, so the judge's grounding can only match real source
 // text.
-function candidateEvidenceQuotes(candidate: RunCandidate): string[] {
-  const quotes = [
-    ...candidate.mentions.map((mention) => mention.evidenceQuote),
-    ...candidate.admission.standaloneLearningObjective.evidence.map((item) => item.evidenceQuote),
-    ...candidate.admission.establishedDomainMeaning.evidence.map((item) => item.evidenceQuote),
-    ...candidate.admission.definitionBearingTreatment.evidence.map((item) => item.evidenceQuote),
-    ...candidate.admission.organizingPower.aspects.map((aspect) => aspect.evidence.evidenceQuote)
+function candidateEvidence(candidate: RunCandidate): { blockId: string; evidenceQuote: string }[] {
+  const evidence = [
+    ...candidate.mentions,
+    ...candidate.admission.standaloneLearningObjective.evidence,
+    ...candidate.admission.establishedDomainMeaning.evidence,
+    ...candidate.admission.definitionBearingTreatment.evidence,
+    ...candidate.admission.organizingPower.aspects.map((aspect) => aspect.evidence)
   ];
-  return [...new Set(quotes.filter((quote) => quote.trim().length > 0))];
+  const byIdentity = new Map<string, { blockId: string; evidenceQuote: string }>();
+  for (const item of evidence) {
+    if (item.evidenceQuote.trim().length === 0) continue;
+    byIdentity.set(`${item.blockId}\u0000${item.evidenceQuote}`, item);
+  }
+  return [...byIdentity.values()];
 }
 
 function demote(

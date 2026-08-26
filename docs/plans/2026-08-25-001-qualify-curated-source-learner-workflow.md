@@ -7,12 +7,12 @@ execution: code
 
 # Qualify the Curated-Source Learner Workflow
 
-**Status:** In progress — U0–U6 complete; U7 lesson-role repair qualified, rescue carrier FIX_FIRST
+**Status:** In progress — U0–U6 complete; U7 carrier boundary qualified, fresh bank NEXT
 
-**NEXT:** Prevent a demoted Curated Source carrier from re-entering as a `source_mentioned` rescue;
-use the diagnostic protocol title plus a real prerequisite as negative/positive controls, bind the
-policy into Graph Enrichment identity, and generate one fresh enrichment only after automation
-passes. Do not adopt, open Support Path, or rerun the current bank.
+**NEXT:** Generate one Study Item Bank for enrichment
+`fbd1b430-beb0-4b40-80ca-731480a5face`; inspect every lesson, option, absence, and qualification
+beside evidence, then supply any missing definitions through a new registered Curated Source rather
+than relaxing admission. Do not adopt or open Support Path unless the whole candidate qualifies.
 
 **Decision state:** Accepted by the owner on 2026-08-25. The current product starts with registered
 Curated Sources and automatically admits only source-backed learner assets. Anchor-less Synthetic
@@ -571,17 +571,16 @@ The plan is complete only when all of the following are true:
 
 ### U7 — complete-journey real-use qualification — 2026-08-26 — in progress
 
-- Identities extraction `349d7d8bf354`, canonicalization `c9f1b792acf4`, and enrichment
-  `7acf2b563308` produced two clean six-core runs, artifact `176671df-f653-43d8-a349-e7577175f3ac`,
-  graph `cc478c10-6857-452d-a9de-011757ffbb56`, and typed enrichment `c06a62c8-2962-4648-93e6-726a0cea7f7a` with zero LLM-grounded nodes.
+- Identities extraction `349d7d8bf354`, canonicalization `c9f1b792acf4`, and graph `cc478c10-6857-452d-a9de-011757ffbb56` produced two clean six-core runs. Source structure moves future extraction identity to `bc1ef4197773`; no stale extraction is relabeled.
 - Its first `21e87c60d969` bank was a valid negative control: 12 lessons / 7 absences / 16 items / 41 rejections and 210 calls / 322,113 tokens / $0.0206015216. A Forecast-revision mention was falsely promoted as the definition of Channel-depth forecast; nothing was adopted.
 - Lesson assembly now requires typed Definition Passage evidence for a `definition`, before neural spend, while mention-backed examples remain eligible. The load-bearing bank identity is `9674922fd8c3`; 865 application and 209 LiteLLM tests, affected typechecks, lint with zero errors, and whitespace pass.
 - The one replacement bank retained 11 lessons / 8 absences / 16 items / 41 rejections. All 15 lesson citations match immutable blocks, all 11 definitions match typed definition evidence, and all 11 option keys/explanations exactly equal their selected lesson unit with one key and four unique options. Channel-depth forecast has zero lesson/item plus one explicit absence; Forecast revision remains correctly taught.
-- The 13-stop trail still has five explicit lesson gaps and qualification returns `lesson_missing`; no adoption or Support Path ran. Replacement spend isolated by attempt delta is 219 calls / 342,063 tokens / $0.0234629196 over 546,273 ms. A visible carrier rescue is a separate material false acceptance, so U7 remains `FIX_FIRST`.
+- Rescue now refuses an exact registered-source-title identity before re-labeling and applies the grounded carrier judge to every other candidate, failing the enrichment if unavailable. A direct neural probe still conflated the title with its subject; the typed collision is the guarantee, not prompt luck. The 870 application / 210 LiteLLM / eight worker tests, four typechecks, lint, and whitespace pass.
+- Fresh enrichment `fbd1b430-beb0-4b40-80ca-731480a5face` under identity `2d3d853dd755` dropped both source titles, retained `token validation`, verified every surviving source passage, and persisted six anchors / 12 source-mentioned / zero LLM-grounded nodes, two inspected collapsing merges, and 17 certain / 10 uncertain edges. It used 73 calls / 149,838 tokens / $0.0201664148 over 250,691 ms; some spend is provider-estimated. No bank, adoption, or Support Path ran.
 
 ### Open findings
 
-- Fix the established carrier/referent problem at source-mentioned rescue: `Harbor Dispatch Core Protocol` was correctly demoted from core yet re-entered as a visible rescued lesson. Then reassess five safe absences—channel entry authorization, safety override, Harbor Control authority, reservation registry, and tide-margin dependency—through normal Curated Source evidence, never by relaxing qualification.
+- Generate and inspect one bank for the carrier-clean enrichment. Reassess channel entry authorization, safety override, Harbor Control authority, reservation registry, and the absorbed tide-margin dependency through normal Curated Source evidence; register a diagnostic supplement for any real definition gap. Before the final general carrier claim, add a non-exact carrier negative because the exact-title collision, not the neural probe alone, owns today's fix.
 - U4's local verifier remains rejected; the remote assignment is qualified for source support and exact Concept identity, not general generation or source-less grounding.
 - Matching/impostor stay preserved but unqualified; the replacement Tide-margin impostor reveal itself makes a false dispatch-token claim, confirming exclusion.
 - Same-ID bank regeneration makes the cost report aggregate prior LiteLLM spend even after telemetry cleanup. Use the recorded attempt delta above and make reporting attempt/config-scoped before the final cost claim.

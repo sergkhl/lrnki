@@ -405,6 +405,12 @@ type AdmissionLabelInput = {
   label: string;
   aliases: string[];
   evidenceQuotes: string[];
+  sourceCarrierLabels?: string[];
+  evidenceContexts?: {
+    evidenceQuote: string;
+    headingPath: string[];
+    passageType?: "definition" | "mention";
+  }[];
 };
 
 export const admissionLabelJudgmentDescriptor: NeuralStageDescriptor<
@@ -421,16 +427,52 @@ export const admissionLabelJudgmentDescriptor: NeuralStageDescriptor<
     declaredDomain: input.declaredDomain,
     label: input.label,
     aliases: renderAliases(input.aliases),
+    sourceCarrierLabels: renderAliases(input.sourceCarrierLabels ?? []),
+    evidenceContexts: renderAdmissionEvidenceContexts(input.evidenceContexts ?? []),
     evidenceQuotes: input.evidenceQuotes.map((quote, index) => `[${index + 1}] "${quote}"`).join("\n")
   }),
   mapResult: (result, input) => groundedAdmissionLabelJudgment(result, input.evidenceQuotes)
 };
 
+// The same semantic judgment and forced schema at the rescue boundary, with a distinct
+// stage tag so Graph Enrichment owns its spend/config identity independently from
+// Extraction. Source titles and heading paths arrive through the shared input above;
+// the application still decides which verdict can subtract output.
+export const rescueCarrierAdmissionJudgmentDescriptor: NeuralStageDescriptor<
+  AdmissionLabelInput,
+  AdmissionLabelJudgment,
+  AdmissionLabelJudgment
+> = {
+  ...admissionLabelJudgmentDescriptor,
+  stageTag: STAGE_TAGS.rescueCarrierAdmission
+};
+
 export function createAdmissionLabelJudgmentPort(client: LiteLlmForcedToolClient): AdmissionLabelJudgmentPort {
+  return createAdmissionLabelPort(client, admissionLabelJudgmentDescriptor);
+}
+
+export function createRescueCarrierAdmissionJudgmentPort(client: LiteLlmForcedToolClient): AdmissionLabelJudgmentPort {
+  return createAdmissionLabelPort(client, rescueCarrierAdmissionJudgmentDescriptor);
+}
+
+function createAdmissionLabelPort(
+  client: LiteLlmForcedToolClient,
+  descriptor: NeuralStageDescriptor<AdmissionLabelInput, AdmissionLabelJudgment, AdmissionLabelJudgment>
+): AdmissionLabelJudgmentPort {
   return {
-    model: readPromptFile(admissionLabelJudgmentDescriptor.promptPath).model,
-    judge: (input) => executeForcedToolStage(client, admissionLabelJudgmentDescriptor, input)
+    model: readPromptFile(descriptor.promptPath).model,
+    judge: (input) => executeForcedToolStage(client, descriptor, input)
   };
+}
+
+function renderAdmissionEvidenceContexts(
+  contexts: NonNullable<AdmissionLabelInput["evidenceContexts"]>
+): string {
+  if (contexts.length === 0) return "none supplied";
+  return contexts.map((context, index) => {
+    const passageType = context.passageType ? `; passageType=${context.passageType}` : "";
+    return `[${index + 1}] headingPath=${renderHeadingPath(context.headingPath)}${passageType}; quote="${context.evidenceQuote}"`;
+  }).join("\n");
 }
 
 function renderEligibleConcept(input: CoreSelectionInput, decision: ToolAdmissionProposal): string {

@@ -9,6 +9,7 @@ import type {
   SourceMentionGroundingPassage
 } from "@lrnki/domain-core";
 import type {
+  AdmissionLabelJudgmentPort,
   MintingDurabilityJudgmentPort,
   MissingPrerequisiteProposalPort,
   RescueDurabilityJudgmentPort,
@@ -16,6 +17,7 @@ import type {
 } from "@lrnki/ports";
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import { applyMintingDurabilityJudge, type ReservedMintingProposal } from "./applyMintingDurabilityJudge";
+import { applyRescueCarrierAdmissionJudge } from "./applyRescueCarrierAdmissionJudge";
 import { applyRescueDurabilityJudge } from "./applyRescueDurabilityJudge";
 import { applyRescuedNodeLabeling } from "./applyRescuedNodeLabeling";
 import { passthroughStageBracket, type StageBracket } from "./runProgressReporter";
@@ -75,6 +77,12 @@ type EnrichmentNodeMintingDependencies =
 export async function assembleEnrichmentNodes(input: {
   anchors: MintingAnchor[];
   rescueCandidates: NonCoreRescueCandidate[];
+  // Required whenever an aggregated rescue candidate exists. The grounded semantic
+  // gate sees original candidate labels plus source-carrier provenance before any
+  // canonical re-label can transfer a document carrier into a conceptual referent.
+  // Unavailable judgment fails the enrichment; source-backed precision has no
+  // fail-open bypass at this boundary.
+  rescueCarrierAdmissionJudge?: AdmissionLabelJudgmentPort;
   // Optional measured rescue durability judge (U3). When provided, each AGGREGATED
   // rescued node is judged against its same-domain anchors before minting runs; a
   // node judged non-durable (confident + grounded) is dropped with a recorded
@@ -135,16 +143,20 @@ export async function assembleEnrichmentNodes(input: {
 
   // --- Rescue: source_mentioned nodes from member-run non-core mentions ----------
   const rescuedByKey = new Map<string, SourceMentionedEnrichmentNode>();
+  const sourceCarrierLabelsByNodeId = new Map<string, Set<string>>();
   for (const candidate of input.rescueCandidates) {
     if (isTaken(candidate.declaredDomain, candidate.normalizedLabel)) {
       // Already an anchor or an earlier member run's rescue — merge its mentions so a
       // concept appearing in two member runs collapses to a single node (R7, KTD5).
       const existing = rescuedByKey.get(`${candidate.declaredDomain}|${candidate.normalizedLabel}`);
-      if (existing) existing.groundingPassages.push(...rescuePassages(candidate));
+      if (existing) {
+        existing.groundingPassages.push(...rescuePassages(candidate));
+        sourceCarrierLabelsByNodeId.get(existing.derivedNodeId)?.add(candidate.sourceTitle);
+      }
       continue;
     }
     take(candidate.declaredDomain, candidate.normalizedLabel, candidate.canonicalLabel);
-    rescuedByKey.set(`${candidate.declaredDomain}|${candidate.normalizedLabel}`, {
+    const node: SourceMentionedEnrichmentNode = {
       nodeKind: "enrichment",
       derivedNodeId: input.newNodeId(),
       groundingOrigin: "source_mentioned",
@@ -155,9 +167,35 @@ export async function assembleEnrichmentNodes(input: {
       declaredDomain: candidate.declaredDomain,
       aliases: candidate.aliases,
       groundingPassages: rescuePassages(candidate)
-    });
+    };
+    rescuedByKey.set(`${candidate.declaredDomain}|${candidate.normalizedLabel}`, node);
+    sourceCarrierLabelsByNodeId.set(node.derivedNodeId, new Set([candidate.sourceTitle]));
   }
   const aggregatedRescuedNodes = [...rescuedByKey.values()];
+
+  // --- Source-carrier admission over ORIGINAL aggregated rescue labels -----------
+  // This must precede both durability and canonical re-labeling. A source title cannot
+  // first be renamed to one of the concepts it contains and then pass as that referent.
+  // Dropped labels remain reserved in `takenByDomain`, so minting cannot resurrect the
+  // carrier under the same label. Unlike the recall-oriented extraction gate, an
+  // unavailable call fails this precision-first enrichment rather than publishing a
+  // potentially unsafe rescue node.
+  let rescuedNodes = aggregatedRescuedNodes;
+  let rescueDispositions: RescueDisposition[] = [];
+  if (aggregatedRescuedNodes.length > 0) {
+    if (!input.rescueCarrierAdmissionJudge) {
+      throw new Error("assembleEnrichmentNodes requires source-carrier admission for rescued nodes.");
+    }
+    const carrierJudged = await stage(STAGE_TAGS.rescueCarrierAdmission, () =>
+      applyRescueCarrierAdmissionJudge({
+        rescuedNodes: aggregatedRescuedNodes,
+        sourceCarrierLabelsByNodeId,
+        judge: input.rescueCarrierAdmissionJudge!
+      })
+    );
+    rescuedNodes = carrierJudged.keptNodes;
+    rescueDispositions = carrierJudged.dispositions;
+  }
 
   // --- Durability judging over AGGREGATED rescue nodes (U3) -----------------------
   // The judge runs once per merged candidate (so it sees the node's full aggregated
@@ -165,9 +203,7 @@ export async function assembleEnrichmentNodes(input: {
   // fail-open-with-flag. Dropped nodes leave the derived layer but their labels stay
   // in `takenByDomain`, so the minting pass below cannot resurrect a dropped concept
   // as an `llm_grounded` node. When no judge is provided, every node is accepted.
-  let rescuedNodes = aggregatedRescuedNodes;
-  let rescueDispositions: RescueDisposition[] = [];
-  if (input.rescueDurabilityJudge && aggregatedRescuedNodes.length > 0) {
+  if (input.rescueDurabilityJudge && rescuedNodes.length > 0) {
     const anchorsByDomain = new Map<string, { canonicalLabel: string; definitionQuotes: string[] }[]>();
     for (const anchor of input.anchors) {
       const existing = anchorsByDomain.get(anchor.declaredDomain) ?? [];
@@ -176,13 +212,13 @@ export async function assembleEnrichmentNodes(input: {
     }
     const judged = await stage(STAGE_TAGS.rescueDurability, () =>
       applyRescueDurabilityJudge({
-        rescuedNodes: aggregatedRescuedNodes,
+        rescuedNodes,
         anchorsByDomain,
         judge: input.rescueDurabilityJudge!
       })
     );
     rescuedNodes = judged.keptNodes;
-    rescueDispositions = judged.dispositions;
+    rescueDispositions = mergeRescueDispositions(rescueDispositions, judged.dispositions);
   }
 
   // --- Rescued-Node Canonical Labeling over KEPT durable nodes (TODO #1) ----------
@@ -334,6 +370,27 @@ export async function assembleEnrichmentNodes(input: {
   }
 
   return { rescuedNodes, mintedNodes, rescueDispositions, mintingDispositions, groundingAdmissionDispositions };
+}
+
+// Carrier admission and durability are two judgments over one rescue candidate but
+// persistence intentionally owns one consolidated RescueDisposition row. A carrier
+// drop never reaches durability. For a carrier-kept node, the later durability outcome
+// owns disposition/grounding while its rationale retains both decisions.
+function mergeRescueDispositions(
+  carrierDispositions: RescueDisposition[],
+  durabilityDispositions: RescueDisposition[]
+): RescueDisposition[] {
+  const merged = new Map(carrierDispositions.map((item) => [item.derivedNodeId, item] as const));
+  for (const durability of durabilityDispositions) {
+    const carrier = merged.get(durability.derivedNodeId);
+    merged.set(durability.derivedNodeId, {
+      ...durability,
+      rationale: carrier
+        ? `${carrier.rationale} [rescue durability: ${durability.rationale}]`
+        : durability.rationale
+    });
+  }
+  return [...merged.values()];
 }
 
 function toAdmissionCandidate(proposal: ReservedMintingProposal): GroundingAdmissionCandidate {

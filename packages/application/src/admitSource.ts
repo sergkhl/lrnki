@@ -28,6 +28,8 @@ export async function admitSource(input: {
   blockText: Map<string, string>;
   declaredDomain: string;
   labelJudge: AdmissionLabelJudgmentPort;
+  sourceCarrierLabels?: string[];
+  headingPathByBlockId?: ReadonlyMap<string, readonly string[]>;
   labelJudgeConcurrency?: number;
 }): Promise<RunCandidate[]> {
   const { discovered, admissionProposals, blockText } = input;
@@ -67,6 +69,8 @@ export async function admitSource(input: {
     candidates: policyCandidates,
     declaredDomain: input.declaredDomain,
     judge: input.labelJudge,
+    sourceCarrierLabels: input.sourceCarrierLabels,
+    headingPathByBlockId: input.headingPathByBlockId,
     concurrency: input.labelJudgeConcurrency
   });
 }

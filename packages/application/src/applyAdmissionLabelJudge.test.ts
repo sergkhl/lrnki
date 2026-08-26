@@ -70,6 +70,29 @@ test("keeps a core candidate judged a concept as core", async () => {
   assert.deepEqual(result.admission.boundaryReasonCodes, []);
 });
 
+test("passes source-title and evidence-heading provenance to the shared semantic judge", async () => {
+  let seen: Parameters<AdmissionLabelJudgmentPort["judge"]>[0] | undefined;
+  const judge: AdmissionLabelJudgmentPort = {
+    model: "fake-admission-judge",
+    async judge(input) {
+      seen = input;
+      return conceptVerdict;
+    }
+  };
+  await applyAdmissionLabelJudge({
+    candidates: [candidate()],
+    declaredDomain: "machine learning",
+    judge,
+    sourceCarrierLabels: ["Operator Handbook"],
+    headingPathByBlockId: new Map([["block-1", ["Operator Handbook", "Performance"]]])
+  });
+  assert.deepEqual(seen?.sourceCarrierLabels, ["Operator Handbook"]);
+  assert.deepEqual(seen?.evidenceContexts, [{
+    evidenceQuote: "The operator set is the bottleneck to performance.",
+    headingPath: ["Operator Handbook", "Performance"]
+  }]);
+});
+
 test("demotes a grounded source artifact without pretending its subject is an alias", async () => {
   const artifact = candidate("core", {
     canonicalLabel: "Procedure Handbook",

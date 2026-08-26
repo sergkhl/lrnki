@@ -12,6 +12,7 @@ import type {
 } from "@lrnki/domain-core";
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import type {
+  AdmissionLabelJudgmentPort,
   DifficultyPort,
   EnrichmentRunStorePort,
   MintingDurabilityJudgmentPort,
@@ -125,6 +126,11 @@ export async function runGraphEnrichment(input: {
   // Explicit production availability for source-backed rescue. When omitted, the legacy direct
   // application seam keeps rescue coupled to an enabled minting tuple for existing callers.
   sourceMentionedNodesAvailable?: boolean;
+  // Load-bearing carrier-versus-referent admission for every source-mentioned rescue
+  // candidate. Required whenever source-mentioned nodes are available: it runs over
+  // original labels plus registered source-title/heading context before canonical
+  // re-labeling, and fails the enrichment on unavailable judgment.
+  rescueCarrierAdmissionJudge?: AdmissionLabelJudgmentPort;
   // The proposal path is structurally paired with its durability judge and the finished
   // admission module below. Either all three dependencies are present or the operation is
   // anchor-only; direct grounding is not a Graph Enrichment dependency any more.
@@ -178,6 +184,9 @@ export async function runGraphEnrichment(input: {
   }
   const mintingEnabled = mintingDependencyCount === 3;
   const sourceMentionedNodesAvailable = input.sourceMentionedNodesAvailable ?? mintingEnabled;
+  if (sourceMentionedNodesAvailable && !input.rescueCarrierAdmissionJudge) {
+    throw new Error("runGraphEnrichment requires source-carrier admission when source-mentioned rescue is available.");
+  }
   const config = input.config ?? DEFAULT_ENRICHMENT_CONFIG;
   const reporter = input.reporter ?? noopRunProgressReporter;
   const operationId = input.enrichmentId;
@@ -231,6 +240,7 @@ export async function runGraphEnrichment(input: {
       const assembled = await assembleEnrichmentNodes({
         anchors: mintingAnchors,
         rescueCandidates,
+        rescueCarrierAdmissionJudge: input.rescueCarrierAdmissionJudge,
         rescueDurabilityJudge: input.rescueDurabilityJudge,
         rescuedNodeLabelingJudge: input.rescuedNodeLabelingJudge,
         bounds: config.mintingBounds,

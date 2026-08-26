@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { GeneratedGroundingBundle, NonCoreRescueCandidate, MissingPrerequisiteProposal } from "@lrnki/domain-core";
 import type {
+  AdmissionLabelJudgmentPort,
   MintingDurabilityJudgmentPort,
   MissingPrerequisiteProposalPort,
   RescueDurabilityJudgmentPort,
@@ -77,20 +78,31 @@ const acceptAllMintingJudge: MintingDurabilityJudgmentPort = {
   judge: async () => ({ verdict: "durable", rationale: "foundation" })
 };
 
+const acceptAllCarrierJudge: AdmissionLabelJudgmentPort = {
+  model: "kg-independent-judge",
+  judge: async () => ({ labelKind: "concept", underlyingNounPhrase: "", groundingSpan: "", rationale: "names a concept" })
+};
+
 type AssemblyInput = Parameters<typeof assembleEnrichmentNodes>[0];
 
 function assemble(
-  input: Omit<AssemblyInput, "mintingDurabilityJudge"> & {
+  input: Omit<AssemblyInput, "mintingDurabilityJudge" | "rescueCarrierAdmissionJudge"> & {
     mintingDurabilityJudge?: MintingDurabilityJudgmentPort;
+    rescueCarrierAdmissionJudge?: AdmissionLabelJudgmentPort;
   }
 ) {
-  const { mintingDurabilityJudge = acceptAllMintingJudge, ...rest } = input;
-  return assembleEnrichmentNodes({ ...rest, mintingDurabilityJudge } as AssemblyInput);
+  const {
+    mintingDurabilityJudge = acceptAllMintingJudge,
+    rescueCarrierAdmissionJudge = acceptAllCarrierJudge,
+    ...rest
+  } = input;
+  return assembleEnrichmentNodes({ ...rest, mintingDurabilityJudge, rescueCarrierAdmissionJudge } as AssemblyInput);
 }
 
-function mention(label: string, runId: string): NonCoreRescueCandidate {
+function mention(label: string, runId: string, sourceTitle = "Source guide"): NonCoreRescueCandidate {
   return {
     runId,
+    sourceTitle,
     declaredDomain: "software engineering",
     candidateKey: label.toLowerCase(),
     canonicalLabel: label,
@@ -107,6 +119,7 @@ function mention(label: string, runId: string): NonCoreRescueCandidate {
 function definitionBearing(label: string, runId: string): NonCoreRescueCandidate {
   return {
     runId,
+    sourceTitle: "Source guide",
     declaredDomain: "software engineering",
     candidateKey: label.toLowerCase(),
     canonicalLabel: label,
@@ -330,6 +343,104 @@ test("a re-labeled rescued node reserves its new label, blocking a later same-do
   assert.equal(mintedNodes.some((n) => n.canonicalLabel === "Move semantics"), false, "the reserved re-label blocks the mint");
 });
 
+test("source-carrier admission drops a Curated Source title while retaining a real prerequisite positive control", async () => {
+  counter = 0;
+  const calls: { label: string; sourceCarrierLabels?: string[]; headings: string[][] }[] = [];
+  const carrierJudge: AdmissionLabelJudgmentPort = {
+    model: "kg-independent-judge",
+    async judge(input) {
+      calls.push({
+        label: input.label,
+        sourceCarrierLabels: input.sourceCarrierLabels,
+        headings: (input.evidenceContexts ?? []).map((context) => context.headingPath)
+      });
+      return { labelKind: "concept", underlyingNounPhrase: "", groundingSpan: "", rationale: "the evidence teaches token validation" };
+    }
+  };
+  const carrier = mention("Harbor Dispatch Core Protocol", "run-1", "Harbor Dispatch Core Protocol");
+  carrier.mentions[0].headingPath = ["Harbor Dispatch Core Protocol"];
+  const prerequisite = definitionBearing("Token validation", "run-1");
+  prerequisite.sourceTitle = "Harbor Dispatch Core Protocol";
+  prerequisite.definitions[0].headingPath = ["Harbor Dispatch Core Protocol", "Dispatch token"];
+
+  const { rescuedNodes, mintedNodes, rescueDispositions } = await assemble({
+    anchors: [anchor("a", "Dispatch token")],
+    rescueCandidates: [carrier, prerequisite],
+    proposalPort: proposer({ a: [{ proposedLabel: "Harbor Dispatch Core Protocol", rationale: "must stay reserved" }] }),
+    sourceLessGroundingAdmission: admission,
+    rescueCarrierAdmissionJudge: carrierJudge,
+    newNodeId
+  });
+
+  assert.deepEqual(rescuedNodes.map((node) => node.canonicalLabel), ["Token validation"]);
+  assert.equal(mintedNodes.length, 0, "the dropped carrier label stays reserved and cannot be re-minted");
+  assert.equal(rescueDispositions.find((item) => item.canonicalLabel === "Harbor Dispatch Core Protocol")?.disposition, "dropped");
+  assert.match(
+    rescueDispositions.find((item) => item.canonicalLabel === "Harbor Dispatch Core Protocol")?.rationale ?? "",
+    /registered_source_title_identity_collision/
+  );
+  assert.equal(rescueDispositions.find((item) => item.canonicalLabel === "Token validation")?.disposition, "accepted");
+  assert.equal(calls.length, 1, "the typed title collision spends no semantic-judge call");
+  assert.equal(calls[0].label, "Token validation");
+  assert.deepEqual(calls[0].sourceCarrierLabels, ["Harbor Dispatch Core Protocol"]);
+  assert.deepEqual(calls[0].headings[0], ["Harbor Dispatch Core Protocol", "Dispatch token"]);
+});
+
+test("source-mentioned rescue has no bypass when carrier admission is absent", async () => {
+  counter = 0;
+  await assert.rejects(
+    () => assembleEnrichmentNodes({
+      anchors: [anchor("a", "Dispatch token")],
+      rescueCandidates: [mention("Protocol handbook", "run-1", "Harbor Dispatch Core Protocol")],
+      newNodeId
+    }),
+    /requires source-carrier admission/
+  );
+});
+
+test("a grounded non-exact source-artifact verdict also drops through the semantic carrier gate", async () => {
+  counter = 0;
+  const judge: AdmissionLabelJudgmentPort = {
+    model: "kg-independent-judge",
+    judge: async () => ({
+      labelKind: "source_artifact",
+      underlyingNounPhrase: "",
+      groundingSpan: "Protocol handbook",
+      rationale: "the label names a handbook carrying the concepts"
+    })
+  };
+  const { rescuedNodes, rescueDispositions } = await assemble({
+    anchors: [anchor("a", "Dispatch token")],
+    rescueCandidates: [mention("Protocol handbook", "run-1", "Harbor Dispatch Core Protocol")],
+    proposalPort: proposer({}),
+    sourceLessGroundingAdmission: admission,
+    rescueCarrierAdmissionJudge: judge,
+    newNodeId
+  });
+  assert.deepEqual(rescuedNodes, []);
+  assert.equal(rescueDispositions[0].disposition, "dropped");
+  assert.match(rescueDispositions[0].rationale, /^source_artifact:/);
+});
+
+test("an unavailable carrier judgment fails enrichment instead of preserving a potential carrier", async () => {
+  counter = 0;
+  const unavailable: AdmissionLabelJudgmentPort = {
+    model: "kg-independent-judge",
+    judge: async () => { throw new Error("carrier judge transport unavailable"); }
+  };
+  await assert.rejects(
+    () => assemble({
+      anchors: [anchor("a", "Dispatch token")],
+      rescueCandidates: [mention("Protocol handbook", "run-1", "Harbor Dispatch Core Protocol")],
+      proposalPort: proposer({}),
+      sourceLessGroundingAdmission: admission,
+      rescueCarrierAdmissionJudge: unavailable,
+      newNodeId
+    }),
+    /carrier judge transport unavailable/
+  );
+});
+
 test("a dropped rescue label is not resurrected as a minted node", async () => {
   counter = 0;
   const dropPointer: RescueDurabilityJudgmentPort = {
@@ -370,7 +481,7 @@ test("the durability judge sees a concept's MERGED evidence (judged after dedupe
   assert.equal(seenMentionCount, 2, "the judge saw both member runs' mentions on the merged node");
 });
 
-test("omitting the judge accepts every rescue candidate with no dispositions (opt-in)", async () => {
+test("omitting the durability judge keeps the carrier-admitted candidate with its admission disposition", async () => {
   counter = 0;
   const { rescuedNodes, rescueDispositions } = await assemble({
     anchors: [anchor("a", "Ownership")],
@@ -380,7 +491,9 @@ test("omitting the judge accepts every rescue candidate with no dispositions (op
     newNodeId
   });
   assert.equal(rescuedNodes.length, 1);
-  assert.deepEqual(rescueDispositions, []);
+  assert.equal(rescueDispositions.length, 1);
+  assert.equal(rescueDispositions[0].disposition, "accepted");
+  assert.match(rescueDispositions[0].rationale, /not_source_artifact/);
 });
 
 test("an accept-all judge records accepted dispositions and keeps every node", async () => {

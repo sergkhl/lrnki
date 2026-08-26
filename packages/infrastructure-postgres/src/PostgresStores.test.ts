@@ -598,6 +598,7 @@ maybe("nonCoreRescueCandidates returns a no-CEP optional candidate mention-only,
     const rescue = await new PostgresEnrichmentRunStore(sql).nonCoreRescueCandidates(graphVersionId);
     const borrowing = rescue.find((candidate) => candidate.candidateKey === "borrowing");
     assert.ok(borrowing, "the non-core mentioned candidate is a rescue candidate");
+    assert.equal(borrowing.sourceTitle, "Test source", "the registered carrier title crosses the rescue read boundary");
     assert.equal(borrowing.tier, "optional");
     assert.equal(borrowing.declaredDomain, "software engineering");
     assert.equal(borrowing.definitions.length, 0, "no CEP -> no definition passages");

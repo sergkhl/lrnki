@@ -414,12 +414,12 @@ export type ExtractionQualityIssue = {
 // Concept-vs-non-concept admission judgment (ADR-0005). One bounded LLM judgment
 // over a single admitted-`core` label, replacing the brittle deterministic
 // non-concept?" is a semantic judgment, not a provable surface property. The
-// judge is DOWNGRADE-ONLY: it demotes a claim label or a source carrier mistaken
-// for the concepts it contains, and never resurrects an optional candidate.
+// Extraction uses the judge DOWNGRADE-ONLY; source-mentioned rescue reuses the
+// grounded source-artifact classification as a drop-only carrier gate before re-labeling.
 // Every non-concept veto must ground its span in candidate evidence; propositions
 // additionally ground the noun phrase they reduce to. An unavailable or
 // ungrounded verdict preserves core recall; an unavailable judge fails the owning
-// Extraction Run before any candidate artifact is persisted.
+// owning Extraction or Enrichment operation before any candidate artifact is persisted.
 export type AdmissionLabelKind = "concept" | "proposition_or_claim" | "source_artifact";
 
 export type AdmissionLabelJudgment = {
@@ -960,6 +960,11 @@ export type NonCoreRescuePassage = {
 
 export type NonCoreRescueCandidate = {
   runId: string;
+  // Provenance-owned title of the Curated Source that produced this candidate. Rescue
+  // uses an exact normalized collision as a typed carrier/concept identity conflict,
+  // not a lexical claim about what other wording means; non-colliding labels also pass
+  // this title as context to the semantic carrier-versus-referent judgment.
+  sourceTitle: string;
   declaredDomain: string;
   candidateKey: string;
   canonicalLabel: string;
@@ -1922,6 +1927,7 @@ export const STAGE_TAGS = {
   // Domain: the prior per-pair `enrichment-judge` + cross-family
   // `generated-enrichment-judge` tags collapse into this single attribution bucket.
   prerequisiteOrdering: "prerequisite-ordering",
+  rescueCarrierAdmission: "rescue-carrier-admission",
   rescueDurability: "rescue-durability",
   rescuedNodeLabeling: "rescued-node-labeling",
   rescueDefinitionQuality: "rescue-definition-quality",

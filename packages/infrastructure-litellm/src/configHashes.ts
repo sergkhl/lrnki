@@ -1,6 +1,7 @@
 import {
   ADMISSION_LABEL_NON_CONCEPT_POLICY,
   DEFINITION_PASSAGE_DISPOSITION_POLICY,
+  RESCUE_CARRIER_ADMISSION_POLICY,
   SOURCE_CITATION_MATCH_CLASSIFICATION_POLICY,
   SOURCE_LESSON_EXTRACTIVE_ADMISSION_POLICY,
   SOURCE_LESSON_PASSAGE_ROLE_POLICY,
@@ -13,7 +14,7 @@ import {
   type SyntheticGenerationConfig
 } from "@lrnki/application";
 import { STAGE_TAGS } from "@lrnki/domain-core";
-import { admissionDecisionsDescriptor, admissionLabelJudgmentDescriptor, conceptDiscoveryDescriptor, coreSelectionDescriptor, definitionEntailmentDescriptor, definitionPassageQualityDescriptor, evidenceProfileExtractionDescriptor } from "./extractionAdapters";
+import { admissionDecisionsDescriptor, admissionLabelJudgmentDescriptor, conceptDiscoveryDescriptor, coreSelectionDescriptor, definitionEntailmentDescriptor, definitionPassageQualityDescriptor, evidenceProfileExtractionDescriptor, rescueCarrierAdmissionJudgmentDescriptor } from "./extractionAdapters";
 import { mintingDurabilityDescriptor, prerequisiteOrderingDescriptor, rescuedNodeLabelingDescriptor, rescueDurabilityDescriptor } from "./enrichmentAdapters";
 import {
   GENERATED_NODE_JUDGE_MODEL,
@@ -122,6 +123,7 @@ export const neuralOperationRegistry = {
       claimVerificationAnsweringDescriptor,
       claimFactualityJudgmentDescriptor,
       claimFactualityChallengeDescriptor,
+      rescueCarrierAdmissionJudgmentDescriptor,
       rescueDurabilityDescriptor,
       rescuedNodeLabelingDescriptor,
       mintingDurabilityDescriptor,
@@ -210,6 +212,7 @@ export function graphEnrichmentConfigHash(config: GraphEnrichmentConfig): string
   return operationConfigHash(entry.configSeed, entry.descriptors, {
     ...graphEnrichmentBehaviorConfig(config),
     definitionPassageDispositionPolicy: DEFINITION_PASSAGE_DISPOSITION_POLICY,
+    rescueCarrierAdmissionPolicy: RESCUE_CARRIER_ADMISSION_POLICY,
     nodeEmbeddingModel: NODE_EMBEDDING_MODEL
   }, {
     additionalModels: [NODE_EMBEDDING_MODEL]

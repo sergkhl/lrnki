@@ -77,6 +77,7 @@ import {
   createMissingPrerequisiteProposalPort,
   createMintingDurabilityJudgmentPort,
   createRescueDurabilityJudgmentPort,
+  createRescueCarrierAdmissionJudgmentPort,
   createRescuedNodeLabelingPort,
   createPrerequisiteOrderingPort,
   createNeuralClients,
@@ -245,6 +246,12 @@ function buildContext() {
     // candidate is a durable prerequisite before it becomes a derived node. Drop-only,
     // fail-open-with-flag; the generator never grades rescue durability.
     rescueDurabilityJudge: createRescueDurabilityJudgmentPort(deterministicClient),
+    // Grounded carrier-versus-referent admission for source-mentioned rescue. The same
+    // independent semantic family used at extraction receives registered source titles
+    // and heading paths here, under its own enrichment stage identity. It runs before
+    // rescue re-labeling and fails the operation if unavailable, so a source carrier can
+    // never re-enter merely because its judgment could not run.
+    rescueCarrierAdmissionJudge: createRescueCarrierAdmissionJudgmentPort(deterministicClient),
     // Measured Rescued-Node Canonical Labeling step (TODO #1): the SAME cross-family
     // independent judge (kg-independent-judge) re-names each durable rescued node — labeled
     // with the source sentence it was mentioned in — to a concept-shaped label, one whole-set
@@ -486,6 +493,7 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
       CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY,
       "sourceMentionedPrerequisites"
     ),
+    rescueCarrierAdmissionJudge: ctx.rescueCarrierAdmissionJudge,
     rescueDurabilityJudge: ctx.rescueDurabilityJudge,
     rescuedNodeLabelingJudge: ctx.rescuedNodeLabelingJudge,
     rescuedDefinitionQualityJudge: ctx.rescuedDefinitionQualityJudge,

@@ -134,6 +134,7 @@ export {
   createEvidenceProfileExtractionPort,
   createAssertionEntailmentJudgmentPort,
   createAdmissionLabelJudgmentPort,
+  createRescueCarrierAdmissionJudgmentPort,
   createDefinitionPassageQualityJudgmentPort,
   conceptDiscoveryDescriptor,
   admissionDecisionsDescriptor,
@@ -141,7 +142,8 @@ export {
   evidenceProfileExtractionDescriptor,
   definitionEntailmentDescriptor,
   definitionPassageQualityDescriptor,
-  admissionLabelJudgmentDescriptor
+  admissionLabelJudgmentDescriptor,
+  rescueCarrierAdmissionJudgmentDescriptor
 } from "./extractionAdapters";
 export {
   createPrerequisiteOrderingPort,

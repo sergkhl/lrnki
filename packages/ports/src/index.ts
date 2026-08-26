@@ -190,17 +190,29 @@ export interface DefinitionPassageQualityJudgmentPort {
 // judgment over ONE admitted-`core` label, run on an independent model family
 // (`kg-independent-judge`) so the judge is not the admission extractor grading its
 // own homework. It answers whether the label names a durable concept, asserts a
-// claim, or names the source artifact carrying the taught concepts. Used only to
-// DOWNGRADE a `core` candidate; it never promotes or resurrects. The adapter
-// grounds every non-concept verdict fail-closed, so an ungrounded positive is
-// returned as `concept`; an unavailable call fails the owning Extraction Run.
+// claim, or names the source artifact carrying the taught concepts. Extraction uses
+// it only to DOWNGRADE a `core` candidate; source-mentioned rescue uses its grounded
+// source-artifact verdict only to DROP before re-labeling. Neither consumer promotes
+// or resurrects. The adapter coerces every ungrounded non-concept verdict to
+// `concept`; an unavailable call fails the owning Extraction or Enrichment operation.
 export interface AdmissionLabelJudgmentPort {
   readonly model: string;
   judge(input: {
     declaredDomain: string;
-    label: string; // proposed canonical label of the admitted-core candidate
+    label: string; // candidate label at the extraction or source-rescue boundary
     aliases: string[];
     evidenceQuotes: string[]; // already verbatim-verified candidate mention/eligibility evidence
+    // Optional source-structure context for the same grounded judgment. Extraction may
+    // omit it; source-mentioned rescue supplies registered carrier titles plus the
+    // heading paths attached to its already-verbatim-verified passages. These fields
+    // inform a semantic verdict. The application may separately refuse an exact
+    // registered-title identity collision; heading text never authorizes a lexical veto.
+    sourceCarrierLabels?: string[];
+    evidenceContexts?: {
+      evidenceQuote: string;
+      headingPath: string[];
+      passageType?: "definition" | "mention";
+    }[];
   }): Promise<AdmissionLabelJudgment>;
 }
 
