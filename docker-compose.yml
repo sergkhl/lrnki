@@ -48,10 +48,22 @@ services:
   # demands an explicit reset, because changing the greenfield schema means resetting the database
   # rather than migrating it incrementally (ADR-0039). Deliberately one-shot: never restarted,
   # and never destructive on its own.
+  #
+  # Runs the learner-api image with an overridden command rather than an image of its own. That
+  # image already carries everything the migrator needs — its `COPY . .` brings the migrations
+  # folder, and `--filter @lrnki/learner-api...` installs the workspace closure, which includes
+  # @lrnki/infrastructure-postgres and (no `--prod`) the tsx that runs the CLI. A second Dockerfile
+  # was therefore building an image whose distinguishing content was a strict subset of this one.
+  # It stays a separate SERVICE, not a step in the API's entrypoint, because the deploy reads this
+  # container's exit code before recreating the API: a refused migration must leave the previous
+  # API container running rather than crash-looping the new one.
+  #
+  # No `build:` here, so the image must already exist — the deploy builds learner-api first, and a
+  # cold `docker compose up -d` needs `--build`. The tag is pinned on learner-api rather than left
+  # to compose's project-derived default so this reference cannot drift with COMPOSE_PROJECT_NAME.
   migrate:
-    build:
-      context: .
-      dockerfile: scripts/docker/postgres/Dockerfile.migrate
+    image: lrnki-learner-api
+    command: ["pnpm", "--filter", "@lrnki/infrastructure-postgres", "run", "db:migrate"]
     container_name: lrnki-migrate
     networks:
       - lrnki
@@ -128,6 +140,9 @@ services:
     build:
       context: .
       dockerfile: apps/learner-api/Dockerfile
+    # Pinned explicitly, not left to compose's `<project>-<service>` default: the `migrate` service
+    # above references this tag, and a project-name override would otherwise repoint it.
+    image: lrnki-learner-api
     container_name: lrnki-learner-api
     networks:
       - lrnki

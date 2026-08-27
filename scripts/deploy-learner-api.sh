@@ -42,8 +42,10 @@ fi
 
 # Never pipe a compose build: a pipeline reports the LAST command's status, so a build that died on
 # `no space left on device` would still look like a success. Reclaim with `docker builder prune -f`.
-echo "==> docker compose build migrate learner-api caddy"
-docker compose build migrate learner-api caddy
+# `migrate` is not built: it runs the learner-api image with an overridden command, so building
+# learner-api is what brings the migrator to current too. It must happen before the migrate step.
+echo "==> docker compose build learner-api caddy"
+docker compose build learner-api caddy
 
 echo "==> docker compose up -d --wait postgres"
 docker compose up -d --wait postgres

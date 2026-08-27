@@ -299,7 +299,8 @@ every session cookie ships without `Secure` over HTTPS. Nothing errors, because 
 still resolves. The deploy now asserts the shipped value against the origin it serves and fails
 loudly on a mismatch; `curl -sSI` the `Set-Cookie` from a sign-up if you need to confirm by hand.
 
-**The deploy does not reload LiteLLM.** It rebuilds `migrate`, `learner-api`, and `caddy` only.
+**The deploy does not reload LiteLLM.** It rebuilds `learner-api` and `caddy` only (`migrate` runs
+the learner-api image, so it needs no build of its own).
 `litellm/config.yaml` is a read-only bind read once at process start, and `store_model_in_db` is
 unset, so the file is authoritative *only at that moment* — a commit that repoints a
 `model_group_alias` leaves the running router serving the previous model, with no error anywhere,
