@@ -4,10 +4,10 @@
 
 - **Curate five ready-to-play Source Expedition mockups.** Execute the
   [active plan](./2026-08-27-001-curate-five-ready-source-expedition-mockups.md) in order. U0–U1 own
-  the accepted source set and qualified 35-stop Critical Thinking path. U2 and its exclusive
-  dependents are blocked by the schema/reset contradiction recorded in
-  [BLOCKERS](./BLOCKERS.md#source-expedition-catalog-schema-transition); do not apply manual DDL,
-  reset the development database, or advance U3 until the owner resolves it.
+  the accepted source set and historical 35-stop Critical Thinking qualification. U2 is next: land
+  the code-first catalog schema, perform the one additionally authorized guarded development reset,
+  regenerate and re-qualify Critical Thinking, and publish it. Preserve that resulting Concept
+  registry without another reset through U7; do not advance the exclusive U3 unit before U2 commits.
 
 ## COMPLETED
 

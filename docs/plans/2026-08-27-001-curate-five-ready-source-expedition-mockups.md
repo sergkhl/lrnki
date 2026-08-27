@@ -7,10 +7,11 @@ execution: code
 
 # Curate Five Ready-to-Play Source Expedition Mockups
 
-**Status:** Blocked — U0–U1 complete; U2 needs the owner reset-order decision
+**Status:** In progress — U0–U1 complete; U2 is next
 
-**NEXT:** Resolve the owner action in [BLOCKERS](./BLOCKERS.md#source-expedition-catalog-schema-transition).
-After it is cleared, implement U2 only; do not advance the exclusive units or alter database policy.
+**NEXT:** Implement U2 only. After its code-first catalog schema lands, perform the one additionally
+authorized guarded development reset, regenerate and independently re-qualify Critical Thinking,
+publish that fresh asset set, validate the learner projection, persist status, and commit.
 
 **Decision state:** Accepted by the owner through the 2026-08-27 grilling. The initial catalog is
 exactly Critical Thinking, Probability and Statistics, Personal Finance, Machine Learning, and
@@ -24,9 +25,12 @@ not repeated through the play flow. Validation includes a fresh Debug iOS Simula
 Android run.
 
 The 2026-08-27 critical review added four owner decisions: generation runs before the catalog and
-package units; all five paths build into one live database with no reset between them; five or more
-playable stops is the target with three accepted as the floor; and the accepted asset-set identity
-is pinned in the catalog row.
+package units; all five paths share one live Concept registry; five or more playable stops is the
+target with three accepted as the floor; and the accepted asset-set identity is pinned in the
+catalog row. After U1 exposed the U2 baseline transition, the owner authorized one additional
+guarded development reset after the catalog schema lands. Critical Thinking is regenerated and
+re-qualified against that schema; its resulting registry is then preserved without another reset
+through U7. U8 still owns the separate model-free reinstall reset.
 
 ## Goal capsule
 
@@ -203,13 +207,16 @@ Do not extend one graph with another path, merge the five domains, or create cro
 prerequisites. A missing prerequisite makes that path unavailable until the project primer supplies
 it and the whole path is regenerated. It does not reopen LLM-grounded prerequisites.
 
-Every path generates into the same live database. The development database is hard-reset once,
-before the first path, and not again until the model-free install in U8. This is not convenience:
-Concept IRIs are minted against the whole registry, so paths built in separate empty databases mint
-colliding identities for any shared normalized label. Within a path, canonicalization and
-Graph-Version Build stay adjacent and serialized, because a build fails closed when the registry
-gained Concepts after its own canonicalization. A regenerated path reuses its existing registry
-identities for unchanged labels; its superseded enrichment stays inspectable and unlisted.
+Every accepted path generates into the same live registry. The historical U1 evidence followed the
+initial guarded reset. After U2 changes the code-first baseline, one additionally authorized guarded
+development reset discards those artifacts; Critical Thinking is regenerated and re-qualified
+first, then that registry is preserved while U3–U7 run. The next reset is the model-free install in
+U8. This is not convenience: Concept IRIs are minted against the whole registry, so paths built in
+separate empty databases mint colliding identities for any shared normalized label. Within a path,
+canonicalization and Graph-Version Build stay adjacent and serialized, because a build fails closed
+when the registry gained Concepts after its own canonicalization. A regenerated path reuses its
+existing registry identities for unchanged labels; its superseded enrichment stays inspectable and
+unlisted.
 
 Five or more playable stops is the target — five through seven for general paths, seven through ten
 for advanced ones — and three is the accepted floor. A path below five gets at most two source-edit
@@ -405,8 +412,9 @@ contract test, and this plan and its indexes are in place. The Validation Log ow
 
 ### U1 — Qualify Critical Thinking and measure the achievable trail — complete
 
-The first source is generated, qualified, measured, and played through in the once-reset live
-registry. The Validation Log owns its evidence; no publication or package exists yet.
+The first source was generated, qualified, measured, and played through in the pre-U2 registry. The
+Validation Log owns that historical evidence; U2 replaces its artifacts and evidence after the
+authorized schema reset. No publication or package exists yet.
 
 ### U2 — Explicit accepted catalog and learner projection
 
@@ -420,8 +428,11 @@ registry. The Validation Log owns its evidence; no publication or package exists
    candidate card, search, and one Catalog source dialog without changing trail or mastery UX.
 4. Prove unlisted qualification, listed publication, exact ordering, missing-entry refusal, drifted
    identity refusal, one name across candidate and adopted views, ownership, no client presentation
-   authority, source-list single ownership, and code-first reset. Publish the U1 path against the
-   live database as the smallest real-use route and commit one coherent unit.
+   authority, source-list single ownership, and code-first reset. After the schema lands, perform
+   the one additionally authorized guarded development reset; regenerate and independently
+   re-qualify Critical Thinking, publish only that fresh asset set, exercise the smallest live
+   learner route, and commit one coherent unit. Preserve its resulting Concept registry without
+   another reset through U7.
 
 ### U3 — Accepted package export/import and reset replacement
 
@@ -548,51 +559,50 @@ The plan is complete only when all of the following are true:
   empty-state snapshot unless separate work proves it redundant.
 - No shared-host/production reset, deployment, Android run, automated iOS rig, distributable iOS
   build, physical-device run, or release action without separately explicit authority.
-- No reset between generated paths: the development database is hard-reset once before U1 and again
-  only for the model-free install in U8. Re-resolve the exact database immediately before each, keep
-  unrelated dirty work, and follow the root runbook's host-only detached Compose rule.
+- No reset between the post-U2 generated paths: after the one additionally authorized guarded reset
+  following the U2 baseline change, preserve the regenerated Critical Thinking Concept registry
+  through U7. The next reset is the model-free install in U8. Re-resolve the exact database
+  immediately before each reset, keep unrelated dirty work, and follow the root runbook's host-only
+  detached Compose rule.
 
 ## Validation Log
 
+### Reset-order resolution — 2026-08-27
+
+- The owner explicitly authorized one guarded development reset after the U2 schema, fresh Critical
+  Thinking qualification, and preservation of that resulting Concept registry through U7. This
+  coordination batch changed no schema, database, model artifact, learner surface, or release state.
+
 ### U0 — Accepted contract and source fixtures — 2026-08-27
 
-- Three workers drafted/reviewed the sources; integrated review reconciled catalog order, audiences, source/reset policy, interfaces, and authority.
-- The contract test proves the exact five unique entries/order and source/fixture/Markdown/locator
-  constraints. Parsing yielded 88–134 blocks; ingestion checks, focused ESLint, links, JSON, and whitespace passed.
-- Authority is source-authoring/documentation only; no model, database, learner, surface, deployed, simulator, or device behavior was exercised.
+- Integrated review reconciled the five sources' catalog order, audiences, reset policy, interfaces,
+  and authority. Their contract passed exact order/metadata, ingestion, links, JSON, and whitespace.
+- Authority is source/documentation only; no model, database, learner, surface, or device ran.
 
 ### U1 — Critical Thinking qualification and achievable trail — 2026-08-27
 
-- Guarded local database `lrnki` was reset once. The 116-block source yielded 61 candidates (27 core,
-  34 optional) and a standalone published 27-Concept Graph Version.
-- Two arms failed when synchronized `429`s exhausted one mixed retry budget: a thundering herd against
-  a shared rate-limited resource. Separate ordinary/`429` budgets and capped equal jitter fixed the shared
-  transport seam without changing K=8 or semantic retry; the next live arm recovered under `429` pressure.
-- The accepted enrichment has 58 source-backed nodes (27 document-anchored, 31 source-mentioned), zero
-  `llm_grounded`, 27 certain/23 uncertain edges, and 58 difficulty rows; route inspection found no cross-path node.
-- Generation retained 44 lessons, 14 absences, 43 option-select, 3 matching, and 8 impostor items.
-  Qualification admitted 35 lessons/items/stops: KTD8 `27 → 35 → 35 → 35`; no source edit was needed.
-- All 35 visible payloads were read. Independent evaluation resolved 37/37 evidence rows and accepted
-  129/129 claims, 105/105 distractors, and 35/35 keys; 387 calls used 546,575 tokens/about `$0.026176692`.
-  The journey used 1,280 calls, 2,244,266 tokens, and about `$0.197703456`.
-- Ordering used 9 DigitalOcean calls and 1 configured Groq fallback. This qualifies the inspected
-  artifact/topology, not quantization equivalence; all 387 independent verifier calls used DeepInfra.
-- A reserved learner mastered all 35 frontier stops with 35 reads/responses, no dead end or scaffold;
-  the positive-control rows existed before exact teardown returned learner state to zero.
-- Focused tests passed 49/49; full LiteLLM infrastructure/application/worker suites passed 217/217,
-  875/875, and 8/8 with typechecks and focused ESLint. Authority is local DB/model/artifact/learner-route only.
+- Guarded `lrnki` was reset once. The 116-block source yielded 61 candidates (27 core, 34 optional)
+  and a standalone 27-Concept Graph Version.
+- Two synchronized-`429` arms failed before separate ordinary/rate-limit budgets plus capped equal
+  jitter repaired the shared transport seam; the next K=8 arm recovered under rate-limit pressure.
+- The enrichment has 58 source-backed nodes, zero `llm_grounded`, 27 certain/23 uncertain edges, and
+  58 difficulty rows. Generation retained 44 lessons and 43 options; qualification admitted 35.
+- Inspection accepted 129/129 claims, 105/105 distractors, and 35/35 keys. Evaluation used 387 calls,
+  546,575 tokens/about `$0.026176692`; the journey used 1,280/2,244,266/about `$0.197703456`.
+- Ordering used 9 DigitalOcean calls and one Groq fallback; all 387 verifier calls used DeepInfra.
+  This qualifies inspected topology, not quantization equivalence.
+- A reserved learner mastered all 35 stops without scaffold; positive controls preceded exact
+  teardown. Focused/full suites passed 49/49, 217/217, 875/875, and 8/8 with types and ESLint.
+- Authority is local database, production-model, artifact, and learner-route evidence only.
 
 ### Open findings
 
-- The five primers intentionally lack an external claim-verification ledger. That is the accepted
-  playtest authority boundary, not an omission; a known material defect still blocks acceptance.
-- Critical Thinking is qualified but deliberately unpublished; its pre-catalog neural title is
-  `Robust Option`. U2 must make the manifest entry the sole accepted presentation owner. No package,
-  export, or import infrastructure exists until U3.
+- The five primers intentionally lack an external claim-verification ledger; that is their accepted
+  playtest boundary, while a known material defect still blocks acceptance.
+- Critical Thinking is qualified but unpublished under neural title `Robust Option`. U2 makes the
+  manifest presentation authoritative; no package/export/import exists until U3.
 - Achievable stop count remains unmeasured for Probability and Statistics, Personal Finance,
   Machine Learning, and Neuroscience. U4–U7 own those independent measurements.
-- U2's new table makes the current database reset-required under ADR-0039, but this plan forbids the
-  needed reset. The owner action and resolution choices live in [BLOCKERS](./BLOCKERS.md#source-expedition-catalog-schema-transition).
 - Pinning the accepted identity turns a drifted qualification into a named refusal but does not
   decouple it: a prompt or route change after acceptance still requires regeneration, and AGENTS
   rule 14 still invalidates the affected quality evidence.
