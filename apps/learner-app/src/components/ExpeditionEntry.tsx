@@ -162,6 +162,9 @@ function LearnerExpeditionRow({
       <View className="min-w-0 flex-1">
         <Text variant="label" numberOfLines={1}>{expedition.title}</Text>
         <Text variant="caption" color="muted" numberOfLines={1}>{expedition.declaredDomain}</Text>
+        {expedition.teaser ? (
+          <Text variant="caption" color="muted" numberOfLines={2}>{expedition.teaser}</Text>
+        ) : null}
         {/* Purpose teaser (plan 2026-07-10-001 U2): the layer's capability statement makes
             the mid-horizon goal visible before opening the trail. Absent row → no teaser;
             the progress line below is the mechanical fallback. */}
@@ -212,9 +215,9 @@ export function CandidateCard({ candidate }: Readonly<{ candidate: CandidateCard
   };
   return (
     <Card className="gap-3">
-      <Badge className="border-gem-soft bg-gem-soft">{titleCase(candidate.declaredDomain)}</Badge>
-      <Text variant="title">Expedition: {candidate.title}</Text>
-      <Text variant="caption" color="muted">{candidate.totalStopCount} concepts to the summit</Text>
+      <Text variant="title">{candidate.title}</Text>
+      <Text variant="body" color="muted">{candidate.teaser}</Text>
+      <Text variant="caption" color="muted">{candidate.totalStopCount} playable stops</Text>
       <Button
         busy={pending}
         onPress={begin}
@@ -226,14 +229,6 @@ export function CandidateCard({ candidate }: Readonly<{ candidate: CandidateCard
       />
     </Card>
   );
-}
-
-function titleCase(value: string): string {
-  return value
-    .trim()
-    .split(/\s+/)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(" ");
 }
 
 function NoCandidates() {

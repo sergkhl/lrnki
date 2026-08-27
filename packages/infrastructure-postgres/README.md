@@ -17,6 +17,7 @@ one way only:
 | `publishedGraph.ts` | graph versions, Concepts, publication evidence, artifacts |
 | `derivedGraph.ts` | enrichments, grounding, prerequisites, dispositions, merges |
 | `learningAssets.ts` | Study Items, Concept Lessons, their children and absence facts |
+| `sourceExpeditionCatalog.ts` | accepted global Source Expedition publication and presentation |
 | `learnerState.ts` | expeditions, calibration, scaffold, response/recall, awards |
 | `operations.ts` | operation runs and the stage timeline |
 | `inspectionViews.ts` | the PostgreSQL 18 JSON_TABLE inspection views |

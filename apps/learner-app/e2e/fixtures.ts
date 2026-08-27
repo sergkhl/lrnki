@@ -116,13 +116,38 @@ export const journalPopulated = {
     }
   ],
   shared: [
-    { enrichmentId: "enr-shared-1", title: "Tectonic plates", declaredDomain: "Geology", totalStopCount: 7, searchTerms: ["plate", "tectonics"] },
-    { enrichmentId: "enr-shared-2", title: "Photosynthesis", declaredDomain: "Biology", totalStopCount: 5, searchTerms: ["photosynthesis", "carbon fixation"] }
+    { enrichmentId: "enr-shared-1", catalogKey: "tectonic-plates", title: "Tectonic plates", teaser: "Follow moving plates through a changing crust.", declaredDomain: "Geology", sortOrder: 1, totalStopCount: 7, searchTerms: ["plate", "tectonics"] },
+    { enrichmentId: "enr-shared-2", catalogKey: "photosynthesis", title: "Photosynthesis", teaser: "Trace light into stored chemical energy.", declaredDomain: "Biology", sortOrder: 2, totalStopCount: 5, searchTerms: ["photosynthesis", "carbon fixation"] }
   ]
 };
 
 export const catalogPopulated = {
-  candidates: journalPopulated.shared
+  candidates: [{
+    enrichmentId: "enr-critical-thinking",
+    catalogKey: "critical-thinking",
+    title: "Critical Thinking",
+    teaser: "Build stronger arguments, weigh evidence, test causal claims, and revise conclusions with confidence.",
+    declaredDomain: "critical thinking",
+    sortOrder: 1,
+    totalStopCount: 5,
+    searchTerms: ["arguments", "evidence", "causal claims"]
+  }],
+  sources: [{
+    catalogKey: "critical-thinking",
+    title: "Critical Thinking",
+    sourceProvenance: {
+      authorship: "lrnki_model_authored_project_source",
+      knowledgeBasis: "general_model_knowledge_only",
+      externalClaimVerificationRequired: false,
+      acceptanceScope: "local_shared_learner_playtest"
+    },
+    sourceCredits: [{
+      sourceResourceId: "source-critical-thinking",
+      title: "Critical Thinking",
+      sourceUri: "lrnki model-authored project source accepted for local playtest",
+      license: "lrnki project-owned playtest fixture"
+    }]
+  }]
 };
 
 export const leaderboardFixture = {

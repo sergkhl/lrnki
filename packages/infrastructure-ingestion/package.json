@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "@lrnki/domain-core": "workspace:*",
-    "@lrnki/ports": "workspace:*"
+    "@lrnki/ports": "workspace:*",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

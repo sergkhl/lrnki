@@ -116,6 +116,14 @@ test.describe("route states", () => {
 
     await page.getByRole("button", { name: "Retry" }).click();
     await expect(page.getByText(re("Browse expeditions"))).toBeVisible();
+    await expect(page.getByText("Critical Thinking", { exact: true })).toBeVisible();
+    await expect(page.getByText(/Build stronger arguments/)).toBeVisible();
+    const sourceAction = page.getByRole("button", { name: "Sources & licenses" });
+    await expect(sourceAction).toHaveCount(1);
+    await sourceAction.click();
+    await expect(page.getByText(/general model knowledge/)).toBeVisible();
+    await expect(page.getByText(/Source: lrnki model-authored project source/)).toBeVisible();
+    await expect(page.getByText(/License: lrnki project-owned playtest fixture/)).toBeVisible();
   });
 
   // AE3 (Expedition): a failing trail read renders the named error with Retry + Return, never a

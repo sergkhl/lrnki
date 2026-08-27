@@ -18,6 +18,7 @@ import type { NeutralResponseLogRow, ResponseLogRow, StudyItem } from "@lrnki/do
 import {
   getExpeditionCatalog,
   getExpeditionJournal,
+  type ExpeditionCatalogDeps,
   type ExpeditionJournalDeps
 } from "./expeditionJournal";
 import { OPERATION_HEARTBEAT_STALE_AFTER_MS } from "./operationRunLiveness";
@@ -262,7 +263,8 @@ test("Explore curation filters adopted candidates then takes the top five, narro
     enrichmentId,
     detail(enrichmentId, [node(`${enrichmentId}-a`, `${enrichmentId} start`, true), node(`${enrichmentId}-b`, `${enrichmentId} summit`, true)], [edge(`${enrichmentId}-a`, `${enrichmentId}-b`)])
   ]));
-  // The adopted candidate would rank first by recency; it must not consume a slot.
+  // Put the adopted candidate first: filtering must happen before the five-row cap.
+  summaries.unshift(summaries.pop()!);
   const adopted: LearnerExpedition = { ...expedition("learner-one", "row-adopted"), status: "ready", enrichmentId: "adopted" };
   const journal = await getExpeditionJournal({ learnerStateRef: "learner-one" }, deps({
     summaries, details, expeditions: [adopted]
@@ -271,11 +273,20 @@ test("Explore curation filters adopted candidates then takes the top five, narro
   assert.ok(!journal.shared.some((candidate) => candidate.enrichmentId === "adopted"));
   assert.deepEqual(
     Object.keys(journal.shared[0]).sort(),
-    ["declaredDomain", "enrichmentId", "searchTerms", "title", "totalStopCount"]
+    [
+      "catalogKey",
+      "declaredDomain",
+      "enrichmentId",
+      "searchTerms",
+      "sortOrder",
+      "teaser",
+      "title",
+      "totalStopCount"
+    ]
   );
 });
 
-test("the catalog is unlimited, adoption-filtered, readiness-ranked, and excludes one-stop trails", async () => {
+test("the catalog is unlimited, adoption-filtered, accepted-order preserving, and excludes one-stop trails", async () => {
   const catalog = await getExpeditionCatalog({ learnerStateRef: "learner-one" }, deps({
     summaries: [
       summary("later", "2026-01-02T00:00:00.000Z"),
@@ -299,7 +310,7 @@ test("the catalog is unlimited, adoption-filtered, readiness-ranked, and exclude
   assert.deepEqual(catalog.candidates[0].searchTerms, ["Photosynthetic start", "Later summit"]);
 });
 
-test("ranking prefers fully ready candidates over larger unready ones", async () => {
+test("the Journal preserves the Source Expedition module's accepted candidate order", async () => {
   const journal = await getExpeditionJournal({ learnerStateRef: "learner-one" }, deps({
     summaries: [summary("unready", "2026-01-02T00:00:00.000Z"), summary("ready", "2026-01-01T00:00:00.000Z")],
     details: {
@@ -307,7 +318,7 @@ test("ranking prefers fully ready candidates over larger unready ones", async ()
       ready: detail("ready", [node("r-a", "Ready prerequisite", true), node("r-b", "Ready target", true)], [edge("r-a", "r-b")])
     }
   }));
-  assert.deepEqual(journal.shared.map((candidate) => candidate.enrichmentId), ["ready", "unready"]);
+  assert.deepEqual(journal.shared.map((candidate) => candidate.enrichmentId), ["unready", "ready"]);
 });
 
 test("the current policy lists source-mentioned candidates but holds out any LLM-grounded candidate", async () => {
@@ -372,7 +383,7 @@ function deps(input: {
   lessonReadNodeIds?: string[];
   timelines?: Record<string, OperationTimelineDetail>;
   learnerKnowledgeAvailability?: LearnerKnowledgeAvailability;
-}): ExpeditionJournalDeps {
+}): ExpeditionJournalDeps & ExpeditionCatalogDeps {
   const learnerKnowledgeAvailability = input.learnerKnowledgeAvailability ??
     ALL_LEARNER_KNOWLEDGE_AVAILABLE;
   const expeditions = input.expeditions ?? [];
@@ -399,11 +410,10 @@ function fakeSourceExpeditions(input: {
   details: Record<string, DerivedGraphDetail>;
   expeditions: LearnerExpedition[];
   learnerKnowledgeAvailability: LearnerKnowledgeAvailability;
-}): ExpeditionJournalDeps["sourceExpeditions"] {
-  return {
-    async listCandidates() {
-      const adopted = new Set(input.expeditions.flatMap((row) => row.enrichmentId ? [row.enrichmentId] : []));
-      return input.summaries.flatMap((summary) => {
+}): ExpeditionJournalDeps["sourceExpeditions"] & ExpeditionCatalogDeps["sourceExpeditions"] {
+  const listCandidates = async () => {
+    const adopted = new Set(input.expeditions.flatMap((row) => row.enrichmentId ? [row.enrichmentId] : []));
+    return input.summaries.flatMap((summary) => {
         const detail = input.details[summary.enrichmentId];
         if (!detail || adopted.has(summary.enrichmentId) ||
             derivedGraphLearnerKnowledgeAvailability(
@@ -416,17 +426,20 @@ function fakeSourceExpeditions(input: {
         const summitNode = detail.nodes.find((node) => node.derivedNodeId === summit.derivedNodeId);
         return [{
           enrichmentId: summary.enrichmentId,
+          catalogKey: summary.enrichmentId,
           title: summit.label,
+          teaser: `Learn ${summit.label}.`,
           declaredDomain: summitNode?.declaredDomain ?? "",
+          sortOrder: 1,
           totalStopCount: trailNodeIds.size,
-          searchTerms: [...new Set(trailNodes.flatMap((node) => [node.label, ...node.aliases]))],
-          startedAt: summary.startedAt,
-          ready: trailNodes.every((node) => node.hasStudyItem)
+          searchTerms: [...new Set(trailNodes.flatMap((node) => [node.label, ...node.aliases]))]
         }];
-      }).sort((left, right) =>
-        Number(right.ready) - Number(left.ready) ||
-        Date.parse(right.startedAt) - Date.parse(left.startedAt)
-      ).map(({ startedAt: _startedAt, ready: _ready, ...candidate }) => candidate);
+    });
+  };
+  return {
+    listCandidates,
+    async listCatalog() {
+      return { candidates: await listCandidates(), sources: [] };
     },
     async openOwned() {
       return { status: "unavailable" as const, reason: "expedition_not_owned" as const };

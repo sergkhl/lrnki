@@ -16,7 +16,11 @@ import {
   type LearnerKnowledgeAvailability
 } from "./learnerKnowledgeAvailability";
 import { isStaleOperation } from "./operationRunLiveness";
-import type { SourceExpeditionCandidate, SourceExpeditionModule } from "./sourceExpedition";
+import type {
+  SourceExpeditionCandidate,
+  SourceExpeditionCatalog,
+  SourceExpeditionModule
+} from "./sourceExpedition";
 import {
   TOPIC_EXPEDITION_STAGE_PROFILE,
   TOPIC_EXPEDITION_STAGE_TOTAL,
@@ -57,6 +61,7 @@ export type ReadyExpeditionRow = {
   status: "ready";
   learnerExpeditionId: string;
   title: string;
+  teaser: string | null;
   declaredDomain: string | null;
   // Nullable by persisted reality (KTD10): the UI guard that refuses to route without an
   // enrichment is presentation, not data repair.
@@ -88,12 +93,10 @@ export type ExpeditionJournal = {
   shared: ExpeditionCandidateCard[];
 };
 
-export type ExpeditionCatalog = {
-  candidates: ExpeditionCandidateCard[];
-};
+export type ExpeditionCatalog = SourceExpeditionCatalog;
 
 export type ExpeditionCatalogDeps = {
-  sourceExpeditions: Pick<SourceExpeditionModule, "listCandidates">;
+  sourceExpeditions: Pick<SourceExpeditionModule, "listCatalog">;
 };
 
 // Every dependency is required (KTD7): the interface no longer encodes the
@@ -149,7 +152,7 @@ export async function getExpeditionJournal(
   )).filter((row): row is ExpeditionJournalRow => row !== undefined);
 
   // Partition WITHOUT re-sorting: owned rows arrive active-first from the store and
-  // candidates readiness-ranked from the derivation; preserving input order keeps those
+  // candidates accepted-catalog ordered by Source Expedition; preserving input order keeps those
   // guarantees (KTD5).
   const started: ReadyExpeditionRow[] = [];
   const yours: ExpeditionJournalRow[] = [];
@@ -170,12 +173,12 @@ export async function getExpeditionJournal(
 }
 
 // Browse all: every shared, beginnable, ≥2-stop expedition the learner has not adopted,
-// readiness-ranked and unlimited. Fetched lazily; carries no timelines or owned rows.
+// accepted-catalog ordered and unlimited. Fetched lazily; carries no timelines or owned rows.
 export async function getExpeditionCatalog(
   input: { learnerStateRef: string },
   deps: ExpeditionCatalogDeps
 ): Promise<ExpeditionCatalog> {
-  return { candidates: await deps.sourceExpeditions.listCandidates(input) };
+  return deps.sourceExpeditions.listCatalog(input);
 }
 
 type GradedAttempts = {
@@ -215,6 +218,7 @@ async function readyRow(
     status: "ready" as const,
     learnerExpeditionId: expedition.learnerExpeditionId,
     title: opened?.candidate.title ?? expedition.title,
+    teaser: opened?.candidate.teaser ?? null,
     declaredDomain: opened?.candidate.declaredDomain ?? expedition.declaredDomain,
     enrichmentId: expedition.enrichmentId,
     active: expedition.active

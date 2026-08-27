@@ -7,6 +7,6 @@ export function filterCatalogCandidates(candidates: CatalogCandidate[], query: s
   const needle = query.trim().toLocaleLowerCase();
   if (!needle) return candidates;
   return candidates.filter((candidate) =>
-    `${candidate.title} ${candidate.declaredDomain} ${candidate.searchTerms.join(" ")}`.toLocaleLowerCase().includes(needle)
+    `${candidate.title} ${candidate.teaser} ${candidate.declaredDomain} ${candidate.searchTerms.join(" ")}`.toLocaleLowerCase().includes(needle)
   );
 }

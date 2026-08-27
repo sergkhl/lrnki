@@ -9,6 +9,10 @@ import type {
   LearnerExpedition,
   LearnerExpeditionStorePort,
   SourceExpeditionAssetExpectation,
+  SourceExpeditionCatalogEntry,
+  SourceExpeditionCatalogPort,
+  SourceExpeditionSourceCredit,
+  SourceExpeditionSourceProvenance,
   SourceExpeditionStorePort,
   StudyItemBankStorePort,
   ConceptLessonStorePort,
@@ -55,9 +59,11 @@ export type SourceExpeditionUnavailableReason =
   | "lesson_unqualified"
   | "option_select_missing"
   | "option_select_unqualified"
+  | "accepted_catalog_entry_required"
+  | "accepted_catalog_stop_floor_not_met"
   | "expedition_not_owned"
   | "expedition_inactive"
-  | "asset_set_changed";
+  | "accepted_asset_set_changed";
 
 export type SourceExpeditionUnavailable = {
   status: "unavailable";
@@ -65,12 +71,41 @@ export type SourceExpeditionUnavailable = {
   derivedNodeId?: string;
 };
 
-export type SourceExpeditionCandidate = {
+export type QualifiedSourceExpeditionCandidate = {
   enrichmentId: string;
   title: string;
   declaredDomain: string;
   totalStopCount: number;
   searchTerms: string[];
+};
+
+export type SourceExpeditionCandidate = QualifiedSourceExpeditionCandidate & {
+  catalogKey: string;
+  teaser: string;
+  sortOrder: number;
+};
+
+export type SourceExpeditionCatalogSource = {
+  catalogKey: string;
+  title: string;
+  sourceProvenance: SourceExpeditionSourceProvenance;
+  sourceCredits: SourceExpeditionSourceCredit[];
+};
+
+export type SourceExpeditionCatalog = {
+  candidates: SourceExpeditionCandidate[];
+  sources: SourceExpeditionCatalogSource[];
+};
+
+export type PublishAcceptedSourceExpedition = {
+  enrichmentId: string;
+  catalogKey: string;
+  title: string;
+  teaser: string;
+  catalogRole: string;
+  audience: string;
+  sortOrder: number;
+  sourceProvenance: SourceExpeditionSourceProvenance;
 };
 
 export type QualifiedSourceExpeditionAssets = {
@@ -84,13 +119,18 @@ export type QualifiedSourceExpeditionAssets = {
 
 export type QualifiedSourceExpedition = {
   status: "available";
-  candidate: SourceExpeditionCandidate;
+  candidate: QualifiedSourceExpeditionCandidate;
   assets: QualifiedSourceExpeditionAssets;
 };
 
 export type SourceExpeditionQualification = QualifiedSourceExpedition | SourceExpeditionUnavailable;
 
-export type OpenedSourceExpedition = QualifiedSourceExpedition & {
+type AcceptedQualifiedSourceExpedition = Omit<QualifiedSourceExpedition, "candidate"> & {
+  candidate: SourceExpeditionCandidate;
+  catalogEntry: SourceExpeditionCatalogEntry;
+};
+
+export type OpenedSourceExpedition = Omit<AcceptedQualifiedSourceExpedition, "catalogEntry"> & {
   expedition: LearnerExpedition & { kind: "source"; status: "ready"; enrichmentId: string };
 };
 
@@ -98,7 +138,7 @@ export type SourceExpeditionOpenResult = OpenedSourceExpedition | SourceExpediti
 
 export type SourceExpeditionModuleDeps = {
   learnerKnowledgeAvailability: LearnerKnowledgeAvailability;
-  enrichmentRead: Pick<EnrichmentInspectionReadPort, "listEnrichmentSummaries" | "getDerivedGraphDetail">;
+  enrichmentRead: Pick<EnrichmentInspectionReadPort, "getDerivedGraphDetail">;
   conceptLessonStore: Pick<
     ConceptLessonStorePort,
     "listLessonsForEnrichment" | "listAbsentForEnrichment"
@@ -108,6 +148,7 @@ export type SourceExpeditionModuleDeps = {
     LearnerExpeditionStorePort,
     "listForLearner" | "getForLearner" | "getByEnrichment"
   > & SourceExpeditionStorePort;
+  catalog: SourceExpeditionCatalogPort;
   qualifiedAssetConfigHash: string;
   newId?: () => string;
 };
@@ -287,6 +328,73 @@ export function createSourceExpeditionModule(deps: SourceExpeditionModuleDeps) {
     };
   };
 
+  const acceptedQualification = async (
+    enrichmentId: string,
+    knownEntry?: SourceExpeditionCatalogEntry
+  ): Promise<AcceptedQualifiedSourceExpedition | SourceExpeditionUnavailable> => {
+    const entry = knownEntry ?? await deps.catalog.getAcceptedByEnrichment(enrichmentId);
+    if (!entry) return unavailable("accepted_catalog_entry_required");
+    const qualification = await qualify(enrichmentId);
+    if (qualification.status !== "available") return qualification;
+    if (
+      entry.acceptedAssetSetIdentity !== qualification.assets.expectedAssets.assetSetIdentity ||
+      entry.acceptedAssetConfigHash !== deps.qualifiedAssetConfigHash
+    ) {
+      return unavailable("accepted_asset_set_changed");
+    }
+    return {
+      ...qualification,
+      candidate: {
+        ...qualification.candidate,
+        catalogKey: entry.catalogKey,
+        title: entry.title,
+        teaser: entry.teaser,
+        sortOrder: entry.sortOrder
+      },
+      catalogEntry: entry
+    };
+  };
+
+  const listAcceptedQualifications = async (): Promise<AcceptedQualifiedSourceExpedition[]> => {
+    const entries = await deps.catalog.listAccepted();
+    const qualifications = await Promise.all(
+      entries.map((entry) => acceptedQualification(entry.enrichmentId, entry))
+    );
+    return qualifications.filter(
+      (entry): entry is AcceptedQualifiedSourceExpedition => entry.status === "available"
+    );
+  };
+
+  const candidatesForLearner = (
+    qualifications: AcceptedQualifiedSourceExpedition[],
+    owned: LearnerExpedition[]
+  ): SourceExpeditionCandidate[] => {
+    const ownedIdentity = new Map(
+      owned
+        .filter((expedition) => expedition.kind === "source" && expedition.enrichmentId)
+        .map((expedition) => [
+          expedition.enrichmentId as string,
+          expedition.assetSetIdentity
+        ] as const)
+    );
+    return qualifications
+      .filter((qualification) =>
+        ownedIdentity.get(qualification.candidate.enrichmentId) !==
+          qualification.assets.expectedAssets.assetSetIdentity
+      )
+      .map((qualification) => qualification.candidate);
+  };
+
+  const listCandidates = async (input: {
+    learnerStateRef: string;
+  }): Promise<SourceExpeditionCandidate[]> => {
+    const [qualifications, owned] = await Promise.all([
+      listAcceptedQualifications(),
+      deps.expeditionStore.listForLearner(input.learnerStateRef)
+    ]);
+    return candidatesForLearner(qualifications, owned);
+  };
+
   const open = async (input: {
     learnerStateRef: string;
     enrichmentId: string;
@@ -298,13 +406,15 @@ export function createSourceExpeditionModule(deps: SourceExpeditionModuleDeps) {
       return unavailable("expedition_not_owned");
     }
     if (input.active && !expedition.active) return unavailable("expedition_inactive");
-    const qualification = await qualify(input.enrichmentId);
+    const qualification = await acceptedQualification(input.enrichmentId);
     if (qualification.status !== "available") return qualification;
     if (expedition.assetSetIdentity !== qualification.assets.expectedAssets.assetSetIdentity) {
-      return unavailable("asset_set_changed");
+      return unavailable("accepted_asset_set_changed");
     }
     return {
-      ...qualification,
+      status: qualification.status,
+      candidate: qualification.candidate,
+      assets: qualification.assets,
       expedition: {
         ...expedition,
         kind: "source",
@@ -317,33 +427,41 @@ export function createSourceExpeditionModule(deps: SourceExpeditionModuleDeps) {
   return {
     qualify,
 
-    async listCandidates(input: { learnerStateRef: string }): Promise<SourceExpeditionCandidate[]> {
-      const [summaries, owned] = await Promise.all([
-        deps.enrichmentRead.listEnrichmentSummaries(),
+    listCandidates,
+
+    async listCatalog(input: { learnerStateRef: string }): Promise<SourceExpeditionCatalog> {
+      const [qualifications, owned] = await Promise.all([
+        listAcceptedQualifications(),
         deps.expeditionStore.listForLearner(input.learnerStateRef)
       ]);
-      const ownedIdentity = new Map(
-        owned
-          .filter((expedition) => expedition.kind === "source" && expedition.enrichmentId)
-          .map((expedition) => [expedition.enrichmentId as string, expedition.assetSetIdentity] as const)
-      );
-      const qualifications = await Promise.all(
-        summaries
-          .filter((summary) => summary.status === "succeeded" && summary.graphVersionId !== null)
-          .map(async (summary) => ({ summary, qualification: await qualify(summary.enrichmentId) }))
-      );
-      return qualifications
-        .filter((entry): entry is typeof entry & { qualification: QualifiedSourceExpedition } =>
-          entry.qualification.status === "available" &&
-          ownedIdentity.get(entry.summary.enrichmentId) !==
-            entry.qualification.assets.expectedAssets.assetSetIdentity
-        )
-        .sort((left, right) =>
-          Date.parse(right.summary.startedAt) - Date.parse(left.summary.startedAt) ||
-          right.qualification.candidate.totalStopCount - left.qualification.candidate.totalStopCount ||
-          left.qualification.candidate.title.localeCompare(right.qualification.candidate.title)
-        )
-        .map((entry) => entry.qualification.candidate);
+      return {
+        candidates: candidatesForLearner(qualifications, owned),
+        sources: qualifications.map(({ catalogEntry }) => ({
+          catalogKey: catalogEntry.catalogKey,
+          title: catalogEntry.title,
+          sourceProvenance: catalogEntry.sourceProvenance,
+          sourceCredits: catalogEntry.sourceCredits
+        }))
+      };
+    },
+
+    async publishAccepted(input: PublishAcceptedSourceExpedition): Promise<
+      | { published: true }
+      | { published: false; refused: SourceExpeditionUnavailableReason }
+    > {
+      const qualification = await qualify(input.enrichmentId);
+      if (qualification.status !== "available") {
+        return { published: false, refused: qualification.reason };
+      }
+      if (qualification.candidate.totalStopCount < 3) {
+        return { published: false, refused: "accepted_catalog_stop_floor_not_met" };
+      }
+      return deps.catalog.publishAccepted({
+        ...input,
+        acceptedAssetSetIdentity: qualification.assets.expectedAssets.assetSetIdentity,
+        acceptedAssetConfigHash: deps.qualifiedAssetConfigHash,
+        expectedAssets: qualification.assets.expectedAssets
+      });
     },
 
     async adopt(input: {
@@ -353,7 +471,7 @@ export function createSourceExpeditionModule(deps: SourceExpeditionModuleDeps) {
       | { adopted: true; learnerExpeditionId: string }
       | { adopted: false; refused: SourceExpeditionUnavailableReason }
     > {
-      const qualification = await qualify(input.enrichmentId);
+      const qualification = await acceptedQualification(input.enrichmentId);
       if (qualification.status !== "available") {
         return { adopted: false, refused: qualification.reason };
       }
@@ -367,7 +485,7 @@ export function createSourceExpeditionModule(deps: SourceExpeditionModuleDeps) {
       });
       return stored.adopted
         ? stored
-        : { adopted: false, refused: "asset_set_changed" };
+        : { adopted: false, refused: "accepted_asset_set_changed" };
     },
 
     async activate(input: {
@@ -382,12 +500,12 @@ export function createSourceExpeditionModule(deps: SourceExpeditionModuleDeps) {
           !expedition.enrichmentId) {
         return { activated: false, refused: "expedition_not_owned" };
       }
-      const qualification = await qualify(expedition.enrichmentId);
+      const qualification = await acceptedQualification(expedition.enrichmentId);
       if (qualification.status !== "available") {
         return { activated: false, refused: qualification.reason };
       }
       if (expedition.assetSetIdentity !== qualification.assets.expectedAssets.assetSetIdentity) {
-        return { activated: false, refused: "asset_set_changed" };
+        return { activated: false, refused: "accepted_asset_set_changed" };
       }
       const stored = await deps.expeditionStore.activateSourceExpedition({
         learnerStateRef: input.learnerStateRef,
@@ -399,7 +517,9 @@ export function createSourceExpeditionModule(deps: SourceExpeditionModuleDeps) {
         ? { activated: true, enrichmentId: expedition.enrichmentId }
         : {
             activated: false,
-            refused: stored.refused === "not_found" ? "expedition_not_owned" : "asset_set_changed"
+            refused: stored.refused === "not_found"
+              ? "expedition_not_owned"
+              : "accepted_asset_set_changed"
           };
     },
 

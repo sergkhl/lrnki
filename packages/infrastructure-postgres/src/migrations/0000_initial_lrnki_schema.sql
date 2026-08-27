@@ -697,6 +697,24 @@ CREATE TABLE "study_items" (
 	CONSTRAINT "study_items_grounding_provenance_check" CHECK (grounding_provenance IN ('source_cep', 'source_mentioned', 'generated'))
 );
 --> statement-breakpoint
+CREATE TABLE "source_expedition_catalog_entries" (
+	"catalog_key" text PRIMARY KEY NOT NULL,
+	"enrichment_id" uuid NOT NULL,
+	"title" text NOT NULL,
+	"teaser" text NOT NULL,
+	"catalog_role" text NOT NULL,
+	"audience" text NOT NULL,
+	"sort_order" integer NOT NULL,
+	"source_provenance" jsonb NOT NULL,
+	"accepted_asset_set_identity" text NOT NULL,
+	"accepted_asset_config_hash" text NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "source_expedition_catalog_entries_enrichment_id_key" UNIQUE("enrichment_id"),
+	CONSTRAINT "source_expedition_catalog_entries_sort_order_key" UNIQUE("sort_order"),
+	CONSTRAINT "source_expedition_catalog_entries_nonempty_check" CHECK (catalog_key <> '' AND title <> '' AND teaser <> '' AND catalog_role <> '' AND audience <> '' AND accepted_asset_set_identity <> '' AND accepted_asset_config_hash <> ''),
+	CONSTRAINT "source_expedition_catalog_entries_sort_order_check" CHECK (sort_order > 0)
+);
+--> statement-breakpoint
 CREATE TABLE "calibration_verdicts" (
 	"learner_state_ref" text NOT NULL,
 	"derived_node_id" uuid NOT NULL,
@@ -1022,6 +1040,7 @@ ALTER TABLE "study_item_options" ADD CONSTRAINT "study_item_options_study_item_i
 ALTER TABLE "study_items" ADD CONSTRAINT "study_items_graph_version_id_fkey" FOREIGN KEY ("graph_version_id") REFERENCES "public"."graph_versions"("graph_version_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "study_items" ADD CONSTRAINT "study_items_enrichment_id_fkey" FOREIGN KEY ("enrichment_id") REFERENCES "public"."graph_enrichments"("enrichment_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "study_items" ADD CONSTRAINT "study_items_derived_node_id_fkey" FOREIGN KEY ("derived_node_id") REFERENCES "public"."derived_graph_nodes"("derived_node_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "source_expedition_catalog_entries" ADD CONSTRAINT "source_expedition_catalog_entries_enrichment_id_fkey" FOREIGN KEY ("enrichment_id") REFERENCES "public"."graph_enrichments"("enrichment_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "calibration_verdicts" ADD CONSTRAINT "calibration_verdicts_learner_state_ref_fkey" FOREIGN KEY ("learner_state_ref") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "calibration_verdicts" ADD CONSTRAINT "calibration_verdicts_derived_node_id_fkey" FOREIGN KEY ("derived_node_id") REFERENCES "public"."derived_graph_nodes"("derived_node_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "learner_awards" ADD CONSTRAINT "learner_awards_learner_ref_fkey" FOREIGN KEY ("learner_ref") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint

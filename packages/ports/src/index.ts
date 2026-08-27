@@ -768,6 +768,54 @@ export type SourceExpeditionAssetExpectation = {
   currentStudyItemIds: string[];
 };
 
+// One accepted catalog row publishes one exact qualified Source Expedition asset set. The row owns
+// stable learner-facing presentation; its source credits remain derived from Graph Version
+// membership so neither the catalog table nor a client duplicates the registered-source list.
+export type SourceExpeditionSourceProvenance = {
+  authorship: string;
+  knowledgeBasis: string;
+  externalClaimVerificationRequired: boolean;
+  acceptanceScope: string;
+};
+
+export type SourceExpeditionSourceCredit = {
+  sourceResourceId: string;
+  title: string;
+  sourceUri: string | null;
+  license: string | null;
+};
+
+export type SourceExpeditionCatalogEntry = {
+  catalogKey: string;
+  enrichmentId: string;
+  title: string;
+  teaser: string;
+  catalogRole: string;
+  audience: string;
+  sortOrder: number;
+  sourceProvenance: SourceExpeditionSourceProvenance;
+  acceptedAssetSetIdentity: string;
+  acceptedAssetConfigHash: string;
+  sourceCredits: SourceExpeditionSourceCredit[];
+  createdAt: string;
+};
+
+export type PublishSourceExpeditionCatalogEntry = Omit<
+  SourceExpeditionCatalogEntry,
+  "sourceCredits" | "createdAt"
+> & {
+  expectedAssets: SourceExpeditionAssetExpectation;
+};
+
+export interface SourceExpeditionCatalogPort {
+  listAccepted(): Promise<SourceExpeditionCatalogEntry[]>;
+  getAcceptedByEnrichment(enrichmentId: string): Promise<SourceExpeditionCatalogEntry | undefined>;
+  publishAccepted(input: PublishSourceExpeditionCatalogEntry): Promise<
+    | { published: true }
+    | { published: false; refused: "accepted_asset_set_changed" }
+  >;
+}
+
 export interface SourceExpeditionStorePort {
   adoptSourceExpedition(input: {
     learnerExpeditionId: string;

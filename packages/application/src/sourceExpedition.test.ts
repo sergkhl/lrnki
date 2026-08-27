@@ -9,7 +9,9 @@ import type {
 import type {
   DerivedGraphDetail,
   LearnerExpedition,
-  SourceExpeditionAssetExpectation
+  PublishSourceExpeditionCatalogEntry,
+  SourceExpeditionAssetExpectation,
+  SourceExpeditionCatalogEntry
 } from "@lrnki/ports";
 import { CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY } from "./learnerKnowledgeAvailability";
 import {
@@ -265,12 +267,60 @@ function expedition(overrides: Partial<LearnerExpedition> = {}): LearnerExpediti
   };
 }
 
+function catalogEntry(overrides: Partial<SourceExpeditionCatalogEntry> = {}): SourceExpeditionCatalogEntry {
+  return {
+    catalogKey: "critical-thinking",
+    enrichmentId: ENRICHMENT_ID,
+    title: "Critical Thinking",
+    teaser: "Build stronger arguments and weigh evidence.",
+    catalogRole: "broad_reasoning_topic",
+    audience: "curious_general_adult_high_school_reading",
+    sortOrder: 1,
+    sourceProvenance: {
+      authorship: "lrnki_model_authored_project_source",
+      knowledgeBasis: "general_model_knowledge_only",
+      externalClaimVerificationRequired: false,
+      acceptanceScope: "local_shared_learner_playtest"
+    },
+    acceptedAssetSetIdentity: "resolved-by-harness",
+    acceptedAssetConfigHash: QUALIFIED_CONFIG,
+    sourceCredits: [{
+      sourceResourceId: "source-resource",
+      title: "Critical Thinking",
+      sourceUri: "lrnki model-authored project source",
+      license: "lrnki project-owned playtest fixture"
+    }],
+    createdAt: "2026-08-27T00:00:00.000Z",
+    ...overrides
+  };
+}
+
+const acceptedPublication = {
+  enrichmentId: ENRICHMENT_ID,
+  catalogKey: "critical-thinking",
+  title: "Critical Thinking",
+  teaser: "Build stronger arguments and weigh evidence.",
+  catalogRole: "broad_reasoning_topic",
+  audience: "curious_general_adult_high_school_reading",
+  sortOrder: 1,
+  sourceProvenance: {
+    authorship: "lrnki_model_authored_project_source",
+    knowledgeBasis: "general_model_knowledge_only",
+    externalClaimVerificationRequired: false,
+    acceptanceScope: "local_shared_learner_playtest"
+  }
+} as const;
+
 type HarnessOptions = {
   graph?: DerivedGraphDetail;
   lessons?: ConceptLesson[];
   items?: StudyItem[];
   owned?: LearnerExpedition[];
   refuseSnapshot?: boolean;
+  cataloged?: boolean;
+  acceptedAssetSetIdentity?: string;
+  acceptedAssetConfigHash?: string;
+  refuseCatalogSnapshot?: boolean;
 };
 
 function harness(options: HarnessOptions = {}) {
@@ -284,10 +334,21 @@ function harness(options: HarnessOptions = {}) {
     expectedAssets: SourceExpeditionAssetExpectation;
   }> = [];
   const activationCalls: SourceExpeditionAssetExpectation[] = [];
+  const publicationCalls: PublishSourceExpeditionCatalogEntry[] = [];
+  const resolvedCatalogEntry = async (): Promise<SourceExpeditionCatalogEntry | undefined> => {
+    if (options.cataloged === false) return undefined;
+    const qualification = await sourceExpedition.qualify(ENRICHMENT_ID);
+    return catalogEntry({
+      acceptedAssetSetIdentity: options.acceptedAssetSetIdentity ??
+        (qualification.status === "available"
+          ? qualification.assets.expectedAssets.assetSetIdentity
+          : "unavailable-fixture"),
+      acceptedAssetConfigHash: options.acceptedAssetConfigHash ?? QUALIFIED_CONFIG
+    });
+  };
   const sourceExpedition = createSourceExpeditionModule({
     learnerKnowledgeAvailability: CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY,
     enrichmentRead: {
-      async listEnrichmentSummaries() { return [graph.summary]; },
       async getDerivedGraphDetail(enrichmentId) {
         return enrichmentId === graph.summary.enrichmentId ? graph : undefined;
       }
@@ -344,6 +405,21 @@ function harness(options: HarnessOptions = {}) {
         return { activated: true as const };
       }
     },
+    catalog: {
+      async listAccepted() {
+        const entry = await resolvedCatalogEntry();
+        return entry ? [entry] : [];
+      },
+      async getAcceptedByEnrichment(enrichmentId) {
+        return enrichmentId === ENRICHMENT_ID ? resolvedCatalogEntry() : undefined;
+      },
+      async publishAccepted(input) {
+        publicationCalls.push(input);
+        return options.refuseCatalogSnapshot
+          ? { published: false as const, refused: "accepted_asset_set_changed" as const }
+          : { published: true as const };
+      }
+    },
     qualifiedAssetConfigHash: QUALIFIED_CONFIG,
     newId: () => "new-source-expedition"
   });
@@ -351,6 +427,7 @@ function harness(options: HarnessOptions = {}) {
     sourceExpedition,
     adoptionCalls,
     activationCalls,
+    publicationCalls,
     owned: () => owned
   };
 }
@@ -383,6 +460,93 @@ test("qualification derives authoritative presentation and admits only qualified
     result.assets.expectedAssets.currentStudyItemIds,
     ["option-node-prerequisite", "option-node-summit"]
   );
+});
+
+test("qualification remains inspectable before publication while every learner entry point refuses it", async () => {
+  const state = harness({ cataloged: false });
+  const qualification = await state.sourceExpedition.qualify(ENRICHMENT_ID);
+  assert.equal(qualification.status, "available");
+  assert.deepEqual(
+    await state.sourceExpedition.listCandidates({ learnerStateRef: "learner-1" }),
+    []
+  );
+  assert.deepEqual(
+    await state.sourceExpedition.adopt({ learnerStateRef: "learner-1", enrichmentId: ENRICHMENT_ID }),
+    { adopted: false, refused: "accepted_catalog_entry_required" }
+  );
+  assert.equal(state.adoptionCalls.length, 0);
+});
+
+test("accepted catalog presentation and source credits are the finished learner projection", async () => {
+  const { sourceExpedition } = harness();
+  const catalog = await sourceExpedition.listCatalog({ learnerStateRef: "learner-1" });
+  assert.deepEqual(catalog.candidates[0], {
+    enrichmentId: ENRICHMENT_ID,
+    catalogKey: "critical-thinking",
+    title: "Critical Thinking",
+    teaser: "Build stronger arguments and weigh evidence.",
+    declaredDomain: "authoritative-domain",
+    sortOrder: 1,
+    totalStopCount: 2,
+    searchTerms: [
+      "Trusted prerequisite",
+      "Prerequisite alias",
+      "Authoritative summit",
+      "Summit alias"
+    ]
+  });
+  assert.deepEqual(catalog.sources, [{
+    catalogKey: "critical-thinking",
+    title: "Critical Thinking",
+    sourceProvenance: acceptedPublication.sourceProvenance,
+    sourceCredits: catalogEntry().sourceCredits
+  }]);
+});
+
+test("a drifted accepted identity or config is held out by its exact refusal name", async () => {
+  for (const options of [
+    { acceptedAssetSetIdentity: "stale-assets" },
+    { acceptedAssetConfigHash: "stale-config" }
+  ]) {
+    const state = harness(options);
+    assert.deepEqual(
+      await state.sourceExpedition.listCandidates({ learnerStateRef: "learner-1" }),
+      []
+    );
+    assert.deepEqual(
+      await state.sourceExpedition.adopt({ learnerStateRef: "learner-1", enrichmentId: ENRICHMENT_ID }),
+      { adopted: false, refused: "accepted_asset_set_changed" }
+    );
+  }
+});
+
+test("publication enforces the three-stop floor before the catalog write", async () => {
+  const state = harness();
+  assert.deepEqual(await state.sourceExpedition.publishAccepted(acceptedPublication), {
+    published: false,
+    refused: "accepted_catalog_stop_floor_not_met"
+  });
+  assert.equal(state.publicationCalls.length, 0);
+});
+
+test("publication pins the exact qualified asset identity and current qualification config", async () => {
+  const graph = partiallyAssetReadyDetail();
+  const state = harness({
+    graph,
+    lessons: graph.nodes.map((node) => lesson(node.derivedNodeId)),
+    items: graph.nodes.map((node) => option(node.derivedNodeId))
+  });
+  assert.deepEqual(await state.sourceExpedition.publishAccepted(acceptedPublication), {
+    published: true
+  });
+  assert.equal(state.publicationCalls.length, 1);
+  assert.equal(state.publicationCalls[0].acceptedAssetConfigHash, QUALIFIED_CONFIG);
+  assert.equal(
+    state.publicationCalls[0].acceptedAssetSetIdentity,
+    state.publicationCalls[0].expectedAssets.assetSetIdentity
+  );
+  assert.equal(state.publicationCalls[0].expectedAssets.currentConceptLessonIds.length, 4);
+  assert.equal(state.publicationCalls[0].expectedAssets.currentStudyItemIds.length, 4);
 });
 
 test("qualification keeps the greatest asset-ready prerequisite-closed sublayer", async () => {
@@ -442,14 +606,24 @@ test("qualification excludes LLM-grounded branches without suppressing an indepe
 
 test("adoption is authoritative, idempotent, and hides the exact owned snapshot from candidates", async () => {
   const state = harness();
-  assert.equal((await state.sourceExpedition.listCandidates({ learnerStateRef: "learner-1" })).length, 1);
+  const candidate = (await state.sourceExpedition.listCandidates({ learnerStateRef: "learner-1" }))[0];
+  assert.equal(candidate.title, "Critical Thinking");
   const first = await state.sourceExpedition.adopt({ learnerStateRef: "learner-1", enrichmentId: ENRICHMENT_ID });
   assert.deepEqual(first, { adopted: true, learnerExpeditionId: "new-source-expedition" });
-  assert.equal(state.adoptionCalls[0].title, "Authoritative summit");
+  assert.equal(state.adoptionCalls[0].title, "Critical Thinking");
   assert.equal(state.adoptionCalls[0].declaredDomain, "authoritative-domain");
   assert.equal(state.owned()[0].kind, "source");
   assert.equal(state.owned()[0].currentOperationId, null);
   assert.equal((await state.sourceExpedition.listCandidates({ learnerStateRef: "learner-1" })).length, 0);
+  const opened = await state.sourceExpedition.openOwned({
+    learnerStateRef: "learner-1",
+    enrichmentId: ENRICHMENT_ID
+  });
+  assert.equal(opened.status, "available");
+  if (opened.status !== "available") return;
+  assert.equal(opened.candidate.title, candidate.title);
+  assert.equal(opened.candidate.teaser, candidate.teaser);
+  assert.equal(opened.expedition.title, candidate.title);
 
   const repeat = await state.sourceExpedition.adopt({ learnerStateRef: "learner-1", enrichmentId: ENRICHMENT_ID });
   assert.deepEqual(repeat, first);
@@ -529,7 +703,7 @@ test("owned reads and learner authorization reject a changed snapshot and expose
   const stale = harness({ owned: [expedition({ assetSetIdentity: "old-snapshot" })] });
   assert.deepEqual(await stale.sourceExpedition.openOwned({ learnerStateRef: "learner-1", enrichmentId: ENRICHMENT_ID }), {
     status: "unavailable",
-    reason: "asset_set_changed"
+    reason: "accepted_asset_set_changed"
   });
   assert.equal((await stale.sourceExpedition.listCandidates({ learnerStateRef: "learner-1" })).length, 1);
 
@@ -567,14 +741,14 @@ test("atomic store refusal cannot leave a partial adopted or activated source ex
   const state = harness({ owned: [prior], refuseSnapshot: true });
   assert.deepEqual(await state.sourceExpedition.adopt({ learnerStateRef: "learner-1", enrichmentId: ENRICHMENT_ID }), {
     adopted: false,
-    refused: "asset_set_changed"
+    refused: "accepted_asset_set_changed"
   });
   assert.deepEqual(await state.sourceExpedition.activate({
     learnerStateRef: "learner-1",
     learnerExpeditionId: prior.learnerExpeditionId
   }), {
     activated: false,
-    refused: "asset_set_changed"
+    refused: "accepted_asset_set_changed"
   });
   assert.deepEqual(state.owned(), [prior]);
   assert.equal(state.adoptionCalls.length, 1);

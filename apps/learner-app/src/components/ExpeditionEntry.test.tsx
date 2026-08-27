@@ -49,6 +49,7 @@ function journal(overrides: Partial<JournalView> = {}): JournalView {
         learnerExpeditionId: "le1",
         enrichmentId: "e1",
         title: "Rust ownership",
+        teaser: "Build intuition for moves and borrows.",
         declaredDomain: "software engineering",
         active: true,
         layerPurpose: "Reason about moves and borrows.",
@@ -59,8 +60,11 @@ function journal(overrides: Partial<JournalView> = {}): JournalView {
     shared: [
       {
         enrichmentId: "e2",
-        title: "Photosynthesis",
+        catalogKey: "critical-thinking",
+        title: "Critical Thinking",
+        teaser: "Build stronger arguments and weigh evidence.",
         declaredDomain: "biology",
+        sortOrder: 1,
         totalStopCount: 7,
         searchTerms: []
       }
@@ -77,6 +81,7 @@ test("journal sections render Continue, Your expeditions, Explore in order", asy
   expect(screen.getByText("Exploring as scout")).toBeTruthy();
   // The started expedition surfaces its purpose teaser and progress.
   expect(screen.getAllByText("Rust ownership").length).toBeGreaterThan(0);
+  expect(screen.getAllByText("Build intuition for moves and borrows.").length).toBeGreaterThan(0);
   expect(screen.getAllByText("Reason about moves and borrows.").length).toBeGreaterThan(0);
 });
 
@@ -125,4 +130,14 @@ test("beginning a candidate fires one action even under rapid presses", async ()
   await fireEvent.press(begin);
   await fireEvent.press(begin);
   expect(chooseMock.mock.calls.length + setActiveMock.mock.calls.length).toBe(1);
+});
+
+test("an accepted candidate renders only catalog title, teaser, playable count, and Begin", async () => {
+  await renderEntry(journal());
+  expect(screen.getByText("Critical Thinking")).toBeTruthy();
+  expect(screen.getByText("Build stronger arguments and weigh evidence.")).toBeTruthy();
+  expect(screen.getByText("7 playable stops")).toBeTruthy();
+  expect(screen.getByLabelText("Begin")).toBeTruthy();
+  expect(screen.queryByText("Biology")).toBeNull();
+  expect(screen.queryByText("Expedition: Critical Thinking")).toBeNull();
 });

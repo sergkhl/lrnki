@@ -3,11 +3,11 @@
 ## TODO
 
 - **Curate five ready-to-play Source Expedition mockups.** Execute the
-  [active plan](./2026-08-27-001-curate-five-ready-source-expedition-mockups.md) in order. U0–U1 own
-  the accepted source set and historical 35-stop Critical Thinking qualification. U2 is next: land
-  the code-first catalog schema, perform the one additionally authorized guarded development reset,
-  regenerate and re-qualify Critical Thinking, and publish it. Preserve that resulting Concept
-  registry without another reset through U7; do not advance the exclusive U3 unit before U2 commits.
+  [active plan](./2026-08-27-001-curate-five-ready-source-expedition-mockups.md) in order. U0–U2 own
+  the accepted sources, catalog schema, and freshly regenerated/published 31-stop Critical Thinking
+  path. U3 is next: seal and round-trip its package in `lrnki_test`, prove incomplete-set refusal,
+  and replace the demo reset/seed path. The authorized development reset is consumed; preserve the
+  resulting Concept registry without another reset through U7.
 
 ## COMPLETED
 

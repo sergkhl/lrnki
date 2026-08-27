@@ -7,11 +7,12 @@ execution: code
 
 # Curate Five Ready-to-Play Source Expedition Mockups
 
-**Status:** In progress — U0–U1 complete; U2 is next
+**Status:** In progress — U0–U2 complete; U3 is next
 
-**NEXT:** Implement U2 only. After its code-first catalog schema lands, perform the one additionally
-authorized guarded development reset, regenerate and independently re-qualify Critical Thinking,
-publish that fresh asset set, validate the learner projection, persist status, and commit.
+**NEXT:** Implement U3 only. Define the sealed package schema and export/import boundaries, export
+and round-trip the accepted Critical Thinking package through `lrnki_test`, prove an incomplete
+five-package set refuses before reset, and replace the demo reset/seed path. Preserve the live
+development Concept registry; no further development reset is authorized through U7.
 
 **Decision state:** Accepted by the owner through the 2026-08-27 grilling. The initial catalog is
 exactly Critical Thinking, Probability and Statistics, Personal Finance, Machine Learning, and
@@ -416,7 +417,7 @@ The first source was generated, qualified, measured, and played through in the p
 Validation Log owns that historical evidence; U2 replaces its artifacts and evidence after the
 authorized schema reset. No publication or package exists yet.
 
-### U2 — Explicit accepted catalog and learner projection
+### U2 — Explicit accepted catalog and learner projection — complete
 
 1. Add the code-first catalog-entry table with its pinned accepted identity columns, regenerate the
    sole baseline, and add the narrow catalog read/write port and Postgres adapter. Parse the
@@ -567,42 +568,26 @@ The plan is complete only when all of the following are true:
 
 ## Validation Log
 
-### Reset-order resolution — 2026-08-27
-
-- The owner explicitly authorized one guarded development reset after the U2 schema, fresh Critical
-  Thinking qualification, and preservation of that resulting Concept registry through U7. This
-  coordination batch changed no schema, database, model artifact, learner surface, or release state.
-
 ### U0 — Accepted contract and source fixtures — 2026-08-27
 
-- Integrated review reconciled the five sources' catalog order, audiences, reset policy, interfaces,
-  and authority. Their contract passed exact order/metadata, ingestion, links, JSON, and whitespace.
-- Authority is source/documentation only; no model, database, learner, surface, or device ran.
+- Integrated review reconciled order, audiences, reset policy, interfaces, and authority; exact metadata, ingestion, links, JSON, and whitespace passed. Authority is source/documentation only.
 
 ### U1 — Critical Thinking qualification and achievable trail — 2026-08-27
 
-- Guarded `lrnki` was reset once. The 116-block source yielded 61 candidates (27 core, 34 optional)
-  and a standalone 27-Concept Graph Version.
-- Two synchronized-`429` arms failed before separate ordinary/rate-limit budgets plus capped equal
-  jitter repaired the shared transport seam; the next K=8 arm recovered under rate-limit pressure.
-- The enrichment has 58 source-backed nodes, zero `llm_grounded`, 27 certain/23 uncertain edges, and
-  58 difficulty rows. Generation retained 44 lessons and 43 options; qualification admitted 35.
-- Inspection accepted 129/129 claims, 105/105 distractors, and 35/35 keys. Evaluation used 387 calls,
-  546,575 tokens/about `$0.026176692`; the journey used 1,280/2,244,266/about `$0.197703456`.
-- Ordering used 9 DigitalOcean calls and one Groq fallback; all 387 verifier calls used DeepInfra.
-  This qualifies inspected topology, not quantization equivalence.
-- A reserved learner mastered all 35 stops without scaffold; positive controls preceded exact
-  teardown. Focused/full suites passed 49/49, 217/217, 875/875, and 8/8 with types and ESLint.
-- Authority is local database, production-model, artifact, and learner-route evidence only.
+- Commit `73181e5` retains the pre-U2 27-Concept/35-stop qualification and shared rate-limit repair. The authorized post-schema reset superseded its generated artifacts and quality evidence; it is historical transport evidence only.
+
+### U2 — Accepted catalog, fresh qualification, and learner projection — 2026-08-28
+
+- One runtime manifest schema, the 59-table code-first baseline, a narrow Postgres catalog port, and the existing Source Expedition authority now own accepted publication, presentation, current source credits, and named asset drift.
+- `pnpm test:db` passed reset/migration guards, DB-backed catalog/API coverage, and workspace suites. `pnpm check` passed schema parity, types/tests, ESLint with zero errors/10 warnings, both web builds, and 70/70 intercepted-web scenarios.
+- The intended local `lrnki` database was resolved before the one authorized reset; that reset is consumed. Fresh generation from 116 blocks produced one 28-Concept graph and 31 qualified stops; no further development reset is authorized through U7.
+- Inspection accepted 122/122 material claims, 93/93 distractors, and 31/31 unique keys. All lessons and boards were coherent and completable with no visible `llm_grounded` node; sparse definition-only lessons and exact-text recall are safe limitations.
+- Publication pinned `source-expedition-assets-02cb55fe3bee71d8e631851445c47d313433892c91b236f4ddcb91ea6e6514fc` under `Critical Thinking`; neural title `Value of Information` is diagnostic only. A learner mastered 31/31 stops and authenticated Catalog/Begin/Journal HTTP passed; both controls tore down all learner/progress rows.
+- The preserved 28-row Concept registry projection SHA-256 is `56a4ad4fa300ff6877dc9b56ed0511ab00b130058b2262715a442ba5f308e1ed`. U3–U7 must verify it without reset. Authority is local database, production-model, artifact, application-route, build, and intercepted-web evidence only.
 
 ### Open findings
 
-- The five primers intentionally lack an external claim-verification ledger; that is their accepted
-  playtest boundary, while a known material defect still blocks acceptance.
-- Critical Thinking is qualified but unpublished under neural title `Robust Option`. U2 makes the
-  manifest presentation authoritative; no package/export/import exists until U3.
-- Achievable stop count remains unmeasured for Probability and Statistics, Personal Finance,
-  Machine Learning, and Neuroscience. U4–U7 own those independent measurements.
-- Pinning the accepted identity turns a drifted qualification into a named refusal but does not
-  decouple it: a prompt or route change after acceptance still requires regeneration, and AGENTS
-  rule 14 still invalidates the affected quality evidence.
+- The five primers intentionally lack an external claim-verification ledger; that is their accepted playtest boundary, while a known material defect still blocks acceptance.
+- Critical Thinking is accepted and published with 31 stops, but no sealed package/export/import exists until U3.
+- Stop counts remain unmeasured for Probability and Statistics, Personal Finance, Machine Learning, and Neuroscience; U4–U7 own those independent measurements.
+- Accepted-identity drift refuses by name but still requires regeneration, and AGENTS rule 14 still invalidates affected quality evidence.

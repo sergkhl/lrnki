@@ -41,6 +41,7 @@ import {
   DoclingStructuredDocumentParser,
   HtmlStructuredDocumentParser,
   MarkdownStructuredDocumentParser,
+  parseSourceRegistrationManifest,
   StructuredDocumentParserRegistry,
   TextStructuredDocumentParser
 } from "@lrnki/infrastructure-ingestion";
@@ -299,7 +300,6 @@ function buildContext() {
 }
 
 type Context = ReturnType<typeof buildContext>;
-type Manifest = { fixtures: { path: string; contentType: string; declaredDomain: string; title: string; source?: string; license?: string }[] };
 
 const DEFAULT_BOUNDARY_PROBE_CALIBRATION_DIR = "tmp/2026-07-07-boundary-probe-calibration";
 const DEFAULT_BOUNDARY_PROBE_DEPLOYMENTS = [
@@ -308,7 +308,9 @@ const DEFAULT_BOUNDARY_PROBE_DEPLOYMENTS = [
 ];
 
 async function registerFromManifest(ctx: Context, manifestPath: string) {
-  const manifest = JSON.parse(await readFile(path.resolve(REPO_ROOT, manifestPath), "utf8")) as Manifest;
+  const manifest = parseSourceRegistrationManifest(
+    JSON.parse(await readFile(path.resolve(REPO_ROOT, manifestPath), "utf8"))
+  );
   for (const fixture of manifest.fixtures) {
     const bytes = new Uint8Array(await readFile(path.resolve(REPO_ROOT, fixture.path)));
     const contentHash = createHash("sha256").update(bytes).digest("hex");

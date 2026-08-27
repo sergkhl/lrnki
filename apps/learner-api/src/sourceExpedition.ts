@@ -9,6 +9,7 @@ import {
   PostgresConceptLessonStore,
   PostgresEnrichmentInspectionRead,
   PostgresLearnerExpeditionStore,
+  PostgresSourceExpeditionCatalog,
   PostgresStudyItemBankStore
 } from "@lrnki/infrastructure-postgres";
 import type { DatabaseClient } from "./db";
@@ -26,6 +27,7 @@ export function createLearnerSourceExpeditions(
     conceptLessonStore: new PostgresConceptLessonStore(sql),
     studyItemStore: new PostgresStudyItemBankStore(sql),
     expeditionStore: new PostgresLearnerExpeditionStore(sql),
+    catalog: new PostgresSourceExpeditionCatalog(sql),
     qualifiedAssetConfigHash: qualifiedSourceExpeditionAssetConfigHash(studyItemBankConfigHash())
   });
 }

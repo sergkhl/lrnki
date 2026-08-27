@@ -3,39 +3,12 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { MarkdownStructuredDocumentParser } from "./MarkdownStructuredDocumentParser";
-
-type AcceptedPathFixture = Readonly<{
-  fixtureId: string;
-  catalogKey: string;
-  catalogRole: string;
-  catalogOrder: number;
-  audience: string;
-  preferredStopCount: Readonly<{ minimum: number; maximum: number }>;
-  path: string;
-  contentType: string;
-  declaredDomain: string;
-  title: string;
-  teaser: string;
-  source: string;
-  license: string;
-  curation: string;
-}>;
-
-type AcceptedPathManifest = Readonly<{
-  sourcePolicy: Readonly<{
-    authorship: string;
-    knowledgeBasis: string;
-    acceptanceScope: string;
-    externalClaimVerificationRequired: boolean;
-    revisionPolicy: string;
-  }>;
-  fixtures: AcceptedPathFixture[];
-}>;
+import { parseAcceptedPathManifest } from "./SourceManifest";
 
 const repoRoot = path.resolve(import.meta.dirname, "../../..");
-const manifest = JSON.parse(
+const manifest = parseAcceptedPathManifest(JSON.parse(
   readFileSync(path.join(repoRoot, "fixtures/accepted-paths/manifest.json"), "utf8")
-) as AcceptedPathManifest;
+));
 const parser = new MarkdownStructuredDocumentParser();
 
 const expectedCatalog = [
@@ -77,6 +50,15 @@ test("accepted-path manifest owns exactly the current five model-authored playte
     new Set(manifest.fixtures.map((fixture) => path.basename(fixture.path))).size,
     manifest.fixtures.length,
     "source basenames must be unique because registration derives objectKey from the basename"
+  );
+});
+
+test("accepted-path manifest parsing rejects duplicate publication identity", () => {
+  const duplicate = structuredClone(manifest);
+  duplicate.fixtures[1]!.catalogOrder = duplicate.fixtures[0]!.catalogOrder;
+  assert.throws(
+    () => parseAcceptedPathManifest(duplicate),
+    /catalogOrder duplicates fixtures\[0\]/
   );
 });
 

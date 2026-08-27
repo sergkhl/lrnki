@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { test } from "node:test";
+import { CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY } from "@lrnki/application";
 import { createLearnerApp } from "./app";
 import type { DatabaseClient } from "./db";
+import { createLearnerSourceExpeditions } from "./sourceExpedition";
 
 // Better Auth reads its secret and public origin from the environment when the app is
 // constructed. `app.request` issues `http://localhost/...` URLs, so the base URL must agree or
@@ -195,7 +197,10 @@ maybeDb("paused Synthetic Topic routes expose one capability and perform no writ
       enrichmentId: heldEnrichmentId
     });
     assert.equal(chooseHeld.status, 409);
-    assert.equal((await chooseHeld.json() as { error: string }).error, "registered_source_required");
+    assert.equal(
+      (await chooseHeld.json() as { error: string }).error,
+      "accepted_catalog_entry_required"
+    );
     const [afterChoose] = await sql<{ count: number }[]>`
       SELECT count(*)::int AS count
       FROM learner_expeditions
@@ -291,6 +296,7 @@ maybeDb("exact-reference Support Path and recall challenge share qualified neutr
     const sourceResourceId = randomUUID();
     const sourceDocumentId = randomUUID();
     const sourceBlockId = randomUUID();
+    const extractionRunId = randomUUID();
     const lessonTexts = [
       "Source prerequisite establishes the invariant.",
       "Source summit applies that invariant."
@@ -298,8 +304,11 @@ maybeDb("exact-reference Support Path and recall challenge share qualified neutr
     const sourceText = `${lessonTexts.join(" ")} Diagnostic glossary gap labels supplementary material that is not modeled as a trail node.`;
     await sql`
       INSERT INTO source_resources
-        (source_resource_id, content_hash, content_type, object_key, declared_domain, title)
-      VALUES (${sourceResourceId}, ${randomUUID()}, 'text/plain', ${randomUUID()}, 'software engineering', 'Challenge source')`;
+        (source_resource_id, content_hash, content_type, object_key, declared_domain, title,
+         source_uri, license)
+      VALUES (${sourceResourceId}, ${randomUUID()}, 'text/plain', ${randomUUID()},
+        'software engineering', 'Challenge source',
+        'https://example.test/challenge-source', 'CC-BY-4.0')`;
     await sql`
       INSERT INTO source_documents
         (source_document_id, source_resource_id, parser_name, parser_version, parser_config_hash)
@@ -308,10 +317,18 @@ maybeDb("exact-reference Support Path and recall challenge share qualified neutr
       INSERT INTO source_blocks
         (source_block_id, source_document_id, block_id, block_type, text, heading_path, locator)
       VALUES (${sourceBlockId}, ${sourceDocumentId}, 'block-1', 'paragraph', ${sourceText}, ${sql.json(["Challenge source"])}, ${sql.json({ lineStart: 1, lineEnd: 1 })})`;
+    await sql`
+      INSERT INTO extraction_runs
+        (run_id, source_resource_id, source_document_id, pipeline_config_hash, status, completed_at)
+      VALUES (${extractionRunId}, ${sourceResourceId}, ${sourceDocumentId}, 'test', 'succeeded', now())`;
     const graphVersionId = randomUUID();
     await sql`
       INSERT INTO graph_versions (graph_version_id, base_graph_version_id, status, refinement_config_hash, published_at)
       VALUES (${graphVersionId}, NULL, 'published', 'test', now())`;
+    await sql`
+      INSERT INTO graph_version_run_memberships
+        (graph_version_run_membership_id, graph_version_id, run_id, source_resource_id)
+      VALUES (${randomUUID()}, ${graphVersionId}, ${extractionRunId}, ${sourceResourceId})`;
     const enrichmentId = randomUUID();
     await sql`
       INSERT INTO graph_enrichments (enrichment_id, graph_version_id, enrichment_config_hash, status, judge_model, difficulty_method, completed_at)
@@ -412,6 +429,84 @@ maybeDb("exact-reference Support Path and recall challenge share qualified neutr
       })),
       rejected: []
     });
+    // This test isolates exact-reference and Recall Challenge behavior over the historical
+    // two-stop minimum. U2's application publication command owns the new three-stop accepted
+    // floor; the fixture installs an already-accepted row directly and pins the exact same
+    // qualification identity that every learner read rechecks.
+    const sourceExpeditions = createLearnerSourceExpeditions(
+      sql,
+      CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY
+    );
+    const qualification = await sourceExpeditions.qualify(enrichmentId);
+    assert.equal(qualification.status, "available");
+    if (qualification.status !== "available") throw new Error("fixture qualification failed");
+    await sql`
+      INSERT INTO source_expedition_catalog_entries (
+        catalog_key, enrichment_id, title, teaser, catalog_role, audience, sort_order,
+        source_provenance, accepted_asset_set_identity, accepted_asset_config_hash
+      ) VALUES (
+        ${`challenge-${enrichmentId}`}, ${enrichmentId}, 'Challenge source',
+        'Exercise exact-reference support and recall.', 'test_fixture', 'test_fixture', 999,
+        ${sql.json({
+          authorship: "test_fixture",
+          knowledgeBasis: "registered_source",
+          externalClaimVerificationRequired: false,
+          acceptanceScope: "automated_test"
+        })}, ${qualification.assets.expectedAssets.assetSetIdentity}, ${qualifiedConfigHash}
+      )`;
+    const catalogResponse = await authed("/catalog");
+    assert.equal(catalogResponse.status, 200);
+    const catalogBody = await catalogResponse.json() as {
+      candidates: Array<{
+        enrichmentId: string;
+        catalogKey: string;
+        title: string;
+        teaser: string;
+        sortOrder: number;
+      }>;
+      sources: Array<{
+        catalogKey: string;
+        title: string;
+        sourceCredits: Array<{
+          sourceResourceId: string;
+          title: string;
+          sourceUri: string | null;
+          license: string | null;
+        }>;
+      }>;
+    };
+    assert.deepEqual(
+      catalogBody.candidates.find((candidate) => candidate.enrichmentId === enrichmentId),
+      {
+        enrichmentId,
+        catalogKey: `challenge-${enrichmentId}`,
+        title: "Challenge source",
+        teaser: "Exercise exact-reference support and recall.",
+        declaredDomain: "software engineering",
+        totalStopCount: 2,
+        searchTerms: ["Source prerequisite", "Source summit"],
+        sortOrder: 999
+      }
+    );
+    assert.deepEqual(
+      catalogBody.sources.find((source) => source.catalogKey === `challenge-${enrichmentId}`),
+      {
+        catalogKey: `challenge-${enrichmentId}`,
+        title: "Challenge source",
+        sourceProvenance: {
+          authorship: "test_fixture",
+          knowledgeBasis: "registered_source",
+          externalClaimVerificationRequired: false,
+          acceptanceScope: "automated_test"
+        },
+        sourceCredits: [{
+          sourceResourceId,
+          title: "Challenge source",
+          sourceUri: "https://example.test/challenge-source",
+          license: "CC-BY-4.0"
+        }]
+      }
+    );
     const adoption = await authed("/expedition/choose", { enrichmentId });
     assert.equal(adoption.status, 200);
 

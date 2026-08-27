@@ -110,8 +110,11 @@ function sourceExpeditions(input: {
         status: "available" as const,
         candidate: {
           enrichmentId: request.enrichmentId,
+          catalogKey: "ownership",
           title: "Ownership",
+          teaser: "Learn Rust ownership.",
           declaredDomain: "rust",
+          sortOrder: 1,
           totalStopCount: graph.nodes.length,
           searchTerms: graph.nodes.map((node) => node.label)
         },

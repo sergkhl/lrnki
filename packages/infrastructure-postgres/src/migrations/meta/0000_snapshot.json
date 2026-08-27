@@ -1,5 +1,5 @@
 {
-  "id": "a5280e8f-90ae-4aca-b113-058b25708b50",
+  "id": "d8d1e896-04f7-418f-afa8-721e7ea9941a",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -4604,6 +4604,124 @@
         "study_items_grounding_provenance_check": {
           "name": "study_items_grounding_provenance_check",
           "value": "grounding_provenance IN ('source_cep', 'source_mentioned', 'generated')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.source_expedition_catalog_entries": {
+      "name": "source_expedition_catalog_entries",
+      "schema": "",
+      "columns": {
+        "catalog_key": {
+          "name": "catalog_key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "enrichment_id": {
+          "name": "enrichment_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "teaser": {
+          "name": "teaser",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "catalog_role": {
+          "name": "catalog_role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "audience": {
+          "name": "audience",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_provenance": {
+          "name": "source_provenance",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "accepted_asset_set_identity": {
+          "name": "accepted_asset_set_identity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "accepted_asset_config_hash": {
+          "name": "accepted_asset_config_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "source_expedition_catalog_entries_enrichment_id_fkey": {
+          "name": "source_expedition_catalog_entries_enrichment_id_fkey",
+          "tableFrom": "source_expedition_catalog_entries",
+          "tableTo": "graph_enrichments",
+          "columnsFrom": [
+            "enrichment_id"
+          ],
+          "columnsTo": [
+            "enrichment_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "source_expedition_catalog_entries_enrichment_id_key": {
+          "name": "source_expedition_catalog_entries_enrichment_id_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "enrichment_id"
+          ]
+        },
+        "source_expedition_catalog_entries_sort_order_key": {
+          "name": "source_expedition_catalog_entries_sort_order_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "sort_order"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "source_expedition_catalog_entries_nonempty_check": {
+          "name": "source_expedition_catalog_entries_nonempty_check",
+          "value": "catalog_key <> '' AND title <> '' AND teaser <> '' AND catalog_role <> '' AND audience <> '' AND accepted_asset_set_identity <> '' AND accepted_asset_config_hash <> ''"
+        },
+        "source_expedition_catalog_entries_sort_order_check": {
+          "name": "source_expedition_catalog_entries_sort_order_check",
+          "value": "sort_order > 0"
         }
       },
       "isRLSEnabled": false

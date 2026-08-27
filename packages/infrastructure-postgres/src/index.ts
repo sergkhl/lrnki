@@ -14,6 +14,7 @@ export { PostgresEnrichmentRunStore } from "./PostgresEnrichmentStores";
 export { PostgresStudyItemBankStore, PostgresConceptLessonStore, PostgresEnrichmentLayerPurposeStore, PostgresLessonReadStore, PostgresResponseLogStore, PostgresCalibrationVerdictStore } from "./PostgresLearnerLoopStores";
 export { PostgresLearnerScaffoldStore, PostgresScaffoldReferenceActivityRead } from "./PostgresLearnerScaffoldStore";
 export { PostgresLearnerExpeditionStore } from "./PostgresLearnerExpeditionStore";
+export { PostgresSourceExpeditionCatalog } from "./PostgresSourceExpeditionCatalog";
 export { PostgresLearnerRecallChallengeStore } from "./PostgresLearnerRecallChallengeStore";
 export { PostgresLearnerProfileRead, PostgresLearnerAwardsStore } from "./PostgresLearnerProfileStores";
 export { PostgresRunProgressReporter } from "./PostgresRunProgressReporter";
