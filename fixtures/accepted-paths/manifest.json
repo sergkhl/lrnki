@@ -71,7 +71,11 @@
       "teaser": "Make resilient financial choices using cash flow, compounding, debt, risk, and diversification.",
       "source": "lrnki model-authored project source accepted for local playtest; general model knowledge only",
       "license": "lrnki project-owned playtest fixture",
-      "curation": "Purpose-written as a geography-neutral, self-contained onboarding source; no external source material or citation set was used."
+      "curation": "Purpose-written as a geography-neutral, self-contained onboarding source; no external source material or citation set was used.",
+      "acceptedPackage": {
+        "path": "fixtures/accepted-paths/packages/personal-finance.json",
+        "sha256": "0f6b75fb670348a9e23aadd16232bd88437f6be16a585ccdaaa45c4997e04fa2"
+      }
     },
     {
       "fixtureId": "accepted-path-machine-learning",

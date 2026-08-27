@@ -7,9 +7,9 @@ execution: code
 
 # Curate Five Ready-to-Play Source Expedition Mockups
 
-**Status:** In progress — U0–U4 complete; U5 is next
+**Status:** In progress — U0–U5 complete; U6 is next
 
-**NEXT:** Implement U5 only. Generate, inspect, qualify, publish, export, and round-trip Personal Finance in the preserved live Concept registry; no further development reset is authorized through U7.
+**NEXT:** Implement U6 only. Generate, inspect, qualify, publish, export, and round-trip Machine Learning in the preserved live Concept registry; no further development reset is authorized through U7.
 
 **Decision state:** Accepted by the owner through the 2026-08-27 grilling. The initial catalog is
 exactly Critical Thinking, Probability and Statistics, Personal Finance, Machine Learning, and
@@ -456,10 +456,9 @@ population/sample distinctions, conditional probability direction, interval inte
 errors, effect size, and association-versus-causation. Mathematical notation must render readably on
 learner surfaces and no approximation may be presented as an identity.
 
-### U5 — Qualify Personal Finance
+### U5 — Qualify Personal Finance — complete
 
-Repeat the U4 shape for Personal Finance. Reject jurisdiction-specific assumptions, individualized
-advice, guaranteed outcomes, fixed universal reserve/allocation rules, modal inflation, or a
+Repeat the U4 shape for Personal Finance. Reject jurisdiction-specific assumptions, individualized advice, guaranteed outcomes, fixed universal reserve/allocation rules, modal inflation, or a
 comparison that hides total cost, liquidity, or risk. Central source disclosure must remain visible
 without entering cards or lessons.
 
@@ -574,8 +573,7 @@ The plan is complete only when all of the following are true:
 
 ### U2 — Accepted catalog, fresh qualification, and learner projection — 2026-08-28
 
-- One runtime manifest schema, the 59-table code-first baseline, a narrow Postgres catalog port, and the existing Source Expedition authority now own accepted publication, presentation, current source credits, and named asset drift.
-- `pnpm test:db` passed reset/migration guards, DB-backed catalog/API coverage, and workspace suites. `pnpm check` passed schema parity, types/tests, ESLint with zero errors/10 warnings, both web builds, and 70/70 intercepted-web scenarios.
+- One runtime manifest schema, the 59-table code-first baseline, a narrow Postgres catalog port, and the existing Source Expedition authority now own accepted publication, presentation, current source credits, and named asset drift. `pnpm test:db` passed reset/migration guards, DB-backed catalog/API coverage, and workspace suites; `pnpm check` passed schema parity, types/tests, ESLint with zero errors/10 warnings, both web builds, and 70/70 intercepted-web scenarios.
 - The intended local `lrnki` database was resolved before the one authorized reset; that reset is consumed. Fresh generation from 116 blocks produced one 28-Concept graph and 31 qualified stops; no further development reset is authorized through U7.
 - Inspection accepted 122/122 material claims, 93/93 distractors, and 31/31 unique keys. All lessons and boards were coherent and completable with no visible `llm_grounded` node; sparse definition-only lessons and exact-text recall are safe limitations.
 - Publication pinned `source-expedition-assets-02cb55fe3bee71d8e631851445c47d313433892c91b236f4ddcb91ea6e6514fc` under `Critical Thinking`; neural title `Value of Information` is diagnostic only. A learner mastered 31/31 stops and authenticated Catalog/Begin/Journal HTTP passed; both controls tore down all learner/progress rows.
@@ -583,18 +581,20 @@ The plan is complete only when all of the following are true:
 
 ### U3 — Sealed package and model-free install — 2026-08-28
 
-- One Postgres deep module now owns a runtime-validated, canonical 43-table global closure; the application sees only sealed package metadata and qualification. The Critical Thinking package digest is `8f0977a457b0a8cc0c2fc8d2d7182d09b3c27f6071e2529cf019b5177cbdeec4`; learner, authentication, response, progress, and operation rows are excluded.
-- Actual incomplete-set `pnpm seed:accepted-paths` refused before environment loading, database access, or reset; after a guarded fresh `lrnki_test` reset, the model-free CLI installed one source, one catalog entry, and 28 Concepts with the exact subset hash, zero users/learner expeditions/responses/operation runs, a usable learner catalog route, and byte-identical re-export. The development database remained unchanged, and transactional DB coverage separately proved catalog-last publication and rollback.
+- One Postgres deep module owns a runtime-validated, canonical 43-table global closure; the application sees only sealed package metadata and qualification. The Critical Thinking package digest is `8f0977a457b0a8cc0c2fc8d2d7182d09b3c27f6071e2529cf019b5177cbdeec4`, and learner/auth/response/progress/operation rows are excluded. Actual incomplete-set `pnpm seed:accepted-paths` refused before environment loading, database access, or reset; after a guarded fresh `lrnki_test` reset, the model-free CLI installed one source, one catalog entry, and 28 Concepts with exact identity, zero learner/operation rows, a usable catalog route, and byte-identical re-export. Development remained unchanged; transactional coverage proved catalog-last publication and rollback.
 - `pnpm test:db` passed the migration matrix, reset guard, DB round trip, and workspace suites. `pnpm check` passed 59-table parity, types/tests, ESLint with zero errors/10 warnings, both web builds, and 70/70 intercepted-web scenarios. Authority is local development/test database, package artifact, application-route, build, and intercepted-web evidence only; no real-backend, deployed, native, physical-device, or release claim is made.
 
 ### U4 — Probability and Statistics accepted path — 2026-08-28
 
-- One production-model arm transformed 119 blocks into 93 candidates/42 admitted core Concepts, a 42-Concept graph, and source-derived enrichment with 91 nodes, 47 trusted/32 uncertain edges, zero `llm_grounded` nodes, 71 lessons/20 honest absences, and 97 retained items. Qualification admitted 44 predecessor-closed stops with exactly 44 current lessons and 44 option-select items. Independent read-only evaluation accepted 156/156 material source-support decisions, 132/132 distractor decisions, and 44/44 unique keys with 49/49 evidence controls; direct reading confirmed conditional direction, Type I/II errors and power, sampling/assignment, association/prediction/causation, readable notation, and qualified approximations. Confidence intervals and effect size were safely omitted rather than weakened. The full journey used 2,033 calls/3,758,077 tokens/about $0.3020635356; evaluation used 468 separate calls. A disposable learner mastered 44/44 stops and teardown left zero learner rows.
-- Publication pinned `source-expedition-assets-91e00849e8e5449a14837893d0d774e1b5a5b0dd958dfd2250d020d7cc77e961` under manifest-owned `Probability and Statistics`. Its package digest is `1c45b20e55626671947d2ed4eabcbe4528697cbbc139f638c5946d03e86f8bc0`; a guarded fresh `lrnki_test` reset installed both current packages with 70 Concepts and zero user/progress/operation rows, re-qualified both paths, and reproduced both package digests exactly. Probability's 42-row registry hash is `af9a1dfcfb138e83271cc5d20c7e69b7b9010a01ed85b641a70e30e365be5b41`; the preserved Critical Thinking subset remains exactly `56a4ad4fa300ff6877dc9b56ed0511ab00b130058b2262715a442ba5f308e1ed` in development and test. No development reset occurred. `pnpm test:db` passed; `pnpm check` passed schema parity, types/tests, ESLint with zero errors/10 warnings, both builds, and 70/70 intercepted-web scenarios. Authority is local development/test database, production-model, artifact, application-route, build, and intercepted-web evidence only; no real-backend, deployed, native, physical-device, or release claim is made.
+- One production-model arm transformed 119 blocks into 93 candidates/42 core Concepts, a 42-Concept graph, and 91 source-derived nodes with 47 trusted/32 uncertain edges and zero `llm_grounded`; qualification admitted 44 lessons/items/stops. Independent evaluation accepted 156/156 material claims, 132/132 distractors, and 44/44 keys with 49/49 evidence controls; direct reading confirmed conditional direction, test errors/power, sampling/assignment, association/causation, readable notation, and qualified approximations, while confidence intervals/effect size were safely omitted. The journey used 2,033 calls/3,758,077 tokens/about $0.3020635356; evaluation used 468 calls; a learner mastered 44/44 and tore down cleanly. Publication pinned `source-expedition-assets-91e00849e8e5449a14837893d0d774e1b5a5b0dd958dfd2250d020d7cc77e961`; package digest `1c45b20e55626671947d2ed4eabcbe4528697cbbc139f638c5946d03e86f8bc0` round-tripped with 70 Concepts and zero learner/operation rows. Probability's registry hash is `af9a1dfcfb138e83271cc5d20c7e69b7b9010a01ed85b641a70e30e365be5b41`; Critical Thinking remains `56a4ad4fa300ff6877dc9b56ed0511ab00b130058b2262715a442ba5f308e1ed`. No development reset occurred; `pnpm test:db` and `pnpm check` passed through 70/70 intercepted web. Authority remains local development/test database, production-model, artifact, application-route, build, and intercepted-web only.
+
+### U5 — Personal Finance accepted path — 2026-08-28
+
+- One production-model arm transformed 134 blocks into 67 candidates/29 core Concepts and a 29-Concept graph; enrichment retained 67 source-derived nodes, 51 trusted/17 uncertain edges, 67 difficulties, and zero source-less mints. Generation retained 52 lessons/15 honest absences/69 items and fail-closed 132 drafts; qualification admitted 37 predecessor-closed lessons/items/stops with zero visible `llm_grounded`. Independent evaluation accepted 143/143 material claims, 111/111 distractors, and 37/37 keys with 47/47 evidence controls. Direct reading found no jurisdictional assumption, individual prescription, guarantee, universal reserve/allocation, modal inflation, or hidden cost/liquidity/risk; comparisons retain full cash flows, risk capacity, diversification limits, and concentration across the whole position. The journey used 1,455 calls/2,516,370 tokens/about $0.204581803; evaluation used 429 separate calls. A learner mastered 37/37 and tore down cleanly. Publication pinned `source-expedition-assets-0a7ddc24fde0326b3fb89c358555a6a951080f2a2eaab95d2f419da87318395f`; package digest `0f6b75fb670348a9e23aadd16232bd88437f6be16a585ccdaaa45c4997e04fa2` installed with all three paths/99 Concepts and zero learner/operation rows, re-qualified 31/44/37 stops, and reproduced all three digests. Existing registry projections remained exact and no development reset occurred. After one non-reproducing Postgres-suite failure, the isolated suite passed 122/122 and full `pnpm test:db` reran green; `pnpm check` passed schema parity, types/tests, ESLint with zero errors/10 warnings, both builds, and 70/70 intercepted web. Authority is local development/test database, production-model, artifact, application-route, build, and intercepted-web only; no real-backend, deployed, native, physical-device, or release claim is made.
 
 ### Open findings
 
 - The five primers intentionally lack an external claim-verification ledger; that is their accepted playtest boundary. Any material inspection defect still blocks the affected path's acceptance.
-- Critical Thinking and Probability and Statistics are accepted, published, and sealed; complete-set install intentionally refuses until U5–U7 add the remaining three packages.
-- Stop counts remain unmeasured for Personal Finance, Machine Learning, and Neuroscience; U5–U7 own those independent measurements.
+- Critical Thinking, Probability and Statistics, and Personal Finance are accepted, published, and sealed; complete-set install intentionally refuses until U6–U7 add the remaining two packages.
+- Stop counts remain unmeasured for Machine Learning and Neuroscience; U6–U7 own those independent measurements.
 - Accepted-identity drift refuses by name but still requires regeneration, and AGENTS rule 14 still invalidates affected quality evidence.
