@@ -184,6 +184,10 @@ maybe("accepted catalog publication pins assets, orders rows, and derives regist
       (await store.getAcceptedByEnrichment(seeds[0].enrichmentId))?.acceptedAssetSetIdentity,
       seeds[0].expectedAssets.assetSetIdentity
     );
+    assert.equal(
+      (await store.getAcceptedByCatalogKey(keys[1]))?.enrichmentId,
+      seeds[1].enrichmentId
+    );
   } finally {
     await cleanup(sql, keys, seeds);
     await sql.end();

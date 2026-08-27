@@ -800,6 +800,45 @@ export type SourceExpeditionCatalogEntry = {
   createdAt: string;
 };
 
+export type AcceptedPathPackageSource = {
+  fixtureId: string;
+  path: string;
+  contentHash: string;
+  contentType: string;
+  declaredDomain: string;
+  title: string;
+  sourceUri: string;
+  license: string;
+};
+
+export type AcceptedPathPackageQualification = {
+  declaredDomain: string;
+  totalStopCount: number;
+  trailNodeIds: string[];
+  expectedAssets: SourceExpeditionAssetExpectation;
+};
+
+// The relational projection is deliberately opaque to application code. Its runtime schema and
+// foreign-key closure belong to the Postgres package adapter; the application boundary sees only
+// the accepted identity and the deterministic qualification snapshot it must re-derive.
+export type AcceptedPathPackage = {
+  format: "lrnki.accepted-path-package.v1";
+  catalog: Omit<SourceExpeditionCatalogEntry, "sourceCredits" | "createdAt">;
+  source: AcceptedPathPackageSource;
+  qualification: AcceptedPathPackageQualification;
+  projection: unknown;
+};
+
+export interface AcceptedPathPackageStorePort {
+  exportAccepted(input: {
+    catalogEntry: SourceExpeditionCatalogEntry;
+    source: AcceptedPathPackageSource;
+    qualification: AcceptedPathPackageQualification;
+  }): Promise<AcceptedPathPackage>;
+  installGlobalProjections(packages: readonly AcceptedPathPackage[]): Promise<void>;
+  publishCatalogProjections(packages: readonly AcceptedPathPackage[]): Promise<void>;
+}
+
 export type PublishSourceExpeditionCatalogEntry = Omit<
   SourceExpeditionCatalogEntry,
   "sourceCredits" | "createdAt"
@@ -809,6 +848,7 @@ export type PublishSourceExpeditionCatalogEntry = Omit<
 
 export interface SourceExpeditionCatalogPort {
   listAccepted(): Promise<SourceExpeditionCatalogEntry[]>;
+  getAcceptedByCatalogKey(catalogKey: string): Promise<SourceExpeditionCatalogEntry | undefined>;
   getAcceptedByEnrichment(enrichmentId: string): Promise<SourceExpeditionCatalogEntry | undefined>;
   publishAccepted(input: PublishSourceExpeditionCatalogEntry): Promise<
     | { published: true }

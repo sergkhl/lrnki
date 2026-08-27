@@ -27,6 +27,11 @@ const preferredStopCountSchema = z.object({
   }
 });
 
+const acceptedPackageSchema = z.object({
+  path: z.string().regex(/^fixtures\/accepted-paths\/packages\/[a-z0-9-]+\.json$/),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/)
+}).strict();
+
 export const acceptedPathFixtureSchema = sourceRegistrationFixtureSchema.extend({
   fixtureId: nonEmpty.regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
   catalogKey: nonEmpty.regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
@@ -39,7 +44,8 @@ export const acceptedPathFixtureSchema = sourceRegistrationFixtureSchema.extend(
   teaser: nonEmpty,
   source: nonEmpty,
   license: nonEmpty,
-  curation: nonEmpty
+  curation: nonEmpty,
+  acceptedPackage: acceptedPackageSchema.optional()
 }).strict();
 
 export const acceptedPathManifestSchema = z.object({
@@ -76,6 +82,19 @@ export const acceptedPathManifestSchema = z.object({
       }
     });
   }
+  manifest.fixtures.forEach((fixture, index) => {
+    if (
+      fixture.acceptedPackage &&
+      fixture.acceptedPackage.path !==
+        `fixtures/accepted-paths/packages/${fixture.catalogKey}.json`
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["fixtures", index, "acceptedPackage", "path"],
+        message: "accepted package path must be derived from catalogKey"
+      });
+    }
+  });
 });
 
 export type SourceRegistrationManifest = z.infer<typeof sourceRegistrationManifestSchema>;

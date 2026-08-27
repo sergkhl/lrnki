@@ -25,7 +25,11 @@
       "teaser": "Build stronger arguments, weigh evidence, test causal claims, and revise conclusions with confidence.",
       "source": "lrnki model-authored project source accepted for local playtest; general model knowledge only",
       "license": "lrnki project-owned playtest fixture",
-      "curation": "Purpose-written as a compact, self-contained onboarding source; no external source material or citation set was used."
+      "curation": "Purpose-written as a compact, self-contained onboarding source; no external source material or citation set was used.",
+      "acceptedPackage": {
+        "path": "fixtures/accepted-paths/packages/critical-thinking.json",
+        "sha256": "8f0977a457b0a8cc0c2fc8d2d7182d09b3c27f6071e2529cf019b5177cbdeec4"
+      }
     },
     {
       "fixtureId": "accepted-path-probability-and-statistics",

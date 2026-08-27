@@ -8,6 +8,7 @@
     "./rival-simulation": "./src/rivalSimulation.ts"
   },
   "scripts": {
+    "accepted-paths": "tsx src/acceptedPathPackageCli.ts",
     "evaluate:source-assets": "tsx src/sourceAssetEvaluationCli.ts",
     "publish:accepted-source": "tsx src/publishAcceptedSourceExpeditionCli.ts",
     "realuse-server": "tsx src/realuseServer.ts",

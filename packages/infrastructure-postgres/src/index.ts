@@ -15,6 +15,18 @@ export { PostgresStudyItemBankStore, PostgresConceptLessonStore, PostgresEnrichm
 export { PostgresLearnerScaffoldStore, PostgresScaffoldReferenceActivityRead } from "./PostgresLearnerScaffoldStore";
 export { PostgresLearnerExpeditionStore } from "./PostgresLearnerExpeditionStore";
 export { PostgresSourceExpeditionCatalog } from "./PostgresSourceExpeditionCatalog";
+export {
+  ACCEPTED_PATH_PACKAGE_FORMAT,
+  ACCEPTED_PATH_PACKAGE_TABLES,
+  PostgresAcceptedPathPackageStore,
+  acceptedPathPackageSchema,
+  installAcceptedPathGlobalProjections,
+  parseAcceptedPathPackage,
+  parseCanonicalAcceptedPathPackage,
+  publishAcceptedPathCatalogProjections,
+  serializeAcceptedPathPackage,
+  validateAcceptedPathPackageSet
+} from "./PostgresAcceptedPathPackages";
 export { PostgresLearnerRecallChallengeStore } from "./PostgresLearnerRecallChallengeStore";
 export { PostgresLearnerProfileRead, PostgresLearnerAwardsStore } from "./PostgresLearnerProfileStores";
 export { PostgresRunProgressReporter } from "./PostgresRunProgressReporter";

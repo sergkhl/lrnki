@@ -410,6 +410,9 @@ function harness(options: HarnessOptions = {}) {
         const entry = await resolvedCatalogEntry();
         return entry ? [entry] : [];
       },
+      async getAcceptedByCatalogKey(catalogKey) {
+        return catalogKey === "critical-thinking" ? resolvedCatalogEntry() : undefined;
+      },
       async getAcceptedByEnrichment(enrichmentId) {
         return enrichmentId === ENRICHMENT_ID ? resolvedCatalogEntry() : undefined;
       },

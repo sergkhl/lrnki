@@ -35,7 +35,8 @@
     "db:check": "scripts/check-drizzle-schema.sh",
     "db:migrate": "scripts/migrate-db.sh",
     "db:reset": "scripts/reset-db.sh",
-    "seed:demo": "scripts/seed-demo.sh",
+    "accepted-paths": "pnpm --filter @lrnki/learner-api accepted-paths",
+    "seed:accepted-paths": "scripts/seed-accepted-paths.sh",
     "worker:kg": "pnpm --filter @lrnki/kg-worker worker:kg"
   },
   "devDependencies": {

@@ -7,12 +7,11 @@ execution: code
 
 # Curate Five Ready-to-Play Source Expedition Mockups
 
-**Status:** In progress — U0–U2 complete; U3 is next
+**Status:** In progress — U0–U3 complete; U4 is next
 
-**NEXT:** Implement U3 only. Define the sealed package schema and export/import boundaries, export
-and round-trip the accepted Critical Thinking package through `lrnki_test`, prove an incomplete
-five-package set refuses before reset, and replace the demo reset/seed path. Preserve the live
-development Concept registry; no further development reset is authorized through U7.
+**NEXT:** Implement U4 only. Generate, inspect, qualify, publish, export, and round-trip Probability
+and Statistics in the same live Concept registry. Preserve the 28 Critical Thinking Concept rows
+exactly; no further development reset is authorized through U7.
 
 **Decision state:** Accepted by the owner through the 2026-08-27 grilling. The initial catalog is
 exactly Critical Thinking, Probability and Statistics, Personal Finance, Machine Learning, and
@@ -156,10 +155,9 @@ independently verified, stop and propose an ADR amendment before learner publica
   stop count.
 - Each adopted Source Expedition is already learner-owned and pinned to an exact asset-set identity.
   The same qualified enrichment remains available to other learners.
-- [`scripts/seed-demo.sh`](../../scripts/seed-demo.sh) resets the database, combines every selected
-  source into one graph, reruns model stages, and creates non-sign-in demo learners. It already
-  fails: its build step omits the now-required `--canonicalization` argument, so the repository owns
-  no working automated route to a seeded database. Repairing it would preserve the wrong workflow.
+- The root [accepted-package runbook](../../README.md#accepted-source-expedition-packages) owns the
+  current export, validation, and model-free install mechanics. Complete-set validation occurs before
+  the destructive reset, accepted catalog rows publish last, and the superseded demo seeder is gone.
 - The inspected development database had one disposable Better Auth user and no source, graph,
   learner-asset, or expedition data. A current hard reset drops `public` and therefore removes that
   user, sessions, every learner expedition, and progress. Re-resolve the exact database immediately
@@ -415,7 +413,7 @@ contract test, and this plan and its indexes are in place. The Validation Log ow
 
 The first source was generated, qualified, measured, and played through in the pre-U2 registry. The
 Validation Log owns that historical evidence; U2 replaces its artifacts and evidence after the
-authorized schema reset. No publication or package exists yet.
+authorized schema reset. That unit created no publication or package; U2 and U3 own current state.
 
 ### U2 — Explicit accepted catalog and learner projection — complete
 
@@ -435,7 +433,7 @@ authorized schema reset. No publication or package exists yet.
    learner route, and commit one coherent unit. Preserve its resulting Concept registry without
    another reset through U7.
 
-### U3 — Accepted package export/import and reset replacement
+### U3 — Accepted package export/import and reset replacement — complete
 
 1. Define the package runtime schema, closure projection, canonical serialization/digest, exporter,
    and importer behind narrow application/port boundaries. Reject learner-scoped, incomplete, or
@@ -583,11 +581,18 @@ The plan is complete only when all of the following are true:
 - The intended local `lrnki` database was resolved before the one authorized reset; that reset is consumed. Fresh generation from 116 blocks produced one 28-Concept graph and 31 qualified stops; no further development reset is authorized through U7.
 - Inspection accepted 122/122 material claims, 93/93 distractors, and 31/31 unique keys. All lessons and boards were coherent and completable with no visible `llm_grounded` node; sparse definition-only lessons and exact-text recall are safe limitations.
 - Publication pinned `source-expedition-assets-02cb55fe3bee71d8e631851445c47d313433892c91b236f4ddcb91ea6e6514fc` under `Critical Thinking`; neural title `Value of Information` is diagnostic only. A learner mastered 31/31 stops and authenticated Catalog/Begin/Journal HTTP passed; both controls tore down all learner/progress rows.
-- The preserved 28-row Concept registry projection SHA-256 is `56a4ad4fa300ff6877dc9b56ed0511ab00b130058b2262715a442ba5f308e1ed`. U3–U7 must verify it without reset. Authority is local database, production-model, artifact, application-route, build, and intercepted-web evidence only.
+- The preserved 28-row Critical Thinking Concept subset SHA-256 is `56a4ad4fa300ff6877dc9b56ed0511ab00b130058b2262715a442ba5f308e1ed`. U3–U7 must verify those exact rows while the shared registry grows without reset. Authority is local database, production-model, artifact, application-route, build, and intercepted-web evidence only.
+
+### U3 — Sealed package and model-free install — 2026-08-28
+
+- One Postgres deep module now owns a runtime-validated, canonical 43-table global closure; the application sees only sealed package metadata and qualification. The Critical Thinking package digest is `8f0977a457b0a8cc0c2fc8d2d7182d09b3c27f6071e2529cf019b5177cbdeec4`; learner, authentication, response, progress, and operation rows are excluded.
+- Actual incomplete-set `pnpm seed:accepted-paths` refused before environment loading, database access, or reset. The development database remained at one published path and the exact 28-row Critical Thinking subset hash, so no additional development reset was consumed.
+- After a guarded fresh `lrnki_test` reset, the model-free CLI installed one source, one catalog entry, and 28 Concepts with the exact subset hash, zero users/learner expeditions/responses/operation runs, a usable learner catalog route, and byte-identical re-export. Transactional DB coverage separately proved catalog-last publication and rollback behavior.
+- `pnpm test:db` passed the migration matrix, reset guard, DB round trip, and workspace suites. `pnpm check` passed 59-table parity, types/tests, ESLint with zero errors/10 warnings, both web builds, and 70/70 intercepted-web scenarios. Authority is local development/test database, package artifact, application-route, build, and intercepted-web evidence only; no real-backend, deployed, native, physical-device, or release claim is made.
 
 ### Open findings
 
-- The five primers intentionally lack an external claim-verification ledger; that is their accepted playtest boundary, while a known material defect still blocks acceptance.
-- Critical Thinking is accepted and published with 31 stops, but no sealed package/export/import exists until U3.
+- The five primers intentionally lack an external claim-verification ledger; that is their accepted playtest boundary. Any material inspection defect still blocks the affected path's acceptance.
+- Critical Thinking is accepted, published, and sealed; complete-set install intentionally refuses until U4–U7 add the other four accepted packages.
 - Stop counts remain unmeasured for Probability and Statistics, Personal Finance, Machine Learning, and Neuroscience; U4–U7 own those independent measurements.
 - Accepted-identity drift refuses by name but still requires regeneration, and AGENTS rule 14 still invalidates affected quality evidence.

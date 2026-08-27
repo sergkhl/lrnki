@@ -54,6 +54,18 @@ export class PostgresSourceExpeditionCatalog implements SourceExpeditionCatalogP
     return (await attachSourceCredits(this.sql, rows))[0];
   }
 
+  async getAcceptedByCatalogKey(
+    catalogKey: string
+  ): Promise<SourceExpeditionCatalogEntry | undefined> {
+    const rows = await this.sql<CatalogRow[]>`
+      SELECT catalog_key, enrichment_id, title, teaser, catalog_role, audience, sort_order,
+             source_provenance, accepted_asset_set_identity, accepted_asset_config_hash, created_at
+      FROM source_expedition_catalog_entries
+      WHERE catalog_key = ${catalogKey}
+      LIMIT 1`;
+    return (await attachSourceCredits(this.sql, rows))[0];
+  }
+
   async publishAccepted(input: PublishSourceExpeditionCatalogEntry): Promise<
     | { published: true }
     | { published: false; refused: "accepted_asset_set_changed" }

@@ -266,6 +266,10 @@ export {
   type SourceExpeditionUnavailableReason
 } from "./sourceExpedition";
 export {
+  createAcceptedPathPackageModule,
+  type AcceptedPathPackageModuleDeps
+} from "./acceptedPathPackage";
+export {
   SOURCE_CITATION_MATCH_CLASSIFICATION_POLICY,
   SOURCE_MATERIAL_CLAIM_PROJECTION,
   projectSourceMaterialClaims,

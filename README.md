@@ -208,6 +208,26 @@ Locally that is `pnpm db:reset`. On the shared environment it is the cutover run
 never resolves these states by itself, and no fix is ever a volume deletion — `postgres_data` also
 holds LiteLLM's database and its virtual keys.
 
+### Accepted Source Expedition packages
+
+After a Source Expedition passes its owning plan's real-use gate and accepted publication, seal its
+current global closure from the guarded development database:
+
+```bash
+pnpm accepted-paths export --catalog-key=critical-thinking
+pnpm accepted-paths validate --allow-partial  # authoring-time packages currently present
+pnpm accepted-paths validate                  # exact complete manifest set; no database access
+pnpm seed:accepted-paths                      # destructive model-free reset + complete install
+```
+
+Export overwrites the current package file and records its SHA-256 in the accepted-path manifest.
+The complete validator checks canonical serialization, source bytes, package digests, relational
+closure, and cross-package Concept identity before a reset is possible. `seed:accepted-paths` names
+the exact guarded database/endpoint, discards its users, sessions, learner paths, responses, awards,
+and progress, installs no learner, makes no model call, and publishes the catalog only after every
+installed package re-qualifies under the current runtime asset contract. It accepts only `lrnki` or
+`lrnki_test`; shared-host installation remains the manual cutover workflow below.
+
 ## Deployment
 
 Runbook for the topology decided in

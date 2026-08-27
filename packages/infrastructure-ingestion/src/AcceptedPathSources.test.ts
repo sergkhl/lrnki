@@ -51,6 +51,14 @@ test("accepted-path manifest owns exactly the current five model-authored playte
     manifest.fixtures.length,
     "source basenames must be unique because registration derives objectKey from the basename"
   );
+  for (const fixture of manifest.fixtures) {
+    if (!fixture.acceptedPackage) continue;
+    assert.equal(
+      fixture.acceptedPackage.path,
+      `fixtures/accepted-paths/packages/${fixture.catalogKey}.json`
+    );
+    assert.match(fixture.acceptedPackage.sha256, /^[a-f0-9]{64}$/);
+  }
 });
 
 test("accepted-path manifest parsing rejects duplicate publication identity", () => {
