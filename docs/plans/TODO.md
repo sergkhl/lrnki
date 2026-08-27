@@ -3,11 +3,12 @@
 ## TODO
 
 - **Curate five ready-to-play Source Expedition mockups.** Execute the
-  [active plan](./2026-08-27-001-curate-five-ready-source-expedition-mockups.md) in order. U0–U3 own
+  [active plan](./2026-08-27-001-curate-five-ready-source-expedition-mockups.md) in order. U0–U4 own
   the accepted sources, catalog schema, freshly regenerated/published 31-stop Critical Thinking
-  path, and its sealed model-free package. U4 is next: generate, inspect, qualify, publish, export,
-  and round-trip Probability and Statistics in the same live registry. The authorized development
-  reset is consumed; preserve the Critical Thinking Concept rows without another reset through U7.
+  path, and the sealed Critical Thinking and 44-stop Probability and Statistics paths. U5 is next:
+  generate, inspect, qualify, publish, export, and round-trip Personal Finance in the same live
+  registry. The authorized development reset is consumed; preserve the existing Concept registry
+  without another reset through U7.
 
 ## COMPLETED
 

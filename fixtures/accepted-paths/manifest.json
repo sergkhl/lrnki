@@ -48,7 +48,11 @@
       "teaser": "Reason from data and uncertainty through probability, variation, inference, association, and causation.",
       "source": "lrnki model-authored project source accepted for local playtest; general model knowledge only",
       "license": "lrnki project-owned playtest fixture",
-      "curation": "Purpose-written as a compact, self-contained onboarding source; no external source material or citation set was used."
+      "curation": "Purpose-written as a compact, self-contained onboarding source; no external source material or citation set was used.",
+      "acceptedPackage": {
+        "path": "fixtures/accepted-paths/packages/probability-and-statistics.json",
+        "sha256": "1c45b20e55626671947d2ed4eabcbe4528697cbbc139f638c5946d03e86f8bc0"
+      }
     },
     {
       "fixtureId": "accepted-path-personal-finance",

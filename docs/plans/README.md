@@ -12,7 +12,7 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [Curate five ready-to-play Source Expedition mockups](./2026-08-27-001-curate-five-ready-source-expedition-mockups.md)
-   — in progress after U3; U4 generates, qualifies, publishes, packages, and round-trips Probability
-   and Statistics in the preserved shared Concept registry without another development reset.
+   — in progress after U4; U5 generates, qualifies, publishes, packages, and round-trips Personal
+   Finance in the preserved shared Concept registry without another development reset.
 
 <!-- Hygiene and retention rules: AGENTS.md → Documentation workflow. -->

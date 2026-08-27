@@ -7,11 +7,9 @@ execution: code
 
 # Curate Five Ready-to-Play Source Expedition Mockups
 
-**Status:** In progress — U0–U3 complete; U4 is next
+**Status:** In progress — U0–U4 complete; U5 is next
 
-**NEXT:** Implement U4 only. Generate, inspect, qualify, publish, export, and round-trip Probability
-and Statistics in the same live Concept registry. Preserve the 28 Critical Thinking Concept rows
-exactly; no further development reset is authorized through U7.
+**NEXT:** Implement U5 only. Generate, inspect, qualify, publish, export, and round-trip Personal Finance in the preserved live Concept registry; no further development reset is authorized through U7.
 
 **Decision state:** Accepted by the owner through the 2026-08-27 grilling. The initial catalog is
 exactly Critical Thinking, Probability and Statistics, Personal Finance, Machine Learning, and
@@ -450,7 +448,7 @@ authorized schema reset. That unit created no publication or package; U2 and U3 
 4. Run focused unit and `pnpm test:db` coverage, update the plan status, log, and findings, and
    commit once.
 
-### U4 — Qualify Probability and Statistics
+### U4 — Qualify Probability and Statistics — complete
 
 Run the U1 generation and inspection route for Probability and Statistics into the same live
 database, then export and round-trip its package as U3 defines. Give focused attention to
@@ -586,13 +584,17 @@ The plan is complete only when all of the following are true:
 ### U3 — Sealed package and model-free install — 2026-08-28
 
 - One Postgres deep module now owns a runtime-validated, canonical 43-table global closure; the application sees only sealed package metadata and qualification. The Critical Thinking package digest is `8f0977a457b0a8cc0c2fc8d2d7182d09b3c27f6071e2529cf019b5177cbdeec4`; learner, authentication, response, progress, and operation rows are excluded.
-- Actual incomplete-set `pnpm seed:accepted-paths` refused before environment loading, database access, or reset. The development database remained at one published path and the exact 28-row Critical Thinking subset hash, so no additional development reset was consumed.
-- After a guarded fresh `lrnki_test` reset, the model-free CLI installed one source, one catalog entry, and 28 Concepts with the exact subset hash, zero users/learner expeditions/responses/operation runs, a usable learner catalog route, and byte-identical re-export. Transactional DB coverage separately proved catalog-last publication and rollback behavior.
+- Actual incomplete-set `pnpm seed:accepted-paths` refused before environment loading, database access, or reset; after a guarded fresh `lrnki_test` reset, the model-free CLI installed one source, one catalog entry, and 28 Concepts with the exact subset hash, zero users/learner expeditions/responses/operation runs, a usable learner catalog route, and byte-identical re-export. The development database remained unchanged, and transactional DB coverage separately proved catalog-last publication and rollback.
 - `pnpm test:db` passed the migration matrix, reset guard, DB round trip, and workspace suites. `pnpm check` passed 59-table parity, types/tests, ESLint with zero errors/10 warnings, both web builds, and 70/70 intercepted-web scenarios. Authority is local development/test database, package artifact, application-route, build, and intercepted-web evidence only; no real-backend, deployed, native, physical-device, or release claim is made.
+
+### U4 — Probability and Statistics accepted path — 2026-08-28
+
+- One production-model arm transformed 119 blocks into 93 candidates/42 admitted core Concepts, a 42-Concept graph, and source-derived enrichment with 91 nodes, 47 trusted/32 uncertain edges, zero `llm_grounded` nodes, 71 lessons/20 honest absences, and 97 retained items. Qualification admitted 44 predecessor-closed stops with exactly 44 current lessons and 44 option-select items. Independent read-only evaluation accepted 156/156 material source-support decisions, 132/132 distractor decisions, and 44/44 unique keys with 49/49 evidence controls; direct reading confirmed conditional direction, Type I/II errors and power, sampling/assignment, association/prediction/causation, readable notation, and qualified approximations. Confidence intervals and effect size were safely omitted rather than weakened. The full journey used 2,033 calls/3,758,077 tokens/about $0.3020635356; evaluation used 468 separate calls. A disposable learner mastered 44/44 stops and teardown left zero learner rows.
+- Publication pinned `source-expedition-assets-91e00849e8e5449a14837893d0d774e1b5a5b0dd958dfd2250d020d7cc77e961` under manifest-owned `Probability and Statistics`. Its package digest is `1c45b20e55626671947d2ed4eabcbe4528697cbbc139f638c5946d03e86f8bc0`; a guarded fresh `lrnki_test` reset installed both current packages with 70 Concepts and zero user/progress/operation rows, re-qualified both paths, and reproduced both package digests exactly. Probability's 42-row registry hash is `af9a1dfcfb138e83271cc5d20c7e69b7b9010a01ed85b641a70e30e365be5b41`; the preserved Critical Thinking subset remains exactly `56a4ad4fa300ff6877dc9b56ed0511ab00b130058b2262715a442ba5f308e1ed` in development and test. No development reset occurred. `pnpm test:db` passed; `pnpm check` passed schema parity, types/tests, ESLint with zero errors/10 warnings, both builds, and 70/70 intercepted-web scenarios. Authority is local development/test database, production-model, artifact, application-route, build, and intercepted-web evidence only; no real-backend, deployed, native, physical-device, or release claim is made.
 
 ### Open findings
 
 - The five primers intentionally lack an external claim-verification ledger; that is their accepted playtest boundary. Any material inspection defect still blocks the affected path's acceptance.
-- Critical Thinking is accepted, published, and sealed; complete-set install intentionally refuses until U4–U7 add the other four accepted packages.
-- Stop counts remain unmeasured for Probability and Statistics, Personal Finance, Machine Learning, and Neuroscience; U4–U7 own those independent measurements.
+- Critical Thinking and Probability and Statistics are accepted, published, and sealed; complete-set install intentionally refuses until U5–U7 add the remaining three packages.
+- Stop counts remain unmeasured for Personal Finance, Machine Learning, and Neuroscience; U5–U7 own those independent measurements.
 - Accepted-identity drift refuses by name but still requires regeneration, and AGENTS rule 14 still invalidates affected quality evidence.
