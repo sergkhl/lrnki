@@ -12,7 +12,7 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [Curate five ready-to-play Source Expedition mockups](./2026-08-27-001-curate-five-ready-source-expedition-mockups.md)
-   — in progress after U5; U6 generates, qualifies, publishes, packages, and round-trips Machine
-   Learning in the preserved shared Concept registry without another development reset.
+   — in progress after U6; U7 generates, qualifies, publishes, packages, and round-trips Neuroscience
+   of Memory and Attention in the preserved shared Concept registry without another development reset.
 
 <!-- Hygiene and retention rules: AGENTS.md → Documentation workflow. -->

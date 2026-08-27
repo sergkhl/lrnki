@@ -3,12 +3,12 @@
 ## TODO
 
 - **Curate five ready-to-play Source Expedition mockups.** Execute the
-  [active plan](./2026-08-27-001-curate-five-ready-source-expedition-mockups.md) in order. U0–U5 own
+  [active plan](./2026-08-27-001-curate-five-ready-source-expedition-mockups.md) in order. U0–U6 own
   the accepted sources, catalog schema, freshly regenerated/published 31-stop Critical Thinking
-  path, and the sealed 44-stop Probability and Statistics and 37-stop Personal Finance paths. U6 is
-  next: generate, inspect, qualify, publish, export, and round-trip Machine Learning in the same live
-  registry. The authorized development reset is consumed; preserve the existing Concept registry
-  without another reset through U7.
+  path, and the sealed 44-stop Probability and Statistics, 37-stop Personal Finance, and 31-stop
+  Machine Learning paths. U7 is next: generate, inspect, qualify, publish, export, and round-trip
+  Neuroscience of Memory and Attention in the same live registry. The authorized development reset
+  is consumed; preserve the existing Concept registry without another reset through U7.
 
 ## COMPLETED
 

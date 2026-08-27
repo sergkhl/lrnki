@@ -94,7 +94,11 @@
       "teaser": "Design and evaluate supervised-learning systems without leakage, metric traps, or brittle validation.",
       "source": "lrnki model-authored project source accepted for local playtest; general model knowledge only",
       "license": "lrnki project-owned playtest fixture",
-      "curation": "Purpose-written as a dense applied-supervised-learning source; no external source material, repository, or citation set was used."
+      "curation": "Purpose-written as a dense applied-supervised-learning source; no external source material, repository, or citation set was used.",
+      "acceptedPackage": {
+        "path": "fixtures/accepted-paths/packages/machine-learning.json",
+        "sha256": "45b2dc125c5fdbca7c30b3cae2b910bf2674472c222f5ced6c1da745de9bcc6f"
+      }
     },
     {
       "fixtureId": "accepted-path-neuroscience-memory-attention",
