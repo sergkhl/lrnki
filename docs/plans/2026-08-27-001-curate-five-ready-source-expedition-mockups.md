@@ -7,12 +7,12 @@ execution: code
 
 # Curate Five Ready-to-Play Source Expedition Mockups
 
-**Status:** In progress — U0 complete; U1 is next
+**Status:** In progress — U0–U1 complete; U2 is next
 
-**NEXT:** Implement U1 only: hard-reset the development database once, run the exact Critical
-Thinking source through the production source-backed pipeline, inspect it end to end, and record the
-achievable yield from admitted core concepts through predecessor-closed stops. No catalog entry,
-package, exporter, or reset command is built until that measurement exists.
+**NEXT:** Implement U2 only: add the code-first accepted catalog and validated manifest seam, deepen
+Source Expedition around publication without changing prepublication qualification, project the
+accepted presentation and source credits through the API and learner UI, publish the existing
+Critical Thinking asset set in the live development database, validate that route, and commit.
 
 **Decision state:** Accepted by the owner through the 2026-08-27 grilling. The initial catalog is
 exactly Critical Thinking, Probability and Statistics, Personal Finance, Machine Learning, and
@@ -405,19 +405,10 @@ package export, shared plan edits, and surface validation are serialized.
 The grilling, the current-only manifest, the five purpose-written Markdown sources, their mechanical
 contract test, and this plan and its indexes are in place. The Validation Log owns the evidence.
 
-### U1 — Qualify Critical Thinking and measure the achievable trail
+### U1 — Qualify Critical Thinking and measure the achievable trail — complete
 
-1. Re-resolve the exact development database, then hard-reset it once. This is the only reset before
-   U8; every later path builds into this same live Concept registry.
-2. Run the exact Critical Thinking source independently through registration, extraction,
-   canonicalization, publication, enrichment, and asset generation with production model calls,
-   keeping canonicalization and Graph-Version Build adjacent and serialized.
-3. Inspect source, graph, route, every visible lesson claim, every option-select key/distractor, and
-   a complete learner playthrough through the existing pre-catalog reads. Fix the owning source or
-   domain-general module and restart the path after any `FIX_FIRST` finding.
-4. Record the yield ratio KTD8 names and apply the KTD2 stop rule, including its two-regeneration
-   budget. Commit once. No catalog entry, package, exporter, or reset command exists yet, and no
-   learner-visible publication is claimed.
+The first source is generated, qualified, measured, and played through in the once-reset live
+registry. The Validation Log owns its evidence; no publication or package exists yet.
 
 ### U2 — Explicit accepted catalog and learner projection
 
@@ -567,35 +558,43 @@ The plan is complete only when all of the following are true:
 
 ### U0 — Accepted contract and source fixtures — 2026-08-27
 
-- Three independent workers drafted non-overlapping source files and reviewed the design from
-  pedagogy, pipeline/persistence, and documentation/validation perspectives. One integrated review
-  reconciled their output with the accepted catalog order, audience split, source and reset policy,
-  repository interfaces, and documentation authority; no worker edited the shared plan or indexes.
-- The accepted-source contract test proves exactly five unique catalog keys, titles, roles,
-  audiences, orders, fixture identities, paths, and Declared Domains; exact order `1..5`; unique
-  source basenames; the accepted general-model-knowledge policy; pure Markdown source bodies; no
-  external URL, citation section, provenance boilerplate, NUL byte, empty block, or invalid block
-  locator; and the accepted section/word envelopes.
-- Direct native-Markdown parsing passed for all five sources, each within the accepted section and
-  word envelopes and yielding 88 to 134 located blocks.
-- `pnpm --filter @lrnki/infrastructure-ingestion test` and `typecheck` passed, including both new
-  accepted-source contract cases. Focused ESLint, JSON parsing, changed-document local-link
-  resolution, tracked and untracked whitespace checks, and `git diff --check` passed. The plan and
-  `TODO.md` remain within their retained-document caps.
-- Evidence is source-authoring and documentation evidence only. No source was registered, no model
-  generation pipeline ran, no database was reset or written, and no learner, web, simulator,
-  deployed, or device behavior is claimed.
+- Three workers drafted/reviewed the sources; integrated review reconciled catalog order, audiences, source/reset policy, interfaces, and authority.
+- The contract test proves the exact five unique entries/order and source/fixture/Markdown/locator
+  constraints. Parsing yielded 88–134 blocks; ingestion checks, focused ESLint, links, JSON, and whitespace passed.
+- Authority is source-authoring/documentation only; no model, database, learner, surface, deployed, simulator, or device behavior was exercised.
+
+### U1 — Critical Thinking qualification and achievable trail — 2026-08-27
+
+- Guarded local database `lrnki` was reset once. The 116-block source yielded 61 candidates (27 core,
+  34 optional) and a standalone published 27-Concept Graph Version.
+- Two arms failed when synchronized `429`s exhausted one mixed retry budget: a thundering herd against
+  a shared rate-limited resource. Separate ordinary/`429` budgets and capped equal jitter fixed the shared
+  transport seam without changing K=8 or semantic retry; the next live arm recovered under `429` pressure.
+- The accepted enrichment has 58 source-backed nodes (27 document-anchored, 31 source-mentioned), zero
+  `llm_grounded`, 27 certain/23 uncertain edges, and 58 difficulty rows; route inspection found no cross-path node.
+- Generation retained 44 lessons, 14 absences, 43 option-select, 3 matching, and 8 impostor items.
+  Qualification admitted 35 lessons/items/stops: KTD8 `27 → 35 → 35 → 35`; no source edit was needed.
+- All 35 visible payloads were read. Independent evaluation resolved 37/37 evidence rows and accepted
+  129/129 claims, 105/105 distractors, and 35/35 keys; 387 calls used 546,575 tokens/about `$0.026176692`.
+  The journey used 1,280 calls, 2,244,266 tokens, and about `$0.197703456`.
+- Ordering used 9 DigitalOcean calls and 1 configured Groq fallback. This qualifies the inspected
+  artifact/topology, not quantization equivalence; all 387 independent verifier calls used DeepInfra.
+- A reserved learner mastered all 35 frontier stops with 35 reads/responses, no dead end or scaffold;
+  the positive-control rows existed before exact teardown returned learner state to zero.
+- Focused tests passed 49/49; full LiteLLM infrastructure/application/worker suites passed 217/217,
+  875/875, and 8/8 with typechecks and focused ESLint. Authority is local DB/model/artifact/learner-route only.
 
 ### Open findings
 
 - The five primers intentionally lack an external claim-verification ledger. That is the accepted
   playtest authority boundary, not an omission; a known material defect still blocks acceptance.
-- No package or catalog-entry schema exists yet, and the development database observation predates
-  implementation. The five files are durable inputs, not ready learner paths, until U1–U8 close.
-- The achievable stop count is unmeasured for all five sources; the only comparable evidence is one
-  source at exactly five predecessor-closed stops and one at a single stop. U1 is a feasibility
-  measurement as much as a generation, which is why the owner set a three-stop floor in advance
-  rather than an unbounded source-editing loop.
+- Critical Thinking is qualified but deliberately unpublished; its pre-catalog neural title is
+  `Robust Option`. U2 must make the manifest entry the sole accepted presentation owner. No package,
+  export, or import infrastructure exists until U3.
+- Achievable stop count remains unmeasured for Probability and Statistics, Personal Finance,
+  Machine Learning, and Neuroscience. U4–U7 own those independent measurements.
+- Do not reset the development database again before U8; U2–U7 must preserve U1's live Concept
+  registry.
 - Pinning the accepted identity turns a drifted qualification into a named refusal but does not
   decouple it: a prompt or route change after acceptance still requires regeneration, and AGENTS
   rule 14 still invalidates the affected quality evidence.

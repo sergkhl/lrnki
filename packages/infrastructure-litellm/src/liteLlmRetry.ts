@@ -35,8 +35,8 @@ export function parseRetryAfterMs(value: string | null, nowMs = Date.now()): num
 // The one transport retry/backoff/classification loop shared by the forced-tool and
 // embedding clients (rule 18: their previous inline copies are deleted). Two policies
 // live here:
-// - Backoff: 429 gets a real cooldown window (15s base) vs. 500ms for ordinary blips,
-//   exponential per attempt.
+// - Backoff: 429 gets a jittered cooldown window (up to a 15s base) vs. 500ms for ordinary
+//   blips, exponential per attempt.
 // - TERMINAL timeouts: a header/body timeout means the server may have completed the
 //   call — blind-retrying at the transport pays for the same expensive LLM call twice
 //   (the fda1509c incident shape). Timeout-class failures make exactly ONE HTTP call
@@ -67,14 +67,19 @@ export function classifyTransportFailure(attempt: number, error: unknown): Force
 
 export async function runWithTransportRetries<T>(input: {
   maxRetries: number;
+  maxRateLimitRetries?: number;
   attemptOnce: (attempt: number, previousAttempt: ForcedToolFailureAttempt | undefined) => Promise<T>;
   classify: TransportAttemptClassifier;
   onExhausted: (attempts: ForcedToolFailureAttempt[], lastError: unknown) => never;
   sleep?: (milliseconds: number) => Promise<void>;
+  random?: () => number;
 }): Promise<T> {
   const attempts: ForcedToolFailureAttempt[] = [];
+  let ordinaryRetries = 0;
+  let rateLimitRetries = 0;
   let lastError: unknown;
-  for (let attempt = 0; attempt <= input.maxRetries; attempt++) {
+  for (;;) {
+    const attempt = attempts.length;
     try {
       return await input.attemptOnce(attempt, attempts.at(-1));
     } catch (error) {
@@ -83,20 +88,43 @@ export async function runWithTransportRetries<T>(input: {
       attempts.push(classified);
       // Terminal at the transport: the call may have completed server-side.
       if (classified.kind === "timeout") break;
-      if (attempt < input.maxRetries) {
-        await (input.sleep ?? delay)(transportRetryDelayMs(classified));
-      }
+      const rateLimited = classified.kind === "http" && classified.status === 429;
+      const retriesUsed = rateLimited ? rateLimitRetries : ordinaryRetries;
+      const retryLimit = rateLimited
+        ? input.maxRateLimitRetries ?? input.maxRetries
+        : input.maxRetries;
+      if (retriesUsed >= retryLimit) break;
+      if (rateLimited) rateLimitRetries += 1;
+      else ordinaryRetries += 1;
+      // Attempt numbers in the evidence trail remain global and chronological. Backoff is based on
+      // the retry ordinal for this failure class so an intervening schema correction cannot inflate
+      // a later provider cooldown.
+      await (input.sleep ?? delay)(transportRetryDelayMs(
+        { ...classified, attempt: retriesUsed },
+        input.random
+      ));
     }
   }
   return input.onExhausted(attempts, lastError);
 }
 
-export function transportRetryDelayMs(attempt: ForcedToolFailureAttempt): number {
+export function transportRetryDelayMs(
+  attempt: ForcedToolFailureAttempt,
+  random: () => number = Math.random
+): number {
   if (attempt.kind === "http" && attempt.status === 429) {
-    const exponentialFloor = RATE_LIMIT_BACKOFF_BASE_MS * 2 ** attempt.attempt;
+    const exponentialCeiling = Math.min(
+      RATE_LIMIT_BACKOFF_CAP_MS,
+      RATE_LIMIT_BACKOFF_BASE_MS * 2 ** attempt.attempt
+    );
+    // Equal jitter preserves a meaningful cooldown while spreading a concurrent bracket across
+    // the upper half of its exponential window. A server Retry-After remains the minimum request;
+    // the local cap keeps the whole operation bounded when a proxy sends an extreme value.
+    const unit = Math.min(1, Math.max(0, random()));
+    const jitteredDelay = Math.round(exponentialCeiling / 2 + unit * exponentialCeiling / 2);
     return Math.min(
       RATE_LIMIT_BACKOFF_CAP_MS,
-      Math.max(exponentialFloor, attempt.retryAfterMs ?? 0)
+      Math.max(jitteredDelay, attempt.retryAfterMs ?? 0)
     );
   }
   return TRANSIENT_BACKOFF_BASE_MS * 2 ** attempt.attempt;

@@ -27,7 +27,7 @@ export class LiteLlmForcedToolClient {
     this.dispatcher = createLiteLlmDispatcher(options.timeoutMs);
   }
 
-  async call<T>(input: { model: string; messages: ToolMessage[]; toolName: string; toolDescription: string; parameters: JsonSchema; validator: ZodType<T>; tags?: string[]; maxRetries?: number }): Promise<T> {
+  async call<T>(input: { model: string; messages: ToolMessage[]; toolName: string; toolDescription: string; parameters: JsonSchema; validator: ZodType<T>; tags?: string[]; maxRetries?: number; maxRateLimitRetries?: number }): Promise<T> {
     // The application catalog is the sole owner of operation-to-stage membership. Its
     // allowed set arrives through the ambient context; reject a wrong pair before the
     // retry loop can issue or wrap a request. With no ambient operation (measurement),
@@ -50,6 +50,9 @@ export class LiteLlmForcedToolClient {
     let attemptMessages = input.messages;
     return runWithTransportRetries({
       maxRetries,
+      ...(input.maxRateLimitRetries !== undefined
+        ? { maxRateLimitRetries: input.maxRateLimitRetries }
+        : {}),
       attemptOnce: (_attempt, previousAttempt) => {
         if (previousAttempt && isCorrectableModelDeviation(previousAttempt.kind)) {
           attemptMessages = buildRetryMessages(input.messages, previousAttempt, input.toolName);

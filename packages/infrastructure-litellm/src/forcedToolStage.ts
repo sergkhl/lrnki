@@ -12,6 +12,9 @@ export type NeuralStageDescriptor<TInput, TArgs, TResult> = {
   validator: ZodType<TArgs> | ((input: TInput) => ZodType<TArgs>);
   sentinelInput: TInput;
   maxRetries?: number;
+  // Execution-only transport posture. Unlike maxRetries, this never changes the prompt after a
+  // model response and is therefore excluded from the neural artifact/config identity.
+  maxRateLimitRetries?: number;
   templateData: (input: TInput) => Record<string, unknown>;
   mapResult: (args: TArgs, input: TInput, model: string) => TResult;
 };
@@ -29,6 +32,7 @@ export type AnyNeuralStageDescriptor = {
   validator: ZodType<unknown> | ((input: never) => ZodType<unknown>);
   sentinelInput: unknown;
   maxRetries?: number;
+  maxRateLimitRetries?: number;
   templateData: (input: never) => Record<string, unknown>;
   mapResult: (args: never, input: never, model: string) => unknown;
 };
@@ -55,7 +59,10 @@ export async function executeForcedToolStage<TInput, TArgs, TResult>(
     parameters: resolveSchema(descriptor, input),
     validator: resolveValidator(descriptor, input),
     tags: [descriptor.stageTag],
-    ...(descriptor.maxRetries !== undefined ? { maxRetries: descriptor.maxRetries } : {})
+    ...(descriptor.maxRetries !== undefined ? { maxRetries: descriptor.maxRetries } : {}),
+    ...(descriptor.maxRateLimitRetries !== undefined
+      ? { maxRateLimitRetries: descriptor.maxRateLimitRetries }
+      : {})
   });
   return descriptor.mapResult(args, input, model);
 }

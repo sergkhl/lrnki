@@ -27,6 +27,7 @@ const pilotDescriptor: NeuralStageDescriptor<PilotInput, OrderingArgs, OrderingA
     ]
   },
   maxRetries: 1,
+  maxRateLimitRetries: 3,
   templateData: (input) => ({
     declaredDomain: input.declaredDomain,
     concepts: input.nodes.map((node, index) => ({
@@ -66,11 +67,12 @@ test("generic executor renders, builds schema from input, passes tags and maps r
   } as unknown as LiteLlmForcedToolClient;
   const result = await executeForcedToolStage(client, pilotDescriptor, pilotDescriptor.sentinelInput);
   assert.equal(result.edges[0]?.dependentNumber, 2);
-  const call = calls[0] as { model: string; toolName: string; tags: string[]; maxRetries: number; parameters: { properties?: unknown } };
+  const call = calls[0] as { model: string; toolName: string; tags: string[]; maxRetries: number; maxRateLimitRetries: number; parameters: { properties?: unknown } };
   assert.equal(call.model, "kg-prerequisite-ordering");
   assert.equal(call.toolName, "submit_prerequisite_ordering");
   assert.deepEqual(call.tags, [STAGE_TAGS.prerequisiteOrdering]);
   assert.equal(call.maxRetries, 1);
+  assert.equal(call.maxRateLimitRetries, 3);
   assert.ok(call.parameters.properties);
 });
 
@@ -92,9 +94,10 @@ test("one descriptor override changes execution and hash without mutating the ba
   assert.notEqual(stageConfigHash(overridden), stageConfigHash(pilotDescriptor));
 });
 
-test("stage config hash includes prompt bytes, schema, and scalar descriptor identity", () => {
+test("stage config hash includes neural behavior and excludes the execution-only 429 budget", () => {
   const hash = stageConfigHash(pilotDescriptor);
   assert.match(hash, /^[a-f0-9]{64}$/);
   const changedStageHash = stageConfigHash({ ...pilotDescriptor, stageTag: STAGE_TAGS.intrinsicDifficulty });
   assert.notEqual(hash, changedStageHash);
+  assert.equal(hash, stageConfigHash({ ...pilotDescriptor, maxRateLimitRetries: 2 }));
 });

@@ -64,7 +64,11 @@ export const prerequisiteOrderingDescriptor: NeuralStageDescriptor<
       { derivedNodeId: "sentinel_b", canonicalLabel: "Sentinel B", aliases: [], definitions: [], mentions: ["B mention"], assertions: [] }
     ]
   },
+  // K=8 ordering intentionally keeps its calibrated concurrent draw bracket. Provider 429s get a
+  // separate bounded budget that can span one shared-pool minute window; malformed neural output
+  // still gets exactly one corrective re-prompt through maxRetries.
   maxRetries: 1,
+  maxRateLimitRetries: 3,
   templateData: (input) => ({
     declaredDomain: input.declaredDomain,
     concepts: input.nodes.map((node, index) => conceptContextTemplateData(`Concept ${index + 1}`, node))

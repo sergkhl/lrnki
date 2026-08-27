@@ -26,10 +26,10 @@ type OrderingEdge = { prerequisiteNumber: number; dependentNumber: number; confi
 // args (a deterministic envelope over a canned response — rule 11). `capture` records the
 // last client call so a test can assert the prompt's forced tool name, stage tag, and
 // per-call retry budget.
-function adapterReturning(canned: { edges: OrderingEdge[] }, capture?: { lastCall?: { messages?: { role: string; content: string }[]; tags?: string[]; toolName?: string; maxRetries?: number } }) {
+function adapterReturning(canned: { edges: OrderingEdge[] }, capture?: { lastCall?: { messages?: { role: string; content: string }[]; tags?: string[]; toolName?: string; maxRetries?: number; maxRateLimitRetries?: number } }) {
   const client = {
     async call(input: unknown) {
-      if (capture) capture.lastCall = input as { messages?: { role: string; content: string }[]; tags?: string[]; toolName?: string; maxRetries?: number };
+      if (capture) capture.lastCall = input as { messages?: { role: string; content: string }[]; tags?: string[]; toolName?: string; maxRetries?: number; maxRateLimitRetries?: number };
       return canned;
     }
   } as unknown as LiteLlmForcedToolClient;
@@ -59,11 +59,13 @@ test("returns the validated number-cited edges verbatim, in order", async () => 
   assert.equal(edges[1].dependentNumber, 3);
 });
 
-// The ordering stage gets a tightened budget: first call + exactly one corrective re-prompt.
-test("ordering request passes maxRetries: 1 for a single corrective re-prompt", async () => {
-  const capture: { lastCall?: { maxRetries?: number } } = {};
+// The ordering stage gets independent bounded budgets: one corrective model re-prompt, while
+// provider 429s may span a shared-pool minute window without changing K=8 generation concurrency.
+test("ordering request separates corrective and rate-limit retry budgets", async () => {
+  const capture: { lastCall?: { maxRetries?: number; maxRateLimitRetries?: number } } = {};
   await adapterReturning({ edges: [] }, capture).order({ declaredDomain: "x", nodes: [ownership, moveSemantics] });
   assert.equal(capture.lastCall?.maxRetries, 1);
+  assert.equal(capture.lastCall?.maxRateLimitRetries, 3);
 });
 
 // Edge case: an empty edges array (the judge asserts no relations) is a valid empty ordering.
