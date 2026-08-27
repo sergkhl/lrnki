@@ -4,9 +4,10 @@
 
 - **Curate five ready-to-play Source Expedition mockups.** Execute the
   [active plan](./2026-08-27-001-curate-five-ready-source-expedition-mockups.md) in order. U0–U1 own
-  the accepted source set and qualified 35-stop Critical Thinking path; U2 adds the explicit
-  accepted catalog, learner presentation, and source-credit projection before package work. Do not
-  reset the development database again before U8 or run a shared/deployed reset.
+  the accepted source set and qualified 35-stop Critical Thinking path. U2 and its exclusive
+  dependents are blocked by the schema/reset contradiction recorded in
+  [BLOCKERS](./BLOCKERS.md#source-expedition-catalog-schema-transition); do not apply manual DDL,
+  reset the development database, or advance U3 until the owner resolves it.
 
 ## COMPLETED
 

@@ -7,12 +7,10 @@ execution: code
 
 # Curate Five Ready-to-Play Source Expedition Mockups
 
-**Status:** In progress — U0–U1 complete; U2 is next
+**Status:** Blocked — U0–U1 complete; U2 needs the owner reset-order decision
 
-**NEXT:** Implement U2 only: add the code-first accepted catalog and validated manifest seam, deepen
-Source Expedition around publication without changing prepublication qualification, project the
-accepted presentation and source credits through the API and learner UI, publish the existing
-Critical Thinking asset set in the live development database, validate that route, and commit.
+**NEXT:** Resolve the owner action in [BLOCKERS](./BLOCKERS.md#source-expedition-catalog-schema-transition).
+After it is cleared, implement U2 only; do not advance the exclusive units or alter database policy.
 
 **Decision state:** Accepted by the owner through the 2026-08-27 grilling. The initial catalog is
 exactly Critical Thinking, Probability and Statistics, Personal Finance, Machine Learning, and
@@ -593,8 +591,8 @@ The plan is complete only when all of the following are true:
   export, or import infrastructure exists until U3.
 - Achievable stop count remains unmeasured for Probability and Statistics, Personal Finance,
   Machine Learning, and Neuroscience. U4–U7 own those independent measurements.
-- Do not reset the development database again before U8; U2–U7 must preserve U1's live Concept
-  registry.
+- U2's new table makes the current database reset-required under ADR-0039, but this plan forbids the
+  needed reset. The owner action and resolution choices live in [BLOCKERS](./BLOCKERS.md#source-expedition-catalog-schema-transition).
 - Pinning the accepted identity turns a drifted qualification into a named refusal but does not
   decouple it: a prompt or route change after acceptance still requires regeneration, and AGENTS
   rule 14 still invalidates the affected quality evidence.

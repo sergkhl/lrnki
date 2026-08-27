@@ -12,7 +12,7 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [Curate five ready-to-play Source Expedition mockups](./2026-08-27-001-curate-five-ready-source-expedition-mockups.md)
-   — in progress; U0–U1 are complete, and U2 adds the accepted catalog and learner projection around
-   the qualified Critical Thinking path.
+   — blocked after U1; U2's code-first catalog table conflicts with the no-reset-before-U8 invariant.
+   The owner decision is in [BLOCKERS](./BLOCKERS.md#source-expedition-catalog-schema-transition).
 
 <!-- Hygiene and retention rules: AGENTS.md → Documentation workflow. -->
