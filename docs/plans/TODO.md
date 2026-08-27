@@ -2,7 +2,11 @@
 
 ## TODO
 
-No current tasks.
+- **Curate five ready-to-play Source Expedition mockups.** Execute the
+  [active plan](./2026-08-27-001-curate-five-ready-source-expedition-mockups.md) in order. U0 owns
+  the accepted model-authored source set; U1 generates and inspects the Critical Thinking path and
+  measures its achievable trail before any catalog or package work. Do not run a shared/deployed
+  reset or advance a unit without closing the current one's validation and handoff.
 
 ## COMPLETED
 

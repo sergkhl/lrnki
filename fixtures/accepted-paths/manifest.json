@@ -1,0 +1,107 @@
+{
+  "$comment": "Current-only registration and catalog-authoring manifest for five model-authored lrnki onboarding sources. The owner accepted general model knowledge as the source-quality basis for this local playtest set on 2026-08-27; no external source material or independent claim-verification ledger is required in this iteration. Runtime learner assets must still pass the source-backed qualification and real-use playability gates owned by the active implementation plan.",
+  "sourcePolicy": {
+    "authorship": "lrnki_model_authored_project_source",
+    "knowledgeBasis": "general_model_knowledge_only",
+    "acceptanceScope": "local_shared_learner_playtest",
+    "externalClaimVerificationRequired": false,
+    "revisionPolicy": "replace_then_hard_reset_and_reseed"
+  },
+  "fixtures": [
+    {
+      "fixtureId": "accepted-path-critical-thinking",
+      "catalogKey": "critical-thinking",
+      "catalogRole": "broad_reasoning_topic",
+      "catalogOrder": 1,
+      "audience": "curious_general_adult_high_school_reading",
+      "preferredStopCount": {
+        "minimum": 5,
+        "maximum": 7
+      },
+      "path": "fixtures/accepted-paths/sources/critical-thinking.md",
+      "contentType": "text/markdown",
+      "declaredDomain": "critical thinking",
+      "title": "Critical Thinking",
+      "teaser": "Build stronger arguments, weigh evidence, test causal claims, and revise conclusions with confidence.",
+      "source": "lrnki model-authored project source accepted for local playtest; general model knowledge only",
+      "license": "lrnki project-owned playtest fixture",
+      "curation": "Purpose-written as a compact, self-contained onboarding source; no external source material or citation set was used."
+    },
+    {
+      "fixtureId": "accepted-path-probability-and-statistics",
+      "catalogKey": "probability-and-statistics",
+      "catalogRole": "quantitative_foundation",
+      "catalogOrder": 2,
+      "audience": "curious_general_adult_high_school_reading",
+      "preferredStopCount": {
+        "minimum": 5,
+        "maximum": 7
+      },
+      "path": "fixtures/accepted-paths/sources/probability-and-statistics.md",
+      "contentType": "text/markdown",
+      "declaredDomain": "probability and statistics",
+      "title": "Probability and Statistics",
+      "teaser": "Reason from data and uncertainty through probability, variation, inference, association, and causation.",
+      "source": "lrnki model-authored project source accepted for local playtest; general model knowledge only",
+      "license": "lrnki project-owned playtest fixture",
+      "curation": "Purpose-written as a compact, self-contained onboarding source; no external source material or citation set was used."
+    },
+    {
+      "fixtureId": "accepted-path-personal-finance",
+      "catalogKey": "personal-finance",
+      "catalogRole": "broad_consumer_topic",
+      "catalogOrder": 3,
+      "audience": "curious_general_adult_high_school_reading",
+      "preferredStopCount": {
+        "minimum": 5,
+        "maximum": 7
+      },
+      "path": "fixtures/accepted-paths/sources/personal-finance.md",
+      "contentType": "text/markdown",
+      "declaredDomain": "personal finance",
+      "title": "Personal Finance",
+      "teaser": "Make resilient financial choices using cash flow, compounding, debt, risk, and diversification.",
+      "source": "lrnki model-authored project source accepted for local playtest; general model knowledge only",
+      "license": "lrnki project-owned playtest fixture",
+      "curation": "Purpose-written as a geography-neutral, self-contained onboarding source; no external source material or citation set was used."
+    },
+    {
+      "fixtureId": "accepted-path-machine-learning",
+      "catalogKey": "machine-learning",
+      "catalogRole": "advanced_technical_path",
+      "catalogOrder": 4,
+      "audience": "technically_experienced_density_first",
+      "preferredStopCount": {
+        "minimum": 7,
+        "maximum": 10
+      },
+      "path": "fixtures/accepted-paths/sources/machine-learning.md",
+      "contentType": "text/markdown",
+      "declaredDomain": "machine learning",
+      "title": "Machine Learning",
+      "teaser": "Design and evaluate supervised-learning systems without leakage, metric traps, or brittle validation.",
+      "source": "lrnki model-authored project source accepted for local playtest; general model knowledge only",
+      "license": "lrnki project-owned playtest fixture",
+      "curation": "Purpose-written as a dense applied-supervised-learning source; no external source material, repository, or citation set was used."
+    },
+    {
+      "fixtureId": "accepted-path-neuroscience-memory-attention",
+      "catalogKey": "neuroscience-of-memory-and-attention",
+      "catalogRole": "science_curiosity_path",
+      "catalogOrder": 5,
+      "audience": "technically_experienced_density_first",
+      "preferredStopCount": {
+        "minimum": 7,
+        "maximum": 10
+      },
+      "path": "fixtures/accepted-paths/sources/neuroscience-of-memory-and-attention.md",
+      "contentType": "text/markdown",
+      "declaredDomain": "neuroscience of memory and attention",
+      "title": "Neuroscience of Memory and Attention",
+      "teaser": "Connect neural plasticity, attention, working memory, consolidation, and retrieval.",
+      "source": "lrnki model-authored project source accepted for local playtest; general model knowledge only",
+      "license": "lrnki project-owned playtest fixture",
+      "curation": "Purpose-written as a dense cognitive-neuroscience source with explicit uncertainty limits; no external source material or citation set was used."
+    }
+  ]
+}

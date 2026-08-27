@@ -6,8 +6,8 @@ date: 2026-08-19
 
 # Architecture deepening review
 
-**Status:** Candidate 3's Source Expedition adoption slice is accepted by the active curated-source
-plan. Candidates 4–7 remain shaping findings; original numbering is retained for stable references.
+**Status:** Candidate 3's Source Expedition adoption slice is implemented and source-owned.
+Candidates 4–7 remain shaping findings; original numbering is retained for stable references.
 Candidate 2 is implemented and its durable mechanics are source-owned.
 
 ## Review question
@@ -494,8 +494,8 @@ implementation as an adapter under
 
 ## Top remaining recommendation
 
-Execute candidate 3's accepted Source Expedition slice through the active plan. Among work without a
-plan owner, candidate 4 is next: navigation-memory policy still spans two platform implementations.
+Candidate 3's accepted Source Expedition slice is complete. Among work without a plan owner,
+candidate 4 is next: navigation-memory policy still spans two platform implementations.
 
 ## Open decisions
 

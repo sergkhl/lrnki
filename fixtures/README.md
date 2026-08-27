@@ -2,6 +2,15 @@
 
 Stable English-language sources for integration quality runs. Generated artifacts belong under `tmp/`, not here.
 
+## Accepted-path onboarding sources
+
+[`accepted-paths/manifest.json`](./accepted-paths/manifest.json) registers five project-owned,
+model-authored Markdown primers accepted as the current local shared-catalog playtest inputs. The
+manifest discloses their general-model-knowledge basis and deferred external claim verification;
+the source bodies remain pure learner-facing material. They are durable inputs, not proof of ready
+learner paths: processing, packaging, publication, reset, and qualified evidence claims belong to
+the [active implementation plan](../docs/plans/2026-08-27-001-curate-five-ready-source-expedition-mockups.md).
+
 ## Project-authored diagnostic sources
 
 [`diagnostic-manifest.json`](./diagnostic-manifest.json) registers a compact source-backed workflow

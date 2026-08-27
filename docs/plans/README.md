@@ -11,6 +11,8 @@ lifecycle, retention, and validation rules live in
 
 ## Active implementation plans (execution order)
 
-No active implementation plans.
+1. [Curate five ready-to-play Source Expedition mockups](./2026-08-27-001-curate-five-ready-source-expedition-mockups.md)
+   — in progress; U0 source fixtures and contract are complete, and U1 qualifies the first generated
+   path.
 
 <!-- Hygiene and retention rules: AGENTS.md → Documentation workflow. -->
