@@ -7,9 +7,9 @@ execution: code
 
 # Curate Five Ready-to-Play Source Expedition Mockups
 
-**Status:** In progress — U0–U6 complete; U7 is next
+**Status:** In progress — U0–U7 complete; U8 is next
 
-**NEXT:** Implement U7 only. Generate, inspect, qualify, publish, export, and round-trip Neuroscience of Memory and Attention in the preserved live Concept registry; no further development reset is authorized through U7.
+**NEXT:** Implement U8 only. Prevalidate the complete five-package manifest, run the separately authorized model-free development reset/install twice, prove the exact shared catalog and Concept projection, and exercise two-learner/API plus intercepted- and real-backend-web behavior; do not touch a deployed or shared-host database.
 
 **Decision state:** Accepted by the owner through the 2026-08-27 grilling. The initial catalog is
 exactly Critical Thinking, Probability and Statistics, Personal Finance, Machine Learning, and
@@ -470,7 +470,7 @@ calibration, and distribution shift. Reject version-specific API claims, source-
 scores, or an evaluation rule that assumes independent and identically distributed data when the
 source states otherwise.
 
-### U7 — Qualify Neuroscience of Memory and Attention
+### U7 — Qualify Neuroscience of Memory and Attention — complete
 
 Repeat the U4 shape for Neuroscience of Memory and Attention. Distinguish observation from mechanism
 and settled principle from active model; preserve limits around neural correlates, consolidation,
@@ -540,12 +540,9 @@ The plan is complete only when all of the following are true:
 
 ## Out of scope and safety boundaries
 
-- No external source research, citation pack, claim ledger, licensing crawl, or mandatory
-  independent fact-check stage for these five initial primers.
-- No runtime smart-model source authoring, web search, retrieval/ranking, upload CMS, admin
-  mutation, moderation queue, or source approval UI.
-- No reactivation or redesign of Synthetic Topic Generation, LLM-grounded prerequisites, generated
-  Support Steps, matching items, or impostor items.
+- No external source research, citation pack, claim ledger, licensing crawl, or mandatory independent fact-check stage for these five initial primers.
+- No runtime smart-model source authoring, web search, retrieval/ranking, upload CMS, admin mutation, moderation queue, or source approval UI.
+- No reactivation or redesign of Synthetic Topic Generation, LLM-grounded prerequisites, generated Support Steps, matching items, or impostor items.
 - No combined five-domain graph, cross-expedition prerequisite, broad field-completeness promise, or
   source-specific prompt/schema/gate tuning.
 - No stable path revisions, historical package compatibility, coexistence, migration UX, additive
@@ -591,9 +588,12 @@ The plan is complete only when all of the following are true:
 
 - One production-model arm transformed 122 blocks into 86 candidates/26 core Concepts and a 26-Concept graph; enrichment retained 81 source-derived nodes, 27 trusted/42 uncertain edges, 81 difficulties, zero cycles, and zero source-less mints. Generation retained 46 lessons/35 honest absences/61 items and fail-closed 182 drafts; qualification admitted 31 predecessor-closed lessons/items/stops with zero visible `llm_grounded`. Independent evaluation accepted 121/121 material claims, 93/93 distractors, and 31/31 keys with 38/38 evidence controls. Direct reading confirmed split/leakage boundaries, fold-scoped preprocessing, untouched-test and nested-validation roles, ROC/threshold/calibration distinctions, and training-serving skew; no version-specific API, benchmark score, or IID assumption entered learner assets. Distribution shift was safely omitted, and two minor sentence fragments are non-material wording limits. The journey used 1,609 calls/3,033,522 tokens/about $0.2772991452; evaluation used 363 separate calls. A learner mastered 31/31 and tore down cleanly. Publication pinned `source-expedition-assets-9c6323b38a47c0880333b61948755ebe7233f8ef50a2432775ebb9897d139857`; package digest `45b2dc125c5fdbca7c30b3cae2b910bf2674472c222f5ced6c1da745de9bcc6f` installed with all four paths/125 Concepts and zero learner/operation rows, re-qualified 31/44/37/31 stops, and reproduced all four digests. Machine Learning's registry hash is `b96e36d8ed9bb69f41e1992b8750f4a736ff0c1b990edd666546f9e889f56b25`; all prior projections remained exact and no development reset occurred. `pnpm test:db` and `pnpm check` passed schema parity, all types/tests, ESLint with zero errors/10 warnings, both builds, and 70/70 intercepted web. Authority is local development/test database, production-model, artifact, application-route, build, and intercepted-web only; no real-backend, deployed, native, physical-device, or release claim is made.
 
+### U7 — Neuroscience of Memory and Attention accepted path — 2026-08-28
+
+- One production-model arm transformed 88 blocks into 96 candidates/16 core Concepts and a 16-Concept graph; enrichment retained 94 source-derived nodes, 30 trusted/41 uncertain edges, 94 difficulties, zero cycles, and zero source-less mints. Generation retained 40 complete lesson/item pairs with no lesson absences; qualification admitted all 40 predecessor-closed stops with zero visible `llm_grounded`. Independent evaluation accepted 143/143 material claims, 120/120 distractors, and 40/40 keys with 43/43 evidence controls. Direct reading preserved observation/mechanism boundaries, indirect fMRI measurement, qualified CA1/CA3 models, distributed traces, non-fixed working-memory capacity, selective consolidation, and sleep reactivation as plausible rather than proven; it found no deterministic region/neurotransmitter story, universal schedule, brain-training promise, or trauma-erasure claim. The journey used 1,674 calls/3,190,114 tokens/about $0.2852608396; evaluation used 429 separate calls. A learner mastered 40/40 and tore down cleanly. Publication pinned `source-expedition-assets-9999fce0841f211ee7c25744a50744c6542be51adc2ef9f138981966a15ce500`; package digest `ffabde24ea0fc862e9b962dfb38740d807b1947f94e6fb87ba92aadb3496589e` installed with all five paths/141 Concepts and zero learner/operation rows, re-qualified 31/44/37/31/40 stops, and reproduced all five digests byte-for-byte. Neuroscience's registry hash is `58f72ddcbad210e6ff1813a493cc39469c203b86b874820c0da706d5ffcbba92`; all prior projections remained exact and no development reset occurred. `pnpm test:db` and `pnpm check` passed schema parity, all types/tests, ESLint with zero errors/10 warnings, both builds, and 70/70 intercepted web. Authority is local development/test database, production-model, artifact, application-route, build, and intercepted-web only; no real-backend, deployed, native, physical-device, or release claim is made.
+
 ### Open findings
 
 - The five primers intentionally lack an external claim-verification ledger; that is their accepted playtest boundary. Any material inspection defect still blocks the affected path's acceptance.
-- Critical Thinking, Probability and Statistics, Personal Finance, and Machine Learning are accepted, published, and sealed; complete-set install intentionally refuses until U7 adds the remaining package.
-- Stop count remains unmeasured for Neuroscience of Memory and Attention; U7 owns that independent measurement.
+- All five paths are accepted, published, sealed, and complete-set-valid in the preserved 141-Concept development registry. U8 owns the separately authorized model-free development reinstall plus exact shared-catalog, two-learner, restart, and real-backend-web evidence.
 - Accepted-identity drift refuses by name but still requires regeneration, and AGENTS rule 14 still invalidates affected quality evidence.

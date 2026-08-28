@@ -117,7 +117,11 @@
       "teaser": "Connect neural plasticity, attention, working memory, consolidation, and retrieval.",
       "source": "lrnki model-authored project source accepted for local playtest; general model knowledge only",
       "license": "lrnki project-owned playtest fixture",
-      "curation": "Purpose-written as a dense cognitive-neuroscience source with explicit uncertainty limits; no external source material or citation set was used."
+      "curation": "Purpose-written as a dense cognitive-neuroscience source with explicit uncertainty limits; no external source material or citation set was used.",
+      "acceptedPackage": {
+        "path": "fixtures/accepted-paths/packages/neuroscience-of-memory-and-attention.json",
+        "sha256": "ffabde24ea0fc862e9b962dfb38740d807b1947f94e6fb87ba92aadb3496589e"
+      }
     }
   ]
 }
