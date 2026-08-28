@@ -12,7 +12,7 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [Curate five ready-to-play Source Expedition mockups](./2026-08-27-001-curate-five-ready-source-expedition-mockups.md)
-   — in progress after U8; U9 runs the fresh Debug iOS Simulator checklist, complete repository
-   gate, consolidation, and plan closure without Android, physical-device, deployed, or release work.
+   — U9 in progress: the native bundle repair passed; the complete repository gate is next, while
+   Simulator UI inspection awaits the owner unlock recorded in BLOCKERS.
 
 <!-- Hygiene and retention rules: AGENTS.md → Documentation workflow. -->

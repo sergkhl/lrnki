@@ -7,9 +7,9 @@ execution: code
 
 # Curate Five Ready-to-Play Source Expedition Mockups
 
-**Status:** In progress — U0–U8 complete; U9 is next
+**Status:** In progress — U0–U8 complete; U9 native-bundle repair is complete, repository gate is next, and Simulator inspection is owner-gated
 
-**NEXT:** Implement U9 only. Reverify the local native toolchain and exact development database, build and install a fresh Debug client on one named iOS Simulator, exercise KTD9, then run the complete repository gate and close the plan under the documentation lifecycle. Run no Android, physical-device, deployed, or release action.
+**NEXT:** Continue U9 only. Run the complete repository gate while the owner unlocks the development Mac; after unlock, rebuild the exact committed revision, exercise KTD9 on the named iOS Simulator, clean its disposable learner, and close the plan. Run no Android, physical-device, deployed, or release action.
 
 **Decision state:** Accepted by the owner through the 2026-08-27 grilling. The initial catalog is
 exactly Critical Thinking, Probability and Statistics, Personal Finance, Machine Learning, and
@@ -508,16 +508,13 @@ universal study prescriptions not supported by the project source.
 
 The plan is complete only when all of the following are true:
 
-1. The repository owns exactly five current project primers and one validated manifest with the
-   accepted titles, order, audience split, disclosure, and current package digests.
+1. The repository owns exactly five current project primers and one validated manifest with the accepted titles, order, audience split, disclosure, and current package digests.
 2. Each path is an independent source-derived graph and qualified predecessor-closed trail meeting
    the KTD2 stop rule — five or more wherever achievable, never fewer than three — with no
    learner-visible LLM-grounded node, one current qualified lesson per stop, and at least one
    current qualified option-select item per stop. Any path accepted below five records its measured
    yield.
-3. Direct inspection finds no unsupported learner-visible material claim, false/non-unique key,
-   trusted-prerequisite leak, incoherent route, known material source error, dangerous financial
-   prescription, or misleading neuroscience certainty.
+3. Direct inspection finds no unsupported learner-visible material claim, false/non-unique key, trusted-prerequisite leak, incoherent route, known material source error, dangerous financial prescription, or misleading neuroscience certainty.
 4. One sealed current package per path reproduces the accepted global source-to-assets closure with
    exact qualification/config identity and contains no learner, auth, progress, secret, or scratch
    data. The five packages agree on one Concept registry, and a package whose accepted asset config
@@ -529,8 +526,7 @@ The plan is complete only when all of the following are true:
 6. Every learner sees the same exact ordered global catalog under one accepted name per path in both
    candidate and adopted views; Begin creates a per-user pinned Source Expedition; adoption and
    progress by one learner do not alter another learner.
-7. Candidate UI stays compact, while all source disclosures and licenses are reachable from one
-   Catalog action and have no second client-owned list.
+7. Candidate UI stays compact, while all source disclosures and licenses are reachable from one Catalog action and have no second client-owned list.
 8. Intercepted web, real-backend web, and fresh Debug iOS Simulator checks pass for the interactions
    they actually exercise. Evidence is not upgraded to Android, automated native, deployed,
    distributable, physical-device, or release authority.
@@ -592,8 +588,12 @@ The plan is complete only when all of the following are true:
 
 - The complete manifest passed before destruction, then two consecutive model-free guarded installs reproduced the same five ordered catalog rows, five source/run/graph/enrichment closures, 31/44/37/31/40 qualified stops, 28/42/29/26/16 package Concept projections, and one 141-Concept registry with zero auth, learner, award, or operation rows. Two fresh API learners saw the same catalog; one learner's Critical Thinking adoption/read survived an API restart without changing the other, and exact teardown passed. The real-backend web gate passed phone and desktop after an occupied default port failed before work and the supported port override was used. A separate real browser verified titles, teasers, disclosures/licenses, search, Begin, the sealed correct first activity for every path, and Critical Thinking's complete 31/31 acquisition route; its positive control was one user/five expeditions/35 lesson reads/35 responses before exact cleanup. The final installed projection remained byte-identical with zero learner rows, and 70/70 intercepted web scenarios passed. Authority is local development database, real local API, real-backend web, and intercepted-web only; no deployed, native, Android, physical-device, or release claim is made.
 
+### U9 — Fresh Debug native build and bundle repair — 2026-08-28 (in progress)
+
+- Xcode 26.6 built and installed a fresh Debug client with zero errors on an iPhone 17 Pro / iOS 26.5 Simulator against the supervisor-free API and exact 141-Concept development state. The first native Metro load failed because a test inside Expo Router's route root pulled the Node-only testing library into the iOS bundle; official Expo Router structure guidance confirmed the problem class. Moving that test outside `src/app` and adding a source-tree guard produced a 4,171-module native bundle; learner-app typecheck, focused ESLint, and 59 suites/323 tests passed. The Mac session then locked, so Computer Use produced no UI observation and no native behavior claim; the concrete owner action is in `BLOCKERS.md`.
+
 ### Open findings
 
 - The five primers intentionally lack an external claim-verification ledger; that is their accepted playtest boundary. Any material inspection defect still blocks the affected path's acceptance.
-- All five paths are accepted, published, sealed, and model-free reinstalled in the exact 141-Concept development registry with local learner state removed. U9 owns the fresh Debug iOS Simulator check, complete repository gate, consolidation, and plan deletion.
+- All five paths remain exact in the 141-Concept registry. U9's native bundle is repaired, but the owner must unlock the Mac before KTD9 visual interaction; the complete repository gate remains agent-actionable meanwhile.
 - Accepted-identity drift refuses by name but still requires regeneration, and AGENTS rule 14 still invalidates affected quality evidence.

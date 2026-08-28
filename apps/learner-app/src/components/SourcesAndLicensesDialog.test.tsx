@@ -3,8 +3,8 @@ import { fireEvent, render, screen } from "@testing-library/react-native";
 import { PortalHost } from "@rn-primitives/portal";
 import { Linking } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { SourcesAndLicensesDialog } from "@/app/catalog";
 import type { CatalogView } from "@/lib/queries";
-import { SourcesAndLicensesDialog } from "./catalog";
 
 const sources: CatalogView["sources"] = [{
   catalogKey: "critical-thinking",
