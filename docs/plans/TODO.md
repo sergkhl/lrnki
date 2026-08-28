@@ -11,9 +11,11 @@
   restart persistence, 70/70 intercepted scenarios, phone/desktop real-backend web, every path's
   first real-browser activity, and Critical Thinking's 31/31 acquisition route passed with exact
   learner cleanup. U9 built and installed the fresh Debug iOS client, repaired a route-root test that
-  blocked native Metro, and passed its 59-suite/323-test package gate. The complete repository gate
-  is next; Simulator UI evidence, cleanup, consolidation, and plan deletion follow after the owner
-  unlock in BLOCKERS. No Android, physical-device, deployed, or release work is authorized.
+  blocked native Metro, then passed `pnpm test:db`, schema parity, all types/tests, lint, both builds,
+  and 70/70 intercepted scenarios. The exact disposable learner is removed and the five-path,
+  141-Concept registry remains unchanged. Only Simulator UI evidence, a fresh learner cleanup,
+  consolidation, and plan deletion remain after the owner unlock in BLOCKERS. No Android,
+  physical-device, deployed, or release work is authorized.
 
 ## COMPLETED
 
