@@ -3,13 +3,15 @@
 ## TODO
 
 - **Curate five ready-to-play Source Expedition mockups.** Execute the
-  [active plan](./2026-08-27-001-curate-five-ready-source-expedition-mockups.md) in order. U0–U7 own
+  [active plan](./2026-08-27-001-curate-five-ready-source-expedition-mockups.md) in order. U0–U8 own
   the accepted sources, catalog schema, freshly regenerated/published 31-stop Critical Thinking
   path, and the sealed 44-stop Probability and Statistics, 37-stop Personal Finance, and 31-stop
   Machine Learning and 40-stop Neuroscience of Memory and Attention paths in one preserved
-  141-Concept registry. U8 is next: prevalidate all five sealed packages, run the separately
-  authorized model-free development reinstall twice, and prove exact shared-catalog, two-learner,
-  restart, intercepted-web, and real-backend-web behavior without touching a deployed or shared host.
+  141-Concept registry. Two consecutive model-free development installs, isolated API learners,
+  restart persistence, 70/70 intercepted scenarios, phone/desktop real-backend web, every path's
+  first real-browser activity, and Critical Thinking's 31/31 acquisition route passed with exact
+  learner cleanup. U9 is next: fresh Debug iOS Simulator evidence, the complete repository gate,
+  consolidation, and plan deletion; no Android, physical-device, deployed, or release work.
 
 ## COMPLETED
 

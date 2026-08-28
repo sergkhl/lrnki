@@ -7,9 +7,9 @@ execution: code
 
 # Curate Five Ready-to-Play Source Expedition Mockups
 
-**Status:** In progress — U0–U7 complete; U8 is next
+**Status:** In progress — U0–U8 complete; U9 is next
 
-**NEXT:** Implement U8 only. Prevalidate the complete five-package manifest, run the separately authorized model-free development reset/install twice, prove the exact shared catalog and Concept projection, and exercise two-learner/API plus intercepted- and real-backend-web behavior; do not touch a deployed or shared-host database.
+**NEXT:** Implement U9 only. Reverify the local native toolchain and exact development database, build and install a fresh Debug client on one named iOS Simulator, exercise KTD9, then run the complete repository gate and close the plan under the documentation lifecycle. Run no Android, physical-device, deployed, or release action.
 
 **Decision state:** Accepted by the owner through the 2026-08-27 grilling. The initial catalog is
 exactly Critical Thinking, Probability and Statistics, Personal Finance, Machine Learning, and
@@ -477,7 +477,7 @@ and settled principle from active model; preserve limits around neural correlate
 sleep, reconsolidation, and practical transfer. Reject deterministic brain-region stories or
 universal study prescriptions not supported by the project source.
 
-### U8 — Install and exercise the complete shared catalog
+### U8 — Install and exercise the complete shared catalog — complete
 
 1. From a prevalidated five-package manifest, run the model-free hard reset and install over the
    live generation database. Prove the result contains exactly five accepted entries in order, one
@@ -543,15 +543,11 @@ The plan is complete only when all of the following are true:
 - No external source research, citation pack, claim ledger, licensing crawl, or mandatory independent fact-check stage for these five initial primers.
 - No runtime smart-model source authoring, web search, retrieval/ranking, upload CMS, admin mutation, moderation queue, or source approval UI.
 - No reactivation or redesign of Synthetic Topic Generation, LLM-grounded prerequisites, generated Support Steps, matching items, or impostor items.
-- No combined five-domain graph, cross-expedition prerequisite, broad field-completeness promise, or
-  source-specific prompt/schema/gate tuning.
-- No stable path revisions, historical package compatibility, coexistence, migration UX, additive
-  update, or preservation of learners across a source/package update.
+- No combined five-domain graph, cross-expedition prerequisite, broad field-completeness promise, or source-specific prompt/schema/gate tuning.
+- No stable path revisions, historical package compatibility, coexistence, migration UX, additive update, or preservation of learners across a source/package update.
 - No per-card or per-lesson source credit, role/audience badge, or duplicate client source list.
-- No runtime model call during reset/install and no fake demo learner. Keep the unrelated Admin Lab
-  empty-state snapshot unless separate work proves it redundant.
-- No shared-host/production reset, deployment, Android run, automated iOS rig, distributable iOS
-  build, physical-device run, or release action without separately explicit authority.
+- No runtime model call during reset/install and no fake demo learner. Keep the unrelated Admin Lab empty-state snapshot unless separate work proves it redundant.
+- No shared-host/production reset, deployment, Android run, automated iOS rig, distributable iOS build, physical-device run, or release action without separately explicit authority.
 - No reset between the post-U2 generated paths: after the one additionally authorized guarded reset
   following the U2 baseline change, preserve the regenerated Critical Thinking Concept registry
   through U7. The next reset is the model-free install in U8. Re-resolve the exact database
@@ -592,8 +588,12 @@ The plan is complete only when all of the following are true:
 
 - One production-model arm transformed 88 blocks into 96 candidates/16 core Concepts and a 16-Concept graph; enrichment retained 94 source-derived nodes, 30 trusted/41 uncertain edges, 94 difficulties, zero cycles, and zero source-less mints. Generation retained 40 complete lesson/item pairs with no lesson absences; qualification admitted all 40 predecessor-closed stops with zero visible `llm_grounded`. Independent evaluation accepted 143/143 material claims, 120/120 distractors, and 40/40 keys with 43/43 evidence controls. Direct reading preserved observation/mechanism boundaries, indirect fMRI measurement, qualified CA1/CA3 models, distributed traces, non-fixed working-memory capacity, selective consolidation, and sleep reactivation as plausible rather than proven; it found no deterministic region/neurotransmitter story, universal schedule, brain-training promise, or trauma-erasure claim. The journey used 1,674 calls/3,190,114 tokens/about $0.2852608396; evaluation used 429 separate calls. A learner mastered 40/40 and tore down cleanly. Publication pinned `source-expedition-assets-9999fce0841f211ee7c25744a50744c6542be51adc2ef9f138981966a15ce500`; package digest `ffabde24ea0fc862e9b962dfb38740d807b1947f94e6fb87ba92aadb3496589e` installed with all five paths/141 Concepts and zero learner/operation rows, re-qualified 31/44/37/31/40 stops, and reproduced all five digests byte-for-byte. Neuroscience's registry hash is `58f72ddcbad210e6ff1813a493cc39469c203b86b874820c0da706d5ffcbba92`; all prior projections remained exact and no development reset occurred. `pnpm test:db` and `pnpm check` passed schema parity, all types/tests, ESLint with zero errors/10 warnings, both builds, and 70/70 intercepted web. Authority is local development/test database, production-model, artifact, application-route, build, and intercepted-web only; no real-backend, deployed, native, physical-device, or release claim is made.
 
+### U8 — Complete catalog install and local learner exercise — 2026-08-28
+
+- The complete manifest passed before destruction, then two consecutive model-free guarded installs reproduced the same five ordered catalog rows, five source/run/graph/enrichment closures, 31/44/37/31/40 qualified stops, 28/42/29/26/16 package Concept projections, and one 141-Concept registry with zero auth, learner, award, or operation rows. Two fresh API learners saw the same catalog; one learner's Critical Thinking adoption/read survived an API restart without changing the other, and exact teardown passed. The real-backend web gate passed phone and desktop after an occupied default port failed before work and the supported port override was used. A separate real browser verified titles, teasers, disclosures/licenses, search, Begin, the sealed correct first activity for every path, and Critical Thinking's complete 31/31 acquisition route; its positive control was one user/five expeditions/35 lesson reads/35 responses before exact cleanup. The final installed projection remained byte-identical with zero learner rows, and 70/70 intercepted web scenarios passed. Authority is local development database, real local API, real-backend web, and intercepted-web only; no deployed, native, Android, physical-device, or release claim is made.
+
 ### Open findings
 
 - The five primers intentionally lack an external claim-verification ledger; that is their accepted playtest boundary. Any material inspection defect still blocks the affected path's acceptance.
-- All five paths are accepted, published, sealed, and complete-set-valid in the preserved 141-Concept development registry. U8 owns the separately authorized model-free development reinstall plus exact shared-catalog, two-learner, restart, and real-backend-web evidence.
+- All five paths are accepted, published, sealed, and model-free reinstalled in the exact 141-Concept development registry with local learner state removed. U9 owns the fresh Debug iOS Simulator check, complete repository gate, consolidation, and plan deletion.
 - Accepted-identity drift refuses by name but still requires regeneration, and AGENTS rule 14 still invalidates affected quality evidence.
