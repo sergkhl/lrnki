@@ -12,10 +12,13 @@
   first real-browser activity, and Critical Thinking's 31/31 acquisition route passed with exact
   learner cleanup. U9 built and installed the fresh Debug iOS client, repaired a route-root test that
   blocked native Metro, then passed `pnpm test:db`, schema parity, all types/tests, lint, both builds,
-  and 70/70 intercepted scenarios. The exact disposable learner is removed and the five-path,
-  141-Concept registry remains unchanged. Only Simulator UI evidence, a fresh learner cleanup,
-  consolidation, and plan deletion remain after the owner unlock in BLOCKERS. No Android,
-  physical-device, deployed, or release work is authorized.
+  and 70/70 intercepted scenarios. The unlocked Simulator reached the exact catalog, centralized
+  source registry, Begin, trail, and first Critical Thinking lesson/activity. That run exposed a
+  native nested-portal race when a one-crystal Leg completed; the arrival offer now waits until the
+  Activity or Support Path surface returns focus to the trail, with a focused six-test regression,
+  typecheck, and lint pass. Exact-revision visual requalification, disposable-learner cleanup,
+  consolidation, and plan deletion remain. The five-path, 141-Concept registry is preserved. No
+  Android, physical-device, deployed, or release work is authorized.
 
 ## COMPLETED
 

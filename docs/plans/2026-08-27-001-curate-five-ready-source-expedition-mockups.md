@@ -7,9 +7,9 @@ execution: code
 
 # Curate Five Ready-to-Play Source Expedition Mockups
 
-**Status:** In progress — U0–U8 complete; U9 native-bundle repair and repository gate are complete, while Simulator inspection is owner-gated
+**Status:** In progress — U0–U8 complete; U9 native/repository gates are green and the Simulator-found nested-portal defect is repaired, while exact-revision visual requalification and closure remain
 
-**NEXT:** Continue U9 only after the owner unlocks the development Mac. Recreate one disposable learner, start the supervisor-free API, rebuild the exact committed revision, exercise KTD9 on the named iOS Simulator, inspect screenshots, clean the learner, and close the plan. Run no Android, physical-device, deployed, or release action.
+**NEXT:** Commit the U9 arrival-sequencing repair, reload the exact committed revision on the named iOS Simulator, repeat and finish KTD9 with inspected screenshots, inspect and remove the disposable learner, re-prove the preserved five-path/141-Concept registry, then consolidate and delete this plan. Run no Android, physical-device, deployed, or release action.
 
 **Decision state:** Accepted by the owner through the 2026-08-27 grilling. The initial catalog is
 exactly Critical Thinking, Probability and Statistics, Personal Finance, Machine Learning, and
@@ -591,9 +591,10 @@ The plan is complete only when all of the following are true:
 ### U9 — Fresh Debug native build and bundle repair — 2026-08-28 (in progress)
 
 - Xcode 26.6 built and installed a fresh Debug client with zero errors on an iPhone 17 Pro / iOS 26.5 Simulator against the supervisor-free API and exact 141-Concept development state. The first native Metro load failed because a test inside Expo Router's route root pulled the Node-only testing library into the iOS bundle; official Expo Router structure guidance confirmed the problem class. Moving that test outside `src/app` and adding a source-tree guard produced a 4,171-module native bundle; learner-app typecheck, focused ESLint, and 59 suites/323 tests passed. `pnpm test:db` passed its 9-case migration/reset matrix and DB workspace suites; `pnpm check` passed the 59-table schema parity check, every typecheck/test, ESLint with zero errors/10 warnings, both production web builds, and 70/70 intercepted scenarios. Coordination links/caps, whitespace, exact disposable-learner cleanup, and the unchanged five-path/141-Concept projection passed. The Mac session remained locked, so Computer Use produced no UI observation and no native behavior claim; the concrete owner action is in `BLOCKERS.md`.
+- After unlock, a new disposable learner on the same real local API/development database reached the exact five-path catalog, centralized source registry, Critical Thinking Begin/trail, first source-grounded Field notes, and first option-select; its sealed correct answer persisted. Completing that one-crystal Leg exposed a simultaneous-overlay defect: React Navigation route focus remained true while the portaled full-screen Activity surface was open, so the Guardian-arrival Dialog opened as a second native portal and painted a blank card. The conventional handoff is now explicit: the arrival effect waits for route focus and for Activity/Support Path surfaces to return control to the trail. The regression proves the arrival stays absent through the active sheet and appears after close; all 6 focused `CheckpointPath` tests, learner-app typecheck, and focused ESLint pass. This is defect-reproduction and focused local/native-development evidence only; KTD9 remains unqualified until the repair is committed and rerun from that exact revision.
 
 ### Open findings
 
 - The five primers intentionally lack an external claim-verification ledger; that is their accepted playtest boundary. Any material inspection defect still blocks the affected path's acceptance.
-- All five paths remain exact in the 141-Concept registry with zero learner rows, and U9's native bundle plus repository gate are green. Only the owner unlock required before KTD9 visual interaction remains.
+- U9 must reload the committed arrival-sequencing repair, finish all five first activities and one complete path, inspect the resulting learner rows, remove that learner, and re-prove the five-path/141-Concept zero-learner projection before closure.
 - Accepted-identity drift refuses by name but still requires regeneration, and AGENTS rule 14 still invalidates affected quality evidence.

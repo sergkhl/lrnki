@@ -23,10 +23,15 @@ jest.mock("@/lib/navMemory", () => ({
   markGuardianArrivalSeen: jest.fn(() => Promise.resolve())
 }));
 jest.mock("./ActivitySheet", () => ({
-  ActivitySheet: ({ open }: { open: boolean }) => {
+  ActivitySheet: ({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { Text } = require("@/ui") as typeof import("@/ui");
-    return open ? <Text>activity-sheet-open</Text> : null;
+    const { Button, Text } = require("@/ui") as typeof import("@/ui");
+    return open ? (
+      <>
+        <Text>activity-sheet-open</Text>
+        <Button label="Close activity" onPress={() => onOpenChange(false)} />
+      </>
+    ) : null;
   }
 }));
 jest.mock("./CheckpointCircle", () => ({
@@ -78,19 +83,21 @@ const summitScope: RecallScopeStatus = {
 };
 
 async function renderPath(scopes: RecallScopeStatus[] = [recallScope]) {
-  // Every stop complete (lesson read + both items latest-correct) so the Leg reads
-  // "complete" and the available scope is a genuine arrival candidate.
-  const base = sessionFixture({
-    classification: { stateByNode: { n1: "mastered" }, selectedFrontierTarget: null },
-    lessonReadByNode: { n1: true },
-    latestOutcomeByStudyItemId: { i1: "correct", i2: "correct" },
-    recallScopes: scopes
-  });
-  const session = {
-    ...base,
-    expeditionPath: base.expeditionPath.map((step) => ({ ...step, state: "mastered" as const }))
+  const makeElement = (nextScopes: RecallScopeStatus[] = scopes) => {
+    // Every stop complete (lesson read + both items latest-correct) so the Leg reads
+    // "complete" and an available scope is a genuine arrival candidate.
+    const base = sessionFixture({
+      classification: { stateByNode: { n1: "mastered" }, selectedFrontierTarget: null },
+      lessonReadByNode: { n1: true },
+      latestOutcomeByStudyItemId: { i1: "correct", i2: "correct" },
+      recallScopes: nextScopes
+    });
+    const session = {
+      ...base,
+      expeditionPath: base.expeditionPath.map((step) => ({ ...step, state: "mastered" as const }))
+    };
+    return <CheckpointPath session={session} view={buildTrailView(session)} />;
   };
-  const makeElement = () => <CheckpointPath session={session} view={buildTrailView(session)} />;
   const utils = await render(makeElement());
   return { ...utils, makeElement };
 }
@@ -160,5 +167,24 @@ test("an unfocused trail never offers a Guardian arrival; focus returning offers
   mockIsFocused = true;
   await rerender(makeElement());
   await act(async () => {});
+  expect(screen.getByText("guardian-arrival-open")).toBeTruthy();
+});
+
+// Regression (U9 iOS Simulator): completing a one-crystal Leg refreshes the still-mounted trail
+// while its full-screen Activity portal is open. Route focus remains true in that state, so route
+// focus alone opened the Guardian Dialog as a second native portal and painted a blank card.
+test("a Guardian arrival waits for the Activity Sheet to return focus to the trail", async () => {
+  mockReadGuardianArrivalSeen.mockImplementation(() => Promise.resolve(false));
+  const { rerender, makeElement } = await renderPath([]);
+  await fireEvent.press(screen.getAllByText("Open activity")[0]);
+  expect(screen.getByText("activity-sheet-open")).toBeTruthy();
+
+  await rerender(makeElement([recallScope]));
+  await act(async () => {});
+  expect(screen.queryByText("guardian-arrival-open")).toBeNull();
+
+  await fireEvent.press(screen.getByText("Close activity"));
+  await act(async () => {});
+  expect(screen.queryByText("activity-sheet-open")).toBeNull();
   expect(screen.getByText("guardian-arrival-open")).toBeTruthy();
 });

@@ -12,7 +12,8 @@ lifecycle, retention, and validation rules live in
 ## Active implementation plans (execution order)
 
 1. [Curate five ready-to-play Source Expedition mockups](./2026-08-27-001-curate-five-ready-source-expedition-mockups.md)
-   — U9 in progress: native bundling and the complete repository gate passed; only Simulator UI
-   inspection and closure await the owner unlock recorded in BLOCKERS.
+   — U9 in progress: the native bundle/repository gate passed, the Simulator reached the catalog,
+   source registry, trail, and first activity, and a discovered nested-portal race is repaired;
+   exact-revision visual requalification, cleanup, and closure remain.
 
 <!-- Hygiene and retention rules: AGENTS.md → Documentation workflow. -->

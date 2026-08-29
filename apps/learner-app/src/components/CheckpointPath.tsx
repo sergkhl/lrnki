@@ -67,14 +67,17 @@ export function CheckpointPath({
   };
 
   // The arrival offer (F1): the first unacknowledged available scope whose Leg is complete
-  // (or the unlocked summit) opens the non-blocking dialog once per device. Offered only
-  // while the trail screen is focused: the trail stays mounted under a pushed /guardian
-  // route, and a post-win session refetch there must not pop the next Leg's arrival over
-  // the reward — it waits for the learner's return to the trail.
+  // (or the unlocked summit) opens the non-blocking dialog once per device. Route focus is
+  // necessary but not sufficient: Activity and Support Path surfaces are root-portaled over this
+  // still-focused trail. Wait until they hand control back so two native modal portals never open
+  // together. The same gate keeps a post-win session refetch from popping the next Leg's arrival
+  // over the pushed reward route.
   const isFocused = useIsFocused();
+  const trailSurfaceFocused =
+    isFocused && selectedStopId === null && progressDetourId === null && pathDetourId === null;
   const [arrivalScope, setArrivalScope] = useState<RecallScopeStatus | null>(null);
   useEffect(() => {
-    if (!isFocused) return;
+    if (!trailSurfaceFocused) return;
     let cancelled = false;
     void (async () => {
       const candidates: RecallScopeStatus[] = [
@@ -90,7 +93,7 @@ export function CheckpointPath({
       }
     })();
     return () => { cancelled = true; };
-  }, [isFocused, view.sections, view.enrichmentScope, session.learnerStateRef]);
+  }, [trailSurfaceFocused, view.sections, view.enrichmentScope, session.learnerStateRef]);
   const acknowledgeArrival = () => {
     if (arrivalScope) void markGuardianArrivalSeen(session.learnerStateRef, recallScopeKey(arrivalScope));
     setArrivalScope(null);
