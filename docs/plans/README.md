@@ -12,8 +12,6 @@ routes shared mechanics through the vendored
 
 ## Active implementation plans (execution order)
 
-1. [Curate five ready-to-play Source Expedition mockups](./2026-08-27-001-curate-five-ready-source-expedition-mockups.md)
-   — complete and consolidated: all implementation, validation, cleanup, and durable-documentation
-   gates passed; plan deletion remains.
+_None._
 
 <!-- Lifecycle adoption and overrides: AGENTS.md → Documentation workflow. -->
