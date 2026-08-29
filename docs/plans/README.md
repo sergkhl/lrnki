@@ -1,8 +1,9 @@
 # Plans
 
 This directory indexes live coordination and ready or in-progress implementation plans. Plan
-lifecycle, retention, and validation rules live in
-[AGENTS.md](../../AGENTS.md#documentation-workflow).
+lifecycle is adopted and overridden in [AGENTS.md](../../AGENTS.md#documentation-workflow), which
+routes shared mechanics through the vendored
+[`plan-lifecycle` skill](../../.agents/plugins/agent-workflow-core/skills/plan-lifecycle/SKILL.md).
 
 ## Live coordination
 
@@ -16,4 +17,4 @@ lifecycle, retention, and validation rules live in
    source registry, trail, and first activity, and a discovered nested-portal race is repaired;
    exact-revision visual requalification, cleanup, and closure remain.
 
-<!-- Hygiene and retention rules: AGENTS.md → Documentation workflow. -->
+<!-- Lifecycle adoption and overrides: AGENTS.md → Documentation workflow. -->

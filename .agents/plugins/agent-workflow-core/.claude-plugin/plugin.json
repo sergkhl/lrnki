@@ -1,0 +1,33 @@
+{
+  "name": "agent-workflow-core",
+  "version": "0.1.0",
+  "description": "A plan-driven agent workflow: grill a design into a plan, drain a plan index to completion, and keep the documentation set honest. Harness-neutral and project-neutral.",
+  "author": {
+    "name": "sergkhl",
+    "url": "https://github.com/sergkhl"
+  },
+  "homepage": "https://github.com/sergkhl/agent-workflow-plugins/tree/main/plugins/agent-workflow-core",
+  "repository": "https://github.com/sergkhl/agent-workflow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "planning",
+    "adr",
+    "documentation",
+    "grilling",
+    "workflow",
+    "domain-modeling"
+  ],
+  "skills": [
+    "./skills/plan-lifecycle",
+    "./skills/plan-from-tasks",
+    "./skills/drain-plans",
+    "./skills/docs-hygiene",
+    "./skills/worklog",
+    "./skills/grilling",
+    "./skills/grill-with-docs",
+    "./skills/domain-modeling",
+    "./skills/codebase-design",
+    "./skills/improve-codebase-architecture",
+    "./skills/wait-what"
+  ]
+}

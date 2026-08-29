@@ -1,0 +1,38 @@
+{
+  "name": "agent-workflow-core",
+  "version": "0.1.0",
+  "description": "A plan-driven agent workflow: grill a design into a plan, drain a plan index to completion, and keep the documentation set honest. Harness-neutral and project-neutral.",
+  "author": {
+    "name": "sergkhl",
+    "url": "https://github.com/sergkhl"
+  },
+  "homepage": "https://github.com/sergkhl/agent-workflow-plugins/tree/main/plugins/agent-workflow-core",
+  "repository": "https://github.com/sergkhl/agent-workflow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "planning",
+    "adr",
+    "documentation",
+    "grilling",
+    "workflow",
+    "domain-modeling"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Agent Workflow Core",
+    "shortDescription": "Grill a design into a plan, then drain the plan index",
+    "longDescription": "Eleven repository-neutral skills for design interviews, domain modeling, ordered plans, documentation hygiene, architectural review, and plan execution.",
+    "developerName": "sergkhl",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/sergkhl/agent-workflow-plugins",
+    "defaultPrompt": [
+      "Use $grilling to stress-test this design.",
+      "Use $plan-from-tasks to turn these tasks into an implementation plan.",
+      "Use $drain-plans to execute the current plan index."
+    ]
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "repositoryUrl": "https://github.com/sergkhl/agent-workflow-plugins",
+  "pluginId": "agent-workflow-core",
+  "releaseTag": "agent-workflow-core--v0.1.0",
+  "commitSha": "23dbf553f9fc4845fd941fd2bf8ce52d783397ae",
+  "pluginVersion": "0.1.0",
+  "contentDigest": "sha256:785e5b82f7b8d3fa2f83bea8815e4c24075de9075698e44a372b2435459270a3",
+  "managedSymlinks": [
+    {
+      "path": ".agents/skills/codebase-design",
+      "target": "../plugins/agent-workflow-core/skills/codebase-design"
+    },
+    {
+      "path": ".agents/skills/docs-hygiene",
+      "target": "../plugins/agent-workflow-core/skills/docs-hygiene"
+    },
+    {
+      "path": ".agents/skills/domain-modeling",
+      "target": "../plugins/agent-workflow-core/skills/domain-modeling"
+    },
+    {
+      "path": ".agents/skills/drain-plans",
+      "target": "../plugins/agent-workflow-core/skills/drain-plans"
+    },
+    {
+      "path": ".agents/skills/grill-with-docs",
+      "target": "../plugins/agent-workflow-core/skills/grill-with-docs"
+    },
+    {
+      "path": ".agents/skills/grilling",
+      "target": "../plugins/agent-workflow-core/skills/grilling"
+    },
+    {
+      "path": ".agents/skills/improve-codebase-architecture",
+      "target": "../plugins/agent-workflow-core/skills/improve-codebase-architecture"
+    },
+    {
+      "path": ".agents/skills/plan-from-tasks",
+      "target": "../plugins/agent-workflow-core/skills/plan-from-tasks"
+    },
+    {
+      "path": ".agents/skills/plan-lifecycle",
+      "target": "../plugins/agent-workflow-core/skills/plan-lifecycle"
+    },
+    {
+      "path": ".agents/skills/wait-what",
+      "target": "../plugins/agent-workflow-core/skills/wait-what"
+    },
+    {
+      "path": ".agents/skills/worklog",
+      "target": "../plugins/agent-workflow-core/skills/worklog"
+    },
+    {
+      "path": ".claude/skills",
+      "target": "../.agents/skills"
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Drain Plans"
+  short_description: "Work the plan index until nothing is actionable"
+  default_prompt: "Use $drain-plans to drain the execution order in docs/plans/README.md — every actionable entry, not one."
+policy:
+  allow_implicit_invocation: false

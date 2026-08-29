@@ -1,0 +1,6 @@
+interface:
+  display_name: "Plan From Tasks"
+  short_description: "Grill a task list into a committed implementation plan"
+  default_prompt: "Use $plan-from-tasks: review these tasks and the codebase, grill me on the design, then write a new plan in docs/plans/."
+policy:
+  allow_implicit_invocation: false

@@ -23,6 +23,12 @@ definitions and repair their references in the same change.
 
 ## Documentation workflow
 
+- Adopt the vendored [`plan-lifecycle`](.agents/plugins/agent-workflow-core/skills/plan-lifecycle/SKILL.md)
+  skill for shared plan-index, status-altitude, closure, and Validation Log mechanics. The rules
+  below are lrnki-specific additions or overrides.
+- `docs/plans/RELEASE.md` is not adopted and must not be created by this workflow. Skip bundled
+  instructions that refer to it until a later explicit workflow decision creates that authority;
+  apply the remaining lifecycle mechanics.
 - `CONTEXT.md` is a glossary only. Keep each project-specific term to one or two sentences; put
   behavior, data shape, implementation, and validation elsewhere.
 - Keep an ADR only for a decision that is hard to reverse, surprising without its context, and the
@@ -37,15 +43,12 @@ definitions and repair their references in the same change.
   ADR retention test above.
 - A brainstorm may own accepted framing, requirements, and unresolved product decisions. Turn it
   into a plan only after those decisions are resolved enough to implement.
-- Keep only ready or in-progress implementation plans. When a plan finishes, first move durable
-  decisions to ADRs, terminology to `CONTEXT.md`, workflow to this file, operational mechanics to the
-  owning README or skill, and current status to `TODO.md`; then delete the plan.
-- A plan's Validation Log keeps one consolidated entry per closed implementation unit and one `Open
-  findings` section. Record current evidence and invariants, not metric or suite-count trajectories.
-  Keep a Validation Log under about 200 lines and a plan under about 600 lines.
-- `TODO.md` has exactly `TODO`, `COMPLETED`, and `VALIDATION` sections. Keep at most seven current
-  tasks, at most eight grouped completed outcomes, and exactly one latest plan-less validation; keep
-  the whole file under about 150 lines. Conditional future ideas do not belong in `TODO.md`.
+- Apply the bundled Validation Log mechanics with lrnki's tighter size limits: keep a Validation Log
+  under about 200 lines and a whole plan under about 600 lines.
+- `TODO.md` has exactly `TODO`, `COMPLETED`, and `VALIDATION` sections. Keep zero to seven genuine
+  current tasks rather than inventing placeholders to meet the bundled three-task minimum, at most
+  eight grouped completed outcomes, and exactly one latest plan-less validation; keep the whole file
+  under about 150 lines. Conditional future ideas do not belong in `TODO.md`.
 - Never link retained documentation to gitignored `tmp/`. Git history archives deleted detail, but
   any knowledge that must remain discoverable needs a live canonical owner before deletion. Preserve
   an uncommitted plan or validation record in history before deleting it, and commit consolidation
