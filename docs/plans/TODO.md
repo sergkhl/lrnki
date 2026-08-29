@@ -2,16 +2,20 @@
 
 ## TODO
 
-- **Consolidate the completed five-path Source Expedition plan.** The
-  [active plan](./2026-08-27-001-curate-five-ready-source-expedition-mockups.md) passed U0–U9. Its
-  sealed 31/44/37/31/40-stop paths share one preserved 141-Concept registry; real-backend web and a
-  fresh Debug iOS Simulator exercised every first activity and Critical Thinking's complete 31/31
-  route. The repaired Guardian arrival rendered only after Activity closed. Disposable learners
-  were removed, the zero-learner projection was re-proved, and `pnpm test:db` plus `pnpm check`
-  passed. Consolidate the durable outcome, then delete the plan in its own commit. No Android,
-  physical-device, deployed, or release work is authorized.
+_None._
 
 ## COMPLETED
+
+- **Five ready-to-play Source Expeditions seed one shared learner catalog (2026-08-27–29).** The
+  [accepted-path manifest](../../fixtures/accepted-paths/manifest.json) owns the exact project-source
+  policy, order, presentation metadata, and sealed package identities for Critical Thinking,
+  Probability and Statistics, Personal Finance, Machine Learning, and Neuroscience of Memory and
+  Attention. Model-free validated install reproduces 31/44/37/31/40-stop paths over one 141-Concept
+  registry; adoption and progress remain per learner, source disclosures stay centralized, and
+  Guardian arrival now waits for an Activity or Support Path to return control to the trail. The
+  root [README](../../README.md#accepted-source-expedition-packages) owns operator mechanics, source
+  and tests own runtime invariants, and detailed implementation/evidence is retained in commit
+  `959dd0b` and the completed plan's history.
 
 - **The curated-source learner workflow is qualified and source-less knowledge remains held out
   (2026-08-24–26).** Registered Curated Sources now reach an automatically qualified
@@ -80,33 +84,24 @@
   correction owns the miss response, then Continue restores the static server-owned shield or Last
   Stand state under [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
-- **Learner web SPA hard loads deployed and verified (2026-08-09).** GitHub Pages deployed
-  commit b0bd09e under the client-rendered single-shell policy in
-  [ADR-0035](../adr/0035-separate-learner-app-static-spa-typed-api.md). The deployed dynamic-route and
-  OAuth-refusal gate passed; evidence:
-  [Pages run 31327027343](https://github.com/sergkhl/lrnki/actions/runs/31327027343).
-
 ## VALIDATION
 
-### Curated-source learner workflow — 2026-08-26
+### Five accepted Source Expeditions — 2026-08-29
 
-- Local external-source real-use: a current-schema NIST FIPS 197 source produced six lessons/options
-  and a five-stop prerequisite-closed qualified route with zero LLM-grounded nodes. Independent
-  inspection accepted 15/15 material claims, 15/15 distractor decisions, and 5/5 unique keys. A
-  disposable learner adopted and activated it, completed `Byte`, `block`, and exact-reference
-  `block cipher`, refused unsupported `permutation` without a row, made zero learner-window model
-  calls or supervisor wakes, and left zero learner rows after teardown.
-- Safe incompleteness: a fresh OpenStax Biology 2e source stayed unavailable when its six qualified
-  lessons/options left only one prerequisite-closed ready stop. Missing lessons excluded their
-  dependents without weakening admission. Matching/impostor and all source-less learner knowledge
-  remain unqualified and cannot enter this route.
-- Route/cost: the NIST journey used 146 calls / 194,053 tokens / about $0.019022261 including BYOK
-  estimates; independent evaluation used 45 calls / 59,947 tokens / $0.002852569. Both had zero
-  error rows.
-- Local automated: `pnpm test:db` passed its 9/9 migration matrix, reset guard, and workspace suites;
-  `pnpm check` passed schema parity, all 11 typechecks/tests, ESLint with zero errors / 12 warnings,
-  both production web builds, and 70/70 intercepted Playwright scenarios. Coordination links/caps
-  and whitespace passed.
-- Authority: this qualifies local test-database, production-model, persisted-artifact inspection,
-  local build, and intercepted-web evidence only. It makes no production-write, real-backend,
-  deployed, native, emulator/simulator, physical-device, or release claim.
+- Production-model generation and direct artifact inspection admitted 31/44/37/31/40 coherent,
+  predecessor-closed stops with current source-backed lessons and uniquely keyed option-select
+  items. The sealed five-package set reinstalled twice without model calls and reproduced one
+  141-Concept registry, exact package identities, and zero auth, learner, award, or operation rows.
+- Real-backend web and a fresh Debug iOS Simulator exercised the exact ordered catalog, centralized
+  source disclosures, and every path's first lesson and correct activity. Critical Thinking
+  completed its continuous 31/31 acquisition route; the post-fix Guardian arrival rendered after
+  Activity closed. A positive database control found one user, five expeditions, 35 lesson reads,
+  35 responses, and zero awards before exact teardown returned every learner projection to zero.
+- `pnpm test:db` passed the migration/reset matrix and database workspace suites. `pnpm check` passed
+  schema parity, every typecheck/test, lint, both production web builds, 70/70 intercepted scenarios,
+  coordination checks, and whitespace.
+- Authority is local production-model artifact inspection, development/test Postgres, real local
+  API, real-backend web, fresh Debug iOS Simulator, local build, and intercepted-web evidence only.
+  It makes no Android, automated-native, deployed, distributable, physical-device, production, or
+  release claim. The five primers are model-authored project playtest sources accepted from general
+  model knowledge without independent claim verification; this does not qualify arbitrary sources.

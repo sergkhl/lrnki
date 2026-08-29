@@ -9,7 +9,7 @@ execution: code
 
 **Status:** Complete — U0–U9 passed; the five accepted Source Expeditions, exact-revision iOS Simulator checklist, disposable-learner cleanup, preserved 141-Concept registry, and complete repository gate are green
 
-**NEXT:** Consolidate the completed outcome into its durable owners and `TODO.md`, then delete this plan in its own commit. Run no Android, physical-device, deployed, or release action.
+**NEXT:** Delete this committed, completed plan in its own commit and re-read the execution index. Run no Android, physical-device, deployed, or release action.
 
 **Decision state:** Accepted by the owner through the 2026-08-27 grilling. The initial catalog is
 exactly Critical Thinking, Probability and Statistics, Personal Finance, Machine Learning, and

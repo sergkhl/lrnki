@@ -1,5 +1,5 @@
 {
-  "$comment": "Current-only registration and catalog-authoring manifest for five model-authored lrnki onboarding sources. The owner accepted general model knowledge as the source-quality basis for this local playtest set on 2026-08-27; no external source material or independent claim-verification ledger is required in this iteration. Runtime learner assets must still pass the source-backed qualification and real-use playability gates owned by the active implementation plan.",
+  "$comment": "Current-only registration and catalog-authoring manifest for five model-authored lrnki onboarding sources. The owner accepted general model knowledge as the source-quality basis for this local playtest set on 2026-08-27; no external source material or independent claim-verification ledger is required in this iteration. Runtime learner assets must still pass the source-backed qualification and real-use playability gates.",
   "sourcePolicy": {
     "authorship": "lrnki_model_authored_project_source",
     "knowledgeBasis": "general_model_knowledge_only",

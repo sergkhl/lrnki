@@ -13,8 +13,7 @@ routes shared mechanics through the vendored
 ## Active implementation plans (execution order)
 
 1. [Curate five ready-to-play Source Expedition mockups](./2026-08-27-001-curate-five-ready-source-expedition-mockups.md)
-   — complete: all five accepted paths, the exact-revision iOS Simulator checklist, learner cleanup,
-   preserved 141-Concept registry, and full repository gate passed; consolidation and plan deletion
-   remain.
+   — complete and consolidated: all implementation, validation, cleanup, and durable-documentation
+   gates passed; plan deletion remains.
 
 <!-- Lifecycle adoption and overrides: AGENTS.md → Documentation workflow. -->
