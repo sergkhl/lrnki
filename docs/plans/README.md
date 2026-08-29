@@ -13,8 +13,8 @@ routes shared mechanics through the vendored
 ## Active implementation plans (execution order)
 
 1. [Curate five ready-to-play Source Expedition mockups](./2026-08-27-001-curate-five-ready-source-expedition-mockups.md)
-   — U9 in progress: the native bundle/repository gate passed, the Simulator reached the catalog,
-   source registry, trail, and first activity, and a discovered nested-portal race is repaired;
-   exact-revision visual requalification, cleanup, and closure remain.
+   — complete: all five accepted paths, the exact-revision iOS Simulator checklist, learner cleanup,
+   preserved 141-Concept registry, and full repository gate passed; consolidation and plan deletion
+   remain.
 
 <!-- Lifecycle adoption and overrides: AGENTS.md → Documentation workflow. -->

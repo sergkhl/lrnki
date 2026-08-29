@@ -2,23 +2,14 @@
 
 ## TODO
 
-- **Curate five ready-to-play Source Expedition mockups.** Execute the
-  [active plan](./2026-08-27-001-curate-five-ready-source-expedition-mockups.md) in order. U0–U8 own
-  the accepted sources, catalog schema, freshly regenerated/published 31-stop Critical Thinking
-  path, and the sealed 44-stop Probability and Statistics, 37-stop Personal Finance, and 31-stop
-  Machine Learning and 40-stop Neuroscience of Memory and Attention paths in one preserved
-  141-Concept registry. Two consecutive model-free development installs, isolated API learners,
-  restart persistence, 70/70 intercepted scenarios, phone/desktop real-backend web, every path's
-  first real-browser activity, and Critical Thinking's 31/31 acquisition route passed with exact
-  learner cleanup. U9 built and installed the fresh Debug iOS client, repaired a route-root test that
-  blocked native Metro, then passed `pnpm test:db`, schema parity, all types/tests, lint, both builds,
-  and 70/70 intercepted scenarios. The unlocked Simulator reached the exact catalog, centralized
-  source registry, Begin, trail, and first Critical Thinking lesson/activity. That run exposed a
-  native nested-portal race when a one-crystal Leg completed; the arrival offer now waits until the
-  Activity or Support Path surface returns focus to the trail, with a focused six-test regression,
-  typecheck, and lint pass. Exact-revision visual requalification, disposable-learner cleanup,
-  consolidation, and plan deletion remain. The five-path, 141-Concept registry is preserved. No
-  Android, physical-device, deployed, or release work is authorized.
+- **Consolidate the completed five-path Source Expedition plan.** The
+  [active plan](./2026-08-27-001-curate-five-ready-source-expedition-mockups.md) passed U0–U9. Its
+  sealed 31/44/37/31/40-stop paths share one preserved 141-Concept registry; real-backend web and a
+  fresh Debug iOS Simulator exercised every first activity and Critical Thinking's complete 31/31
+  route. The repaired Guardian arrival rendered only after Activity closed. Disposable learners
+  were removed, the zero-learner projection was re-proved, and `pnpm test:db` plus `pnpm check`
+  passed. Consolidate the durable outcome, then delete the plan in its own commit. No Android,
+  physical-device, deployed, or release work is authorized.
 
 ## COMPLETED
 
