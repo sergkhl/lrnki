@@ -7,12 +7,11 @@ execution: code
 
 # Expand Source Expedition Legs and Qualify Mixed Study Items
 
-**Status:** In progress — U0–U4 complete; Study Session, mastery/progress, Recall Challenge, and
-catalog consumers now share the qualified route, selected family mix, and honest Concept count; U5
-is next
+**Status:** In progress — U0–U5 complete; the strict v2 package contract now seals and validates the
+same route, selected family mix, asset identity, and honest Concept count; U6 is next
 
-**NEXT:** U5 replaces accepted package v1 with the strict route-bearing mixed-family v2 format and
-deletes the option-only package contract.
+**NEXT:** U6 regenerates, inspects, qualifies, and exports the five replacement v2 packages in
+manifest order against one shared live Concept registry.
 
 **Decision state:** Accepted by the owner on 2026-08-29 and amended the same day after design
 review. A normal Leg contains 3–5 Concepts, targeting four. Every Concept keeps one qualified
@@ -607,6 +606,39 @@ The plan is complete only when all of the following are true:
 
 ## Validation Log
 
+### U5 — Strict route-bearing mixed-family accepted package v2 — 2026-08-30
+
+- **One contract:** the port-owned `lrnki.accepted-path-package.v2` header now carries
+  `totalConceptCount`, the exact ordered route/Legs/anchors/summit/selected bonuses, and the existing
+  current lesson/item identity. The v1 literal, `totalStopCount`, independent trail-node header,
+  option-only validator, manifest bindings, and five obsolete v1 JSON artifacts are deleted; Git
+  history retains them until U6 writes replacements.
+- **Fail-closed validation:** one Node-only content-addressing codec owns both live and offline
+  identity; strict parsing recomputes it from the sealed route and selected rows, then proves 3–5-
+  Concept Leg concatenation, indexes, anchors, summit, unique route closure, predecessor closure/
+  order, one current lesson and option-select per Concept, exact selected item equality, per-Leg
+  bonus membership, Expedition-wide matching and impostor coverage, family-specific child counts/
+  ordinals/keys, and matching/impostor foreign-key closure. Route or item drift and every malformed
+  package are rejected before the first projection insert.
+- **Export/install and operator boundary:** export seals the live qualification route; install
+  compares the freshly qualified route, Concept count, lesson IDs, item IDs, and asset identity,
+  then publishes catalog rows last. The manifest binds format/path/digest. The seed wrapper's
+  complete offline validation remains before environment loading and reset; package tables exclude
+  auth, learner, response, award, progress, and operation rows, and the module exposes no model port.
+- **Cutover state:** `pnpm accepted-paths validate --allow-partial` passes with
+  `complete:false` and zero packages. Complete validation names all five missing paths and exits
+  before database access, so no reset/install can occur until U6 exports the full v2 set.
+- **Validation:** canonical v2 replay and route/family/FK negative tests, exact route/item drift and
+  catalog-last application tests, manifest-format/reset-order tests, `pnpm test`, `pnpm test:db`,
+  `pnpm typecheck`, `pnpm lint`, JSON/plan-size checks, and `git diff --check` pass. Lint retains ten
+  pre-existing warnings; a parallel-only cleanup-test snapshot race was replaced by a run-owned
+  sentinel before the full database rerun passed; two named U6 package/report targets remain TODO.
+- **Real-use quality and authority:** milestone U5 package boundary; the three-Concept all-family
+  package is synthetic structural evidence and model calls are not applicable; result `PASS` for
+  the local deterministic contract. No replacement source package, development reset, package DB
+  round-trip, model generation, web/native, deployed, physical-device, production, or release
+  evidence is claimed; U6–U8 own those layers.
+
 ### U4 — Shared learner route, mixed Guardians, and honest catalog count — 2026-08-30
 
 - **Shared route projection:** Study Session and Recall Challenge now consume the qualified route
@@ -667,127 +699,29 @@ The plan is complete only when all of the following are true:
   reset, model call, real-backend web, native, deployed, physical-device, production, or release
   evidence was produced.
 
-### U2 — Family-complete source Study Item admission — 2026-08-30
+### U0–U2 — Baseline, route authority, and family-complete admission — 2026-08-30
 
-- **Implementation:** `sourceStudyItemAdmission` is now the one source-family boundary for immutable
-  evidence resolution, citation settlement, material support, provenance, unique option/impostor
-  key, and unique matching assignment. Material-claim projection v3 covers every learner-visible
-  option, matching, and impostor field; the option-only admission module is deleted. Accepted
-  generated matching relationships retain honest generated provenance, while unsupported truths,
-  lies, corrections, or relationships remain inspectable rejected candidates.
-- **Generation envelope:** passage-count vetoes are removed; one lesson grounding passage is
-  the structural minimum. Blueprint selection still owns matching/impostor suitability, and absent
-  or failed blueprint evaluation permits only the explicit option-select fallback. Strict matching
-  and impostor verification stays inside the existing one-regeneration stages, then its exact item
-  IDs/model identity are consumed once by final source admission rather than paying a second judge.
-- **Problem-class repair:** the first production-model probe returned `FIX_FIRST` because the
-  matching directive was incorrectly posed as a factual source claim. Assessment-item practice
-  separates directions, prompts/interactions, and scored content
-  ([QTI implementation guide](https://developers.imsglobal.org/spec/qti/v3p0/impl),
-  [QTI beginner's guide](https://developers.imsglobal.org/spec/qti/v3p0/guide)). Projection now
-  retains the directive as `interaction_instruction`, spends no source-support call on it, and
-  still requires accepted support for every relationship. Focused tests freeze that distinction.
-- **Real-use quality:** milestone U2 source-family admission; fixture is the existing Neuroscience
-  Enrichment Run `344ad479-54b7-465c-a7a0-780417ec2c64`; real model calls yes; terminal result
-  `PASS`. The corrected read-only rerun used `kg-source-material-support-verifier` and
-  `kg-independent-judge`: matching item `5f0697bb-ddd9-42c6-a99a-072a4e2cb236`, including one honest
-  generated relationship, was source-supported and uniquely assigned; the known Retrieval Practice
-  impostor `12171844-65e7-43c8-be54-148f1937f266` was rejected for its unsupported dopamine/
-  acetylcholine correction before Answer-Key Verification. Nineteen support calls and zero option
-  truth calls were made. Remaining caveat: this is two-artifact admission evidence, not five-path
-  regeneration, route qualification, or learner delivery. Safe downstream use is U3 qualification.
-- **Validation:** the 50-test focused generation/projection/report/admission suite, `pnpm test`,
-  `pnpm typecheck`, `pnpm lint`, `pnpm test:db`, `pnpm accepted-paths validate`,
-  `pnpm accepted-paths report`, and `git diff --check` pass. Lint retains ten pre-existing warnings;
-  the accepted packages remain the complete valid option-only baseline until U5–U7 replacement.
-- **Authority boundary:** local automated checks, isolated `lrnki_test` reset/database tests, one
-  read-only development-database production-model probe, and direct artifact inspection only. No
-  development-schema reset, package regeneration, real-backend web, native, deployed,
-  physical-device, production, or release evidence was produced.
-
-### U1 — Shared source-cued Expedition Route Plan — 2026-08-30
-
-- **Implementation:** one pure application deep module now owns stable topological ordering,
-  contiguous 3–5-Concept partitioning, joint minimum bonus selection, Leg anchors, summit, typed
-  failure, and coverage diagnostics. It resolves one direct substantive lesson citation through the
-  enriched `SourceEvidenceReadPort`; persisted source document, parser block, heading path, and
-  locator fields supply order/coherence cues. The old terminal-cone claim/split/merge implementation
-  is deleted. Its temporary layer-projection adapter delegates to this same authority until U3–U4
-  bind the qualified source plan directly.
-- **Pure contract:** 12 planner tests and four adapter tests cover empty/short inspection shapes,
-  isolated and dense DAGs, shuffled inputs, same/different source documents, page/slide/character/
-  XPath/natural-block locator fallbacks, backward Personal Finance prerequisites, all totals 3–44,
-  exact node coverage, topological validity, source coherence ahead of target-four sizing, minimum
-  balanced bonus selection, one-Leg two-family selection, deterministic replay, stable anchors and
-  summit, and typed short/cycle/mix failures. The reusable package report now consumes the same
-  source-cue resolver and planner rather than owning a second character-offset route derivation.
-- **Five-package projection:** every one of 183 Concepts resolves a source cue and every trusted
-  edge remains topological. Critical Thinking projects 31 Concepts into `2×3, 5×4, 1×5` Legs with
-  two in-Leg major-heading transitions and zero source backtracks; Probability and Statistics 44
-  into `6×3, 4×4, 2×5` with one/zero; Personal Finance 37 into `4×3, 5×4, 1×5` with five/three, the
-  three backtracks forced by trusted prerequisites; Machine Learning 31 into `3×3, 3×4, 2×5` with
-  three/zero; and Neuroscience 40 into `5×3, 5×4, 1×5` with one/zero. Singleton Legs are zero.
-- **Real-use quality:** Milestone U1 route planning; fixtures are all five committed accepted
-  Markdown package projections; real model calls are not applicable because the route is a pure
-  function of committed artifacts; result `PASS`. Every projected Leg was inspected in route order
-  and formed a coherent completable chapter, including the unavoidable trusted-edge crossings. The
-  first inspection exposed two implementation defects: the temporary projection's broad minimum-one
-  policy competed with the hard 3–5 partition, and treating the retained Markdown document H1 as the
-  major section erased coherence boundaries. The fix restricts undersizing to an explicit whole-path
-  1–2-Concept inspection case and uses the authored section below the H1 when present. Remaining
-  caveats: the source route and selected mix are not qualified/persisted until U3, the temporary
-  runtime adapter has no source cues, and no learner-facing web/native claim is made. Safe downstream
-  use is U2 family admission and generator-gate correction.
-- **Validation:** `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm test:db`,
-  `pnpm accepted-paths validate`, `pnpm accepted-paths report`, the focused planner/report/adapter/
-  projection/inspection suite, and `git diff --check` pass. Lint retains ten pre-existing warnings;
-  the accepted-path suite retains five named TODO bodies for U2–U5 target contracts.
-- **Authority boundary:** local automated checks, isolated `lrnki_test` reset/database tests,
-  committed-package projection, and direct route inspection only. No development-schema reset,
-  model generation, real-backend web, native, deployed, physical-device, production, or release
-  evidence was produced.
-
-### U0 — Five-package baseline and post-veto feasibility probe — 2026-08-30
-
-- **Frozen baseline:** the model-free package report owns the reproducible manifest/package audit:
-  183 Concepts, zero trusted-edge topological violations, 140 one-passage lessons, 183 option-select,
-  26 matching, 43 impostor items, and the singleton-heavy route. The manifest owns the five exact
-  package digests; their frozen asset identities are `02cb55fe…6514fc`, `91e00849…77e961`,
-  `0a7ddc24…18395f`, `9c6323b3…139857`, and `9999fce0…ce500`, all under asset config
-  `source-expedition-learner-assets-v2:study-item-bank-acebfee04913`.
-- **Regression:** report, prerequisite closure, source-expedition, mastery, grading, replay, package
-  safety, typecheck, lint, package-set validation, and whitespace checks passed. Six named TODO
-  contracts froze Leg sizing, source-cued routing, Leg/Expedition family mix, honest Concept count,
-  and route-sensitive identity without changing learner behavior.
-- **Post-veto probe:** one guarded Neuroscience production-MiMo generation with only the two
-  passage-count vetoes temporarily removed yielded 40 current source-cued Concepts, 38 option-select,
-  14 matching, and 36 impostor items. Thirty-six Concepts were bonus-capable, the longest uncovered
-  run was one, and a hard mixed 3–5 partition existed; the two absent options still failed the
-  duplicate-option guard. The patch was reverted and the bank was never accepted.
-- **Inspection and authority:** all 50 bonus artifacts were inspected; two generated matching
-  relationships were coherent, while two unselected impostor corrections were internally false and
-  became U2 regression cases. Result `EXPERIMENT_ONLY`: committed-package/local checks, one guarded
-  development-database model generation, and neutral-artifact inspection only. No learner
-  admission, publication, web/native, deployed, physical-device, production, or release claim.
-
-### Planning baseline and design review — 2026-08-29
-
-- **Authority and replay:** read-only source, five committed package projections, coordination docs,
-  and primary research only. A model-free reimplementation of the proposed route/admission bars
-  reproduced the 140/152 pre-gate declines and 140/12/31 lesson-passage split positive control.
-- **Locked choices:** 3–5 Concepts per Leg, target four; one option-select per Concept; non-option
-  practice per Leg; both bonus families per Expedition; existing mastery and rewards preserved.
-- **Feasibility finding:** the original banks could not partition three paths and forced minimum-Leg
-  solutions for two because bonus-capable Concepts were too sparse (longest uncovered runs
-  12/6/11/7/10). U0 therefore had to measure post-veto yield before route implementation.
-- **Grounding finding:** 140 one-passage lessons each had at least two source passages available;
-  scarcity was the lesson projection, not source supply. Family provenance remained honest:
-  generated relationships/truths were not relabeled source, and every lie was generated/uncited.
-- **Amendments and invariant:** family admission uses the option-select analogue; summit family
-  reservation is best effort over learner state; Leg anchor precedes family coverage; blueprint
-  failure stays option-only; lowest-ID option selection is explicit; grounding depth moved to its
-  brainstorm. Route planning and source-family admission had to land together—arbitrary grouping,
-  removing one filter, or changing copy alone could not satisfy the plan.
+- **U0 baseline/probe:** the five v1 packages froze 183 Concepts, 114 singleton Legs, 183
+  option-select, 26 matching, 43 impostor candidates, and asset config v2. A single guarded
+  Neuroscience MiMo probe with only the passage-count vetoes removed produced 38 options, 14
+  matching, and 36 impostors; a mixed 3–5 partition existed, but the bank stayed unaccepted.
+- **U1 route:** one pure source-cued module replaced terminal cones with stable topological order,
+  3–5-Concept partitioning, minimum balanced bonuses, anchors, summit, and typed diagnostics. All
+  183 Concepts resolved cues, all trusted edges stayed topological, every five-package projection
+  had zero singleton Legs, and direct route inspection passed; exact distributions remain in U1's
+  commit history and the plan's current repository-facts table.
+- **U2 admission:** `sourceStudyItemAdmission` became the only family-complete source boundary;
+  material claims cover all three families, generated provenance stays honest, and unsupported
+  truth, lie, correction, relationship, key, or assignment remains rejected. Passage-count vetoes
+  are gone while blueprint, structural, source, answer-key, and matching-assignment gates remain.
+- **Model-backed quality:** Neuroscience run `344ad479-54b7-465c-a7a0-780417ec2c64` passed a
+  corrected read-only matching/impostor admission probe: the supported generated relationship was
+  admitted and the unsupported dopamine/acetylcholine correction rejected. This proves two-artifact
+  admission only, not five-path readiness or learner delivery.
+- **Validation/authority:** each unit passed its focused suite plus repository tests, typecheck,
+  lint, isolated `lrnki_test`, package validation/report, and diff checks. Evidence is local
+  automation, committed-package inspection, and the named guarded model probes only; no development
+  reset, web/native, deployed, physical-device, production, or release claim was made.
 
 ## Open findings
 

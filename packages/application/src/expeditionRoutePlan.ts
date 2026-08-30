@@ -4,10 +4,13 @@ import type {
   StudyItemType
 } from "@lrnki/domain-core";
 import type {
+  ExpeditionRoutePlan,
   SourceEvidenceReadPort,
   SourceEvidenceRecord
 } from "@lrnki/ports";
 import { SECTION_LINEUP_MAX } from "./recallLineupBudget";
+
+export type { ExpeditionRouteLeg, ExpeditionRoutePlan } from "@lrnki/ports";
 
 export type ExpeditionRoutePolicy = "source_expedition" | "layer_projection";
 
@@ -36,20 +39,6 @@ export type ExpeditionRouteStudyItemCandidate = {
   studyItemId: string;
   derivedNodeId: string;
   itemType: StudyItemType;
-};
-
-export type ExpeditionRouteLeg = {
-  legIndex: number;
-  anchorDerivedNodeId: string;
-  derivedNodeIds: string[];
-  selectedBonusStudyItemIds: string[];
-};
-
-export type ExpeditionRoutePlan = {
-  policyIdentity: string;
-  orderedDerivedNodeIds: string[];
-  legs: ExpeditionRouteLeg[];
-  summitDerivedNodeId: string | null;
 };
 
 export type ExpeditionRouteUnavailableReason =

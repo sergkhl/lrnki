@@ -25,11 +25,7 @@
       "teaser": "Build stronger arguments, weigh evidence, test causal claims, and revise conclusions with confidence.",
       "source": "lrnki model-authored project source accepted for local playtest; general model knowledge only",
       "license": "lrnki project-owned playtest fixture",
-      "curation": "Purpose-written as a compact, self-contained onboarding source; no external source material or citation set was used.",
-      "acceptedPackage": {
-        "path": "fixtures/accepted-paths/packages/critical-thinking.json",
-        "sha256": "8f0977a457b0a8cc0c2fc8d2d7182d09b3c27f6071e2529cf019b5177cbdeec4"
-      }
+      "curation": "Purpose-written as a compact, self-contained onboarding source; no external source material or citation set was used."
     },
     {
       "fixtureId": "accepted-path-probability-and-statistics",
@@ -48,11 +44,7 @@
       "teaser": "Reason from data and uncertainty through probability, variation, inference, association, and causation.",
       "source": "lrnki model-authored project source accepted for local playtest; general model knowledge only",
       "license": "lrnki project-owned playtest fixture",
-      "curation": "Purpose-written as a compact, self-contained onboarding source; no external source material or citation set was used.",
-      "acceptedPackage": {
-        "path": "fixtures/accepted-paths/packages/probability-and-statistics.json",
-        "sha256": "1c45b20e55626671947d2ed4eabcbe4528697cbbc139f638c5946d03e86f8bc0"
-      }
+      "curation": "Purpose-written as a compact, self-contained onboarding source; no external source material or citation set was used."
     },
     {
       "fixtureId": "accepted-path-personal-finance",
@@ -71,11 +63,7 @@
       "teaser": "Make resilient financial choices using cash flow, compounding, debt, risk, and diversification.",
       "source": "lrnki model-authored project source accepted for local playtest; general model knowledge only",
       "license": "lrnki project-owned playtest fixture",
-      "curation": "Purpose-written as a geography-neutral, self-contained onboarding source; no external source material or citation set was used.",
-      "acceptedPackage": {
-        "path": "fixtures/accepted-paths/packages/personal-finance.json",
-        "sha256": "0f6b75fb670348a9e23aadd16232bd88437f6be16a585ccdaaa45c4997e04fa2"
-      }
+      "curation": "Purpose-written as a geography-neutral, self-contained onboarding source; no external source material or citation set was used."
     },
     {
       "fixtureId": "accepted-path-machine-learning",
@@ -94,11 +82,7 @@
       "teaser": "Design and evaluate supervised-learning systems without leakage, metric traps, or brittle validation.",
       "source": "lrnki model-authored project source accepted for local playtest; general model knowledge only",
       "license": "lrnki project-owned playtest fixture",
-      "curation": "Purpose-written as a dense applied-supervised-learning source; no external source material, repository, or citation set was used.",
-      "acceptedPackage": {
-        "path": "fixtures/accepted-paths/packages/machine-learning.json",
-        "sha256": "45b2dc125c5fdbca7c30b3cae2b910bf2674472c222f5ced6c1da745de9bcc6f"
-      }
+      "curation": "Purpose-written as a dense applied-supervised-learning source; no external source material, repository, or citation set was used."
     },
     {
       "fixtureId": "accepted-path-neuroscience-memory-attention",
@@ -117,11 +101,7 @@
       "teaser": "Connect neural plasticity, attention, working memory, consolidation, and retrieval.",
       "source": "lrnki model-authored project source accepted for local playtest; general model knowledge only",
       "license": "lrnki project-owned playtest fixture",
-      "curation": "Purpose-written as a dense cognitive-neuroscience source with explicit uncertainty limits; no external source material or citation set was used.",
-      "acceptedPackage": {
-        "path": "fixtures/accepted-paths/packages/neuroscience-of-memory-and-attention.json",
-        "sha256": "ffabde24ea0fc862e9b962dfb38740d807b1947f94e6fb87ba92aadb3496589e"
-      }
+      "curation": "Purpose-written as a dense cognitive-neuroscience source with explicit uncertainty limits; no external source material or citation set was used."
     }
   ]
 }

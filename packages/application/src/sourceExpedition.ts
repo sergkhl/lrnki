@@ -1,9 +1,13 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import type {
   ConceptLesson,
   LessonAbsentNode,
   StudyItem
 } from "@lrnki/domain-core";
+import {
+  SOURCE_EXPEDITION_TRAIL_SCOPE_POLICY,
+  sourceExpeditionAssetSetIdentity
+} from "@lrnki/domain-core/source-expedition-asset-identity-node";
 import type {
   EnrichmentInspectionReadPort,
   LearnerExpedition,
@@ -40,13 +44,7 @@ import { persistedSourceStudyItemQualificationReasons } from "./sourceStudyItemA
 export const SOURCE_EXPEDITION_ASSET_QUALIFICATION_CONTRACT =
   "source-expedition-learner-assets-v3";
 
-// Source asset absence may narrow a learner trail, but it may never erase a trusted
-// prerequisite underneath a retained stop. This policy identity belongs to the adopted
-// asset-set snapshot rather than the neutral Study Item Bank: the bank remains inspectable
-// in full while Source Expedition admission derives its greatest predecessor-closed,
-// learner-ready sublayer.
-export const SOURCE_EXPEDITION_TRAIL_SCOPE_POLICY =
-  "source-expedition-prerequisite-closed-ready-sublayer-v1";
+export { SOURCE_EXPEDITION_TRAIL_SCOPE_POLICY };
 
 export function qualifiedSourceExpeditionAssetConfigHash(baseConfigHash: string): string {
   if (!baseConfigHash.trim()) throw new Error("Source Expedition asset qualification needs a base config hash.");
@@ -755,25 +753,27 @@ function assetExpectation(input: {
   const currentStudyItemIds = input.studyItems
     .map((item) => item.studyItemId)
     .sort((left, right) => left.localeCompare(right));
-  const identityPayload = {
-    contract: input.qualifiedAssetConfigHash,
-    trailScopePolicy: SOURCE_EXPEDITION_TRAIL_SCOPE_POLICY,
+  const assetSetIdentity = sourceExpeditionAssetSetIdentity({
+    qualifiedAssetConfigHash: input.qualifiedAssetConfigHash,
     enrichmentId: input.detail.summary.enrichmentId,
     graphVersionId: input.detail.summary.graphVersionId,
     enrichmentConfigHash: input.detail.summary.enrichmentConfigHash,
-    trailNodeIds: [...input.trailNodeIds].sort((left, right) => left.localeCompare(right)),
+    trailNodeIds: [...input.trailNodeIds],
     routePlan: input.routePlan,
-    lessons: [...input.lessons]
-      .sort((left, right) => left.conceptLessonId.localeCompare(right.conceptLessonId))
-      .map((lesson) => [lesson.conceptLessonId, lesson.derivedNodeId, lesson.configHash]),
-    studyItems: [...input.studyItems]
-      .sort((left, right) => left.studyItemId.localeCompare(right.studyItemId))
-      .map((item) => [item.studyItemId, item.derivedNodeId, item.itemType, item.configHash])
-  };
+    lessons: input.lessons.map((lesson) => ({
+      conceptLessonId: lesson.conceptLessonId,
+      derivedNodeId: lesson.derivedNodeId,
+      configHash: lesson.configHash
+    })),
+    studyItems: input.studyItems.map((item) => ({
+      studyItemId: item.studyItemId,
+      derivedNodeId: item.derivedNodeId,
+      itemType: item.itemType,
+      configHash: item.configHash
+    }))
+  });
   return {
-    assetSetIdentity: `source-expedition-assets-${createHash("sha256")
-      .update(JSON.stringify(identityPayload))
-      .digest("hex")}`,
+    assetSetIdentity,
     currentConceptLessonIds,
     currentStudyItemIds
   };

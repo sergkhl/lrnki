@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
+import { sourceExpeditionAssetSetIdentity } from "@lrnki/domain-core/source-expedition-asset-identity-node";
+import { ACCEPTED_PATH_PACKAGE_FORMAT } from "@lrnki/ports";
 import type {
   AcceptedPathPackage,
   AcceptedPathPackageQualification,
@@ -11,7 +13,7 @@ import type { JSONValue, Sql, TransactionSql } from "postgres";
 import { z } from "zod";
 import { currentSourceExpeditionAssetsMatch } from "./PostgresLearnerExpeditionStore";
 
-export const ACCEPTED_PATH_PACKAGE_FORMAT = "lrnki.accepted-path-package.v1" as const;
+export { ACCEPTED_PATH_PACKAGE_FORMAT } from "@lrnki/ports";
 
 export const ACCEPTED_PATH_PACKAGE_TABLES = [
   "source_resources",
@@ -125,10 +127,23 @@ const sourceProvenanceSchema = z.object({
   externalClaimVerificationRequired: z.boolean(),
   acceptanceScope: nonEmpty
 }).strict();
+const assetIdentity = z.string().regex(/^source-expedition-assets-[a-f0-9]{64}$/);
 const assetExpectationSchema = z.object({
-  assetSetIdentity: nonEmpty,
+  assetSetIdentity: assetIdentity,
   currentConceptLessonIds: z.array(nonEmpty).min(1),
   currentStudyItemIds: z.array(nonEmpty).min(1)
+}).strict();
+const expeditionRouteLegSchema = z.object({
+  legIndex: z.number().int().nonnegative(),
+  anchorDerivedNodeId: z.uuid(),
+  derivedNodeIds: z.array(z.uuid()).min(3).max(5),
+  selectedBonusStudyItemIds: z.array(z.uuid()).min(1).max(2)
+}).strict();
+const expeditionRoutePlanSchema = z.object({
+  policyIdentity: nonEmpty.regex(/^source-expedition-route-v\d+:/),
+  orderedDerivedNodeIds: z.array(z.uuid()).min(3),
+  legs: z.array(expeditionRouteLegSchema).min(1),
+  summitDerivedNodeId: z.uuid()
 }).strict();
 
 export const acceptedPathPackageSchema = z.object({
@@ -142,7 +157,7 @@ export const acceptedPathPackageSchema = z.object({
     audience: nonEmpty,
     sortOrder: z.number().int().positive(),
     sourceProvenance: sourceProvenanceSchema,
-    acceptedAssetSetIdentity: nonEmpty,
+    acceptedAssetSetIdentity: assetIdentity,
     acceptedAssetConfigHash: nonEmpty
   }).strict(),
   source: z.object({
@@ -157,8 +172,8 @@ export const acceptedPathPackageSchema = z.object({
   }).strict(),
   qualification: z.object({
     declaredDomain: nonEmpty,
-    totalStopCount: z.number().int().min(3),
-    trailNodeIds: z.array(z.uuid()).min(3),
+    totalConceptCount: z.number().int().min(3),
+    routePlan: expeditionRoutePlanSchema,
     expectedAssets: assetExpectationSchema
   }).strict(),
   projection: z.object({
@@ -391,27 +406,64 @@ function validateQualificationRows(
   graphVersionId: string
 ): void {
   const qualification = entry.qualification;
-  requireUnique(qualification.trailNodeIds, "qualified trail node id");
+  const route = qualification.routePlan;
+  requireUnique(route.orderedDerivedNodeIds, "qualified route node id");
   requireUnique(qualification.expectedAssets.currentConceptLessonIds, "qualified lesson id");
   requireUnique(qualification.expectedAssets.currentStudyItemIds, "qualified study item id");
-  if (qualification.trailNodeIds.length !== qualification.totalStopCount) {
-    throw new Error("Qualified trail count differs from its sealed node ids.");
+  if (route.orderedDerivedNodeIds.length !== qualification.totalConceptCount) {
+    throw new Error("Qualified Concept count differs from its sealed route nodes.");
   }
   if (qualification.expectedAssets.assetSetIdentity !== entry.catalog.acceptedAssetSetIdentity) {
     throw new Error("Qualification asset identity differs from the accepted catalog identity.");
   }
-  const trail = new Set(qualification.trailNodeIds);
+  const flattenedRoute = route.legs.flatMap((leg, index) => {
+    if (leg.legIndex !== index) {
+      throw new Error(`Qualified route Leg index ${leg.legIndex} differs from position ${index}.`);
+    }
+    requireUnique(leg.derivedNodeIds, `qualified Leg ${index} node id`);
+    requireUnique(leg.selectedBonusStudyItemIds, `qualified Leg ${index} bonus item id`);
+    const expectedAnchor = leg.derivedNodeIds[leg.derivedNodeIds.length - 1];
+    if (leg.anchorDerivedNodeId !== expectedAnchor) {
+      throw new Error(`Qualified route Leg ${index} anchor differs from its final Concept.`);
+    }
+    return leg.derivedNodeIds;
+  });
+  if (!sameTextList(flattenedRoute, route.orderedDerivedNodeIds)) {
+    throw new Error("Qualified route Legs do not concatenate to the ordered Concept route.");
+  }
+  const expectedSummit = route.orderedDerivedNodeIds[route.orderedDerivedNodeIds.length - 1];
+  if (route.summitDerivedNodeId !== expectedSummit) {
+    throw new Error("Qualified route summit differs from its final Concept.");
+  }
+  const trail = new Set(route.orderedDerivedNodeIds);
+  const routePosition = new Map(
+    route.orderedDerivedNodeIds.map((derivedNodeId, index) => [derivedNodeId, index] as const)
+  );
   const nodeById = indexRows(tables.derived_graph_nodes, "derived_node_id");
   for (const nodeId of trail) {
     const node = nodeById.get(nodeId);
     if (!node) throw new Error(`Qualified trail references missing node ${JSON.stringify(nodeId)}.`);
-    if (node.grounding_origin === "llm_grounded") {
+    if (requiredText(node, "grounding_origin") === "llm_grounded") {
       throw new Error(`Qualified trail contains LLM-grounded node ${JSON.stringify(nodeId)}.`);
+    }
+  }
+  for (const edge of tables.inferred_prerequisite_edges) {
+    if (requiredBoolean(edge, "uncertain")) continue;
+    const dependent = requiredText(edge, "dependent_derived_node_id");
+    if (!trail.has(dependent)) continue;
+    const prerequisite = requiredText(edge, "prerequisite_derived_node_id");
+    if (!trail.has(prerequisite)) {
+      throw new Error(`Qualified route omits prerequisite ${JSON.stringify(prerequisite)} for ${JSON.stringify(dependent)}.`);
+    }
+    if (routePosition.get(prerequisite)! >= routePosition.get(dependent)!) {
+      throw new Error(`Qualified route places prerequisite ${JSON.stringify(prerequisite)} after ${JSON.stringify(dependent)}.`);
     }
   }
 
   const lessonById = indexRows(tables.concept_lessons, "concept_lesson_id");
   const lessonNodes = new Set<string>();
+  const lessonNodeIds: string[] = [];
+  const selectedLessons: JsonRow[] = [];
   for (const lessonId of qualification.expectedAssets.currentConceptLessonIds) {
     const row = lessonById.get(lessonId);
     if (!row || row.superseded_at !== null) throw new Error(`Qualified lesson ${JSON.stringify(lessonId)} is not current.`);
@@ -421,23 +473,129 @@ function validateQualificationRows(
     const nodeId = requiredText(row, "derived_node_id");
     if (!trail.has(nodeId)) throw new Error(`Qualified lesson ${JSON.stringify(lessonId)} is off trail.`);
     lessonNodes.add(nodeId);
+    lessonNodeIds.push(nodeId);
+    selectedLessons.push(row);
   }
+  requireUnique(lessonNodeIds, "qualified lesson node id");
   if (lessonNodes.size !== trail.size) throw new Error("Qualified lessons do not cover every trail node exactly once.");
 
   const itemById = indexRows(tables.study_items, "study_item_id");
-  const itemNodes = new Set<string>();
+  const selectedItems: JsonRow[] = [];
   for (const itemId of qualification.expectedAssets.currentStudyItemIds) {
     const row = itemById.get(itemId);
     if (!row || row.superseded_at !== null) throw new Error(`Qualified study item ${JSON.stringify(itemId)} is not current.`);
-    assertEqual(requiredText(row, "item_type"), "option_select", "qualified item type");
     assertEqual(requiredText(row, "graph_version_id"), graphVersionId, "qualified item graph");
     assertEqual(requiredText(row, "enrichment_id"), entry.catalog.enrichmentId, "qualified item enrichment");
     assertEqual(requiredText(row, "config_hash"), entry.catalog.acceptedAssetConfigHash, "qualified item config");
     const nodeId = requiredText(row, "derived_node_id");
     if (!trail.has(nodeId)) throw new Error(`Qualified study item ${JSON.stringify(itemId)} is off trail.`);
-    itemNodes.add(nodeId);
+    selectedItems.push(row);
   }
-  if (itemNodes.size !== trail.size) throw new Error("Qualified option-select items do not cover every trail node.");
+  const options = selectedItems.filter((row) => requiredText(row, "item_type") === "option_select");
+  const optionNodes = options.map((row) => requiredText(row, "derived_node_id"));
+  requireUnique(optionNodes, "qualified option-select node id");
+  if (!sameTextSet(optionNodes, route.orderedDerivedNodeIds)) {
+    throw new Error("Qualified option-select items do not cover every route Concept exactly once.");
+  }
+
+  const bonusIds = route.legs.flatMap((leg) => leg.selectedBonusStudyItemIds);
+  requireUnique(bonusIds, "qualified route bonus item id");
+  const selectedIds = selectedItems.map((row) => requiredText(row, "study_item_id"));
+  if (!sameTextSet(selectedIds, [...options.map((row) => requiredText(row, "study_item_id")), ...bonusIds])) {
+    throw new Error("Qualified Study Items differ from the route's option-select and selected bonus set.");
+  }
+  const selectedFamilies = new Set<string>();
+  for (const leg of route.legs) {
+    const legNodes = new Set(leg.derivedNodeIds);
+    for (const itemId of leg.selectedBonusStudyItemIds) {
+      const row = itemById.get(itemId);
+      if (!row) {
+        throw new Error(`Qualified route bonus ${JSON.stringify(itemId)} is missing.`);
+      }
+      const itemType = requiredText(row, "item_type");
+      if (itemType !== "matching" && itemType !== "impostor") {
+        throw new Error(`Qualified route bonus ${JSON.stringify(itemId)} is not matching or impostor.`);
+      }
+      if (!legNodes.has(requiredText(row, "derived_node_id"))) {
+        throw new Error(`Qualified route bonus ${JSON.stringify(itemId)} is outside its Leg.`);
+      }
+      selectedFamilies.add(itemType);
+    }
+  }
+  if (!selectedFamilies.has("matching") || !selectedFamilies.has("impostor")) {
+    throw new Error("Qualified route does not select both matching and impostor families.");
+  }
+
+  for (const item of selectedItems) validateSelectedStudyItemChildren(item, tables);
+
+  const actualIdentity = sourceExpeditionAssetSetIdentity({
+    qualifiedAssetConfigHash: entry.catalog.acceptedAssetConfigHash,
+    enrichmentId: entry.catalog.enrichmentId,
+    graphVersionId,
+    enrichmentConfigHash: requiredText(
+      onlyRow(tables.graph_enrichments, "graph enrichment"),
+      "enrichment_config_hash"
+    ),
+    trailNodeIds: route.orderedDerivedNodeIds,
+    routePlan: route,
+    lessons: selectedLessons.map((lesson) => ({
+      conceptLessonId: requiredText(lesson, "concept_lesson_id"),
+      derivedNodeId: requiredText(lesson, "derived_node_id"),
+      configHash: requiredText(lesson, "config_hash")
+    })),
+    studyItems: selectedItems.map((item) => ({
+      studyItemId: requiredText(item, "study_item_id"),
+      derivedNodeId: requiredText(item, "derived_node_id"),
+      itemType: requiredText(item, "item_type"),
+      configHash: requiredText(item, "config_hash")
+    }))
+  });
+  if (actualIdentity !== qualification.expectedAssets.assetSetIdentity) {
+    throw new Error("Qualification asset identity does not match its route and selected assets.");
+  }
+}
+
+function validateSelectedStudyItemChildren(item: JsonRow, tables: PackageTables): void {
+  const itemId = requiredText(item, "study_item_id");
+  const itemType = requiredText(item, "item_type");
+  const optionRows = tables.study_item_options.filter((row) => row.study_item_id === itemId);
+  const matchingRows = tables.matching_pairs.filter((row) => row.study_item_id === itemId);
+  const impostorRows = tables.impostor_statements.filter((row) => row.study_item_id === itemId);
+  if (itemType === "option_select") {
+    if (optionRows.length !== 4 || matchingRows.length !== 0 || impostorRows.length !== 0) {
+      throw new Error(`Qualified option-select ${JSON.stringify(itemId)} has the wrong family child rows.`);
+    }
+    requireOrdinalSequence(optionRows, itemId);
+    if (optionRows.filter((row) => requiredBoolean(row, "is_correct")).length !== 1) {
+      throw new Error(`Qualified option-select ${JSON.stringify(itemId)} must have exactly one correct option.`);
+    }
+    return;
+  }
+  if (itemType === "matching") {
+    if (optionRows.length !== 0 || matchingRows.length < 3 || matchingRows.length > 4 || impostorRows.length !== 0) {
+      throw new Error(`Qualified matching item ${JSON.stringify(itemId)} has the wrong family child rows.`);
+    }
+    requireOrdinalSequence(matchingRows, itemId);
+    return;
+  }
+  if (itemType === "impostor") {
+    if (optionRows.length !== 0 || matchingRows.length !== 0 || impostorRows.length !== 4) {
+      throw new Error(`Qualified impostor item ${JSON.stringify(itemId)} has the wrong family child rows.`);
+    }
+    requireOrdinalSequence(impostorRows, itemId);
+    if (impostorRows.filter((row) => requiredBoolean(row, "is_impostor")).length !== 1) {
+      throw new Error(`Qualified impostor item ${JSON.stringify(itemId)} must have exactly one impostor statement.`);
+    }
+    return;
+  }
+  throw new Error(`Qualified Study Item ${JSON.stringify(itemId)} has unknown family ${JSON.stringify(itemType)}.`);
+}
+
+function requireOrdinalSequence(rows: readonly JsonRow[], itemId: string): void {
+  const ordinals = rows.map((row) => requiredNumber(row, "ordinal")).sort((left, right) => left - right);
+  if (!ordinals.every((ordinal, index) => ordinal === index)) {
+    throw new Error(`Qualified Study Item ${JSON.stringify(itemId)} child ordinals are not contiguous from zero.`);
+  }
 }
 
 function validateArtifacts(
@@ -803,7 +961,6 @@ function canonicalPackageValue(entry: AcceptedPathPackage): AcceptedPathPackage 
     ...entry,
     qualification: {
       ...entry.qualification,
-      trailNodeIds: [...entry.qualification.trailNodeIds].sort(compareText),
       expectedAssets: {
         ...entry.qualification.expectedAssets,
         currentConceptLessonIds: [
@@ -871,6 +1028,12 @@ function requiredNumber(row: JsonRow, field: string): number {
   return value;
 }
 
+function requiredBoolean(row: JsonRow, field: string): boolean {
+  const value = row[field];
+  if (typeof value !== "boolean") throw new Error(`Expected boolean ${field}.`);
+  return value;
+}
+
 function requiredScalar(row: JsonRow, field: string): string | number {
   const value = row[field];
   if ((typeof value !== "string" || value.length === 0) && typeof value !== "number") {
@@ -910,6 +1073,10 @@ function sameTextSet(left: readonly string[], right: readonly string[]): boolean
   const one = [...left].sort(compareText);
   const two = [...right].sort(compareText);
   return one.length === two.length && one.every((value, index) => value === two[index]);
+}
+
+function sameTextList(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
 function compareText(left: string, right: string): number {

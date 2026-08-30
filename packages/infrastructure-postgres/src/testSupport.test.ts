@@ -138,17 +138,18 @@ async function seedReserved(sql: ReturnType<typeof createDatabaseClient>, email:
 
 maybe("cleanupReservedLearners removes only the exact reserved addresses and preserves unrelated data", async () => {
   const sql = createDatabaseClient(databaseUrl);
+  const sharedEnrichmentId = randomUUID();
   try {
+    await sql`
+      INSERT INTO graph_enrichments
+        (enrichment_id, graph_version_id, enrichment_config_hash, status, judge_model, difficulty_method)
+      VALUES (${sharedEnrichmentId}, NULL, 'cleanup-sentinel', 'succeeded', 'test', 'test')`;
     const runId = runIdChars();
     const emails = reservedLearnerEmails(runId);
     const ids: string[] = [];
     for (const email of Object.values(emails)) ids.push(await seedReserved(sql, email));
     const unrelatedEmail = reservedLearnerEmails(runIdChars()).probe; // reserved-shaped, DIFFERENT run
     const unrelatedId = await seedReserved(sql, unrelatedEmail);
-    // Snapshot identities, not a global count: other test files legitimately create shared
-    // enrichments concurrently under Node's test runner.
-    const enrichmentsBefore = await sql<{ enrichment_id: string }[]>`SELECT enrichment_id FROM graph_enrichments`;
-
     const deleted = await cleanupReservedLearners(sql, [emails.probe, emails.phone, emails.desktop]);
     assert.deepEqual(deleted.sort(), [emails.desktop, emails.phone, emails.probe].sort());
 
@@ -159,13 +160,11 @@ maybe("cleanupReservedLearners removes only the exact reserved addresses and pre
     }
     const [{ n: unrel }] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM "user" WHERE id = ${unrelatedId}`;
     assert.equal(unrel, 1, "an unrelated (different-run) reserved learner is NOT deleted");
-    if (enrichmentsBefore.length > 0) {
-      const [{ n: preserved }] = await sql<{ n: number }[]>`
-        SELECT count(*)::int AS n FROM graph_enrichments
-        WHERE enrichment_id IN ${sql(enrichmentsBefore.map((row) => row.enrichment_id))}`;
-      assert.equal(preserved, enrichmentsBefore.length, "every pre-existing shared enrichment is untouched");
-    }
+    const [{ n: preserved }] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM graph_enrichments WHERE enrichment_id = ${sharedEnrichmentId}`;
+    assert.equal(preserved, 1, "the run-owned shared enrichment is untouched");
   } finally {
+    await sql`DELETE FROM graph_enrichments WHERE enrichment_id = ${sharedEnrichmentId}`;
     await sql.end();
   }
 });

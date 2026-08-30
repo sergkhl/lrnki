@@ -47,8 +47,8 @@ export function createAcceptedPathPackageModule(deps: AcceptedPathPackageModuleD
         source: input.source,
         qualification: {
           declaredDomain: qualification.candidate.declaredDomain,
-          totalStopCount: qualification.candidate.totalConceptCount,
-          trailNodeIds: [...qualification.assets.trailNodeIds].sort(compareText),
+          totalConceptCount: qualification.candidate.totalConceptCount,
+          routePlan: qualification.assets.routePlan,
           expectedAssets: qualification.assets.expectedAssets
         }
       });
@@ -98,7 +98,7 @@ export function createAcceptedPathPackageModule(deps: AcceptedPathPackageModuleD
           candidate.title !== entry.catalog.title ||
           candidate.teaser !== entry.catalog.teaser ||
           candidate.sortOrder !== entry.catalog.sortOrder ||
-          candidate.totalConceptCount !== entry.qualification.totalStopCount
+          candidate.totalConceptCount !== entry.qualification.totalConceptCount
         ) {
           throw new Error(
             `Installed path ${JSON.stringify(entry.catalog.catalogKey)} changed in learner projection.`
@@ -125,9 +125,9 @@ function assertInstalledQualification(
   const actualAssets = qualification.assets.expectedAssets;
   if (
     qualification.candidate.declaredDomain !== expected.declaredDomain ||
-    qualification.candidate.totalConceptCount !== expected.totalStopCount ||
+    qualification.candidate.totalConceptCount !== expected.totalConceptCount ||
     actualAssets.assetSetIdentity !== entry.catalog.acceptedAssetSetIdentity ||
-    !sameTextSet(qualification.assets.trailNodeIds, expected.trailNodeIds) ||
+    !sameRoutePlan(qualification.assets.routePlan, expected.routePlan) ||
     !sameTextSet(actualAssets.currentConceptLessonIds, expected.expectedAssets.currentConceptLessonIds) ||
     !sameTextSet(actualAssets.currentStudyItemIds, expected.expectedAssets.currentStudyItemIds)
   ) {
@@ -135,6 +135,29 @@ function assertInstalledQualification(
       `Installed path ${JSON.stringify(entry.catalog.catalogKey)} differs from its sealed qualification.`
     );
   }
+}
+
+function sameRoutePlan(
+  actual: AcceptedPathPackage["qualification"]["routePlan"],
+  expected: AcceptedPathPackage["qualification"]["routePlan"]
+): boolean {
+  return actual.policyIdentity === expected.policyIdentity &&
+    actual.summitDerivedNodeId === expected.summitDerivedNodeId &&
+    sameTextList(actual.orderedDerivedNodeIds, expected.orderedDerivedNodeIds) &&
+    actual.legs.length === expected.legs.length &&
+    actual.legs.every((leg, index) => {
+      const expectedLeg = expected.legs[index];
+      return expectedLeg !== undefined &&
+        leg.legIndex === expectedLeg.legIndex &&
+        leg.anchorDerivedNodeId === expectedLeg.anchorDerivedNodeId &&
+        sameTextList(leg.derivedNodeIds, expectedLeg.derivedNodeIds) &&
+        sameTextList(leg.selectedBonusStudyItemIds, expectedLeg.selectedBonusStudyItemIds);
+    });
+}
+
+function sameTextList(actual: readonly string[], expected: readonly string[]): boolean {
+  return actual.length === expected.length &&
+    actual.every((value, index) => value === expected[index]);
 }
 
 function sameTextSet(actual: Iterable<string>, expected: Iterable<string>): boolean {

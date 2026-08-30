@@ -5,7 +5,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./operation-context": "./src/operationContext.ts",
-    "./operation-context-node": "./src/operationContextNode.ts"
+    "./operation-context-node": "./src/operationContextNode.ts",
+    "./source-expedition-asset-identity-node": "./src/sourceExpeditionAssetIdentity.ts"
   },
   "scripts": {
     "test": "tsx --test src/*.test.ts",

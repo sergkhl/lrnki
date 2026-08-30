@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
+import { ACCEPTED_PATH_PACKAGE_FORMAT } from "@lrnki/ports";
 import { MarkdownStructuredDocumentParser } from "./MarkdownStructuredDocumentParser";
 import { parseAcceptedPathManifest } from "./SourceManifest";
 
@@ -53,6 +54,7 @@ test("accepted-path manifest owns exactly the current five model-authored playte
   );
   for (const fixture of manifest.fixtures) {
     if (!fixture.acceptedPackage) continue;
+    assert.equal(fixture.acceptedPackage.format, ACCEPTED_PATH_PACKAGE_FORMAT);
     assert.equal(
       fixture.acceptedPackage.path,
       `fixtures/accepted-paths/packages/${fixture.catalogKey}.json`
@@ -68,6 +70,26 @@ test("accepted-path manifest parsing rejects duplicate publication identity", ()
     () => parseAcceptedPathManifest(duplicate),
     /catalogOrder duplicates fixtures\[0\]/
   );
+});
+
+test("accepted-path manifest binds every sealed package to the current format", () => {
+  const stale = structuredClone(manifest) as unknown as Record<string, unknown> & {
+    fixtures: Array<Record<string, unknown>>;
+  };
+  stale.fixtures[0]!.acceptedPackage = {
+    format: "lrnki.accepted-path-package.v1",
+    path: "fixtures/accepted-paths/packages/critical-thinking.json",
+    sha256: "0".repeat(64)
+  };
+  assert.throws(() => parseAcceptedPathManifest(stale), /accepted-path-package\.v2|Invalid input/i);
+});
+
+test("the destructive seed wrapper validates the complete package set before environment or reset", () => {
+  const script = readFileSync(path.join(repoRoot, "scripts/seed-accepted-paths.sh"), "utf8");
+  const validation = script.indexOf("pnpm accepted-paths validate");
+  const environment = script.indexOf(". scripts/lib/require-database-url.sh");
+  const reset = script.indexOf("scripts/reset-db.sh");
+  assert.ok(validation >= 0 && environment > validation && reset > environment);
 });
 
 test("accepted-path sources are pure, bounded Markdown and parse into located blocks", async () => {

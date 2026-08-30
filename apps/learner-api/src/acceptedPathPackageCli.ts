@@ -146,7 +146,7 @@ async function exportAccepted(
     const updated = {
       ...manifestValue,
       fixtures: manifestValue.fixtures.map((entry) => entry.catalogKey === fixture.catalogKey
-        ? { ...entry, acceptedPackage: { path: packagePath, sha256 } }
+        ? { ...entry, acceptedPackage: { format: acceptedPackage.format, path: packagePath, sha256 } }
         : entry)
     };
     parseAcceptedPathManifest(updated);
@@ -183,8 +183,7 @@ async function loadValidatedPackages(
     await validateManifestBinding(manifest, fixture, parsed.package);
     packages.push(parsed.package);
   }
-  if (packages.length === 0) throw new Error("Accepted package set contains no package files.");
-  validateAcceptedPathPackageSet(packages);
+  if (packages.length > 0) validateAcceptedPathPackageSet(packages);
   return packages;
 }
 

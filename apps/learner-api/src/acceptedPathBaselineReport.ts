@@ -1,6 +1,5 @@
 import {
   lessonGroundingShape,
-  planExpeditionRoute,
   resolveExpeditionSourceCues,
   type ExpeditionInstructionalSourceCue,
   type ExpeditionRouteLeg
@@ -111,11 +110,6 @@ type SourceResourceRow = JsonRow & {
   title: string;
 };
 
-type RoutePlanShape = {
-  orderedDerivedNodeIds?: unknown;
-  legs?: unknown;
-};
-
 export type AcceptedPathBaselineReport = {
   catalogKey: string;
   title: string;
@@ -165,7 +159,8 @@ export async function acceptedPathBaselineReport(
   packageSha256: string
 ): Promise<AcceptedPathBaselineReport> {
   const tables = packageTables(acceptedPackage);
-  const trailNodeIds = new Set(acceptedPackage.qualification.trailNodeIds);
+  const route = acceptedPackage.qualification.routePlan;
+  const trailNodeIds = new Set(route.orderedDerivedNodeIds);
   const currentStudyItemIds = new Set(
     acceptedPackage.qualification.expectedAssets.currentStudyItemIds
   );
@@ -248,22 +243,6 @@ export async function acceptedPathBaselineReport(
     cue.derivedNodeId,
     cue
   ] as const));
-  const routeResult = planExpeditionRoute({
-    concepts: nodes.map((node) => ({
-      derivedNodeId: node.derivedNodeId,
-      canonicalLabel: node.label,
-      difficulty: node.difficulty
-    })),
-    trustedPrerequisiteEdges: trustedEdges,
-    instructionalSourceCues: cueResolution.cues,
-    policy: "layer_projection"
-  });
-  if (routeResult.status === "unavailable") {
-    throw new Error(
-      `${acceptedPackage.catalog.catalogKey} route report failed: ${routeResult.reason} ${JSON.stringify(routeResult.diagnostics)}`
-    );
-  }
-  const route = routeResult.plan;
   const routeNodeIds = route.orderedDerivedNodeIds;
   requireExactSet(
     routeNodeIds,
@@ -314,24 +293,13 @@ export async function acceptedPathBaselineReport(
   );
   const nodeById = new Map(nodes.map((node) => [node.derivedNodeId, node] as const));
 
-  const qualification = acceptedPackage.qualification as AcceptedPathPackage["qualification"] & {
-    totalConceptCount?: unknown;
-    routePlan?: RoutePlanShape;
-  };
-  const routePlanPresent = Boolean(
-    qualification.routePlan &&
-    Array.isArray(qualification.routePlan.orderedDerivedNodeIds) &&
-    Array.isArray(qualification.routePlan.legs)
-  );
   const currentFamilies = familyCounts(currentStudyItems);
   const everyLegHasThreeToFiveConcepts = route.legs.every((leg) =>
     leg.derivedNodeIds.length >= 3 && leg.derivedNodeIds.length <= 5
   );
   const everyLegHasMixedPractice = mixedLegCount === route.legs.length;
   const expeditionUsesEveryFamily = Object.values(currentFamilies).every((count) => count > 0);
-  const honestConceptCount = typeof qualification.totalConceptCount === "number" &&
-    qualification.totalConceptCount === trailNodeIds.size &&
-    !("totalStopCount" in qualification);
+  const honestConceptCount = acceptedPackage.qualification.totalConceptCount === trailNodeIds.size;
 
   return {
     catalogKey: acceptedPackage.catalog.catalogKey,
@@ -378,16 +346,13 @@ export async function acceptedPathBaselineReport(
       summitDerivedNodeId: route.summitDerivedNodeId
     },
     targetContract: {
-      routePlanPresent,
+      routePlanPresent: true,
       everyLegHasThreeToFiveConcepts,
       everyLegHasMixedPractice,
       expeditionUsesEveryFamily,
       honestConceptCount,
-      // The v1 qualification has no route plan to bind. U3/U5 replace this mechanical check
-      // with the v3 identity payload and v2 package route in the same report.
-      routeSensitiveIdentity: routePlanPresent &&
-        acceptedPackage.catalog.acceptedAssetSetIdentity ===
-          acceptedPackage.qualification.expectedAssets.assetSetIdentity
+      routeSensitiveIdentity: acceptedPackage.catalog.acceptedAssetSetIdentity ===
+        acceptedPackage.qualification.expectedAssets.assetSetIdentity
     }
   };
 }

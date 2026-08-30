@@ -812,18 +812,37 @@ export type AcceptedPathPackageSource = {
   license: string;
 };
 
+// The route is ordered learner policy, not a relational projection detail. Keeping this shape at
+// the application port lets qualification, package sealing, and package installation compare the
+// same value without an adapter-owned copy of the contract.
+export type ExpeditionRouteLeg = {
+  legIndex: number;
+  anchorDerivedNodeId: string;
+  derivedNodeIds: string[];
+  selectedBonusStudyItemIds: string[];
+};
+
+export type ExpeditionRoutePlan = {
+  policyIdentity: string;
+  orderedDerivedNodeIds: string[];
+  legs: ExpeditionRouteLeg[];
+  summitDerivedNodeId: string | null;
+};
+
 export type AcceptedPathPackageQualification = {
   declaredDomain: string;
-  totalStopCount: number;
-  trailNodeIds: string[];
+  totalConceptCount: number;
+  routePlan: ExpeditionRoutePlan;
   expectedAssets: SourceExpeditionAssetExpectation;
 };
+
+export const ACCEPTED_PATH_PACKAGE_FORMAT = "lrnki.accepted-path-package.v2" as const;
 
 // The relational projection is deliberately opaque to application code. Its runtime schema and
 // foreign-key closure belong to the Postgres package adapter; the application boundary sees only
 // the accepted identity and the deterministic qualification snapshot it must re-derive.
 export type AcceptedPathPackage = {
-  format: "lrnki.accepted-path-package.v1";
+  format: typeof ACCEPTED_PATH_PACKAGE_FORMAT;
   catalog: Omit<SourceExpeditionCatalogEntry, "sourceCredits" | "createdAt">;
   source: AcceptedPathPackageSource;
   qualification: AcceptedPathPackageQualification;

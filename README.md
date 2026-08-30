@@ -215,19 +215,22 @@ current global closure from the guarded development database:
 
 ```bash
 pnpm accepted-paths export --catalog-key=critical-thinking
-pnpm accepted-paths validate --allow-partial  # authoring-time packages currently present
+pnpm accepted-paths validate --allow-partial  # zero or more authoring-time v2 packages
 pnpm accepted-paths validate                  # exact complete manifest set; no database access
 pnpm accepted-paths report                    # read-only route/item/grounding baseline
 pnpm seed:accepted-paths                      # destructive model-free reset + complete install
 ```
 
-Export overwrites the current package file and records its SHA-256 in the accepted-path manifest.
-The complete validator checks canonical serialization, source bytes, package digests, relational
-closure, and cross-package Concept identity before a reset is possible. `seed:accepted-paths` names
-the exact guarded database/endpoint, discards its users, sessions, learner paths, responses, awards,
-and progress, installs no learner, makes no model call, and publishes the catalog only after every
-installed package re-qualifies under the current runtime asset contract. It accepts only `lrnki` or
-`lrnki_test`; shared-host installation remains the manual cutover workflow below.
+Export overwrites the current package file and records its v2 format plus SHA-256 in the
+accepted-path manifest. The complete validator checks canonical serialization, source bytes,
+package digests, relational closure, cross-package Concept identity, the exact 3–5-Concept route,
+anchors and summit, prerequisite order, one lesson and option-select per Concept, selected
+matching/impostor membership, and every selected family's child rows before a reset is possible.
+`seed:accepted-paths` names the exact guarded database/endpoint, discards its users, sessions,
+learner paths, responses, awards, and progress, installs no learner, makes no model call, and
+publishes the catalog only after every installed package re-qualifies to the same route and asset
+identity under the current runtime contract. It accepts only `lrnki` or `lrnki_test`; shared-host
+installation remains the manual cutover workflow below.
 
 ## Deployment
 

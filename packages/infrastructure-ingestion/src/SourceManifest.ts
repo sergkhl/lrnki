@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ACCEPTED_PATH_PACKAGE_FORMAT } from "@lrnki/ports";
 
 const nonEmpty = z.string().trim().min(1);
 
@@ -28,6 +29,7 @@ const preferredStopCountSchema = z.object({
 });
 
 const acceptedPackageSchema = z.object({
+  format: z.literal(ACCEPTED_PATH_PACKAGE_FORMAT),
   path: z.string().regex(/^fixtures\/accepted-paths\/packages\/[a-z0-9-]+\.json$/),
   sha256: z.string().regex(/^[a-f0-9]{64}$/)
 }).strict();

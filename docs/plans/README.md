@@ -13,9 +13,9 @@ routes shared mechanics through the vendored
 ## Active implementation plans (execution order)
 
 - [Expand Source Expedition Legs and Qualify Mixed Study Items](./2026-08-29-001-expand-source-expedition-legs-and-mixed-study-items.md)
-  — In progress; U0–U4 complete. Replace singleton terminal-DAG Legs with one 3–5-Concept route
+  — In progress; U0–U5 complete. Replace singleton terminal-DAG Legs with one 3–5-Concept route
   authority and qualify matching/impostor coverage without weakening source, key, prerequisite, or
-  mastery contracts. **NEXT:** U5 replaces accepted package v1 with the strict route-bearing,
-  mixed-family v2 format and deletes the option-only package contract.
+  mastery contracts. **NEXT:** U6 regenerates, inspects, qualifies, and exports the five replacement
+  v2 packages in manifest order against one shared live Concept registry.
 
 <!-- Lifecycle adoption and overrides: AGENTS.md → Documentation workflow. -->

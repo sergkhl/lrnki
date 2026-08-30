@@ -14,8 +14,10 @@
   source-cued route authority; U2 added family-complete source admission and removed the false
   passage-count veto while keeping blueprint failure option-only; U3 bound qualification, minimum
   bonus selection, and the finished route into one route-sensitive mixed-family result; U4 made
-  Study Session, mastery/progress, Guardians, and catalog counts consume it. **NEXT:** U5 replaces
-  accepted package v1 with the strict route-bearing mixed-family v2 format.
+  Study Session, mastery/progress, Guardians, and catalog counts consume it; U5 replaced accepted
+  package v1 with the strict route-bearing mixed-family v2 contract and removed the obsolete package
+  set. **NEXT:** U6 regenerates, inspects, qualifies, and exports the five replacement v2 packages
+  in manifest order against one shared live Concept registry.
 
 - **Shape Concept Lesson grounding depth.** 140 of 183 qualified lessons yield one grounding passage
   while their Concepts hold four to six verified source evidence passages, so the Study Item
