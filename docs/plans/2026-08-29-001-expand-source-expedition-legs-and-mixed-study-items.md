@@ -7,11 +7,11 @@ execution: code
 
 # Expand Source Expedition Legs and Qualify Mixed Study Items
 
-**Status:** In progress — U0 froze the five-package baseline and proved the hard mixed-Leg route
-feasible after passage-count veto removal; U1 is next
+**Status:** In progress — U0–U1 complete; the five-package baseline, post-veto feasibility, and one
+shared deterministic source-cued route authority are proved; U2 is next
 
-**NEXT:** U1 introduces the one shared, source-cued Expedition Route Plan and proves its pure
-topological order, 3–5-Concept partition, bonus coverage, determinism, and explicit failure paths.
+**NEXT:** U2 gives matching and impostor complete source-material admission, removes the false
+passage-count veto, and keeps blueprint unavailability closed to those two families.
 
 **Decision state:** Accepted by the owner on 2026-08-29 and amended the same day after design
 review. A normal Leg contains 3–5 Concepts, targeting four. Every Concept keeps one qualified
@@ -605,6 +605,48 @@ The plan is complete only when all of the following are true:
    remains unrecorded in `BLOCKERS.md`.
 
 ## Validation Log
+
+### U1 — Shared source-cued Expedition Route Plan — 2026-08-30
+
+- **Implementation:** one pure application deep module now owns stable topological ordering,
+  contiguous 3–5-Concept partitioning, joint minimum bonus selection, Leg anchors, summit, typed
+  failure, and coverage diagnostics. It resolves one direct substantive lesson citation through the
+  enriched `SourceEvidenceReadPort`; persisted source document, parser block, heading path, and
+  locator fields supply order/coherence cues. The old terminal-cone claim/split/merge implementation
+  is deleted. Its temporary layer-projection adapter delegates to this same authority until U3–U4
+  bind the qualified source plan directly.
+- **Pure contract:** 12 planner tests and four adapter tests cover empty/short inspection shapes,
+  isolated and dense DAGs, shuffled inputs, same/different source documents, page/slide/character/
+  XPath/natural-block locator fallbacks, backward Personal Finance prerequisites, all totals 3–44,
+  exact node coverage, topological validity, source coherence ahead of target-four sizing, minimum
+  balanced bonus selection, one-Leg two-family selection, deterministic replay, stable anchors and
+  summit, and typed short/cycle/mix failures. The reusable package report now consumes the same
+  source-cue resolver and planner rather than owning a second character-offset route derivation.
+- **Five-package projection:** every one of 183 Concepts resolves a source cue and every trusted
+  edge remains topological. Critical Thinking projects 31 Concepts into `2×3, 5×4, 1×5` Legs with
+  two in-Leg major-heading transitions and zero source backtracks; Probability and Statistics 44
+  into `6×3, 4×4, 2×5` with one/zero; Personal Finance 37 into `4×3, 5×4, 1×5` with five/three, the
+  three backtracks forced by trusted prerequisites; Machine Learning 31 into `3×3, 3×4, 2×5` with
+  three/zero; and Neuroscience 40 into `5×3, 5×4, 1×5` with one/zero. Singleton Legs are zero.
+- **Real-use quality:** Milestone U1 route planning; fixtures are all five committed accepted
+  Markdown package projections; real model calls are not applicable because the route is a pure
+  function of committed artifacts; result `PASS`. Every projected Leg was inspected in route order
+  and formed a coherent completable chapter, including the unavoidable trusted-edge crossings. The
+  first inspection exposed two implementation defects: the temporary projection's broad minimum-one
+  policy competed with the hard 3–5 partition, and treating the retained Markdown document H1 as the
+  major section erased coherence boundaries. The fix restricts undersizing to an explicit whole-path
+  1–2-Concept inspection case and uses the authored section below the H1 when present. Remaining
+  caveats: the source route and selected mix are not qualified/persisted until U3, the temporary
+  runtime adapter has no source cues, and no learner-facing web/native claim is made. Safe downstream
+  use is U2 family admission and generator-gate correction.
+- **Validation:** `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm test:db`,
+  `pnpm accepted-paths validate`, `pnpm accepted-paths report`, the focused planner/report/adapter/
+  projection/inspection suite, and `git diff --check` pass. Lint retains ten pre-existing warnings;
+  the accepted-path suite retains five named TODO bodies for U2–U5 target contracts.
+- **Authority boundary:** local automated checks, isolated `lrnki_test` reset/database tests,
+  committed-package projection, and direct route inspection only. No development-schema reset,
+  model generation, real-backend web, native, deployed, physical-device, production, or release
+  evidence was produced.
 
 ### U0 — Five-package baseline and post-veto feasibility probe — 2026-08-30
 

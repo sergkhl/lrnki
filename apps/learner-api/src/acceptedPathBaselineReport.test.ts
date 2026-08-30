@@ -13,7 +13,7 @@ const repoRoot = path.resolve(import.meta.dirname, "../../..");
 
 const reportsPromise = loadReports();
 
-test("the reusable accepted-path report freezes the current five-package defect baseline", async () => {
+test("the reusable accepted-path report recomputes the five-package route and artifact baseline", async () => {
   const reports = await reportsPromise;
   assert.deepEqual(
     reports.map((report) => ({
@@ -22,14 +22,16 @@ test("the reusable accepted-path report freezes the current five-package defect 
       trustedEdges: report.trustedEdgeCount,
       legs: report.legCount,
       singletonLegs: report.singletonLegCount,
-      legSizes: report.legSizeHistogram
+      legSizes: report.legSizeHistogram,
+      sourceTransitions: report.sourceMajorHeadingTransitionsInsideLegs,
+      sourceBacktracks: report.sourceOrderBacktrackCount
     })),
     [
-      { catalogKey: "critical-thinking", concepts: 31, trustedEdges: 6, legs: 26, singletonLegs: 22, legSizes: { "1": 22, "2": 3, "3": 1 } },
-      { catalogKey: "probability-and-statistics", concepts: 44, trustedEdges: 14, legs: 34, singletonLegs: 25, legSizes: { "1": 25, "2": 8, "3": 1 } },
-      { catalogKey: "personal-finance", concepts: 37, trustedEdges: 25, legs: 28, singletonLegs: 19, legSizes: { "1": 19, "2": 9 } },
-      { catalogKey: "machine-learning", concepts: 31, trustedEdges: 10, legs: 26, singletonLegs: 21, legSizes: { "1": 21, "2": 5 } },
-      { catalogKey: "neuroscience-of-memory-and-attention", concepts: 40, trustedEdges: 14, legs: 32, singletonLegs: 27, legSizes: { "1": 27, "2": 4, "5": 1 } }
+      { catalogKey: "critical-thinking", concepts: 31, trustedEdges: 6, legs: 8, singletonLegs: 0, legSizes: { "3": 2, "4": 5, "5": 1 }, sourceTransitions: 2, sourceBacktracks: 0 },
+      { catalogKey: "probability-and-statistics", concepts: 44, trustedEdges: 14, legs: 12, singletonLegs: 0, legSizes: { "3": 6, "4": 4, "5": 2 }, sourceTransitions: 1, sourceBacktracks: 0 },
+      { catalogKey: "personal-finance", concepts: 37, trustedEdges: 25, legs: 10, singletonLegs: 0, legSizes: { "3": 4, "4": 5, "5": 1 }, sourceTransitions: 5, sourceBacktracks: 3 },
+      { catalogKey: "machine-learning", concepts: 31, trustedEdges: 10, legs: 8, singletonLegs: 0, legSizes: { "3": 3, "4": 3, "5": 2 }, sourceTransitions: 3, sourceBacktracks: 0 },
+      { catalogKey: "neuroscience-of-memory-and-attention", concepts: 40, trustedEdges: 14, legs: 11, singletonLegs: 0, legSizes: { "3": 5, "4": 5, "5": 1 }, sourceTransitions: 1, sourceBacktracks: 0 }
     ]
   );
   assert.equal(reports.reduce((sum, report) => sum + report.conceptCount, 0), 183);
@@ -69,7 +71,7 @@ test("the reusable accepted-path report freezes the current five-package defect 
   );
 });
 
-test("the current route keeps every trusted prerequisite before its dependent", async () => {
+test("the projected source-cued route keeps every trusted prerequisite before its dependent", async () => {
   for (const report of await reportsPromise) {
     assert.equal(report.trustedTopologicalViolationCount, 0, report.catalogKey);
   }
@@ -83,16 +85,14 @@ test("accepted package bytes, asset identities, and source cues have complete po
   }
 });
 
-test("target contract: every Leg has three to five Concepts", {
-  todo: "U1 must replace singleton terminal-cone Legs with the shared route plan"
-}, async () => {
+test("target contract: every Leg has three to five Concepts", async () => {
   assert.ok((await reportsPromise).every((report) =>
     report.targetContract.everyLegHasThreeToFiveConcepts
   ));
 });
 
 test("target contract: source-cued route planning is explicit and remains topological", {
-  todo: "U1 must persist one source-cued, prerequisite-valid route plan"
+  todo: "U3-U5 must persist the U1 source-cued plan through qualification and package v2"
 }, async () => {
   assert.ok((await reportsPromise).every((report) =>
     report.targetContract.routePlanPresent &&
@@ -143,7 +143,7 @@ async function loadReports(): Promise<AcceptedPathBaselineReport[]> {
     const text = await readFile(path.join(repoRoot, fixture.acceptedPackage.path), "utf8");
     const parsed = parseCanonicalAcceptedPathPackage(text);
     assert.equal(parsed.sha256, fixture.acceptedPackage.sha256, fixture.catalogKey);
-    reports.push(acceptedPathBaselineReport(parsed.package, parsed.sha256));
+    reports.push(await acceptedPathBaselineReport(parsed.package, parsed.sha256));
   }
   return reports;
 }

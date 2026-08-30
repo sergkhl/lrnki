@@ -146,23 +146,32 @@ maybe("readSourceEvidence resolves exact immutable resource/block pairs in reque
 
     assert.deepEqual(rows.map((row) => ({
       sourceResourceId: row.sourceResourceId,
+      sourceDocumentId: row.sourceDocumentId,
       sourceBlockId: row.sourceBlockId,
+      blockId: row.blockId,
       sourceTitle: row.sourceTitle,
       headingPath: row.headingPath,
+      locator: row.locator,
       text: row.text
     })), [
       {
         sourceResourceId: secondResourceId,
+        sourceDocumentId: secondDocumentId,
         sourceBlockId: secondBlockId,
+        blockId: "second",
         sourceTitle: "Generated source two",
         headingPath: ["Second"],
+        locator: {},
         text: "The second generated source preserves its exception."
       },
       {
         sourceResourceId: firstResourceId,
+        sourceDocumentId: firstDocumentId,
         sourceBlockId: firstBlockId,
+        blockId: "first",
         sourceTitle: "Generated source one",
         headingPath: ["First"],
+        locator: {},
         text: "The first generated source preserves its condition."
       }
     ]);

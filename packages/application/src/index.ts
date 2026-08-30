@@ -361,6 +361,22 @@ export {
   type SectionedExpedition
 } from "./expeditionSections";
 export {
+  expeditionRoutePolicyIdentity,
+  planExpeditionRoute,
+  resolveExpeditionSourceCues,
+  type ExpeditionInstructionalSourceCue,
+  type ExpeditionRouteConcept,
+  type ExpeditionRouteDiagnostics,
+  type ExpeditionRouteEdge,
+  type ExpeditionRouteLeg,
+  type ExpeditionRoutePlan,
+  type ExpeditionRoutePlanningResult,
+  type ExpeditionRoutePolicy,
+  type ExpeditionRouteStudyItemCandidate,
+  type ExpeditionRouteUnavailableReason,
+  type ExpeditionSourceCueResolution
+} from "./expeditionRoutePlan";
+export {
   lessonGroundingShape,
   type LessonGroundingShape
 } from "./lessonGroundingShape";

@@ -245,20 +245,18 @@ test("composeStudySession treats a learn verdict as cleared calibration, not kno
 });
 
 test("composeStudySession rides down a layer-wide sectioned expedition path with the derived summit", () => {
-  // Both milestones carry a Study Item, so both Legs are winnable and neither is merged away.
   const session = compose({
     studyItems: [optionItem("move"), optionItem("borrow")],
     verdicts: [{ learnerStateRef: "L1", derivedNodeId: "scope", verdict: "known" }]
   });
-  // The whole floored layer is the trail: move's cone (scope, ownership, move) then borrow's
-  // singleton section. Every non-floored node appears exactly once.
+  // The whole floored layer is one target-four route-plan Leg. Every non-floored node appears
+  // exactly once and the stable final Concept is both its anchor and the derived summit.
   assert.deepEqual(session.expeditionPath.map((step) => step.derivedNodeId).sort(), ["borrow", "move", "ownership", "scope"]);
   assert.equal(session.expeditionPath.find((step) => step.derivedNodeId === "scope")?.state, session.classification.stateByNode.scope);
-  // Summit is the last section's milestone — the hardest terminal, borrow.
+  // Summit is the last route Concept, borrow.
   assert.equal(session.target.derivedNodeId, "borrow");
   assert.equal(session.expeditionPath.find((step) => step.derivedNodeId === "borrow")?.isSummit, true);
-  // Two milestone-anchored sections: move (easier cone) first, borrow second.
-  assert.deepEqual(session.sections.map((section) => section.milestoneDerivedNodeId), ["move", "borrow"]);
+  assert.deepEqual(session.sections.map((section) => section.milestoneDerivedNodeId), ["borrow"]);
 });
 
 test("composeStudySession prunes the known closure and keeps the derived summit visible even when known", () => {

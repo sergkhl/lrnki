@@ -134,9 +134,12 @@ const sourceEvidenceRead = {
     return [{
       sourceResourceId: "resource-1",
       sourceTitle: "Generated permit policy",
+      sourceDocumentId: "document-1",
       sourceBlockId: "block-1",
+      blockId: "block-1",
       blockType: "paragraph",
       headingPath: ["Permit validity"],
+      locator: {},
       text: "A permit is effective through 12:00 only when the signed exception is present. An unsigned permit expires earlier."
     }];
   }

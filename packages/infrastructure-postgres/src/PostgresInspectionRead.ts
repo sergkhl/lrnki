@@ -244,13 +244,16 @@ export class PostgresInspectionRead implements RunInspectionReadPort, SourceInsp
     const rows = await this.sql<{
       source_resource_id: string;
       source_title: string;
+      source_document_id: string;
       source_block_id: string;
+      block_id: string;
       block_type: string;
       heading_path: string[];
+      locator: SourceEvidenceRecord["locator"];
       text: string;
     }[]>`
-      SELECT sr.source_resource_id, sr.title AS source_title, sb.source_block_id,
-             sb.block_type, sb.heading_path, sb.text
+      SELECT sr.source_resource_id, sr.title AS source_title, sb.source_document_id,
+             sb.source_block_id, sb.block_id, sb.block_type, sb.heading_path, sb.locator, sb.text
       FROM source_blocks sb
       JOIN source_documents sd ON sd.source_document_id = sb.source_document_id
       JOIN source_resources sr ON sr.source_resource_id = sd.source_resource_id
@@ -263,9 +266,12 @@ export class PostgresInspectionRead implements RunInspectionReadPort, SourceInsp
           {
             sourceResourceId: row.source_resource_id,
             sourceTitle: row.source_title,
+            sourceDocumentId: row.source_document_id,
             sourceBlockId: row.source_block_id,
+            blockId: row.block_id,
             blockType: row.block_type,
             headingPath: row.heading_path,
+            locator: row.locator,
             text: row.text
           } satisfies SourceEvidenceRecord
         ] as const)

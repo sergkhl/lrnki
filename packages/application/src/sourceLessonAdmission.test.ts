@@ -68,9 +68,12 @@ const sourceEvidenceRead: SourceEvidenceReadPort = {
     return [{
       sourceResourceId: "resource-1",
       sourceTitle: "Generated policy source",
+      sourceDocumentId: "document-1",
       sourceBlockId: "block-1",
+      blockId: "block-1",
       blockType: "paragraph",
       headingPath: ["Authorization"],
+      locator: {},
       text: "A bounded authorization retains the stated exception and deadline. Keep this supported condition. Keep this supported caption. A supported paraphrase contains the retained term."
     }];
   }
@@ -137,9 +140,12 @@ test("lesson admission derives normalized citation fidelity from the immutable s
         return [{
           sourceResourceId: "resource-1",
           sourceTitle: "Wrapped generated policy source",
+          sourceDocumentId: "document-1",
           sourceBlockId: "block-1",
+          blockId: "block-1",
           blockType: "paragraph",
           headingPath: ["Authorization"],
+          locator: {},
           text: "A bounded authorization retains the stated exception\nand deadline. Keep this supported condition. Keep this supported caption. A supported paraphrase contains the retained term."
         }];
       }

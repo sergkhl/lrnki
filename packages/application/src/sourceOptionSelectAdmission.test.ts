@@ -75,9 +75,12 @@ const sourceEvidenceRead = {
     return [{
       sourceResourceId: "resource-1",
       sourceTitle: "Generated permit policy",
+      sourceDocumentId: "document-1",
       sourceBlockId: "block-1",
+      blockId: "block-1",
       blockType: "paragraph",
       headingPath: ["Validity"],
+      locator: {},
       text: "A permit remains valid through noon only when the signed exception is present."
     }];
   }

@@ -58,6 +58,7 @@ import type {
   RunCandidate,
   RunForBuild,
   SourceBlock,
+  SourceLocator,
   StructuredDocument
 } from "@lrnki/domain-core";
 
@@ -1546,9 +1547,12 @@ export interface SourceInspectionReadPort {
 export type SourceEvidenceRecord = {
   sourceResourceId: string;
   sourceTitle: string;
+  sourceDocumentId: string;
   sourceBlockId: string;
+  blockId: string;
   blockType: string;
   headingPath: string[];
+  locator: SourceLocator;
   text: string;
 };
 

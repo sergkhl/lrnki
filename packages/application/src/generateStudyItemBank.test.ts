@@ -380,8 +380,11 @@ function sourceAssetQualificationPassing(): GenerateStudyItemBankInput["sourceAs
         return references.map((reference) => ({
           ...reference,
           sourceTitle: "Generated test source",
+          sourceDocumentId: `document-${reference.sourceResourceId}`,
+          blockId: reference.sourceBlockId,
           blockType: "paragraph",
           headingPath: [],
+          locator: {},
           text: [
             ownershipDef,
             "Borrowing lets code reference values without taking ownership.",
@@ -674,8 +677,11 @@ test("a source graph with an unavailable support verifier persists its candidate
           return references.map((reference) => ({
             ...reference,
             sourceTitle: "Generated ownership source",
+            sourceDocumentId: `document-${reference.sourceResourceId}`,
+            blockId: reference.sourceBlockId,
             blockType: "paragraph",
             headingPath: [],
+            locator: {},
             text: ownershipDef
           }));
         }
@@ -1269,8 +1275,11 @@ test("a source-cited non-extractive definition falls back after settlement witho
           return references.map((reference) => ({
             ...reference,
             sourceTitle: "Harbor safety source",
+            sourceDocumentId: `document-${reference.sourceResourceId}`,
+            blockId: reference.sourceBlockId,
             blockType: "paragraph",
             headingPath: ["Safety override"],
+            locator: {},
             text: sourceDefinition
           }));
         }

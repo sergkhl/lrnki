@@ -67,10 +67,10 @@ async function main(): Promise<void> {
     );
     process.stdout.write(`${JSON.stringify({
       complete: packages.length === manifest.fixtures.length,
-      packages: packages.map((acceptedPackage) => acceptedPathBaselineReport(
+      packages: await Promise.all(packages.map((acceptedPackage) => acceptedPathBaselineReport(
         acceptedPackage,
         requiredDigest(digestByCatalogKey, acceptedPackage.catalog.catalogKey)
-      ))
+      )))
     }, null, 2)}\n`);
     return;
   }

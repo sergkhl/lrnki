@@ -1,16 +1,21 @@
 import {
   lessonGroundingShape,
-  projectExpeditionSections
+  planExpeditionRoute,
+  resolveExpeditionSourceCues,
+  type ExpeditionInstructionalSourceCue,
+  type ExpeditionRouteLeg
 } from "@lrnki/application";
 import type {
   ConceptLesson,
   ConceptLessonSection,
+  SourceLocator,
   StudyItemType
 } from "@lrnki/domain-core";
 import type {
   AcceptedPathPackage,
   DerivedGraphEdge,
-  DerivedGraphNode
+  DerivedGraphNode,
+  SourceEvidenceReadPort
 } from "@lrnki/ports";
 
 type JsonRow = Record<string, unknown>;
@@ -88,10 +93,22 @@ type ConceptLessonCitationRow = JsonRow & {
 
 type SourceBlockRow = JsonRow & {
   block_id: string;
+  block_type: string;
   heading_path: string[];
-  locator: { characterStart?: number };
+  locator: SourceLocator;
   source_block_id: string;
   source_document_id: string;
+  text: string;
+};
+
+type SourceDocumentRow = JsonRow & {
+  source_document_id: string;
+  source_resource_id: string;
+};
+
+type SourceResourceRow = JsonRow & {
+  source_resource_id: string;
+  title: string;
 };
 
 type RoutePlanShape = {
@@ -120,6 +137,19 @@ export type AcceptedPathBaselineReport = {
   sourceCueCount: number;
   sourceOrderBacktrackCount: number;
   sourceMajorHeadingTransitionsInsideLegs: number;
+  projectedRoute: {
+    policyIdentity: string;
+    orderedConcepts: Array<{
+      derivedNodeId: string;
+      canonicalLabel: string;
+      sourceDocumentId: string | null;
+      blockId: string | null;
+      headingPath: string[];
+      locator: SourceLocator | null;
+    }>;
+    legs: ExpeditionRouteLeg[];
+    summitDerivedNodeId: string | null;
+  };
   targetContract: {
     routePlanPresent: boolean;
     everyLegHasThreeToFiveConcepts: boolean;
@@ -130,10 +160,10 @@ export type AcceptedPathBaselineReport = {
   };
 };
 
-export function acceptedPathBaselineReport(
+export async function acceptedPathBaselineReport(
   acceptedPackage: AcceptedPathPackage,
   packageSha256: string
-): AcceptedPathBaselineReport {
+): Promise<AcceptedPathBaselineReport> {
   const tables = packageTables(acceptedPackage);
   const trailNodeIds = new Set(acceptedPackage.qualification.trailNodeIds);
   const currentStudyItemIds = new Set(
@@ -194,37 +224,7 @@ export function acceptedPathBaselineReport(
       uncertain: row.uncertain,
       judgeModel: row.judge_model
     }));
-  const route = projectExpeditionSections({
-    detail: { nodes, edges },
-    stateByNode: {}
-  });
-  const routeNodeIds = route.steps.map((step) => step.derivedNodeId);
-  requireExactSet(
-    routeNodeIds,
-    trailNodeIds,
-    `${acceptedPackage.catalog.catalogKey} projected route nodes`
-  );
-  const routePosition = new Map(
-    routeNodeIds.map((derivedNodeId, index) => [derivedNodeId, index] as const)
-  );
   const trustedEdges = edges.filter((edge) => !edge.uncertain);
-  const trustedTopologicalViolationCount = trustedEdges.filter((edge) =>
-    requiredPosition(routePosition, edge.prerequisiteDerivedNodeId) >=
-    requiredPosition(routePosition, edge.dependentDerivedNodeId)
-  ).length;
-
-  const currentFamiliesByNode = familySetsByNode(currentStudyItems);
-  const fullFamiliesByNode = familySetsByNode(studyItems);
-  const mixedLegCount = route.sections.filter((section) =>
-    section.stepDerivedNodeIds.some((derivedNodeId) =>
-      hasBonusFamily(currentFamiliesByNode.get(derivedNodeId))
-    )
-  ).length;
-  const longestBonusUncoveredRun = longestRun(
-    routeNodeIds.map((derivedNodeId) =>
-      !hasBonusFamily(fullFamiliesByNode.get(derivedNodeId))
-    )
-  );
 
   const lessons = reconstructCurrentLessons(tables, currentConceptLessonIds);
   requireExactSet(
@@ -235,7 +235,60 @@ export function acceptedPathBaselineReport(
   const passageCounts = lessons.map((lesson) =>
     lessonGroundingShape(lesson)?.passages.length ?? 0
   );
-  const sourceCues = sourceCuesByNode(tables, lessons);
+  const cueResolution = await resolveExpeditionSourceCues({
+    lessons,
+    sourceEvidenceRead: packageSourceEvidenceRead(tables)
+  });
+  if (!cueResolution.resolved) {
+    throw new Error(
+      `${acceptedPackage.catalog.catalogKey} source cue resolution failed: ${JSON.stringify(cueResolution)}`
+    );
+  }
+  const sourceCues = new Map(cueResolution.cues.map((cue) => [
+    cue.derivedNodeId,
+    cue
+  ] as const));
+  const routeResult = planExpeditionRoute({
+    concepts: nodes.map((node) => ({
+      derivedNodeId: node.derivedNodeId,
+      canonicalLabel: node.label,
+      difficulty: node.difficulty
+    })),
+    trustedPrerequisiteEdges: trustedEdges,
+    instructionalSourceCues: cueResolution.cues,
+    policy: "layer_projection"
+  });
+  if (routeResult.status === "unavailable") {
+    throw new Error(
+      `${acceptedPackage.catalog.catalogKey} route report failed: ${routeResult.reason} ${JSON.stringify(routeResult.diagnostics)}`
+    );
+  }
+  const route = routeResult.plan;
+  const routeNodeIds = route.orderedDerivedNodeIds;
+  requireExactSet(
+    routeNodeIds,
+    trailNodeIds,
+    `${acceptedPackage.catalog.catalogKey} projected route nodes`
+  );
+  const routePosition = new Map(
+    routeNodeIds.map((derivedNodeId, index) => [derivedNodeId, index] as const)
+  );
+  const trustedTopologicalViolationCount = trustedEdges.filter((edge) =>
+    requiredPosition(routePosition, edge.prerequisiteDerivedNodeId) >=
+    requiredPosition(routePosition, edge.dependentDerivedNodeId)
+  ).length;
+  const currentFamiliesByNode = familySetsByNode(currentStudyItems);
+  const fullFamiliesByNode = familySetsByNode(studyItems);
+  const mixedLegCount = route.legs.filter((leg) =>
+    leg.derivedNodeIds.some((derivedNodeId) =>
+      hasBonusFamily(currentFamiliesByNode.get(derivedNodeId))
+    )
+  ).length;
+  const longestBonusUncoveredRun = longestRun(
+    routeNodeIds.map((derivedNodeId) =>
+      !hasBonusFamily(fullFamiliesByNode.get(derivedNodeId))
+    )
+  );
   const orderedSourceCues = routeNodeIds.flatMap((derivedNodeId) => {
     const cue = sourceCues.get(derivedNodeId);
     return cue ? [cue] : [];
@@ -243,20 +296,23 @@ export function acceptedPathBaselineReport(
   const sourceOrderBacktrackCount = orderedSourceCues.slice(1).filter((cue, index) => {
     const previous = orderedSourceCues[index];
     return previous.sourceDocumentId === cue.sourceDocumentId &&
-      previous.characterStart > cue.characterStart;
+      typeof previous.locator.characterStart === "number" &&
+      typeof cue.locator.characterStart === "number" &&
+      previous.locator.characterStart > cue.locator.characterStart;
   }).length;
-  const sourceMajorHeadingTransitionsInsideLegs = route.sections.reduce(
-    (total, section) => total + section.stepDerivedNodeIds.slice(1).filter((derivedNodeId, index) => {
-      const previousCue = sourceCues.get(section.stepDerivedNodeIds[index]);
+  const sourceMajorHeadingTransitionsInsideLegs = route.legs.reduce(
+    (total, leg) => total + leg.derivedNodeIds.slice(1).filter((derivedNodeId, index) => {
+      const previousCue = sourceCues.get(leg.derivedNodeIds[index]);
       const cue = sourceCues.get(derivedNodeId);
       return Boolean(
         previousCue && cue &&
         previousCue.sourceDocumentId === cue.sourceDocumentId &&
-        previousCue.majorHeading !== cue.majorHeading
+        majorHeading(previousCue) !== majorHeading(cue)
       );
     }).length,
     0
   );
+  const nodeById = new Map(nodes.map((node) => [node.derivedNodeId, node] as const));
 
   const qualification = acceptedPackage.qualification as AcceptedPathPackage["qualification"] & {
     totalConceptCount?: unknown;
@@ -268,10 +324,10 @@ export function acceptedPathBaselineReport(
     Array.isArray(qualification.routePlan.legs)
   );
   const currentFamilies = familyCounts(currentStudyItems);
-  const everyLegHasThreeToFiveConcepts = route.sections.every((section) =>
-    section.stepDerivedNodeIds.length >= 3 && section.stepDerivedNodeIds.length <= 5
+  const everyLegHasThreeToFiveConcepts = route.legs.every((leg) =>
+    leg.derivedNodeIds.length >= 3 && leg.derivedNodeIds.length <= 5
   );
-  const everyLegHasMixedPractice = mixedLegCount === route.sections.length;
+  const everyLegHasMixedPractice = mixedLegCount === route.legs.length;
   const expeditionUsesEveryFamily = Object.values(currentFamilies).every((count) => count > 0);
   const honestConceptCount = typeof qualification.totalConceptCount === "number" &&
     qualification.totalConceptCount === trailNodeIds.size &&
@@ -286,12 +342,12 @@ export function acceptedPathBaselineReport(
     conceptCount: trailNodeIds.size,
     trustedEdgeCount: trustedEdges.length,
     trustedTopologicalViolationCount,
-    legCount: route.sections.length,
-    singletonLegCount: route.sections.filter((section) =>
-      section.stepDerivedNodeIds.length === 1
+    legCount: route.legs.length,
+    singletonLegCount: route.legs.filter((leg) =>
+      leg.derivedNodeIds.length === 1
     ).length,
     legSizeHistogram: histogram(
-      route.sections.map((section) => section.stepDerivedNodeIds.length)
+      route.legs.map((leg) => leg.derivedNodeIds.length)
     ),
     fullBankFamilyCounts: familyCounts(studyItems),
     currentFamilyCounts: currentFamilies,
@@ -305,6 +361,22 @@ export function acceptedPathBaselineReport(
     sourceCueCount: sourceCues.size,
     sourceOrderBacktrackCount,
     sourceMajorHeadingTransitionsInsideLegs,
+    projectedRoute: {
+      policyIdentity: route.policyIdentity,
+      orderedConcepts: routeNodeIds.map((derivedNodeId) => {
+        const cue = sourceCues.get(derivedNodeId);
+        return {
+          derivedNodeId,
+          canonicalLabel: nodeById.get(derivedNodeId)?.label ?? derivedNodeId,
+          sourceDocumentId: cue?.sourceDocumentId ?? null,
+          blockId: cue?.blockId ?? null,
+          headingPath: cue?.headingPath ?? [],
+          locator: cue?.locator ?? null
+        };
+      }),
+      legs: route.legs,
+      summitDerivedNodeId: route.summitDerivedNodeId
+    },
     targetContract: {
       routePlanPresent,
       everyLegHasThreeToFiveConcepts,
@@ -462,55 +534,52 @@ function reconstructCurrentLessons(
     }));
 }
 
-function sourceCuesByNode(
-  tables: Record<string, unknown[]>,
-  lessons: readonly ConceptLesson[]
-): Map<string, {
-  sourceDocumentId: string;
-  blockId: string;
-  characterStart: number;
-  majorHeading: string;
-}> {
-  const lessonById = new Map(lessons.map((lesson) => [lesson.conceptLessonId, lesson] as const));
-  const sectionRows = rows<ConceptLessonSectionRow>(tables, "concept_lesson_sections")
-    .filter((row) => lessonById.has(row.concept_lesson_id))
-    .filter((row) => row.kind === "definition" || row.kind === "examples" || row.kind === "formulas");
-  const citationBySection = new Map(
-    rows<ConceptLessonCitationRow>(tables, "concept_lesson_section_citations")
-      .filter((row) => row.provenance === "source")
-      .map((row) => [row.concept_lesson_section_id, row] as const)
-  );
-  const blockById = new Map(
-    rows<SourceBlockRow>(tables, "source_blocks")
-      .map((row) => [row.source_block_id, row] as const)
-  );
-  const cuesByNode = new Map<string, {
-    sourceDocumentId: string;
-    blockId: string;
-    characterStart: number;
-    majorHeading: string;
-  }>();
-  for (const section of sectionRows) {
-    const citation = citationBySection.get(section.concept_lesson_section_id);
-    if (!citation?.source_block_id) continue;
-    const block = blockById.get(citation.source_block_id);
-    const characterStart = block?.locator.characterStart;
-    if (!block || typeof characterStart !== "number") continue;
-    const lesson = lessonById.get(section.concept_lesson_id);
-    if (!lesson) continue;
-    const candidate = {
-      sourceDocumentId: block.source_document_id,
-      blockId: block.block_id,
-      characterStart,
-      majorHeading: block.heading_path[0] ?? ""
-    };
-    const current = cuesByNode.get(lesson.derivedNodeId);
-    if (!current || candidate.characterStart < current.characterStart ||
-        (candidate.characterStart === current.characterStart && candidate.blockId.localeCompare(current.blockId) < 0)) {
-      cuesByNode.set(lesson.derivedNodeId, candidate);
+function packageSourceEvidenceRead(
+  tables: Record<string, unknown[]>
+): SourceEvidenceReadPort {
+  const documentById = new Map(rows<SourceDocumentRow>(tables, "source_documents").map((row) => [
+    row.source_document_id,
+    row
+  ] as const));
+  const resourceById = new Map(rows<SourceResourceRow>(tables, "source_resources").map((row) => [
+    row.source_resource_id,
+    row
+  ] as const));
+  const blockById = new Map(rows<SourceBlockRow>(tables, "source_blocks").map((row) => [
+    row.source_block_id,
+    row
+  ] as const));
+  return {
+    async readSourceEvidence(references) {
+      return [...new Map(references.map((reference) => [
+        `${reference.sourceResourceId}\u0000${reference.sourceBlockId}`,
+        reference
+      ] as const)).values()].flatMap((reference) => {
+        const block = blockById.get(reference.sourceBlockId);
+        const document = block ? documentById.get(block.source_document_id) : undefined;
+        if (!block || !document || document.source_resource_id !== reference.sourceResourceId) {
+          return [];
+        }
+        const resource = resourceById.get(document.source_resource_id);
+        if (!resource) return [];
+        return [{
+          sourceResourceId: resource.source_resource_id,
+          sourceTitle: resource.title,
+          sourceDocumentId: document.source_document_id,
+          sourceBlockId: block.source_block_id,
+          blockId: block.block_id,
+          blockType: block.block_type,
+          headingPath: block.heading_path,
+          locator: block.locator,
+          text: block.text
+        }];
+      });
     }
-  }
-  return cuesByNode;
+  };
+}
+
+function majorHeading(cue: ExpeditionInstructionalSourceCue): string {
+  return cue.headingPath[1] ?? cue.headingPath[0] ?? "";
 }
 
 function rejectionReasonCounts(
