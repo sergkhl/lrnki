@@ -22,9 +22,10 @@ import {
   validateAcceptedPathPackageSet
 } from "@lrnki/infrastructure-postgres";
 import type { AcceptedPathPackage } from "@lrnki/ports";
+import { acceptedPathBaselineReport } from "./acceptedPathBaselineReport";
 import { createLearnerSourceExpeditions } from "./sourceExpedition";
 
-type Command = "export" | "validate" | "install";
+type Command = "export" | "validate" | "report" | "install";
 type Options = {
   command: Command;
   manifest: string;
@@ -56,6 +57,21 @@ async function main(): Promise<void> {
       complete: packages.length === manifest.fixtures.length,
       catalogKeys: packages.map((entry) => entry.catalog.catalogKey)
     })}\n`);
+    return;
+  }
+  if (options.command === "report") {
+    const digestByCatalogKey = new Map(
+      manifest.fixtures.flatMap((fixture) => fixture.acceptedPackage
+        ? [[fixture.catalogKey, fixture.acceptedPackage.sha256] as const]
+        : [])
+    );
+    process.stdout.write(`${JSON.stringify({
+      complete: packages.length === manifest.fixtures.length,
+      packages: packages.map((acceptedPackage) => acceptedPathBaselineReport(
+        acceptedPackage,
+        requiredDigest(digestByCatalogKey, acceptedPackage.catalog.catalogKey)
+      ))
+    }, null, 2)}\n`);
     return;
   }
 
@@ -240,8 +256,8 @@ function loadRepoEnv(): void {
 
 function parseArgs(args: readonly string[]): Options {
   const command = args[0];
-  if (command !== "export" && command !== "validate" && command !== "install") {
-    throw new Error("Use accepted-paths <export|validate|install>.");
+  if (command !== "export" && command !== "validate" && command !== "report" && command !== "install") {
+    throw new Error("Use accepted-paths <export|validate|report|install>.");
   }
   let manifest = "fixtures/accepted-paths/manifest.json";
   let catalogKey: string | undefined;
@@ -256,6 +272,12 @@ function parseArgs(args: readonly string[]): Options {
   }
   if (command === "export" && allowPartial) throw new Error("export does not accept --allow-partial.");
   return { command, manifest, catalogKey, allowPartial };
+}
+
+function requiredDigest(digests: ReadonlyMap<string, string>, catalogKey: string): string {
+  const digest = digests.get(catalogKey);
+  if (!digest) throw new Error(`Accepted package digest is missing for ${JSON.stringify(catalogKey)}.`);
+  return digest;
 }
 
 function requiredValue(argument: string, prefix: string): string {

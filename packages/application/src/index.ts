@@ -360,6 +360,10 @@ export {
   type ExpeditionSectionStep,
   type SectionedExpedition
 } from "./expeditionSections";
+export {
+  lessonGroundingShape,
+  type LessonGroundingShape
+} from "./lessonGroundingShape";
 
 export {
   layoutSphereGrid,

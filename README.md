@@ -217,6 +217,7 @@ current global closure from the guarded development database:
 pnpm accepted-paths export --catalog-key=critical-thinking
 pnpm accepted-paths validate --allow-partial  # authoring-time packages currently present
 pnpm accepted-paths validate                  # exact complete manifest set; no database access
+pnpm accepted-paths report                    # read-only route/item/grounding baseline
 pnpm seed:accepted-paths                      # destructive model-free reset + complete install
 ```
 

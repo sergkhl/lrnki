@@ -8,9 +8,10 @@
   uses all three families; mastery and rewards stay unchanged. The work also owns family-aware
   Guardians, honest Concept counts, asset identity v3, accepted package v2, replacement five-path
   packages, model-free reinstall, real-backend web, and fresh Debug iOS Simulator proof.
-  [Plan](./2026-08-29-001-expand-source-expedition-legs-and-mixed-study-items.md). **NEXT:** U0 freezes
-  the current route/item baseline and accepted identities, then probes one path's post-veto mixed-item
-  yield before U1.
+  [Plan](./2026-08-29-001-expand-source-expedition-legs-and-mixed-study-items.md). U0 froze the exact
+  five-package defect/identity baseline and proved the hard mixed-Leg partition feasible after
+  passage-count veto removal. **NEXT:** U1 introduces and proves the one shared source-cued route
+  plan.
 
 - **Shape Concept Lesson grounding depth.** 140 of 183 qualified lessons yield one grounding passage
   while their Concepts hold four to six verified source evidence passages, so the Study Item

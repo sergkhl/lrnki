@@ -7,12 +7,11 @@ execution: code
 
 # Expand Source Expedition Legs and Qualify Mixed Study Items
 
-**Status:** Ready — repository diagnosis, design review, and owner decisions are complete;
-implementation has not started
+**Status:** In progress — U0 froze the five-package baseline and proved the hard mixed-Leg route
+feasible after passage-count veto removal; U1 is next
 
-**NEXT:** U0 freezes the current five-package route/item baseline in focused regression tests,
-records the exact accepted-package identities, and probes one path's post-veto mixed-item yield
-before U1.
+**NEXT:** U1 introduces the one shared, source-cued Expedition Route Plan and proves its pure
+topological order, 3–5-Concept partition, bonus coverage, determinism, and explicit failure paths.
 
 **Decision state:** Accepted by the owner on 2026-08-29 and amended the same day after design
 review. A normal Leg contains 3–5 Concepts, targeting four. Every Concept keeps one qualified
@@ -606,6 +605,56 @@ The plan is complete only when all of the following are true:
    remains unrecorded in `BLOCKERS.md`.
 
 ## Validation Log
+
+### U0 — Five-package baseline and post-veto feasibility probe — 2026-08-30
+
+- **Implementation:** `pnpm accepted-paths report` now validates the canonical manifest/package set
+  and recomputes route, family, grounding, rejection, source-cue, and target-contract summaries
+  without environment loading or database access. Its focused suite freezes 183 Concepts, zero
+  trusted topological violations, 140 one-passage lessons, full-bank family totals of 183
+  option-select/26 matching/43 impostor, and the current singleton-heavy route. No learner behavior,
+  qualification, package, or generation policy changed in U0.
+- **Frozen package identities:** Critical Thinking `8f0977a457b0a8cc0c2fc8d2d7182d09b3c27f6071e2529cf019b5177cbdeec4`
+  / `source-expedition-assets-02cb55fe3bee71d8e631851445c47d313433892c91b236f4ddcb91ea6e6514fc`;
+  Probability and Statistics `1c45b20e55626671947d2ed4eabcbe4528697cbbc139f638c5946d03e86f8bc0`
+  / `source-expedition-assets-91e00849e8e5449a14837893d0d774e1b5a5b0dd958dfd2250d020d7cc77e961`;
+  Personal Finance `0f6b75fb670348a9e23aadd16232bd88437f6be16a585ccdaaa45c4997e04fa2`
+  / `source-expedition-assets-0a7ddc24fde0326b3fb89c358555a6a951080f2a2eaab95d2f419da87318395f`;
+  Machine Learning `45b2dc125c5fdbca7c30b3cae2b910bf2674472c222f5ced6c1da745de9bcc6f`
+  / `source-expedition-assets-9c6323b38a47c0880333b61948755ebe7233f8ef50a2432775ebb9897d139857`;
+  Neuroscience `ffabde24ea0fc862e9b962dfb38740d807b1947f94e6fb87ba92aadb3496589e`
+  / `source-expedition-assets-9999fce0841f211ee7c25744a50744c6542be51adc2ef9f138981966a15ce500`.
+  All five use asset config `source-expedition-learner-assets-v2:study-item-bank-acebfee04913`.
+- **Focused regression:** the baseline report, prerequisite closure, source-expedition, mastery,
+  grading, replay, and package-safety tests pass. The six named target-contract bodies execute and
+  fail under `node:test` TODO status for Leg size, explicit source-cued routing, Leg mix,
+  Expedition-wide families, honest Concept count, and route-sensitive identity. Both affected
+  workspaces typecheck; ESLint, package-set validation, and `git diff --check` pass.
+- **Post-veto probe:** against the existing Neuroscience Enrichment Run
+  `344ad479-54b7-465c-a7a0-780417ec2c64`, one standard-concurrency production MiMo v2.5 generation
+  ran with only the two passage-count vetoes temporarily removed; the source patch was then restored.
+  The terminal neutral bank has 40 current lessons/source cues, 38 option-select, 14 matching, and
+  36 impostor items. Thirty-six of 40 Concepts are bonus-capable, the longest source-cued uncovered
+  run is one, and a hard 3–5-Concept mixed partition exists. KTD5's `leg_mix_absent` degrade path is
+  therefore not activated for U1. The two missing option-select items failed the unchanged
+  duplicate-option guard, so this bank is not an accepted path.
+- **Direct inspection:** all 50 bonus artifacts were inspected: 52 matching pairs contain 50 source
+  and two generated relationships; 108 impostor truths contain 104 source and four generated
+  relationships; all pass the current mechanical family shapes. Two unselected impostor corrections
+  are internally false: Retrieval Practice Effect attributes its dopamine lie to acetylcholine and
+  neuromodulators, and Retrieval calls an equal-strengthening lie true of Retrieval-Induced
+  Forgetting while describing reduced access. U2 already owns this exact family-complete
+  material-claim and correction-support defect class; neither candidate is admitted.
+- **Real-use quality:** Milestone U0 feasibility probe; fixture Neuroscience of Memory and Attention;
+  real model calls yes; result `EXPERIMENT_ONLY`; useful output is the measured route-feasibility
+  bound; defects are the two false corrections and two absent option-select items; changes after
+  inspection are none because the veto patch was reverted; remaining caveats are source-family
+  admission, unresolved MiMo quantization identity, and no accepted route; safe downstream use is
+  U1 route implementation only, never learner admission or publication.
+- **Authority boundary:** committed-package inspection, local automated checks, one production-model
+  generation into the guarded development database, and direct neutral-artifact inspection only.
+  The development database now contains that unaccepted experimental terminal bank. No real-backend
+  web, native, deployed, physical-device, production, or release evidence was produced.
 
 ### Planning baseline and design review — 2026-08-29
 
