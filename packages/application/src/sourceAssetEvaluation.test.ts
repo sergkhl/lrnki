@@ -120,6 +120,17 @@ function qualifiedFixture(): QualifiedSourceExpedition {
       lessonAbsent: [],
       studyItems: [item],
       trailNodeIds: new Set(["node-1"]),
+      routePlan: {
+        policyIdentity: "source-expedition-route-test",
+        orderedDerivedNodeIds: ["node-1"],
+        legs: [{
+          legIndex: 0,
+          anchorDerivedNodeId: "node-1",
+          derivedNodeIds: ["node-1"],
+          selectedBonusStudyItemIds: []
+        }],
+        summitDerivedNodeId: "node-1"
+      },
       expectedAssets: {
         assetSetIdentity: "source-expedition-assets-test",
         currentConceptLessonIds: ["lesson-1"],
@@ -387,6 +398,7 @@ test("activated source support stays independent while exact-reference truth spe
 test("distractor invalidity and key uniqueness retain distinct rejection and abstention reasons", () => {
   const qualification = qualifiedFixture();
   const item = qualification.assets.studyItems[0]!;
+  if (item.itemType !== "option_select") throw new Error("Fixture item must be option-select.");
   const projection = projectSourceMaterialClaims({
     lessons: qualification.assets.lessons,
     studyItems: qualification.assets.studyItems

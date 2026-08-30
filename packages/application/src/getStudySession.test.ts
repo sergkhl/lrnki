@@ -106,6 +106,8 @@ function sourceExpeditions(input: {
       const items = (input.items ?? []).filter(
         (item): item is OptionSelectItem => item.itemType === "option_select"
       );
+      const orderedDerivedNodeIds = graph.nodes.map((node) => node.derivedNodeId);
+      const summitDerivedNodeId = orderedDerivedNodeIds.at(-1) ?? null;
       return {
         status: "available" as const,
         candidate: {
@@ -124,6 +126,17 @@ function sourceExpeditions(input: {
           lessonAbsent: input.absent ?? [],
           studyItems: items,
           trailNodeIds: new Set(graph.nodes.map((node) => node.derivedNodeId)),
+          routePlan: {
+            policyIdentity: "source-expedition-route-test",
+            orderedDerivedNodeIds,
+            legs: summitDerivedNodeId ? [{
+              legIndex: 0,
+              anchorDerivedNodeId: summitDerivedNodeId,
+              derivedNodeIds: orderedDerivedNodeIds,
+              selectedBonusStudyItemIds: []
+            }] : [],
+            summitDerivedNodeId
+          },
           expectedAssets: {
             assetSetIdentity: "qualified-assets",
             currentConceptLessonIds: (input.lessons ?? []).map((lesson) => lesson.conceptLessonId),

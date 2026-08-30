@@ -624,6 +624,36 @@ export function settleStrictImpostorTruth(
   );
 }
 
+// Deterministic read-time recheck for a persisted item carrying the qualified Source Expedition
+// config identity. Neural decisions are represented by that exact identity; this function replays
+// every metadata, family-shape, provenance, and lesson-grounding condition that can be proven from
+// the persisted rows without calling a model.
+export function persistedSourceStudyItemQualificationReasons(input: {
+  candidate: StudyItem;
+  lesson: ConceptLesson | undefined;
+  canonicalLabel: string;
+  graphVersionId: string;
+  enrichmentId: string;
+  qualifiedAssetConfigHash: string;
+}): string[] {
+  const reasons: string[] = [];
+  if (input.candidate.graphVersionId !== input.graphVersionId) {
+    reasons.push("graph_version: qualified graph version required");
+  }
+  if (input.candidate.enrichmentId !== input.enrichmentId) {
+    reasons.push("enrichment: qualified enrichment required");
+  }
+  if (input.candidate.configHash !== input.qualifiedAssetConfigHash) {
+    reasons.push("config_hash: qualified Source Expedition identity required");
+  }
+  reasons.push(...sourceStudyItemStructureReasons(
+    input.candidate,
+    input.lesson,
+    input.canonicalLabel
+  ));
+  return reasons;
+}
+
 function sourceStudyItemStructureReasons(
   candidate: StudyItem,
   lesson: ConceptLesson | undefined,

@@ -409,8 +409,9 @@ type LearnerExpeditionRow = {
 
 // One persistence-level race check shared by Source Expedition adoption/activation and direct
 // exact-reference Support Path publication. Qualification snapshots only the learner-visible
-// floored trail. Extra current inspection assets (off-trail lessons/options and held-out families)
-// neither grant readiness nor invalidate it; every expected visible id must still be current.
+// floored trail. Extra current inspection assets (off-trail lessons/items and unselected family
+// candidates) neither grant readiness nor invalidate it; every expected visible id must still be
+// current, regardless of Study Item family.
 export async function currentSourceExpeditionAssetsMatch(
   tx: Sql | TransactionSql,
   enrichmentId: string,
@@ -435,7 +436,6 @@ export async function currentSourceExpeditionAssetsMatch(
     SELECT study_item_id
     FROM study_items
     WHERE enrichment_id = ${enrichmentId}
-      AND item_type = 'option_select'
       AND superseded_at IS NULL
     ORDER BY study_item_id
     FOR SHARE`;

@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type {
   ConceptLesson,
   LessonAbsentNode,
-  OptionSelectItem
+  StudyItem
 } from "@lrnki/domain-core";
 import type {
   EnrichmentInspectionReadPort,
@@ -14,25 +14,31 @@ import type {
   SourceExpeditionSourceCredit,
   SourceExpeditionSourceProvenance,
   SourceExpeditionStorePort,
+  SourceEvidenceReadPort,
   StudyItemBankStorePort,
   ConceptLessonStorePort,
   DerivedGraphDetail
 } from "@lrnki/ports";
 import { applyDifficultyFloor } from "./applyDifficultyFloor";
+import { deriveFlooredExpedition } from "./expeditionSections";
 import {
-  deriveFlooredExpedition,
-  projectExpeditionSections
-} from "./expeditionSections";
+  planExpeditionRoute,
+  resolveExpeditionSourceCues,
+  type ExpeditionRouteDiagnostics,
+  type ExpeditionRoutePlan,
+  type ExpeditionRouteUnavailableReason
+} from "./expeditionRoutePlan";
 import {
   learnerKnowledgeCapabilityIsAvailable,
   type LearnerKnowledgeAvailability
 } from "./learnerKnowledgeAvailability";
+import { persistedSourceStudyItemQualificationReasons } from "./sourceStudyItemAdmission";
 
-// U2's explicit legacy boundary. Merely having current rows is not learner qualification: U5 must
-// persist both lessons and option-select items under this wrapper after its named evidence gates run.
-// Keeping the base operation hash inside the value preserves exact Model Assignment/config identity.
+// A persisted row is learner-current only after family admission and route/mix qualification under
+// this wrapper. Keeping the base operation hash inside the value preserves exact Model Assignment/
+// config identity; the route plan itself is independently bound into the asset-set hash below.
 export const SOURCE_EXPEDITION_ASSET_QUALIFICATION_CONTRACT =
-  "source-expedition-learner-assets-v2";
+  "source-expedition-learner-assets-v3";
 
 // Source asset absence may narrow a learner trail, but it may never erase a trusted
 // prerequisite underneath a retained stop. This policy identity belongs to the adopted
@@ -59,8 +65,9 @@ export type SourceExpeditionUnavailableReason =
   | "lesson_unqualified"
   | "option_select_missing"
   | "option_select_unqualified"
+  | "source_cue_unavailable"
+  | ExpeditionRouteUnavailableReason
   | "accepted_catalog_entry_required"
-  | "accepted_catalog_stop_floor_not_met"
   | "expedition_not_owned"
   | "expedition_inactive"
   | "accepted_asset_set_changed";
@@ -69,6 +76,14 @@ export type SourceExpeditionUnavailable = {
   status: "unavailable";
   reason: SourceExpeditionUnavailableReason;
   derivedNodeId?: string;
+  routeDiagnostics?: ExpeditionRouteDiagnostics;
+  sourceCueDiagnostics?: {
+    missingDerivedNodeIds: string[];
+    unresolvedReferences: Array<{
+      sourceResourceId: string;
+      sourceBlockId: string;
+    }>;
+  };
 };
 
 export type QualifiedSourceExpeditionCandidate = {
@@ -112,8 +127,9 @@ export type QualifiedSourceExpeditionAssets = {
   detail: DerivedGraphDetail;
   lessons: ConceptLesson[];
   lessonAbsent: LessonAbsentNode[];
-  studyItems: OptionSelectItem[];
+  studyItems: StudyItem[];
   trailNodeIds: Set<string>;
+  routePlan: ExpeditionRoutePlan;
   expectedAssets: SourceExpeditionAssetExpectation;
 };
 
@@ -144,6 +160,7 @@ export type SourceExpeditionModuleDeps = {
     "listLessonsForEnrichment" | "listAbsentForEnrichment"
   >;
   studyItemStore: Pick<StudyItemBankStorePort, "listStudyItemsForEnrichment">;
+  sourceEvidenceRead: SourceEvidenceReadPort;
   expeditionStore: Pick<
     LearnerExpeditionStorePort,
     "listForLearner" | "getForLearner" | "getByEnrichment"
@@ -184,10 +201,8 @@ export function createSourceExpeditionModule(deps: SourceExpeditionModuleDeps) {
       broadTrail.trailNodeIds.has(node.derivedNodeId)
     );
     const lessonByNode = groupBy(lessons, (lesson) => lesson.derivedNodeId);
-    const optionsByNode = groupBy(
-      studyItems.filter((item): item is OptionSelectItem => item.itemType === "option_select"),
-      (item) => item.derivedNodeId
-    );
+    const itemsByNode = groupBy(studyItems, (item) => item.derivedNodeId);
+    const qualifiedItemsByNode = new Map<string, StudyItem[]>();
     const directlyReadyNodeIds = new Set<string>();
     const directFailureByNode = new Map<string, SourceExpeditionUnavailable>();
     for (const node of broadTrailNodes) {
@@ -237,7 +252,8 @@ export function createSourceExpeditionModule(deps: SourceExpeditionModuleDeps) {
         continue;
       }
 
-      const nodeOptions = optionsByNode.get(node.derivedNodeId) ?? [];
+      const nodeItems = itemsByNode.get(node.derivedNodeId) ?? [];
+      const nodeOptions = nodeItems.filter((item) => item.itemType === "option_select");
       if (nodeOptions.length === 0) {
         directFailureByNode.set(
           node.derivedNodeId,
@@ -245,24 +261,29 @@ export function createSourceExpeditionModule(deps: SourceExpeditionModuleDeps) {
         );
         continue;
       }
-      const qualified = nodeOptions.filter((item) => optionSelectQualifies(
-        item,
-        graphVersionId,
-        enrichmentId,
-        deps.qualifiedAssetConfigHash
-      ));
-      if (qualified.length === 0) {
+      const qualifiedItems = nodeItems.filter((item) =>
+        persistedSourceStudyItemQualificationReasons({
+          candidate: item,
+          lesson,
+          canonicalLabel: node.label,
+          graphVersionId,
+          enrichmentId,
+          qualifiedAssetConfigHash: deps.qualifiedAssetConfigHash
+        }).length === 0
+      );
+      if (!qualifiedItems.some((item) => item.itemType === "option_select")) {
         directFailureByNode.set(
           node.derivedNodeId,
           unavailable("option_select_unqualified", node.derivedNodeId)
         );
         continue;
       }
+      qualifiedItemsByNode.set(node.derivedNodeId, qualifiedItems);
       directlyReadyNodeIds.add(node.derivedNodeId);
     }
 
     const qualifiedTrail = deriveQualifiedSourceTrail(detail, directlyReadyNodeIds);
-    if (!qualifiedTrail.summit || qualifiedTrail.trailNodeIds.size < 2) {
+    if (qualifiedTrail.trailNodeIds.size < 2) {
       return broadTrailNodes
         .map((node) => directFailureByNode.get(node.derivedNodeId))
         .find((failure): failure is SourceExpeditionUnavailable => failure !== undefined)
@@ -272,39 +293,104 @@ export function createSourceExpeditionModule(deps: SourceExpeditionModuleDeps) {
     const qualifiedLessons = trailNodes.map((node) =>
       (lessonByNode.get(node.derivedNodeId) ?? [])[0]!
     );
-    const qualifiedOptions = trailNodes.flatMap((node) =>
-      (optionsByNode.get(node.derivedNodeId) ?? []).filter((item) => optionSelectQualifies(
-        item,
-        graphVersionId,
-        enrichmentId,
-        deps.qualifiedAssetConfigHash
-      ))
+    const primaryOptions = trailNodes.map((node) =>
+      (qualifiedItemsByNode.get(node.derivedNodeId) ?? [])
+        .filter((item) => item.itemType === "option_select")
+        .sort((left, right) => left.studyItemId.localeCompare(right.studyItemId))[0]!
     );
+    const bonusCandidates = trailNodes.flatMap((node) =>
+      (qualifiedItemsByNode.get(node.derivedNodeId) ?? [])
+        .filter((item) => item.itemType === "matching" || item.itemType === "impostor")
+    );
+    const sourceCues = await resolveExpeditionSourceCues({
+      lessons: qualifiedLessons,
+      sourceEvidenceRead: deps.sourceEvidenceRead
+    });
+    if (!sourceCues.resolved) {
+      return {
+        status: "unavailable",
+        reason: sourceCues.reason,
+        sourceCueDiagnostics: {
+          missingDerivedNodeIds: sourceCues.missingDerivedNodeIds,
+          unresolvedReferences: sourceCues.unresolvedReferences
+        }
+      };
+    }
+    const planning = planExpeditionRoute({
+      concepts: trailNodes.map((node) => ({
+        derivedNodeId: node.derivedNodeId,
+        canonicalLabel: node.label,
+        difficulty: node.difficulty
+      })),
+      trustedPrerequisiteEdges: qualifiedTrail.detail.edges
+        .filter((edge) => !edge.uncertain)
+        .map((edge) => ({
+          prerequisiteDerivedNodeId: edge.prerequisiteDerivedNodeId,
+          dependentDerivedNodeId: edge.dependentDerivedNodeId
+        })),
+      instructionalSourceCues: sourceCues.cues,
+      qualifiedStudyItemCandidates: [...primaryOptions, ...bonusCandidates].map((item) => ({
+        studyItemId: item.studyItemId,
+        derivedNodeId: item.derivedNodeId,
+        itemType: item.itemType
+      })),
+      policy: "source_expedition"
+    });
+    if (planning.status === "unavailable") {
+      return {
+        status: "unavailable",
+        reason: planning.reason,
+        routeDiagnostics: planning.diagnostics
+      };
+    }
+    const selectedBonusIds = new Set(planning.plan.legs.flatMap((leg) =>
+      leg.selectedBonusStudyItemIds
+    ));
+    const selectedItemById = new Map(
+      [...primaryOptions, ...bonusCandidates]
+        .filter((item) => item.itemType === "option_select" || selectedBonusIds.has(item.studyItemId))
+        .map((item) => [item.studyItemId, item] as const)
+    );
+    const primaryOptionByNode = new Map(primaryOptions.map((item) => [
+      item.derivedNodeId,
+      item
+    ] as const));
+    const currentStudyItems = planning.plan.orderedDerivedNodeIds.flatMap((derivedNodeId) => {
+      const primary = primaryOptionByNode.get(derivedNodeId);
+      const selectedBonuses = planning.plan.legs.flatMap((leg) =>
+        leg.selectedBonusStudyItemIds
+      ).flatMap((studyItemId) => {
+        const item = selectedItemById.get(studyItemId);
+        return item?.derivedNodeId === derivedNodeId ? [item] : [];
+      }).sort(compareStudyItemFamilyThenId);
+      return [...(primary ? [primary] : []), ...selectedBonuses];
+    });
 
-    // Replace the inspection summary's broad "any item" bit with the exact family admitted by
-    // this contract. Section winnability and every downstream projection now see the same fact.
-    const qualifiedOptionNodes = new Set(qualifiedOptions.map((item) => item.derivedNodeId));
+    // Replace the inspection summary's broad "any item" bit with the exact route-selected current
+    // set. Unselected qualified candidates remain in the neutral bank but cross no learner seam.
+    const currentItemNodes = new Set(currentStudyItems.map((item) => item.derivedNodeId));
     const qualifiedDetail: DerivedGraphDetail = {
       ...qualifiedTrail.detail,
       summary: {
         ...qualifiedTrail.detail.summary,
-        studyItemCount: qualifiedOptions.length
+        studyItemCount: currentStudyItems.length
       },
       nodes: qualifiedTrail.detail.nodes.map((node) => ({
         ...node,
-        hasStudyItem: qualifiedOptionNodes.has(node.derivedNodeId)
+        hasStudyItem: currentItemNodes.has(node.derivedNodeId)
       }))
     };
     const summitNode = qualifiedDetail.nodes.find((node) =>
-      node.derivedNodeId === qualifiedTrail.summit?.derivedNodeId
+      node.derivedNodeId === planning.plan.summitDerivedNodeId
     );
     if (!summitNode) return unavailable("trail_incomplete");
     const expectedAssets = assetExpectation({
       detail: qualifiedDetail,
       lessons: qualifiedLessons,
-      studyItems: qualifiedOptions,
+      studyItems: currentStudyItems,
       qualifiedAssetConfigHash: deps.qualifiedAssetConfigHash,
-      trailNodeIds: qualifiedTrail.trailNodeIds
+      trailNodeIds: qualifiedTrail.trailNodeIds,
+      routePlan: planning.plan
     });
     return {
       status: "available",
@@ -321,8 +407,9 @@ export function createSourceExpeditionModule(deps: SourceExpeditionModuleDeps) {
         lessonAbsent: lessonAbsent.filter((absent) =>
           qualifiedTrail.trailNodeIds.has(absent.derivedNodeId)
         ),
-        studyItems: qualifiedOptions,
+        studyItems: currentStudyItems,
         trailNodeIds: qualifiedTrail.trailNodeIds,
+        routePlan: planning.plan,
         expectedAssets
       }
     };
@@ -453,9 +540,6 @@ export function createSourceExpeditionModule(deps: SourceExpeditionModuleDeps) {
       if (qualification.status !== "available") {
         return { published: false, refused: qualification.reason };
       }
-      if (qualification.candidate.totalStopCount < 3) {
-        return { published: false, refused: "accepted_catalog_stop_floor_not_met" };
-      }
       return deps.catalog.publishAccepted({
         ...input,
         acceptedAssetSetIdentity: qualification.assets.expectedAssets.assetSetIdentity,
@@ -468,7 +552,11 @@ export function createSourceExpeditionModule(deps: SourceExpeditionModuleDeps) {
       learnerStateRef: string;
       enrichmentId: string;
     }): Promise<
-      | { adopted: true; learnerExpeditionId: string }
+      | {
+          adopted: true;
+          learnerExpeditionId: string;
+          routePlan: ExpeditionRoutePlan;
+        }
       | { adopted: false; refused: SourceExpeditionUnavailableReason }
     > {
       const qualification = await acceptedQualification(input.enrichmentId);
@@ -484,7 +572,7 @@ export function createSourceExpeditionModule(deps: SourceExpeditionModuleDeps) {
         expectedAssets: qualification.assets.expectedAssets
       });
       return stored.adopted
-        ? stored
+        ? { ...stored, routePlan: qualification.assets.routePlan }
         : { adopted: false, refused: "accepted_asset_set_changed" };
     },
 
@@ -492,7 +580,11 @@ export function createSourceExpeditionModule(deps: SourceExpeditionModuleDeps) {
       learnerStateRef: string;
       learnerExpeditionId: string;
     }): Promise<
-      | { activated: true; enrichmentId: string }
+      | {
+          activated: true;
+          enrichmentId: string;
+          routePlan: ExpeditionRoutePlan;
+        }
       | { activated: false; refused: SourceExpeditionUnavailableReason }
     > {
       const expedition = await deps.expeditionStore.getForLearner(input);
@@ -514,7 +606,11 @@ export function createSourceExpeditionModule(deps: SourceExpeditionModuleDeps) {
         expectedAssets: qualification.assets.expectedAssets
       });
       return stored.activated
-        ? { activated: true, enrichmentId: expedition.enrichmentId }
+        ? {
+            activated: true,
+            enrichmentId: expedition.enrichmentId,
+            routePlan: qualification.assets.routePlan
+          }
         : {
             activated: false,
             refused: stored.refused === "not_found"
@@ -539,6 +635,7 @@ export function createSourceExpeditionModule(deps: SourceExpeditionModuleDeps) {
         enrichmentId: input.enrichmentId,
         assetSetIdentity: opened.assets.expectedAssets.assetSetIdentity,
         trailNodeIds: opened.assets.trailNodeIds,
+        routePlan: opened.assets.routePlan,
         qualifiedConceptLessonIds: new Set(
           opened.assets.lessons.map((lesson) => lesson.conceptLessonId)
         ),
@@ -561,7 +658,6 @@ function deriveQualifiedSourceTrail(
   directlyReadyNodeIds: ReadonlySet<string>
 ): {
   detail: DerivedGraphDetail;
-  summit: { derivedNodeId: string; label: string } | null;
   trailNodeIds: Set<string>;
 } {
   const floor = applyDifficultyFloor({
@@ -597,10 +693,6 @@ function deriveQualifiedSourceTrail(
     trailNodeIds.has(edge.prerequisiteDerivedNodeId) &&
     trailNodeIds.has(edge.dependentDerivedNodeId)
   );
-  const { summit } = projectExpeditionSections({
-    detail: { nodes, edges },
-    stateByNode: {}
-  });
   const qualifiedDetail: DerivedGraphDetail = {
     ...detail,
     summary: {
@@ -613,7 +705,7 @@ function deriveQualifiedSourceTrail(
     nodes,
     edges
   };
-  return { detail: qualifiedDetail, summit, trailNodeIds };
+  return { detail: qualifiedDetail, trailNodeIds };
 }
 
 function unavailable(
@@ -649,30 +741,13 @@ function lessonQualifies(
     );
 }
 
-function optionSelectQualifies(
-  item: OptionSelectItem,
-  graphVersionId: string,
-  enrichmentId: string,
-  qualifiedAssetConfigHash: string
-): boolean {
-  const keyed = item.options.filter((option) => option.isCorrect);
-  return item.graphVersionId === graphVersionId &&
-    item.enrichmentId === enrichmentId &&
-    item.configHash === qualifiedAssetConfigHash &&
-    item.groundingProvenance !== "generated" &&
-    item.question.trim().length > 0 &&
-    item.explanation.trim().length > 0 &&
-    keyed.length === 1 &&
-    keyed[0].provenance === "source" &&
-    keyed[0].citation?.provenance === "source";
-}
-
 function assetExpectation(input: {
   detail: DerivedGraphDetail;
   lessons: ConceptLesson[];
-  studyItems: OptionSelectItem[];
+  studyItems: StudyItem[];
   qualifiedAssetConfigHash: string;
   trailNodeIds: Set<string>;
+  routePlan: ExpeditionRoutePlan;
 }): SourceExpeditionAssetExpectation {
   const currentConceptLessonIds = input.lessons
     .map((lesson) => lesson.conceptLessonId)
@@ -687,6 +762,7 @@ function assetExpectation(input: {
     graphVersionId: input.detail.summary.graphVersionId,
     enrichmentConfigHash: input.detail.summary.enrichmentConfigHash,
     trailNodeIds: [...input.trailNodeIds].sort((left, right) => left.localeCompare(right)),
+    routePlan: input.routePlan,
     lessons: [...input.lessons]
       .sort((left, right) => left.conceptLessonId.localeCompare(right.conceptLessonId))
       .map((lesson) => [lesson.conceptLessonId, lesson.derivedNodeId, lesson.configHash]),
@@ -701,4 +777,13 @@ function assetExpectation(input: {
     currentConceptLessonIds,
     currentStudyItemIds
   };
+}
+
+function compareStudyItemFamilyThenId(left: StudyItem, right: StudyItem): number {
+  return studyItemFamilyRank(left.itemType) - studyItemFamilyRank(right.itemType) ||
+    left.studyItemId.localeCompare(right.studyItemId);
+}
+
+function studyItemFamilyRank(itemType: StudyItem["itemType"]): number {
+  return itemType === "option_select" ? 0 : itemType === "matching" ? 1 : 2;
 }

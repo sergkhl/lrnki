@@ -106,6 +106,12 @@ function makePorts(over: {
           enrichmentId: "e",
           assetSetIdentity: "qualified",
           trailNodeIds: new Set(over.belongs === false ? [] : ["parent", "reference"]),
+          routePlan: {
+            policyIdentity: "source-expedition-route-test",
+            orderedDerivedNodeIds: over.belongs === false ? [] : ["parent", "reference"],
+            legs: [],
+            summitDerivedNodeId: over.belongs === false ? null : "reference"
+          },
           qualifiedConceptLessonIds: new Set([
             "lesson-reference",
             ...(over.lesson ? [over.lesson.conceptLessonId] : [])

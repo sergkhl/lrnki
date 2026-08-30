@@ -8,6 +8,7 @@ import { studyItemBankConfigHash } from "@lrnki/infrastructure-litellm";
 import {
   PostgresConceptLessonStore,
   PostgresEnrichmentInspectionRead,
+  PostgresInspectionRead,
   PostgresLearnerExpeditionStore,
   PostgresSourceExpeditionCatalog,
   PostgresStudyItemBankStore
@@ -26,6 +27,7 @@ export function createLearnerSourceExpeditions(
     enrichmentRead: new PostgresEnrichmentInspectionRead(sql),
     conceptLessonStore: new PostgresConceptLessonStore(sql),
     studyItemStore: new PostgresStudyItemBankStore(sql),
+    sourceEvidenceRead: new PostgresInspectionRead(sql),
     expeditionStore: new PostgresLearnerExpeditionStore(sql),
     catalog: new PostgresSourceExpeditionCatalog(sql),
     qualifiedAssetConfigHash: qualifiedSourceExpeditionAssetConfigHash(studyItemBankConfigHash())

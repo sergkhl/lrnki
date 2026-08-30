@@ -137,8 +137,8 @@ async function persistSourceAssets(sql: Sql, input: {
     graphVersionId: input.graphVersionId,
     enrichmentId: input.enrichmentId,
     configHash,
-    // Matching remains current and inspectable, but the source snapshot contract below owns only
-    // learner-qualified option-select identities.
+    // Matching remains current and inspectable, but it is deliberately unselected from this
+    // route snapshot. The race check must ignore neutral extras while requiring every selected id.
     studyItems: [item, matching],
     rejected: []
   });

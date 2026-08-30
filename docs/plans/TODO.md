@@ -12,8 +12,9 @@
   five-package defect/identity baseline and proved the hard mixed-Leg partition feasible after
   passage-count veto removal; U1 replaced terminal-cone sectioning with the shared deterministic
   source-cued route authority; U2 added family-complete source admission and removed the false
-  passage-count veto while keeping blueprint failure option-only. **NEXT:** U3 binds qualification,
-  minimum bonus selection, and the finished route into one route-sensitive Source Expedition result.
+  passage-count veto while keeping blueprint failure option-only; U3 bound qualification, minimum
+  bonus selection, and the finished route into one route-sensitive mixed-family result. **NEXT:** U4
+  makes Study Session, Recall Challenge, and catalog UI consume the shared route and family mix.
 
 - **Shape Concept Lesson grounding depth.** 140 of 183 qualified lessons yield one grounding passage
   while their Concepts hold four to six verified source evidence passages, so the Study Item

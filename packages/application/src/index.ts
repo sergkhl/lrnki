@@ -324,6 +324,7 @@ export {
 } from "./sourceLessonAdmission";
 export {
   admitSourceStudyItems,
+  persistedSourceStudyItemQualificationReasons,
   settleStrictImpostorTruth,
   settleStrictMatchingAssignment,
   type SourceStudyItemAdmissionResult,

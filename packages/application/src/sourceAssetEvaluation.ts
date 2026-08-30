@@ -633,8 +633,11 @@ export async function evaluateQualifiedSourceExpedition(input: {
   const joinedEvidence = sourceSupportEvaluation.evidence;
   const joinedEvidenceByKey = new Map(joinedEvidence.map((row) => [row.evidenceKey, row] as const));
   const sourceSupport = sourceSupportEvaluation.decisions;
+  const optionSelectItems = qualification.assets.studyItems.filter(
+    (item): item is OptionSelectItem => item.itemType === "option_select"
+  );
   const optionTruthEvaluation = await evaluateProjectedOptionSelectTruth({
-    items: qualification.assets.studyItems,
+    items: optionSelectItems,
     lessons: qualification.assets.lessons,
     projection,
     evidence: joinedEvidence,

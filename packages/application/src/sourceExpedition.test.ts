@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type {
   ConceptLesson,
+  ImpostorItem,
   MatchingItem,
   OptionSelectItem,
   StudyItem
@@ -10,6 +11,7 @@ import type {
   DerivedGraphDetail,
   LearnerExpedition,
   PublishSourceExpeditionCatalogEntry,
+  SourceEvidenceRecord,
   SourceExpeditionAssetExpectation,
   SourceExpeditionCatalogEntry
 } from "@lrnki/ports";
@@ -18,6 +20,7 @@ import {
   createSourceExpeditionModule,
   qualifiedSourceExpeditionAssetConfigHash
 } from "./sourceExpedition";
+import { sourceOptionExactReferenceQuestion } from "./sourceOptionExactReference";
 
 const BASE_CONFIG = "study-item-bank-test";
 const QUALIFIED_CONFIG = qualifiedSourceExpeditionAssetConfigHash(BASE_CONFIG);
@@ -54,11 +57,11 @@ function detail(overrides: {
       judgeModel: "test-judge",
       difficultyMethod: "test",
       status: overrides.status ?? "succeeded",
-      edgeCount: 1,
-      certainEdgeCount: 1,
+      edgeCount: 3,
+      certainEdgeCount: 3,
       uncertainEdgeCount: 0,
-      conceptCount: 2,
-      studyItemCount: 2,
+      conceptCount: 4,
+      studyItemCount: 6,
       startedAt: "2026-08-25T00:00:00.000Z",
       completedAt: "2026-08-25T00:01:00.000Z"
     },
@@ -79,6 +82,36 @@ function detail(overrides: {
         grounding
       },
       {
+        derivedNodeId: "node-middle-a",
+        label: "First source chapter",
+        aliases: ["First chapter alias"],
+        declaredDomain: "authoritative-domain",
+        difficulty: 3,
+        difficultyRationale: null,
+        difficultyBand: 3,
+        difficultyContested: false,
+        nodeKind: "anchor",
+        groundingOrigin: "document_anchored",
+        role: "anchor",
+        hasStudyItem: true,
+        grounding: null
+      },
+      {
+        derivedNodeId: "node-middle-b",
+        label: "Second source chapter",
+        aliases: ["Second chapter alias"],
+        declaredDomain: "authoritative-domain",
+        difficulty: 3,
+        difficultyRationale: null,
+        difficultyBand: 3,
+        difficultyContested: false,
+        nodeKind: "anchor",
+        groundingOrigin: "document_anchored",
+        role: "anchor",
+        hasStudyItem: true,
+        grounding: null
+      },
+      {
         derivedNodeId: "node-summit",
         label: "Authoritative summit",
         aliases: ["Summit alias"],
@@ -94,13 +127,17 @@ function detail(overrides: {
         grounding: null
       }
     ],
-    edges: [{
-      prerequisiteDerivedNodeId: "node-prerequisite",
-      dependentDerivedNodeId: "node-summit",
+    edges: [
+      ["node-prerequisite", "node-middle-a"],
+      ["node-middle-a", "node-middle-b"],
+      ["node-middle-b", "node-summit"]
+    ].map(([prerequisiteDerivedNodeId, dependentDerivedNodeId]) => ({
+      prerequisiteDerivedNodeId,
+      dependentDerivedNodeId,
       confidence: 0.95,
       uncertain: false,
       judgeModel: "test-judge"
-    }],
+    })),
     originCounts: [],
     rescueDispositions: [],
     mintingDispositions: [],
@@ -127,10 +164,10 @@ function partiallyAssetReadyDetail(): DerivedGraphDetail {
     ...base,
     summary: {
       ...base.summary,
-      edgeCount: 2,
-      certainEdgeCount: 2,
-      conceptCount: 4,
-      studyItemCount: 3
+      edgeCount: base.summary.edgeCount + 1,
+      certainEdgeCount: base.summary.certainEdgeCount + 1,
+      conceptCount: base.summary.conceptCount + 2,
+      studyItemCount: base.summary.studyItemCount + 1
     },
     nodes: [...base.nodes, missingPrerequisite, blockedDependent],
     edges: [
@@ -165,6 +202,31 @@ function partiallySourceReadyDetail(): DerivedGraphDetail {
   };
 }
 
+function diamondDetail(): DerivedGraphDetail {
+  const base = detail();
+  const edges = [
+    ["node-prerequisite", "node-middle-a"],
+    ["node-prerequisite", "node-middle-b"],
+    ["node-middle-a", "node-summit"],
+    ["node-middle-b", "node-summit"]
+  ].map(([prerequisiteDerivedNodeId, dependentDerivedNodeId]) => ({
+    prerequisiteDerivedNodeId,
+    dependentDerivedNodeId,
+    confidence: 0.95,
+    uncertain: false,
+    judgeModel: "test-judge"
+  }));
+  return {
+    ...base,
+    summary: {
+      ...base.summary,
+      edgeCount: edges.length,
+      certainEdgeCount: edges.length
+    },
+    edges
+  };
+}
+
 const sourceCitation = {
   provenance: "source" as const,
   sourceResourceId: "source-resource",
@@ -172,6 +234,31 @@ const sourceCitation = {
   evidenceQuote: "The source defines this material claim.",
   matchKind: "exact" as const
 };
+
+const sourceEvidence: SourceEvidenceRecord = {
+  sourceResourceId: sourceCitation.sourceResourceId,
+  sourceTitle: "Authoritative source",
+  sourceDocumentId: "source-document",
+  sourceBlockId: sourceCitation.sourceBlockId,
+  blockId: "block-1",
+  blockType: "paragraph",
+  headingPath: ["Authoritative source", "Chapter"],
+  locator: { characterStart: 0, characterEnd: 46 },
+  text: sourceCitation.evidenceQuote
+};
+
+const conceptLabels = new Map<string, string>([
+  ["node-prerequisite", "Trusted prerequisite"],
+  ["node-middle-a", "First source chapter"],
+  ["node-middle-b", "Second source chapter"],
+  ["node-summit", "Authoritative summit"],
+  ["node-missing-prerequisite", "Unready prerequisite"],
+  ["node-blocked-dependent", "Blocked dependent"]
+]);
+
+function conceptLabel(derivedNodeId: string): string {
+  return conceptLabels.get(derivedNodeId) ?? derivedNodeId;
+}
 
 function lesson(derivedNodeId: string, configHash = QUALIFIED_CONFIG): ConceptLesson {
   return {
@@ -181,7 +268,7 @@ function lesson(derivedNodeId: string, configHash = QUALIFIED_CONFIG): ConceptLe
     enrichmentId: ENRICHMENT_ID,
     generatingModel: "test-model",
     configHash,
-    canonicalLabel: derivedNodeId,
+    canonicalLabel: conceptLabel(derivedNodeId),
     sections: [{
       kind: "definition",
       text: "The source defines this material claim.",
@@ -192,7 +279,47 @@ function lesson(derivedNodeId: string, configHash = QUALIFIED_CONFIG): ConceptLe
   };
 }
 
+function routeCuedLesson(derivedNodeId: string, routeSourceBlockId: string): ConceptLesson {
+  const base = lesson(derivedNodeId);
+  const routeText = routeCueText(derivedNodeId);
+  return {
+    ...base,
+    sections: [
+      ...base.sections,
+      {
+        kind: "examples",
+        text: routeText,
+        groundingProvenance: "source_cep",
+        citation: {
+          ...sourceCitation,
+          sourceBlockId: routeSourceBlockId,
+          evidenceQuote: routeText
+        }
+      }
+    ]
+  };
+}
+
+function routeCueText(derivedNodeId: string): string {
+  return `Route cue for ${conceptLabel(derivedNodeId)}.`;
+}
+
+function routeEvidence(
+  sourceBlockId: string,
+  characterStart: number,
+  text: string
+): SourceEvidenceRecord {
+  return {
+    ...sourceEvidence,
+    sourceBlockId,
+    blockId: sourceBlockId,
+    locator: { characterStart, characterEnd: characterStart + text.length },
+    text
+  };
+}
+
 function option(derivedNodeId: string, configHash = QUALIFIED_CONFIG): OptionSelectItem {
+  const referenceText = "The source defines this material claim.";
   return {
     studyItemId: `option-${derivedNodeId}`,
     derivedNodeId,
@@ -203,19 +330,31 @@ function option(derivedNodeId: string, configHash = QUALIFIED_CONFIG): OptionSel
     configHash,
     explorableTerms: [],
     itemType: "option_select",
-    question: "Which claim is supported?",
-    explanation: "The cited source supports the keyed claim.",
+    question: sourceOptionExactReferenceQuestion(conceptLabel(derivedNodeId)),
+    explanation: referenceText,
     options: [
       {
         optionId: `correct-${derivedNodeId}`,
-        text: "The source defines this material claim.",
+        text: referenceText,
         isCorrect: true,
         provenance: "source",
         citation: sourceCitation
       },
       {
-        optionId: `wrong-${derivedNodeId}`,
+        optionId: `wrong-a-${derivedNodeId}`,
         text: "An unsupported alternative.",
+        isCorrect: false,
+        provenance: "generated"
+      },
+      {
+        optionId: `wrong-b-${derivedNodeId}`,
+        text: "A second unsupported alternative.",
+        isCorrect: false,
+        provenance: "generated"
+      },
+      {
+        optionId: `wrong-c-${derivedNodeId}`,
+        text: "A third unsupported alternative.",
         isCorrect: false,
         provenance: "generated"
       }
@@ -223,26 +362,85 @@ function option(derivedNodeId: string, configHash = QUALIFIED_CONFIG): OptionSel
   };
 }
 
-function matching(derivedNodeId: string): MatchingItem {
+function matching(
+  derivedNodeId: string,
+  overrides: { studyItemId?: string; configHash?: string } = {}
+): MatchingItem {
   return {
-    studyItemId: `matching-${derivedNodeId}`,
+    studyItemId: overrides.studyItemId ?? `matching-${derivedNodeId}`,
     derivedNodeId,
     graphVersionId: GRAPH_VERSION_ID,
     enrichmentId: ENRICHMENT_ID,
     groundingProvenance: "source_cep",
     generatingModel: "test-model",
-    configHash: QUALIFIED_CONFIG,
+    configHash: overrides.configHash ?? QUALIFIED_CONFIG,
     explorableTerms: [],
     itemType: "matching",
     question: "Match the source-backed pair.",
-    pairs: [{
-      pairId: "pair-1",
-      matchId: "match-1",
-      promptText: "Prompt",
-      matchText: "Match",
+    pairs: [
+      ["Deadline", "Ends authority at 17:00 UTC"],
+      ["Renewal", "Extends the valid interval"],
+      ["Expiry", "Leaves later checks unauthorized"]
+    ].map(([promptText, matchText], index) => ({
+      pairId: `pair-${derivedNodeId}-${index}`,
+      matchId: `match-${derivedNodeId}-${index}`,
+      promptText,
+      matchText,
       citation: sourceCitation
-    }]
+    }))
   };
+}
+
+function impostor(
+  derivedNodeId: string,
+  overrides: { studyItemId?: string; configHash?: string } = {}
+): ImpostorItem {
+  return {
+    studyItemId: overrides.studyItemId ?? `impostor-${derivedNodeId}`,
+    derivedNodeId,
+    graphVersionId: GRAPH_VERSION_ID,
+    enrichmentId: ENRICHMENT_ID,
+    groundingProvenance: "source_cep",
+    generatingModel: "test-model",
+    configHash: overrides.configHash ?? QUALIFIED_CONFIG,
+    explorableTerms: [],
+    itemType: "impostor",
+    question: "Which statement is false?",
+    statements: [
+      ...["First supported truth", "Second supported truth", "Third supported truth"].map(
+        (text, ordinal) => ({
+          statementId: `truth-${derivedNodeId}-${ordinal}`,
+          ordinal,
+          text,
+          isImpostor: false as const,
+          provenance: "source" as const,
+          citation: sourceCitation
+        })
+      ),
+      {
+        statementId: `lie-${derivedNodeId}`,
+        ordinal: 3,
+        text: "The source makes the opposite claim.",
+        isImpostor: true,
+        provenance: "generated",
+        reveal: "The source defines this material claim.",
+        lieSource: "generated"
+      }
+    ]
+  };
+}
+
+function qualifiedItemsFor(graph: DerivedGraphDetail): StudyItem[] {
+  const options = graph.nodes.map((node) => option(node.derivedNodeId));
+  const middleA = graph.nodes.find((node) => node.derivedNodeId === "node-middle-a")
+    ?.derivedNodeId ?? graph.nodes[0]?.derivedNodeId;
+  const middleB = graph.nodes.find((node) => node.derivedNodeId === "node-middle-b")
+    ?.derivedNodeId ?? graph.nodes[1]?.derivedNodeId;
+  return [
+    ...options,
+    ...(middleA ? [matching(middleA)] : []),
+    ...(middleB ? [impostor(middleB)] : [])
+  ];
 }
 
 function expedition(overrides: Partial<LearnerExpedition> = {}): LearnerExpedition {
@@ -321,12 +519,13 @@ type HarnessOptions = {
   acceptedAssetSetIdentity?: string;
   acceptedAssetConfigHash?: string;
   refuseCatalogSnapshot?: boolean;
+  evidence?: SourceEvidenceRecord[];
 };
 
 function harness(options: HarnessOptions = {}) {
   const graph = options.graph ?? detail();
-  const lessons = options.lessons ?? [lesson("node-prerequisite"), lesson("node-summit")];
-  const items = options.items ?? [option("node-prerequisite"), option("node-summit")];
+  const lessons = options.lessons ?? graph.nodes.map((node) => lesson(node.derivedNodeId));
+  const items = options.items ?? qualifiedItemsFor(graph);
   let owned = [...(options.owned ?? [])];
   const adoptionCalls: Array<{
     title: string;
@@ -359,6 +558,15 @@ function harness(options: HarnessOptions = {}) {
     },
     studyItemStore: {
       async listStudyItemsForEnrichment() { return items; }
+    },
+    sourceEvidenceRead: {
+      async readSourceEvidence(references) {
+        const available = options.evidence ?? [sourceEvidence];
+        return references.flatMap((reference) => available.filter((record) =>
+          record.sourceResourceId === reference.sourceResourceId &&
+          record.sourceBlockId === reference.sourceBlockId
+        ));
+      }
     },
     expeditionStore: {
       async listForLearner() { return owned; },
@@ -435,34 +643,102 @@ function harness(options: HarnessOptions = {}) {
   };
 }
 
-test("qualification derives authoritative presentation and admits only qualified option-select activities", async () => {
-  const extraMatching = matching("node-summit");
-  const { sourceExpedition } = harness({
-    items: [option("node-prerequisite"), option("node-summit"), extraMatching]
+test("qualification binds one lowest-id option per Concept and the minimum mixed route", async () => {
+  const graph = detail();
+  const extraOption = {
+    ...option("node-summit"),
+    studyItemId: "option-z-node-summit",
+    options: option("node-summit").options.map((entry) => ({
+      ...entry,
+      optionId: `z-${entry.optionId}`
+    }))
+  };
+  const state = harness({
+    graph,
+    items: [
+      ...qualifiedItemsFor(graph),
+      extraOption,
+      matching("node-summit", { studyItemId: "matching-z-node-summit" })
+    ]
   });
-  const result = await sourceExpedition.qualify(ENRICHMENT_ID);
+  const result = await state.sourceExpedition.qualify(ENRICHMENT_ID);
   assert.equal(result.status, "available");
   if (result.status !== "available") return;
   assert.deepEqual(result.candidate, {
     enrichmentId: ENRICHMENT_ID,
     title: "Authoritative summit",
     declaredDomain: "authoritative-domain",
-    totalStopCount: 2,
+    totalStopCount: 4,
     searchTerms: [
       "Trusted prerequisite",
       "Prerequisite alias",
+      "First source chapter",
+      "First chapter alias",
+      "Second source chapter",
+      "Second chapter alias",
       "Authoritative summit",
       "Summit alias"
     ]
   });
   assert.deepEqual(
     result.assets.studyItems.map((item) => item.studyItemId),
-    ["option-node-prerequisite", "option-node-summit"]
+    [
+      "option-node-prerequisite",
+      "option-node-middle-a",
+      "matching-node-middle-a",
+      "option-node-middle-b",
+      "impostor-node-middle-b",
+      "option-node-summit"
+    ]
   );
+  assert.deepEqual(result.assets.routePlan, {
+    policyIdentity: "source-expedition-route-v1:min3-max5-target4:mixed",
+    orderedDerivedNodeIds: [
+      "node-prerequisite",
+      "node-middle-a",
+      "node-middle-b",
+      "node-summit"
+    ],
+    legs: [{
+      legIndex: 0,
+      anchorDerivedNodeId: "node-summit",
+      derivedNodeIds: [
+        "node-prerequisite",
+        "node-middle-a",
+        "node-middle-b",
+        "node-summit"
+      ],
+      selectedBonusStudyItemIds: [
+        "matching-node-middle-a",
+        "impostor-node-middle-b"
+      ]
+    }],
+    summitDerivedNodeId: "node-summit"
+  });
   assert.deepEqual(
     result.assets.expectedAssets.currentStudyItemIds,
-    ["option-node-prerequisite", "option-node-summit"]
+    [
+      "impostor-node-middle-b",
+      "matching-node-middle-a",
+      "option-node-middle-a",
+      "option-node-middle-b",
+      "option-node-prerequisite",
+      "option-node-summit"
+    ]
   );
+  const adoption = await state.sourceExpedition.adopt({
+    learnerStateRef: "learner-1",
+    enrichmentId: ENRICHMENT_ID
+  });
+  assert.equal(adoption.adopted, true);
+  const authorization = await state.sourceExpedition.authorizeActive({
+    learnerStateRef: "learner-1",
+    enrichmentId: ENRICHMENT_ID
+  });
+  assert.equal(authorization.status, "available");
+  if (authorization.status !== "available") return;
+  assert.equal(authorization.qualifiedStudyItemIds.has("option-z-node-summit"), false);
+  assert.equal(authorization.qualifiedStudyItemIds.has("matching-z-node-summit"), false);
 });
 
 test("qualification remains inspectable before publication while every learner entry point refuses it", async () => {
@@ -490,10 +766,14 @@ test("accepted catalog presentation and source credits are the finished learner 
     teaser: "Build stronger arguments and weigh evidence.",
     declaredDomain: "authoritative-domain",
     sortOrder: 1,
-    totalStopCount: 2,
+    totalStopCount: 4,
     searchTerms: [
       "Trusted prerequisite",
       "Prerequisite alias",
+      "First source chapter",
+      "First chapter alias",
+      "Second source chapter",
+      "Second chapter alias",
       "Authoritative summit",
       "Summit alias"
     ]
@@ -523,21 +803,260 @@ test("a drifted accepted identity or config is held out by its exact refusal nam
   }
 });
 
-test("publication enforces the three-stop floor before the catalog write", async () => {
-  const state = harness();
+test("route-only drift changes identity and is rejected at publication, adoption, open, and authorization", async () => {
+  const graph = diamondDetail();
+  const sourceBlockByNode = new Map(graph.nodes.map((node) => [
+    node.derivedNodeId,
+    `route-${node.derivedNodeId}`
+  ] as const));
+  const lessons = graph.nodes.map((node) => routeCuedLesson(
+    node.derivedNodeId,
+    sourceBlockByNode.get(node.derivedNodeId)!
+  ));
+  const routeEvidenceAt = (positions: Readonly<Record<string, number>>) => [
+    {
+      ...sourceEvidence,
+      locator: { characterStart: 1_000, characterEnd: 1_046 }
+    },
+    ...graph.nodes.map((node) => routeEvidence(
+      sourceBlockByNode.get(node.derivedNodeId)!,
+      positions[node.derivedNodeId]!,
+      routeCueText(node.derivedNodeId)
+    ))
+  ];
+  const firstEvidence = routeEvidenceAt({
+    "node-prerequisite": 0,
+    "node-middle-a": 10,
+    "node-middle-b": 20,
+    "node-summit": 30
+  });
+  const changedEvidence = routeEvidenceAt({
+    "node-prerequisite": 0,
+    "node-middle-a": 20,
+    "node-middle-b": 10,
+    "node-summit": 30
+  });
+  const items = qualifiedItemsFor(graph);
+  const first = await harness({
+    graph,
+    lessons,
+    items,
+    evidence: firstEvidence
+  }).sourceExpedition.qualify(ENRICHMENT_ID);
+  const changed = await harness({
+    graph,
+    lessons,
+    items,
+    evidence: changedEvidence
+  }).sourceExpedition.qualify(ENRICHMENT_ID);
+  assert.equal(first.status, "available");
+  assert.equal(changed.status, "available");
+  if (first.status !== "available" || changed.status !== "available") return;
+  assert.deepEqual(first.assets.routePlan.orderedDerivedNodeIds, [
+    "node-prerequisite",
+    "node-middle-a",
+    "node-middle-b",
+    "node-summit"
+  ]);
+  assert.deepEqual(changed.assets.routePlan.orderedDerivedNodeIds, [
+    "node-prerequisite",
+    "node-middle-b",
+    "node-middle-a",
+    "node-summit"
+  ]);
+  assert.deepEqual(
+    first.assets.studyItems.map((item) => item.studyItemId).sort(),
+    changed.assets.studyItems.map((item) => item.studyItemId).sort()
+  );
+  assert.notEqual(
+    first.assets.expectedAssets.assetSetIdentity,
+    changed.assets.expectedAssets.assetSetIdentity
+  );
+
+  const staleAccepted = harness({
+    graph,
+    lessons,
+    items,
+    evidence: changedEvidence,
+    acceptedAssetSetIdentity: first.assets.expectedAssets.assetSetIdentity
+  });
+  assert.deepEqual(await staleAccepted.sourceExpedition.adopt({
+    learnerStateRef: "learner-1",
+    enrichmentId: ENRICHMENT_ID
+  }), {
+    adopted: false,
+    refused: "accepted_asset_set_changed"
+  });
+  assert.equal(staleAccepted.adoptionCalls.length, 0);
+
+  const staleOwned = harness({
+    graph,
+    lessons,
+    items,
+    evidence: changedEvidence,
+    owned: [expedition({
+      assetSetIdentity: first.assets.expectedAssets.assetSetIdentity,
+      active: true
+    })]
+  });
+  assert.deepEqual(await staleOwned.sourceExpedition.openOwned({
+    learnerStateRef: "learner-1",
+    enrichmentId: ENRICHMENT_ID
+  }), {
+    status: "unavailable",
+    reason: "accepted_asset_set_changed"
+  });
+  assert.deepEqual(await staleOwned.sourceExpedition.authorizeActive({
+    learnerStateRef: "learner-1",
+    enrichmentId: ENRICHMENT_ID
+  }), {
+    status: "unavailable",
+    reason: "accepted_asset_set_changed"
+  });
+
+  const stalePublication = harness({
+    graph,
+    lessons,
+    items,
+    evidence: changedEvidence,
+    refuseCatalogSnapshot: true
+  });
+  assert.deepEqual(
+    await stalePublication.sourceExpedition.publishAccepted(acceptedPublication),
+    { published: false, refused: "accepted_asset_set_changed" }
+  );
+  assert.equal(stalePublication.publicationCalls.length, 1);
+});
+
+test("an undersized source route fails qualification before the catalog write", async () => {
+  const base = detail();
+  const nodes = base.nodes.slice(0, 2);
+  const graph: DerivedGraphDetail = {
+    ...base,
+    summary: {
+      ...base.summary,
+      conceptCount: nodes.length,
+      edgeCount: 1,
+      certainEdgeCount: 1,
+      studyItemCount: nodes.length
+    },
+    nodes,
+    edges: base.edges.slice(0, 1)
+  };
+  const state = harness({
+    graph,
+    lessons: nodes.map((node) => lesson(node.derivedNodeId)),
+    items: nodes.map((node) => option(node.derivedNodeId))
+  });
   assert.deepEqual(await state.sourceExpedition.publishAccepted(acceptedPublication), {
     published: false,
-    refused: "accepted_catalog_stop_floor_not_met"
+    refused: "concept_count_below_route_minimum"
   });
   assert.equal(state.publicationCalls.length, 0);
 });
 
+test("source-cue failure stays diagnostic and cannot reach a catalog or learner write", async () => {
+  const state = harness({ evidence: [] });
+  const qualification = await state.sourceExpedition.qualify(ENRICHMENT_ID);
+  assert.deepEqual(qualification, {
+    status: "unavailable",
+    reason: "source_cue_unavailable",
+    sourceCueDiagnostics: {
+      missingDerivedNodeIds: [
+        "node-middle-a",
+        "node-middle-b",
+        "node-prerequisite",
+        "node-summit"
+      ],
+      unresolvedReferences: [{
+        sourceResourceId: "source-resource",
+        sourceBlockId: "source-block"
+      }]
+    }
+  });
+  assert.deepEqual(await state.sourceExpedition.publishAccepted(acceptedPublication), {
+    published: false,
+    refused: "source_cue_unavailable"
+  });
+  assert.deepEqual(await state.sourceExpedition.adopt({
+    learnerStateRef: "learner-1",
+    enrichmentId: ENRICHMENT_ID
+  }), {
+    adopted: false,
+    refused: "source_cue_unavailable"
+  });
+  assert.equal(state.publicationCalls.length, 0);
+  assert.equal(state.adoptionCalls.length, 0);
+});
+
+test("an impossible family mix returns coverage diagnostics before every learner mutation", async () => {
+  const graph = detail();
+  const state = harness({
+    graph,
+    items: [
+      ...graph.nodes.map((node) => option(node.derivedNodeId)),
+      matching("node-middle-a")
+    ],
+    owned: [expedition({ assetSetIdentity: "previous-route", active: false })]
+  });
+  const qualification = await state.sourceExpedition.qualify(ENRICHMENT_ID);
+  assert.equal(qualification.status, "unavailable");
+  if (qualification.status !== "unavailable") return;
+  assert.equal(qualification.reason, "study_item_mix_unavailable");
+  assert.deepEqual(qualification.routeDiagnostics, {
+    conceptCount: 4,
+    trustedEdgeCount: 3,
+    orderedDerivedNodeIds: [
+      "node-prerequisite",
+      "node-middle-a",
+      "node-middle-b",
+      "node-summit"
+    ],
+    matchingCandidateCount: 1,
+    impostorCandidateCount: 0,
+    uncoveredBonusWindows: [
+      {
+        startPosition: 0,
+        endPosition: 0,
+        derivedNodeIds: ["node-prerequisite"]
+      },
+      {
+        startPosition: 2,
+        endPosition: 3,
+        derivedNodeIds: ["node-middle-b", "node-summit"]
+      }
+    ],
+    implicatedIds: []
+  });
+  assert.deepEqual(await state.sourceExpedition.publishAccepted(acceptedPublication), {
+    published: false,
+    refused: "study_item_mix_unavailable"
+  });
+  assert.deepEqual(await state.sourceExpedition.adopt({
+    learnerStateRef: "learner-1",
+    enrichmentId: ENRICHMENT_ID
+  }), {
+    adopted: false,
+    refused: "study_item_mix_unavailable"
+  });
+  assert.deepEqual(await state.sourceExpedition.activate({
+    learnerStateRef: "learner-1",
+    learnerExpeditionId: "learner-expedition-1"
+  }), {
+    activated: false,
+    refused: "study_item_mix_unavailable"
+  });
+  assert.equal(state.publicationCalls.length, 0);
+  assert.equal(state.adoptionCalls.length, 0);
+  assert.equal(state.activationCalls.length, 0);
+});
+
 test("publication pins the exact qualified asset identity and current qualification config", async () => {
-  const graph = partiallyAssetReadyDetail();
+  const graph = detail();
   const state = harness({
     graph,
     lessons: graph.nodes.map((node) => lesson(node.derivedNodeId)),
-    items: graph.nodes.map((node) => option(node.derivedNodeId))
+    items: qualifiedItemsFor(graph)
   });
   assert.deepEqual(await state.sourceExpedition.publishAccepted(acceptedPublication), {
     published: true
@@ -549,21 +1068,27 @@ test("publication pins the exact qualified asset identity and current qualificat
     state.publicationCalls[0].expectedAssets.assetSetIdentity
   );
   assert.equal(state.publicationCalls[0].expectedAssets.currentConceptLessonIds.length, 4);
-  assert.equal(state.publicationCalls[0].expectedAssets.currentStudyItemIds.length, 4);
+  assert.equal(state.publicationCalls[0].expectedAssets.currentStudyItemIds.length, 6);
 });
 
 test("qualification keeps the greatest asset-ready prerequisite-closed sublayer", async () => {
   const graph = partiallyAssetReadyDetail();
+  const retainedNodeIds = [
+    "node-prerequisite",
+    "node-middle-a",
+    "node-middle-b",
+    "node-summit"
+  ];
   const { sourceExpedition } = harness({
     graph,
     lessons: [
-      lesson("node-prerequisite"),
-      lesson("node-summit"),
+      ...retainedNodeIds.map((derivedNodeId) => lesson(derivedNodeId)),
       lesson("node-blocked-dependent")
     ],
     items: [
-      option("node-prerequisite"),
-      option("node-summit"),
+      ...retainedNodeIds.map((derivedNodeId) => option(derivedNodeId)),
+      matching("node-middle-a"),
+      impostor("node-middle-b"),
       option("node-blocked-dependent")
     ]
   });
@@ -573,20 +1098,34 @@ test("qualification keeps the greatest asset-ready prerequisite-closed sublayer"
   if (result.status !== "available") return;
   assert.deepEqual(
     result.assets.detail.nodes.map((node) => node.derivedNodeId),
-    ["node-prerequisite", "node-summit"]
+    retainedNodeIds
   );
-  assert.deepEqual(result.assets.detail.edges, graph.edges.slice(0, 1));
-  assert.equal(result.assets.detail.summary.conceptCount, 2);
-  assert.equal(result.assets.detail.summary.studyItemCount, 2);
+  assert.deepEqual(
+    result.assets.detail.edges.map((edge) =>
+      `${edge.prerequisiteDerivedNodeId}->${edge.dependentDerivedNodeId}`
+    ).sort(),
+    graph.edges.slice(0, 3).map((edge) =>
+      `${edge.prerequisiteDerivedNodeId}->${edge.dependentDerivedNodeId}`
+    ).sort()
+  );
+  assert.equal(result.assets.detail.summary.conceptCount, 4);
+  assert.equal(result.assets.detail.summary.studyItemCount, 6);
   assert.deepEqual(
     result.assets.lessons.map((entry) => entry.derivedNodeId),
-    ["node-prerequisite", "node-summit"]
+    retainedNodeIds
   );
   assert.deepEqual(
     result.assets.studyItems.map((entry) => entry.derivedNodeId),
-    ["node-prerequisite", "node-summit"]
+    [
+      "node-prerequisite",
+      "node-middle-a",
+      "node-middle-a",
+      "node-middle-b",
+      "node-middle-b",
+      "node-summit"
+    ]
   );
-  assert.equal(result.candidate.totalStopCount, 2);
+  assert.equal(result.candidate.totalStopCount, 4);
 });
 
 test("qualification excludes LLM-grounded branches without suppressing an independent source-ready trail", async () => {
@@ -594,7 +1133,7 @@ test("qualification excludes LLM-grounded branches without suppressing an indepe
   const { sourceExpedition } = harness({
     graph,
     lessons: graph.nodes.map((node) => lesson(node.derivedNodeId)),
-    items: graph.nodes.map((node) => option(node.derivedNodeId))
+    items: qualifiedItemsFor(graph)
   });
 
   const result = await sourceExpedition.qualify(ENRICHMENT_ID);
@@ -602,9 +1141,16 @@ test("qualification excludes LLM-grounded branches without suppressing an indepe
   if (result.status !== "available") return;
   assert.deepEqual(
     result.assets.detail.nodes.map((node) => node.derivedNodeId),
-    ["node-prerequisite", "node-summit"]
+    ["node-prerequisite", "node-middle-a", "node-middle-b", "node-summit"]
   );
-  assert.deepEqual(result.assets.detail.edges, graph.edges.slice(0, 1));
+  assert.deepEqual(
+    result.assets.detail.edges.map((edge) =>
+      `${edge.prerequisiteDerivedNodeId}->${edge.dependentDerivedNodeId}`
+    ).sort(),
+    graph.edges.slice(0, 3).map((edge) =>
+      `${edge.prerequisiteDerivedNodeId}->${edge.dependentDerivedNodeId}`
+    ).sort()
+  );
 });
 
 test("adoption is authoritative, idempotent, and hides the exact owned snapshot from candidates", async () => {
@@ -612,7 +1158,10 @@ test("adoption is authoritative, idempotent, and hides the exact owned snapshot 
   const candidate = (await state.sourceExpedition.listCandidates({ learnerStateRef: "learner-1" }))[0];
   assert.equal(candidate.title, "Critical Thinking");
   const first = await state.sourceExpedition.adopt({ learnerStateRef: "learner-1", enrichmentId: ENRICHMENT_ID });
-  assert.deepEqual(first, { adopted: true, learnerExpeditionId: "new-source-expedition" });
+  assert.equal(first.adopted, true);
+  if (!first.adopted) return;
+  assert.equal(first.learnerExpeditionId, "new-source-expedition");
+  assert.equal(first.routePlan.summitDerivedNodeId, "node-summit");
   assert.equal(state.adoptionCalls[0].title, "Critical Thinking");
   assert.equal(state.adoptionCalls[0].declaredDomain, "authoritative-domain");
   assert.equal(state.owned()[0].kind, "source");
@@ -627,6 +1176,13 @@ test("adoption is authoritative, idempotent, and hides the exact owned snapshot 
   assert.equal(opened.candidate.title, candidate.title);
   assert.equal(opened.candidate.teaser, candidate.teaser);
   assert.equal(opened.expedition.title, candidate.title);
+
+  const activated = await state.sourceExpedition.activate({
+    learnerStateRef: "learner-1",
+    learnerExpeditionId: first.learnerExpeditionId
+  });
+  assert.equal(activated.activated, true);
+  if (activated.activated) assert.deepEqual(activated.routePlan, first.routePlan);
 
   const repeat = await state.sourceExpedition.adopt({ learnerStateRef: "learner-1", enrichmentId: ENRICHMENT_ID });
   assert.deepEqual(repeat, first);
@@ -648,14 +1204,22 @@ test("a legacy asset contract fails closed before any adoption write", async () 
 test("a qualified supported paraphrase need not masquerade as a verbatim source citation", async () => {
   const supportedParaphrase = {
     ...lesson("node-prerequisite"),
-    sections: [{
-      kind: "definition" as const,
-      text: "A materially equivalent paraphrase retained by source-support settlement.",
-      groundingProvenance: "generated" as const
-    }]
+    sections: [
+      ...lesson("node-prerequisite").sections,
+      {
+        kind: "examples" as const,
+        text: "A materially equivalent paraphrase retained by source-support settlement.",
+        groundingProvenance: "generated" as const
+      }
+    ]
   };
   const state = harness({
-    lessons: [supportedParaphrase, lesson("node-summit")]
+    lessons: [
+      supportedParaphrase,
+      lesson("node-middle-a"),
+      lesson("node-middle-b"),
+      lesson("node-summit")
+    ]
   });
 
   assert.equal((await state.sourceExpedition.qualify(ENRICHMENT_ID)).status, "available");
@@ -722,12 +1286,24 @@ test("owned reads and learner authorization reject a changed snapshot and expose
   });
   assert.equal(authorization.status, "available");
   if (authorization.status !== "available") return;
-  assert.deepEqual([...authorization.trailNodeIds].sort(), ["node-prerequisite", "node-summit"]);
+  assert.deepEqual([...authorization.trailNodeIds].sort(), [
+    "node-middle-a",
+    "node-middle-b",
+    "node-prerequisite",
+    "node-summit"
+  ]);
+  assert.deepEqual(authorization.routePlan, qualified.assets.routePlan);
   assert.deepEqual([...authorization.qualifiedConceptLessonIds].sort(), [
+    "lesson-node-middle-a",
+    "lesson-node-middle-b",
     "lesson-node-prerequisite",
     "lesson-node-summit"
   ]);
   assert.deepEqual([...authorization.qualifiedStudyItemIds].sort(), [
+    "impostor-node-middle-b",
+    "matching-node-middle-a",
+    "option-node-middle-a",
+    "option-node-middle-b",
     "option-node-prerequisite",
     "option-node-summit"
   ]);

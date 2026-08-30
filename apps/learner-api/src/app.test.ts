@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { test } from "node:test";
-import { CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY } from "@lrnki/application";
+import {
+  CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY,
+  sourceOptionExactReferenceQuestion
+} from "@lrnki/application";
+import type { StudyItem } from "@lrnki/domain-core";
 import { createLearnerApp } from "./app";
 import type { DatabaseClient } from "./db";
 import { createLearnerSourceExpeditions } from "./sourceExpedition";
@@ -291,14 +295,22 @@ maybeDb("exact-reference Support Path and recall challenge share qualified neutr
         ...(body === undefined ? {} : { body: JSON.stringify(body) })
       });
 
-    // Seed a minimal fully qualified Source Expedition: a two-stop source-backed trail with
-    // one current source-cited lesson and exact-reference option-select activity per stop.
+    // Seed one minimum-size qualified Source Expedition: four source-backed Concepts, one
+    // exact-reference option per Concept, and the matching/impostor pair required by its Leg.
     const sourceResourceId = randomUUID();
     const sourceDocumentId = randomUUID();
     const sourceBlockId = randomUUID();
     const extractionRunId = randomUUID();
+    const labels = [
+      "Source prerequisite",
+      "Source bridge",
+      "Source checkpoint",
+      "Source summit"
+    ];
     const lessonTexts = [
       "Source prerequisite establishes the invariant.",
+      "Source bridge carries the invariant into the worked case.",
+      "Source checkpoint verifies the worked case before application.",
       "Source summit applies that invariant."
     ];
     const sourceText = `${lessonTexts.join(" ")} Diagnostic glossary gap labels supplementary material that is not modeled as a trail node.`;
@@ -333,10 +345,10 @@ maybeDb("exact-reference Support Path and recall challenge share qualified neutr
     await sql`
       INSERT INTO graph_enrichments (enrichment_id, graph_version_id, enrichment_config_hash, status, judge_model, difficulty_method, completed_at)
       VALUES (${enrichmentId}, ${graphVersionId}, 'test', 'succeeded', 'j', 'd', now())`;
-    const nodeIds = [randomUUID(), randomUUID()];
+    const nodeIds = labels.map(() => randomUUID());
     for (const [index, nodeId] of nodeIds.entries()) {
       const conceptId = randomUUID();
-      const label = index === 0 ? "Source prerequisite" : "Source summit";
+      const label = labels[index];
       await sql`
         INSERT INTO concepts (concept_id, iri, normalized_label, declared_domain)
         VALUES (${conceptId}, ${`urn:lrnki:concept:${conceptId}`}, ${`node-${conceptId}`}, 'software engineering')`;
@@ -344,14 +356,16 @@ maybeDb("exact-reference Support Path and recall challenge share qualified neutr
         INSERT INTO derived_graph_nodes (derived_node_id, enrichment_id, node_kind, concept_id, grounding_origin, role, canonical_label, normalized_label, declared_domain, aliases)
         VALUES (${nodeId}, ${enrichmentId}, 'anchor', ${conceptId}, 'document_anchored', 'anchor', ${label}, ${`node-${conceptId}`}, 'software engineering', '[]'::jsonb)`;
     }
-    await sql`
-      INSERT INTO inferred_prerequisite_edges (
-        inferred_prerequisite_edge_id, enrichment_id, prerequisite_derived_node_id,
-        dependent_derived_node_id, confidence, uncertain, judge_model, provenance
-      ) VALUES (
-        ${randomUUID()}, ${enrichmentId}, ${nodeIds[0]}, ${nodeIds[1]},
-        0.95, false, 'test-judge', ${sql.json({ source: "test" })}
-      )`;
+    for (let index = 1; index < nodeIds.length; index += 1) {
+      await sql`
+        INSERT INTO inferred_prerequisite_edges (
+          inferred_prerequisite_edge_id, enrichment_id, prerequisite_derived_node_id,
+          dependent_derived_node_id, confidence, uncertain, judge_model, provenance
+        ) VALUES (
+          ${randomUUID()}, ${enrichmentId}, ${nodeIds[index - 1]}, ${nodeIds[index]},
+          0.95, false, 'test-judge', ${sql.json({ source: "test" })}
+        )`;
+    }
     const qualifiedConfigHash = qualifiedSourceExpeditionAssetConfigHash(studyItemBankConfigHash());
     const citation = {
       provenance: "source" as const,
@@ -370,7 +384,7 @@ maybeDb("exact-reference Support Path and recall challenge share qualified neutr
         derivedNodeId,
         generatingModel: "test-model",
         configHash: qualifiedConfigHash,
-        canonicalLabel: index === 0 ? "Source prerequisite" : "Source summit",
+        canonicalLabel: labels[index],
         sections: [{
           kind: "definition" as const,
           text: lessonTexts[index],
@@ -378,67 +392,124 @@ maybeDb("exact-reference Support Path and recall challenge share qualified neutr
           citation: { ...citation, evidenceQuote: lessonTexts[index] }
         }],
         explorableTerms: index === 0
-          ? [{ term: "Source summit", sectionKind: "definition" as const }]
+          ? [{ term: "Source bridge", sectionKind: "definition" as const }]
           : []
       })),
       absent: []
     });
-    const correctOptionIds = [randomUUID(), randomUUID()];
-    const wrongOptionIds = [randomUUID(), randomUUID()];
+    const correctOptionIds = nodeIds.map(() => randomUUID());
+    const wrongOptionIds = nodeIds.map(() => randomUUID());
     const correctOptionId = correctOptionIds[0];
     const wrongOptionId = wrongOptionIds[0];
-    const studyItemIds = [randomUUID(), randomUUID()];
+    const studyItemIds = nodeIds.map(() => randomUUID());
     const studyItemId = studyItemIds[0];
+    const optionItems: StudyItem[] = nodeIds.map((derivedNodeId, index) => ({
+      studyItemId: studyItemIds[index],
+      graphVersionId,
+      enrichmentId,
+      derivedNodeId,
+      groundingProvenance: "source_cep" as const,
+      generatingModel: "test-model",
+      configHash: qualifiedConfigHash,
+      explorableTerms: index === nodeIds.length - 1
+        ? ["Source prerequisite", "Diagnostic glossary gap"]
+        : [],
+      itemType: "option_select" as const,
+      question: sourceOptionExactReferenceQuestion(labels[index]),
+      explanation: lessonTexts[index],
+      options: [
+        {
+          optionId: correctOptionIds[index],
+          text: lessonTexts[index],
+          isCorrect: true,
+          provenance: "source" as const,
+          citation: { ...citation, evidenceQuote: lessonTexts[index] }
+        },
+        {
+          optionId: wrongOptionIds[index],
+          text: "Wrong A",
+          isCorrect: false,
+          provenance: "generated" as const
+        },
+        { optionId: randomUUID(), text: "Wrong B", isCorrect: false, provenance: "generated" as const },
+        { optionId: randomUUID(), text: "Wrong C", isCorrect: false, provenance: "generated" as const }
+      ]
+    }));
+    const bonusItems: StudyItem[] = [
+      {
+        studyItemId: randomUUID(),
+        graphVersionId,
+        enrichmentId,
+        derivedNodeId: nodeIds[1],
+        groundingProvenance: "source_cep",
+        generatingModel: "test-model",
+        configHash: qualifiedConfigHash,
+        explorableTerms: [],
+        itemType: "matching",
+        question: "Match each checkpoint relationship.",
+        pairs: [
+          ["Alpha", "Begins authority at the first boundary"],
+          ["Beta", "Carries authority into the worked case"],
+          ["Gamma", "Ends authority after verification"]
+        ].map(([promptText, matchText]) => ({
+          pairId: randomUUID(),
+          matchId: randomUUID(),
+          promptText,
+          matchText,
+          citation: { ...citation, evidenceQuote: lessonTexts[1] }
+        }))
+      },
+      {
+        studyItemId: randomUUID(),
+        graphVersionId,
+        enrichmentId,
+        derivedNodeId: nodeIds[2],
+        groundingProvenance: "source_cep",
+        generatingModel: "test-model",
+        configHash: qualifiedConfigHash,
+        explorableTerms: [],
+        itemType: "impostor",
+        question: "Which statement conflicts with the source?",
+        statements: [
+          ...[
+            "The checkpoint precedes application.",
+            "The worked case carries the invariant.",
+            "Verification occurs before the summit."
+          ].map((text, ordinal) => ({
+            statementId: randomUUID(),
+            ordinal,
+            text,
+            isImpostor: false as const,
+            provenance: "source" as const,
+            citation: { ...citation, evidenceQuote: lessonTexts[2] }
+          })),
+          {
+            statementId: randomUUID(),
+            ordinal: 3,
+            text: "The summit comes before every prerequisite.",
+            isImpostor: true,
+            provenance: "generated",
+            reveal: "The source-backed route places every prerequisite before the summit.",
+            lieSource: "generated"
+          }
+        ]
+      }
+    ];
     await new PostgresStudyItemBankStore(sql).persist({
       graphVersionId,
       enrichmentId,
       configHash: qualifiedConfigHash,
-      studyItems: nodeIds.map((derivedNodeId, index) => ({
-        studyItemId: studyItemIds[index],
-        graphVersionId,
-        enrichmentId,
-        derivedNodeId,
-        groundingProvenance: "source_cep" as const,
-        generatingModel: "test-model",
-        configHash: qualifiedConfigHash,
-        explorableTerms: index === 1
-          ? ["Source prerequisite", "Diagnostic glossary gap"]
-          : [],
-        itemType: "option_select" as const,
-        question: index === 1
-          ? "Which source statement defines Source summit? Explore Source prerequisite or Diagnostic glossary gap for related context."
-          : "Which source statement defines Source prerequisite?",
-        explanation: lessonTexts[index],
-        options: [
-          {
-            optionId: correctOptionIds[index],
-            text: lessonTexts[index],
-            isCorrect: true,
-            provenance: "source" as const,
-            citation: { ...citation, evidenceQuote: lessonTexts[index] }
-          },
-          {
-            optionId: wrongOptionIds[index],
-            text: "Wrong A",
-            isCorrect: false,
-            provenance: "generated" as const
-          },
-          { optionId: randomUUID(), text: "Wrong B", isCorrect: false, provenance: "generated" as const },
-          { optionId: randomUUID(), text: "Wrong C", isCorrect: false, provenance: "generated" as const }
-        ]
-      })),
+      studyItems: [...optionItems, ...bonusItems],
       rejected: []
     });
-    // This test isolates exact-reference and Recall Challenge behavior over the historical
-    // two-stop minimum. U2's application publication command owns the new three-stop accepted
-    // floor; the fixture installs an already-accepted row directly and pins the exact same
-    // qualification identity that every learner read rechecks.
+    // The fixture installs an already-accepted row directly and pins the exact same route-bound
+    // mixed-family qualification identity that every learner read rechecks.
     const sourceExpeditions = createLearnerSourceExpeditions(
       sql,
       CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY
     );
     const qualification = await sourceExpeditions.qualify(enrichmentId);
-    assert.equal(qualification.status, "available");
+    assert.equal(qualification.status, "available", JSON.stringify(qualification));
     if (qualification.status !== "available") throw new Error("fixture qualification failed");
     await sql`
       INSERT INTO source_expedition_catalog_entries (
@@ -483,8 +554,8 @@ maybeDb("exact-reference Support Path and recall challenge share qualified neutr
         title: "Challenge source",
         teaser: "Exercise exact-reference support and recall.",
         declaredDomain: "software engineering",
-        totalStopCount: 2,
-        searchTerms: ["Source prerequisite", "Source summit"],
+        totalStopCount: 4,
+        searchTerms: [...labels].sort(),
         sortOrder: 999
       }
     );
@@ -508,14 +579,14 @@ maybeDb("exact-reference Support Path and recall challenge share qualified neutr
       }
     );
     const adoption = await authed("/expedition/choose", { enrichmentId });
-    assert.equal(adoption.status, 200);
+    assert.equal(adoption.status, 200, await adoption.clone().text());
 
     // An advertised term with no exact eligible neutral node refuses before any detour write or
     // supervisor wake. The exact term then publishes READY synchronously and pins the precise
     // qualified lesson/item identities selected from the same active Source Expedition snapshot.
     const missingReference = await authed("/scaffold/request", {
       enrichmentId,
-      source: { kind: "study_item", studyItemId: studyItemIds[1] },
+      source: { kind: "study_item", studyItemId: studyItemIds[3] },
       term: "Diagnostic glossary gap"
     });
     assert.equal(missingReference.status, 409);
@@ -532,7 +603,7 @@ maybeDb("exact-reference Support Path and recall challenge share qualified neutr
 
     const exactReference = await authed("/scaffold/request", {
       enrichmentId,
-      source: { kind: "study_item", studyItemId: studyItemIds[1] },
+      source: { kind: "study_item", studyItemId: studyItemIds[3] },
       term: "Source prerequisite"
     });
     assert.equal(exactReference.status, 200);
@@ -596,7 +667,7 @@ maybeDb("exact-reference Support Path and recall challenge share qualified neutr
     assert.equal(hiddenSession.session.detours.length, 0);
     const restoredResponse = await authed("/scaffold/request", {
       enrichmentId,
-      source: { kind: "study_item", studyItemId: studyItemIds[1] },
+      source: { kind: "study_item", studyItemId: studyItemIds[3] },
       term: "Source prerequisite"
     });
     const restored = await restoredResponse.json() as { detourId: string; status: string };
@@ -655,6 +726,8 @@ maybeDb("exact-reference Support Path and recall challenge share qualified neutr
     );
     assert.equal(stateByNode[nodeIds[0]], "mastered");
     assert.equal(stateByNode[nodeIds[1]], "frontier");
+    assert.equal(stateByNode[nodeIds[2]], "locked");
+    assert.equal(stateByNode[nodeIds[3]], "locked");
 
     // The request composition must read the same lesson evidence as the learner-facing session.
     // This reference is impossible before the prerequisite is mastered and therefore catches a
@@ -662,7 +735,7 @@ maybeDb("exact-reference Support Path and recall challenge share qualified neutr
     const progressedReference = await authed("/scaffold/request", {
       enrichmentId,
       source: { kind: "lesson", derivedNodeId: nodeIds[0] },
-      term: "Source summit"
+      term: "Source bridge"
     });
     assert.equal(progressedReference.status, 200);
     const progressedReferenceBody = await progressedReference.json() as { detourId: string; status: string };
@@ -678,7 +751,7 @@ maybeDb("exact-reference Support Path and recall challenge share qualified neutr
       (await sql<{ count: string }[]>`SELECT COUNT(*) AS count FROM response_log WHERE learner_state_ref = ${learner}`)[0].count;
     const logBefore = await responseLogBaseline();
 
-    // Scope status: one section (available) + the summit (locked until the Leg is won).
+    // Scope status: one four-Concept Leg (available) + the summit (locked until the Leg is won).
     const scopesRes = await authed(`/challenge/scopes/${enrichmentId}`);
     assert.equal(scopesRes.status, 200);
     const { scopes } = (await scopesRes.json()) as { scopes: { scopeKind: string; state: string; anchorDerivedNodeId: string }[] };
@@ -687,14 +760,14 @@ maybeDb("exact-reference Support Path and recall challenge share qualified neutr
     // Fresh-start over an active challenge conflicts; invalid anchors are 422.
     const badAnchor = await authed("/challenge/create", { enrichmentId, scopeKind: "section", anchorDerivedNodeId: randomUUID() });
     assert.equal(badAnchor.status, 422);
-    const createRes = await authed("/challenge/create", { enrichmentId, scopeKind: "section", anchorDerivedNodeId: nodeIds[1] });
+    const createRes = await authed("/challenge/create", { enrichmentId, scopeKind: "section", anchorDerivedNodeId: nodeIds[3] });
     assert.equal(createRes.status, 200);
     const created = (await createRes.json()) as { created: true; view: { challengeId: string; state: string; remainingMissBuffer: number; currentItem: { kind: string; item: { studyItemId: string } } } };
     const challengeId = created.view.challengeId;
     assert.equal(created.view.state, "active");
     // No pre-answer key anywhere in the wire view.
     assert.ok(!JSON.stringify(created.view).includes("isCorrect"));
-    const conflict = await authed("/challenge/create", { enrichmentId, scopeKind: "section", anchorDerivedNodeId: nodeIds[1] });
+    const conflict = await authed("/challenge/create", { enrichmentId, scopeKind: "section", anchorDerivedNodeId: nodeIds[3] });
     assert.equal(conflict.status, 409);
     assert.equal(((await conflict.json()) as { activeChallengeId: string }).activeChallengeId, challengeId);
 
@@ -740,7 +813,7 @@ maybeDb("exact-reference Support Path and recall challenge share qualified neutr
     assert.equal(await responseLogBaseline(), logBefore);
 
     // A rematch creates a fresh challenge; abandoning it frees the scope again.
-    const rematch = (await (await authed("/challenge/create", { enrichmentId, scopeKind: "section", anchorDerivedNodeId: nodeIds[1] })).json()) as { created: true; view: { challengeId: string } };
+    const rematch = (await (await authed("/challenge/create", { enrichmentId, scopeKind: "section", anchorDerivedNodeId: nodeIds[3] })).json()) as { created: true; view: { challengeId: string } };
     assert.notEqual(rematch.view.challengeId, challengeId);
     assert.equal((await authed("/challenge/abandon", { challengeId: rematch.view.challengeId, operationRef: randomUUID() })).status, 200);
     assert.equal((await authed(`/challenge/${rematch.view.challengeId}`)).status, 404);

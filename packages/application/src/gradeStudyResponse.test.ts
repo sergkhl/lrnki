@@ -46,6 +46,12 @@ function fakeSourceExpeditions(
         enrichmentId: input.enrichmentId,
         assetSetIdentity: "qualified",
         trailNodeIds: new Set(overrides.trailNodeIds ?? ["node-1"]),
+        routePlan: {
+          policyIdentity: "source-expedition-route-test",
+          orderedDerivedNodeIds: overrides.trailNodeIds ?? ["node-1"],
+          legs: [],
+          summitDerivedNodeId: (overrides.trailNodeIds ?? ["node-1"]).at(-1) ?? null
+        },
         qualifiedConceptLessonIds: new Set(["lesson-old"]),
         qualifiedStudyItemIds: new Set(
           overrides.qualifiedStudyItemIds ?? ["os-1", "imp-1", "mt-1"]
