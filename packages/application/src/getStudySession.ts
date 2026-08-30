@@ -7,7 +7,10 @@ import type {
   ScaffoldReferenceActivityReadPort,
   ScaffoldDetourStorePort
 } from "@lrnki/ports";
-import { deriveFlooredExpedition } from "./expeditionSections";
+import {
+  expeditionRouteAssetMismatchReasons,
+  projectExpeditionSections
+} from "./expeditionSections";
 import {
   learnerKnowledgeCapabilityIsAvailable,
   type LearnerKnowledgeAvailability
@@ -54,7 +57,10 @@ export async function getStudySession(input: {
     enrichmentId: input.enrichmentId
   });
   if (opened.status !== "available") return undefined;
-  const { detail, studyItems, lessons, lessonAbsent } = opened.assets;
+  const { detail, studyItems, lessons, lessonAbsent, routePlan } = opened.assets;
+  if (expeditionRouteAssetMismatchReasons({ detail, studyItems, routePlan }).length > 0) {
+    return undefined;
+  }
   const challengeScope = { learnerStateRef: input.learnerStateRef, enrichmentId: input.enrichmentId };
   const qualifiedChallengeScope = {
     ...challengeScope,
@@ -87,7 +93,12 @@ export async function getStudySession(input: {
 
   let recallScopes: StudySession["recallScopes"] = [];
   if (input.challengeStore) {
-    const { summit, sections } = deriveFlooredExpedition(detail);
+    const { summit, sections } = projectExpeditionSections({
+      detail,
+      stateByNode: {},
+      routePlan,
+      studyItems
+    });
     const sectionOf = new Map<string, number>();
     for (const section of sections) {
       for (const nodeId of section.stepDerivedNodeIds) sectionOf.set(nodeId, section.sectionIndex);
@@ -107,6 +118,7 @@ export async function getStudySession(input: {
     learnerStateRef: input.learnerStateRef,
     detail,
     studyItems,
+    routePlan,
     lessons,
     lessonAbsent,
     lessonReads: lessonReads.map((read) => read.derivedNodeId),

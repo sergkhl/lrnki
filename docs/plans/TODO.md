@@ -13,8 +13,9 @@
   passage-count veto removal; U1 replaced terminal-cone sectioning with the shared deterministic
   source-cued route authority; U2 added family-complete source admission and removed the false
   passage-count veto while keeping blueprint failure option-only; U3 bound qualification, minimum
-  bonus selection, and the finished route into one route-sensitive mixed-family result. **NEXT:** U4
-  makes Study Session, Recall Challenge, and catalog UI consume the shared route and family mix.
+  bonus selection, and the finished route into one route-sensitive mixed-family result; U4 made
+  Study Session, mastery/progress, Guardians, and catalog counts consume it. **NEXT:** U5 replaces
+  accepted package v1 with the strict route-bearing mixed-family v2 format.
 
 - **Shape Concept Lesson grounding depth.** 140 of 183 qualified lessons yield one grounding passage
   while their Concepts hold four to six verified source evidence passages, so the Study Item

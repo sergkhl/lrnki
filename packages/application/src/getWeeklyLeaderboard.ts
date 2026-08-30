@@ -6,6 +6,7 @@ import type {
   EnrichmentInspectionReadPort,
   LearnerAward,
   LearnerAwardsStorePort,
+  LearnerExpedition,
   LearnerProfile,
   LearnerProfileReadPort,
   LearnerExpeditionStorePort,
@@ -14,6 +15,8 @@ import type {
   ResponseLogStorePort,
   StudyItemBankStorePort
 } from "@lrnki/ports";
+import type { ExpeditionRoutePlan } from "./expeditionRoutePlan";
+import type { SourceExpeditionModule } from "./sourceExpedition";
 import { composeStudySession } from "./studySessionProjection";
 import {
   badgesFromAwards,
@@ -32,6 +35,8 @@ type EnrichmentProjectionData = {
   studyItems: StudyItem[];
   lessons: ConceptLesson[];
   lessonAbsent: LessonAbsentNode[];
+  routePlan?: ExpeditionRoutePlan;
+  assetSetIdentity?: string;
 };
 
 export type WeeklyLeaderboard = {
@@ -64,6 +69,7 @@ export async function getWeeklyLeaderboard(input: {
   responseLog: ResponseLogStorePort;
   verdictStore: CalibrationVerdictStorePort;
   lessonReadStore: LessonReadStorePort;
+  sourceExpeditions: Pick<SourceExpeditionModule, "qualify">;
 }): Promise<WeeklyLeaderboard> {
   const { startMs, endMs, key } = isoWeekRange(input.now);
   const [learners, evidenceRefs] = await Promise.all([
@@ -92,17 +98,39 @@ export async function getWeeklyLeaderboard(input: {
         input.verdictStore.listForLearner(learner.learnerRef),
         input.expeditionStore.listForLearner(learner.learnerRef)
       ]);
-      const readyExpeditions = expeditions.filter((expedition) => expedition.status === "ready" && expedition.enrichmentId);
-      return { learner, responses, lessonReads, verdicts, readyExpeditionEnrichmentIds: readyExpeditions.map((e) => e.enrichmentId as string) };
+      const readyExpeditions = expeditions.filter((expedition): expedition is LearnerExpedition & {
+        status: "ready";
+        enrichmentId: string;
+      } => expedition.status === "ready" && Boolean(expedition.enrichmentId));
+      return { learner, responses, lessonReads, verdicts, readyExpeditions };
     })
   );
 
   // Read every DISTINCT enrichment's projection inputs exactly once (AE5).
   const enrichmentIds = new Set<string>();
-  for (const state of activeState) for (const id of state.readyExpeditionEnrichmentIds) enrichmentIds.add(id);
+  const sourceEnrichmentIds = new Set<string>();
+  for (const state of activeState) {
+    for (const expedition of state.readyExpeditions) {
+      enrichmentIds.add(expedition.enrichmentId);
+      if (expedition.kind === "source") sourceEnrichmentIds.add(expedition.enrichmentId);
+    }
+  }
   const enrichmentDataById = new Map<string, EnrichmentProjectionData>();
   await Promise.all(
     [...enrichmentIds].map(async (enrichmentId) => {
+      if (sourceEnrichmentIds.has(enrichmentId)) {
+        const qualification = await input.sourceExpeditions.qualify(enrichmentId);
+        if (qualification.status !== "available") return;
+        enrichmentDataById.set(enrichmentId, {
+          detail: qualification.assets.detail,
+          studyItems: qualification.assets.studyItems,
+          lessons: qualification.assets.lessons,
+          lessonAbsent: qualification.assets.lessonAbsent,
+          routePlan: qualification.assets.routePlan,
+          assetSetIdentity: qualification.assets.expectedAssets.assetSetIdentity
+        });
+        return;
+      }
       const detail = await input.enrichmentRead.getDerivedGraphDetail(enrichmentId);
       if (!detail) return;
       const [studyItems, lessons, lessonAbsent] = await Promise.all([
@@ -131,7 +159,7 @@ export async function getWeeklyLeaderboard(input: {
       responses: state.responses,
       lessonReads: state.lessonReads,
       verdicts: state.verdicts,
-      readyExpeditionEnrichmentIds: state.readyExpeditionEnrichmentIds,
+      readyExpeditions: state.readyExpeditions,
       enrichmentDataById
     });
     contributionsByLearner.set(state.learner.learnerRef, contributions);
@@ -151,7 +179,7 @@ function computeLearnerContributions(input: {
   responses: ResponseLogRow[];
   lessonReads: LessonRead[];
   verdicts: CalibrationVerdict[];
-  readyExpeditionEnrichmentIds: string[];
+  readyExpeditions: Array<LearnerExpedition & { status: "ready"; enrichmentId: string }>;
   enrichmentDataById: Map<string, EnrichmentProjectionData>;
 }): MasteredNodeContribution[] {
   // The learner's own evidence timestamps (KTD2): the latest CORRECT answer per study item
@@ -168,14 +196,19 @@ function computeLearnerContributions(input: {
   const knownNodes = new Set(input.verdicts.filter((verdict) => verdict.verdict === "known").map((verdict) => verdict.derivedNodeId));
 
   const contributions: MasteredNodeContribution[] = [];
-  for (const enrichmentId of input.readyExpeditionEnrichmentIds) {
+  for (const expedition of input.readyExpeditions) {
+    const enrichmentId = expedition.enrichmentId;
     const data = input.enrichmentDataById.get(enrichmentId);
     if (!data) continue;
+    if (expedition.kind === "source" && data.assetSetIdentity !== expedition.assetSetIdentity) {
+      continue;
+    }
     const session = composeStudySession({
       enrichmentId,
       learnerStateRef: input.learner.learnerRef,
       detail: data.detail,
       studyItems: data.studyItems,
+      routePlan: data.routePlan,
       lessons: data.lessons,
       lessonAbsent: data.lessonAbsent,
       lessonReads: input.lessonReads.map((read) => read.derivedNodeId),

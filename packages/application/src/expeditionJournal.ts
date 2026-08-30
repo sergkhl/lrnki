@@ -172,7 +172,7 @@ export async function getExpeditionJournal(
   };
 }
 
-// Browse all: every shared, beginnable, ≥2-stop expedition the learner has not adopted,
+// Browse all: every shared, qualified expedition the learner has not adopted,
 // accepted-catalog ordered and unlimited. Fetched lazily; carries no timelines or owned rows.
 export async function getExpeditionCatalog(
   input: { learnerStateRef: string },
@@ -233,9 +233,14 @@ async function readyRow(
         deps.studyItemStore.listStudyItemsForEnrichment(expedition.enrichmentId),
         deps.layerPurposeStore.get(expedition.enrichmentId)
       ]);
-  // Count only items on TRAIL-reachable (non-floored) nodes, so the total matches the
-  // stop math the trail walks. A missing detail falls back to the whole bank.
-  const trailNodeIds = detail ? deriveFlooredExpedition(detail).trailNodeIds : null;
+  // Source progress consumes the same qualified route IDs and selected current items as Study
+  // Session. Synthetic/non-source rows retain the layer-projection fallback until that held path
+  // owns an explicit route. A missing detail falls back to the whole bank.
+  const trailNodeIds = opened
+    ? new Set(opened.assets.routePlan.orderedDerivedNodeIds)
+    : detail
+      ? deriveFlooredExpedition(detail).trailNodeIds
+      : null;
   const trailItems = trailNodeIds ? items.filter((item) => trailNodeIds.has(item.derivedNodeId)) : items;
   const itemIds = new Set(trailItems.map((item) => item.studyItemId));
   return {

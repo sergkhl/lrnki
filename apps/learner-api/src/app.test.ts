@@ -554,7 +554,7 @@ maybeDb("exact-reference Support Path and recall challenge share qualified neutr
         title: "Challenge source",
         teaser: "Exercise exact-reference support and recall.",
         declaredDomain: "software engineering",
-        totalStopCount: 4,
+        totalConceptCount: 4,
         searchTerms: [...labels].sort(),
         sortOrder: 999
       }
@@ -717,10 +717,27 @@ maybeDb("exact-reference Support Path and recall challenge share qualified neutr
       session: {
         detours: { complete: boolean; steps: { complete: boolean }[] }[];
         expeditionPath: { derivedNodeId: string; state: string }[];
+        sections: { stepDerivedNodeIds: string[] }[];
+        studySegmentsByNode: Record<string, Array<{ kind: string }>>;
       };
     };
     assert.equal(supportSession.session.detours[0].complete, true);
     assert.equal(supportSession.session.detours[0].steps[0].complete, true);
+    assert.deepEqual(
+      supportSession.session.expeditionPath.map((step) => step.derivedNodeId),
+      qualification.assets.routePlan.orderedDerivedNodeIds,
+      "the API Study Session consumes the qualified source route verbatim"
+    );
+    assert.deepEqual(supportSession.session.sections.map((section) => section.stepDerivedNodeIds),
+      qualification.assets.routePlan.legs.map((leg) => leg.derivedNodeIds));
+    assert.deepEqual(
+      supportSession.session.studySegmentsByNode[nodeIds[1]].map((segment) => segment.kind),
+      ["option_select", "matching"]
+    );
+    assert.deepEqual(
+      supportSession.session.studySegmentsByNode[nodeIds[2]].map((segment) => segment.kind),
+      ["option_select", "impostor"]
+    );
     const stateByNode = Object.fromEntries(
       supportSession.session.expeditionPath.map((step) => [step.derivedNodeId, step.state])
     );

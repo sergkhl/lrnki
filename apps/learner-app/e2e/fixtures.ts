@@ -116,8 +116,8 @@ export const journalPopulated = {
     }
   ],
   shared: [
-    { enrichmentId: "enr-shared-1", catalogKey: "tectonic-plates", title: "Tectonic plates", teaser: "Follow moving plates through a changing crust.", declaredDomain: "Geology", sortOrder: 1, totalStopCount: 7, searchTerms: ["plate", "tectonics"] },
-    { enrichmentId: "enr-shared-2", catalogKey: "photosynthesis", title: "Photosynthesis", teaser: "Trace light into stored chemical energy.", declaredDomain: "Biology", sortOrder: 2, totalStopCount: 5, searchTerms: ["photosynthesis", "carbon fixation"] }
+    { enrichmentId: "enr-shared-1", catalogKey: "tectonic-plates", title: "Tectonic plates", teaser: "Follow moving plates through a changing crust.", declaredDomain: "Geology", sortOrder: 1, totalConceptCount: 7, searchTerms: ["plate", "tectonics"] },
+    { enrichmentId: "enr-shared-2", catalogKey: "photosynthesis", title: "Photosynthesis", teaser: "Trace light into stored chemical energy.", declaredDomain: "Biology", sortOrder: 2, totalConceptCount: 5, searchTerms: ["photosynthesis", "carbon fixation"] }
   ]
 };
 
@@ -129,7 +129,7 @@ export const catalogPopulated = {
     teaser: "Build stronger arguments, weigh evidence, test causal claims, and revise conclusions with confidence.",
     declaredDomain: "critical thinking",
     sortOrder: 1,
-    totalStopCount: 5,
+    totalConceptCount: 5,
     searchTerms: ["arguments", "evidence", "causal claims"]
   }],
   sources: [{

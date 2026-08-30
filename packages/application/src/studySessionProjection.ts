@@ -15,6 +15,7 @@ import { applyDifficultyFloor } from "./applyDifficultyFloor";
 import { composeMastery, pruneClosure, struggledNodes, suggestRestorations } from "./calibrationClosure";
 import { buildMasteryMap, summarizeResponseSources, type ResponseSourceSummary } from "./learnerLoopProjection";
 import { projectExpeditionSections, type ExpeditionSection, type ExpeditionSectionStep } from "./expeditionSections";
+import type { ExpeditionRoutePlan } from "./expeditionRoutePlan";
 
 // The PURE Study Session projection (ADR-0027 projection compute; CONTEXT.md "Study
 // Session"). A Study Session is a learner-stateful, goal-scoped projection over one Derived
@@ -163,14 +164,14 @@ export function conceptLessonToView(lesson: ConceptLesson, supportFor: Explorabl
 // A per-node study-item view, keyed by item type (KTD4). Adding a new study-item type is a
 // localized add here — a new arm of this union, one arm in `studyItemToView`, and one arm in
 // `studyItemViewToSheet` — inherited by every surface. A node groups its views into an
-// ordered `studySegmentsByNode` list (option_select, then impostor).
+// ordered `studySegmentsByNode` list (option_select, matching, then impostor).
 export type StudyItemView =
   | { kind: "option_select"; item: StudyOptionSelectView }
   | { kind: "matching"; item: StudyMatchingView }
   | { kind: "impostor"; item: StudyImpostorView };
 
 // Canonical render order for a node's study segments (R10): theory (the lesson) is shown
-// first by the surface, then option-select, then impostor. A new type extends this rank.
+// first by the surface, then option-select, matching, and impostor. A new type extends this rank.
 const STUDY_ITEM_TYPE_ORDER: Record<StudyItemView["kind"], number> = { option_select: 0, matching: 1, impostor: 2 };
 
 // Side-sheet content gated by the node's learner state. Frontier nodes either render a study
@@ -372,7 +373,7 @@ export type StudySession = {
   sheetByNode: Record<string, SheetContent>;
   verdictByNode: Record<string, Verdict>;
   // The ordered study segments per node (R10, KTD7): each frontier node renders theory (the
-  // lesson) then this list in canonical order (option_select, then impostor), each segment
+  // lesson) then this list in canonical order (option_select, matching, then impostor), each segment
   // independently answerable. The durable seam the Learner App consumes; supersedes the prior
   // single-item-per-node `optionItemsByNode` (rule 18).
   studySegmentsByNode: Record<string, StudyItemView[]>;
@@ -421,6 +422,9 @@ export function composeStudySession(input: {
   learnerStateRef: string;
   detail: DerivedGraphDetail;
   studyItems: StudyItem[];
+  // Source Expeditions pass the exact qualified plan. Omission is retained only for neutral
+  // inspection/non-source composition, which uses the layer-projection policy.
+  routePlan?: ExpeditionRoutePlan;
   rows: ResponseLogRow[];
   verdicts: CalibrationVerdict[];
   // The Concept Lesson substrate for this enrichment (ADR-0031). Optional so existing callers
@@ -551,9 +555,15 @@ export function composeStudySession(input: {
     learnerState,
     masteryThreshold: ADAPTIVE_MASTERY_THRESHOLD
   });
-  // The layer-wide SECTIONED expedition (ADR-0032; R1–R3, R6): milestone-anchored sections over
-  // the floored/contracted layer, easiest section first, summit derived as the last milestone.
-  const expedition = projectExpeditionSections({ detail: { nodes: trailNodes, edges: trailEdges }, stateByNode: classification.stateByNode });
+  // Source sessions project the exact already-qualified route. The projection validates that the
+  // floored detail, current items, ordered Legs, selected bonuses, anchors, and summit agree; it
+  // never independently replans learner assets.
+  const expedition = projectExpeditionSections({
+    detail: { nodes: trailNodes, edges: trailEdges },
+    stateByNode: classification.stateByNode,
+    routePlan: input.routePlan,
+    studyItems: input.studyItems
+  });
   const summitId = expedition.summit?.derivedNodeId ?? null;
   const hiddenNodeIds = adaptedHiddenNodeIds(knownClosure, summitId);
 

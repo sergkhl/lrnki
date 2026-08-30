@@ -4,7 +4,6 @@ import type {
   CalibrationVerdict,
   ConceptLesson,
   LessonAbsentNode,
-  OptionSelectItem,
   ResponseLogRow,
   ScaffoldDetour,
   StudyItem
@@ -98,15 +97,14 @@ function sourceExpeditions(input: {
   items?: StudyItem[];
   lessons?: ConceptLesson[];
   absent?: LessonAbsentNode[];
+  routeOrder?: string[];
 }) {
   return {
     async openOwned(request: { learnerStateRef: string; enrichmentId: string }) {
       const graph = input.detailById[request.enrichmentId];
       if (!graph) return { status: "unavailable" as const, reason: "enrichment_not_found" as const };
-      const items = (input.items ?? []).filter(
-        (item): item is OptionSelectItem => item.itemType === "option_select"
-      );
-      const orderedDerivedNodeIds = graph.nodes.map((node) => node.derivedNodeId);
+      const items = input.items ?? [];
+      const orderedDerivedNodeIds = input.routeOrder ?? graph.nodes.map((node) => node.derivedNodeId);
       const summitDerivedNodeId = orderedDerivedNodeIds.at(-1) ?? null;
       return {
         status: "available" as const,
@@ -117,7 +115,7 @@ function sourceExpeditions(input: {
           teaser: "Learn Rust ownership.",
           declaredDomain: "rust",
           sortOrder: 1,
-          totalStopCount: graph.nodes.length,
+          totalConceptCount: graph.nodes.length,
           searchTerms: graph.nodes.map((node) => node.label)
         },
         assets: {
@@ -133,7 +131,9 @@ function sourceExpeditions(input: {
               legIndex: 0,
               anchorDerivedNodeId: summitDerivedNodeId,
               derivedNodeIds: orderedDerivedNodeIds,
-              selectedBonusStudyItemIds: []
+              selectedBonusStudyItemIds: items
+                .filter((item) => item.itemType !== "option_select")
+                .map((item) => item.studyItemId)
             }] : [],
             summitDerivedNodeId
           },
@@ -212,11 +212,79 @@ test("a refused Source Expedition returns before loading learner evidence", asyn
   assert.equal(learnerEvidenceRead, false);
 });
 
+test("a route/detail mismatch fails closed before loading learner evidence", async () => {
+  let learnerEvidenceRead = false;
+  const session = await getStudySession({
+    enrichmentId: "e",
+    learnerStateRef: "L1",
+    sourceExpeditions: sourceExpeditions({
+      detailById: { e: detail() },
+      items: [optionItem],
+      routeOrder: ["scope", "not-in-detail"]
+    }),
+    lessonReadStore: {
+      ...lessonReadStore(),
+      async listForLearner() { learnerEvidenceRead = true; return []; }
+    },
+    responseLog: {
+      ...responseLog([]),
+      async listForLearner() { learnerEvidenceRead = true; return []; }
+    },
+    verdictStore: verdictStore([]),
+    learnerKnowledgeAvailability: ALL_LEARNER_KNOWLEDGE_AVAILABLE
+  });
+  assert.equal(session, undefined);
+  assert.equal(learnerEvidenceRead, false);
+});
+
+test("getStudySession preserves the qualified source route instead of independently reordering it", async () => {
+  const graph = detail();
+  graph.nodes = [
+    node("a", "A", 0.1),
+    node("b", "B", 0.2),
+    node("c", "C", 0.3),
+    node("d", "D", 0.4)
+  ];
+  graph.edges = [];
+  graph.summary = { ...graph.summary, conceptCount: 4, edgeCount: 0, certainEdgeCount: 0 };
+  const routeOrder = ["d", "c", "b", "a"];
+  const session = await getStudySession({
+    enrichmentId: "e",
+    learnerStateRef: "L1",
+    sourceExpeditions: sourceExpeditions({ detailById: { e: graph }, routeOrder }),
+    lessonReadStore: lessonReadStore(),
+    responseLog: responseLog([]),
+    verdictStore: verdictStore([]),
+    learnerKnowledgeAvailability: ALL_LEARNER_KNOWLEDGE_AVAILABLE
+  });
+  assert.ok(session);
+  assert.deepEqual(session.expeditionPath.map((step) => step.derivedNodeId), routeOrder);
+  assert.equal(session.target.derivedNodeId, "a");
+});
+
 test("getStudySession returns exactly what composeStudySession produces for the loaded data", async () => {
   const rows: ResponseLogRow[] = [];
   const verdicts: CalibrationVerdict[] = [];
   const fromUseCase = await callGetStudySession({ items: [optionItem], rows, verdicts });
-  const fromPure = composeStudySession({ enrichmentId: "e", learnerStateRef: "L1", detail: detail(), studyItems: [optionItem], rows, verdicts });
+  const fromPure = composeStudySession({
+    enrichmentId: "e",
+    learnerStateRef: "L1",
+    detail: detail(),
+    studyItems: [optionItem],
+    routePlan: {
+      policyIdentity: "source-expedition-route-test",
+      orderedDerivedNodeIds: ["scope", "ownership"],
+      legs: [{
+        legIndex: 0,
+        anchorDerivedNodeId: "ownership",
+        derivedNodeIds: ["scope", "ownership"],
+        selectedBonusStudyItemIds: []
+      }],
+      summitDerivedNodeId: "ownership"
+    },
+    rows,
+    verdicts
+  });
   assert.deepEqual(fromUseCase, fromPure);
 });
 

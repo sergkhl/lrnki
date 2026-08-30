@@ -17,8 +17,14 @@ import {
 
 // --- Selection (KTD5, AE7/AE8 selection halves) ------------------------------
 
-function eligible(studyItemId: string, derivedNodeId: string, sectionIndex = 0, priorChallengeExposure = 0): RecallEligibleItem {
-  return { studyItemId, derivedNodeId, sectionIndex, priorChallengeExposure };
+function eligible(
+  studyItemId: string,
+  derivedNodeId: string,
+  sectionIndex = 0,
+  priorChallengeExposure = 0,
+  itemType: RecallEligibleItem["itemType"] = "option_select"
+): RecallEligibleItem {
+  return { studyItemId, derivedNodeId, itemType, sectionIndex, priorChallengeExposure };
 }
 
 test("selection returns empty for an empty pool (unavailable, never fabricated)", () => {
@@ -34,6 +40,31 @@ test("selection reserves an eligible anchor item first", () => {
   });
   assert.equal(lineup[0].derivedNodeId, "n-anchor");
   assert.equal(lineup.length, 3);
+});
+
+test("a five-Concept Leg reserves the anchor bonus first and substitutes it while covering every Concept", () => {
+  const pool = [
+    eligible("anchor-option", "n-anchor", 0, 0, "option_select"),
+    eligible("anchor-matching", "n-anchor", 0, 9, "matching"),
+    eligible("b-option", "n-b"),
+    eligible("c-option", "n-c"),
+    eligible("d-option", "n-d"),
+    eligible("e-option", "n-e")
+  ];
+  const lineup = selectRecallLineup({
+    challengeId: "ch-leg-mix",
+    scopeKind: "section",
+    anchorDerivedNodeId: "n-anchor",
+    eligible: pool
+  });
+  assert.equal(lineup.length, SECTION_LINEUP_MAX);
+  assert.equal(lineup[0].studyItemId, "anchor-matching", "anchor bonus outranks its option");
+  assert.deepEqual(
+    [...new Set(lineup.map((entry) => entry.derivedNodeId))].sort(),
+    ["n-anchor", "n-b", "n-c", "n-d", "n-e"]
+  );
+  const familyById = new Map(pool.map((item) => [item.studyItemId, item.itemType] as const));
+  assert.deepEqual(new Set(lineup.map((entry) => familyById.get(entry.studyItemId))), new Set(["matching", "option_select"]));
 });
 
 test("selection covers distinct concepts before repeating one", () => {
@@ -69,10 +100,44 @@ test("enrichment scope covers distinct Legs before repeats and caps at seven", (
   ];
   const lineup = selectRecallLineup({ challengeId: "ch-1", scopeKind: "enrichment", anchorDerivedNodeId: "n-l2a", eligible: pool });
   assert.equal(lineup.length, ENRICHMENT_LINEUP_MAX);
-  assert.equal(lineup[0].derivedNodeId, "n-l2a"); // anchor reserved
   const bySection = new Map(pool.map((item) => [item.derivedNodeId, item.sectionIndex] as const));
   const firstThreeLegs = new Set(lineup.slice(0, 3).map((entry) => bySection.get(entry.derivedNodeId)));
   assert.equal(firstThreeLegs.size, 3); // all three Legs before any repeats
+});
+
+test("an Expedition Guardian reserves all three families when the eligible pool contains them", () => {
+  const pool = [
+    eligible("o-0", "n-0", 0, 0, "option_select"),
+    eligible("m-1", "n-1", 1, 0, "matching"),
+    eligible("i-2", "n-2", 2, 0, "impostor"),
+    eligible("o-3", "n-3", 0, 0, "option_select"),
+    eligible("m-4", "n-4", 1, 0, "matching")
+  ];
+  const lineup = selectRecallLineup({
+    challengeId: "ch-summit-mix",
+    scopeKind: "enrichment",
+    anchorDerivedNodeId: "n-2",
+    eligible: pool
+  });
+  const familyById = new Map(pool.map((item) => [item.studyItemId, item.itemType] as const));
+  assert.deepEqual(
+    lineup.slice(0, 3).map((entry) => familyById.get(entry.studyItemId)),
+    ["option_select", "matching", "impostor"]
+  );
+});
+
+test("a later wrong answer may remove one summit family without refusing the remaining lineup", () => {
+  const pool = [
+    eligible("o-0", "n-0", 0, 0, "option_select"),
+    eligible("m-1", "n-1", 1, 0, "matching")
+  ];
+  const lineup = selectRecallLineup({
+    challengeId: "ch-summit-narrowed",
+    scopeKind: "enrichment",
+    anchorDerivedNodeId: "n-1",
+    eligible: pool
+  });
+  assert.deepEqual(new Set(lineup.map((entry) => entry.studyItemId)), new Set(["o-0", "m-1"]));
 });
 
 test("more Legs than the enrichment budget still yields one item per Leg until the cap", () => {
@@ -435,5 +500,11 @@ test("eligibleRecallItems filters by scope AND latest-correct, carrying exposure
   const rows = [gradedRow("i-in", 1, "correct"), gradedRow("i-not-passed", 1, "incorrect")];
   const sectionOf = new Map([["m-0", 0], ["m-1", 1]]);
   const pool = eligibleRecallItems({ items, rows, exposure: { "i-in": 2 }, sectionIndexFor: (id) => sectionOf.get(id) });
-  assert.deepEqual(pool, [{ studyItemId: "i-in", derivedNodeId: "m-0", sectionIndex: 0, priorChallengeExposure: 2 }]);
+  assert.deepEqual(pool, [{
+    studyItemId: "i-in",
+    derivedNodeId: "m-0",
+    itemType: "option_select",
+    sectionIndex: 0,
+    priorChallengeExposure: 2
+  }]);
 });

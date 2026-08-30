@@ -12,6 +12,7 @@ import {
 } from "./studySessionProjection";
 import { type AdaptedNodeClassification } from "./adaptivePathProjection";
 import type { RecallScopeStatus } from "./recallChallenge";
+import { buildTrailView } from "./studySessionTrail";
 
 // DAG: scope -> ownership -> move (certain), plus borrow -> move (uncertain).
 const labelByNode: Record<string, string> = { scope: "Variable scope", ownership: "Ownership", move: "Move semantics", borrow: "Borrowing" };
@@ -190,6 +191,64 @@ function lessonFor(derivedNodeId: string): ConceptLesson {
   };
 }
 
+function routeSession(legs: string[][], bonusItems: StudyItem[]) {
+  const ids = legs.flat();
+  const base = detail();
+  const graph: DerivedGraphDetail = {
+    ...base,
+    summary: {
+      ...base.summary,
+      conceptCount: ids.length,
+      edgeCount: Math.max(0, ids.length - 1),
+      certainEdgeCount: Math.max(0, ids.length - 1),
+      uncertainEdgeCount: 0
+    },
+    nodes: ids.map((derivedNodeId, index) => ({
+      ...node("scope"),
+      derivedNodeId,
+      label: `Concept ${index + 1}`,
+      difficulty: (index + 1) / 10,
+      hasStudyItem: true
+    })),
+    edges: ids.slice(1).map((derivedNodeId, index) => ({
+      prerequisiteDerivedNodeId: ids[index],
+      dependentDerivedNodeId: derivedNodeId,
+      confidence: 0.9,
+      uncertain: false,
+      judgeModel: "j"
+    }))
+  };
+  const studyItems = [...ids.map(optionItem), ...bonusItems];
+  const lessons = ids.map((derivedNodeId, index) => ({
+    ...lessonFor("scope"),
+    conceptLessonId: `lesson-${derivedNodeId}`,
+    derivedNodeId,
+    canonicalLabel: `Concept ${index + 1}`
+  }));
+  return composeStudySession({
+    enrichmentId: "e",
+    learnerStateRef: "L1",
+    detail: graph,
+    studyItems,
+    lessons,
+    rows: [],
+    verdicts: [],
+    routePlan: {
+      policyIdentity: "source-expedition-route-test",
+      orderedDerivedNodeIds: ids,
+      legs: legs.map((derivedNodeIds, legIndex) => ({
+        legIndex,
+        anchorDerivedNodeId: derivedNodeIds.at(-1)!,
+        derivedNodeIds,
+        selectedBonusStudyItemIds: bonusItems
+          .filter((item) => derivedNodeIds.includes(item.derivedNodeId))
+          .map((item) => item.studyItemId)
+      })),
+      summitDerivedNodeId: ids.at(-1) ?? null
+    }
+  });
+}
+
 test("composeStudySession gates a frontier node with an option-select item to an option_select sheet (options sorted by id)", () => {
   const session = compose({ studyItems: [optionItem("scope")] });
   // No verdicts/rows: scope and borrow are the ready frontier nodes; the whole-layer ring
@@ -257,6 +316,24 @@ test("composeStudySession rides down a layer-wide sectioned expedition path with
   assert.equal(session.target.derivedNodeId, "borrow");
   assert.equal(session.expeditionPath.find((step) => step.derivedNodeId === "borrow")?.isSummit, true);
   assert.deepEqual(session.sections.map((section) => section.milestoneDerivedNodeId), ["borrow"]);
+});
+
+test("qualified mixed routes project the exact 10-to-17-stop Leg bounds and canonical activity order", () => {
+  const minimum = buildTrailView(routeSession(
+    [["min-a", "min-b", "min-c"], ["min-d", "min-e", "min-f"]],
+    [matchingItem("min-b"), impostorItem("min-e")]
+  ));
+  assert.deepEqual(minimum.sections.map((section) => section.stopsTotal), [10, 10]);
+
+  const maximum = buildTrailView(routeSession(
+    [["max-a", "max-b", "max-c", "max-d", "max-e"]],
+    [matchingItem("max-c"), impostorItem("max-c")]
+  ));
+  assert.equal(maximum.sections[0].stopsTotal, 17);
+  assert.deepEqual(
+    maximum.concepts.find((concept) => concept.derivedNodeId === "max-c")?.stops.map((stop) => stop.kind),
+    ["theory", "option_select", "matching", "impostor", "capstone"]
+  );
 });
 
 test("composeStudySession prunes the known closure and keeps the derived summit visible even when known", () => {

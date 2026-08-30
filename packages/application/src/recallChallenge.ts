@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { neutralResponses, type MatchingItem, type ResponseLogRow, type StudyItem } from "@lrnki/domain-core";
+import { neutralResponses, type MatchingItem, type ResponseLogRow, type StudyItem, type StudyItemType } from "@lrnki/domain-core";
 import type {
   NewRecallChallengeEvent,
   RecallChallengeEvent,
@@ -10,7 +10,10 @@ import type {
   RecallChallengeStorePort,
   ResponseLogStorePort
 } from "@lrnki/ports";
-import { deriveFlooredExpedition } from "./expeditionSections";
+import {
+  expeditionRouteAssetMismatchReasons,
+  projectExpeditionSections
+} from "./expeditionSections";
 import { keyedCorrectIdFor, keyedMatchIdFor } from "./gradedSelectionOutcome";
 import { ENRICHMENT_LINEUP_MAX, SECTION_LINEUP_MAX } from "./recallLineupBudget";
 import { studyItemToView, type StudyItemView } from "./studySessionProjection";
@@ -38,6 +41,7 @@ export const RECALL_MISS_BUFFER = 3;
 export type RecallEligibleItem = {
   studyItemId: string;
   derivedNodeId: string;
+  itemType: StudyItemType;
   sectionIndex: number;
   priorChallengeExposure: number;
 };
@@ -55,11 +59,10 @@ function challengeTieBreak(challengeId: string, studyItemId: string): number {
   return hash;
 }
 
-// Coverage-first lineup selection (KTD5). Group by concept, reserve an eligible anchor, then
-// round-robin distinct concepts — and, for enrichment scope, distinct Legs — before repeats.
-// Equally eligible candidates rank by least prior challenge exposure, then the stable
-// challenge-identity tie-break. The R2 maxima truncate AFTER coverage ordering. An empty
-// result means the scope is `unavailable` (`no_eligible_items`) — never a fabricated lineup.
+// Family-aware lineup selection. A Leg keeps its anchor at position zero, substitutes a selected
+// bonus for that Concept's option when possible, and covers every remaining Concept before repeats.
+// The summit reserves each family present in mutable learner eligibility, then covers Legs and
+// Concepts. Ward maxima, least-exposure ranking, and the stable challenge tie-break are unchanged.
 export function selectRecallLineup(input: {
   challengeId: string;
   scopeKind: RecallChallengeScopeKind;
@@ -73,57 +76,62 @@ export function selectRecallLineup(input: {
     a.priorChallengeExposure - b.priorChallengeExposure ||
     challengeTieBreak(input.challengeId, a.studyItemId) - challengeTieBreak(input.challengeId, b.studyItemId) ||
     a.studyItemId.localeCompare(b.studyItemId);
-
-  // Per-concept queues, each internally rank-ordered; concepts ordered by their best item,
-  // with the eligible anchor concept forced first so its item is reserved as lineup[0].
-  const byConcept = new Map<string, RecallEligibleItem[]>();
-  for (const item of input.eligible) {
-    const queue = byConcept.get(item.derivedNodeId);
-    if (queue) queue.push(item);
-    else byConcept.set(item.derivedNodeId, [item]);
-  }
-  const conceptQueues = [...byConcept.values()].map((items) => [...items].sort(rank));
-  conceptQueues.sort((a, b) => (a[0].derivedNodeId === input.anchorDerivedNodeId ? -1 : b[0].derivedNodeId === input.anchorDerivedNodeId ? 1 : rank(a[0], b[0])));
-
-  // Round-robin pop across an ordered list of queues: one item per queue per cycle until the
-  // budget or the pool is exhausted.
-  const roundRobin = (queues: RecallEligibleItem[][]): RecallEligibleItem[] => {
-    const picked: RecallEligibleItem[] = [];
-    while (picked.length < max && queues.some((queue) => queue.length > 0)) {
-      for (const queue of queues) {
-        if (picked.length >= max) break;
-        const next = queue.shift();
-        if (next) picked.push(next);
-      }
-    }
-    return picked;
+  const remaining = [...input.eligible];
+  const picked: RecallEligibleItem[] = [];
+  const take = (item: RecallEligibleItem | undefined): void => {
+    if (!item || picked.length >= max) return;
+    const index = remaining.findIndex((candidate) => candidate.studyItemId === item.studyItemId);
+    if (index < 0) return;
+    picked.push(item);
+    remaining.splice(index, 1);
   };
+  const best = (
+    candidates: readonly RecallEligibleItem[],
+    compare: (left: RecallEligibleItem, right: RecallEligibleItem) => number = rank
+  ): RecallEligibleItem | undefined => [...candidates].sort(compare)[0];
 
-  let picked: RecallEligibleItem[];
   if (input.scopeKind === "section") {
-    picked = roundRobin(conceptQueues);
+    const anchorCandidates = remaining.filter((item) =>
+      item.derivedNodeId === input.anchorDerivedNodeId
+    );
+    take(best(anchorCandidates, (left, right) =>
+      Number(left.itemType === "option_select") - Number(right.itemType === "option_select") ||
+      rank(left, right)
+    ));
+
+    if (!picked.some((item) => item.itemType !== "option_select")) {
+      take(best(remaining.filter((item) => item.itemType !== "option_select")));
+    }
+
+    const coveredConcepts = new Set(picked.map((item) => item.derivedNodeId));
+    while (picked.length < max) {
+      const uncovered = remaining.filter((item) => !coveredConcepts.has(item.derivedNodeId));
+      if (uncovered.length === 0) break;
+      const next = best(uncovered);
+      take(next);
+      if (next) coveredConcepts.add(next.derivedNodeId);
+    }
+    while (picked.length < max && remaining.length > 0) take(best(remaining));
   } else {
-    // Enrichment scope: distinct Legs before repeats. Legs cycle in best-item order (the
-    // anchor's Leg first, carried by its forced-first concept queue); each Leg-turn pops from
-    // that Leg's own concept round-robin.
-    const legs = new Map<number, RecallEligibleItem[][]>();
-    for (const queue of conceptQueues) {
-      const leg = legs.get(queue[0].sectionIndex);
-      if (leg) leg.push(queue);
-      else legs.set(queue[0].sectionIndex, [queue]);
-    }
-    const legQueues = [...legs.values()];
-    picked = [];
-    while (picked.length < max && legQueues.some((leg) => leg.some((queue) => queue.length > 0))) {
-      for (const leg of legQueues) {
-        if (picked.length >= max) break;
-        const queue = leg.find((candidate) => candidate.length > 0);
-        const next = queue?.shift();
-        if (next) picked.push(next);
-        // Rotate this Leg's concept order so its next turn starts at the following concept.
-        if (queue) leg.push(...leg.splice(leg.indexOf(queue), 1));
+    const usedLegs = new Set<number>();
+    const usedConcepts = new Set<string>();
+    const diversityRank = (left: RecallEligibleItem, right: RecallEligibleItem): number =>
+      Number(usedLegs.has(left.sectionIndex)) - Number(usedLegs.has(right.sectionIndex)) ||
+      Number(usedConcepts.has(left.derivedNodeId)) - Number(usedConcepts.has(right.derivedNodeId)) ||
+      rank(left, right);
+    const takeDiverse = (candidates: readonly RecallEligibleItem[]): void => {
+      const next = best(candidates, diversityRank);
+      take(next);
+      if (next) {
+        usedLegs.add(next.sectionIndex);
+        usedConcepts.add(next.derivedNodeId);
       }
+    };
+
+    for (const family of ["option_select", "matching", "impostor"] as const) {
+      takeDiverse(remaining.filter((item) => item.itemType === family));
     }
+    while (picked.length < max && remaining.length > 0) takeDiverse(remaining);
   }
   return picked.map((item) => ({ studyItemId: item.studyItemId, derivedNodeId: item.derivedNodeId }));
 }
@@ -160,6 +168,7 @@ export function eligibleRecallItems(input: {
     eligible.push({
       studyItemId: item.studyItemId,
       derivedNodeId: item.derivedNodeId,
+      itemType: item.itemType,
       sectionIndex,
       priorChallengeExposure: input.exposure[item.studyItemId] ?? 0
     });
@@ -501,7 +510,17 @@ export function createRecallChallenge(deps: RecallChallengeDeps) {
   const loadScopes = async (input: { learnerStateRef: string; enrichmentId: string }) => {
     const opened = await deps.sourceExpeditions.openActive(input);
     if (opened.status !== "available") return undefined;
-    const { summit, sections } = deriveFlooredExpedition(opened.assets.detail);
+    if (expeditionRouteAssetMismatchReasons({
+      detail: opened.assets.detail,
+      studyItems: opened.assets.studyItems,
+      routePlan: opened.assets.routePlan
+    }).length > 0) return undefined;
+    const { summit, sections } = projectExpeditionSections({
+      detail: opened.assets.detail,
+      stateByNode: {},
+      routePlan: opened.assets.routePlan,
+      studyItems: opened.assets.studyItems
+    });
     return { opened, detail: opened.assets.detail, summit, sections };
   };
 

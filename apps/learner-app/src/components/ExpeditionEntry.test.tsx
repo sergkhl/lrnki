@@ -65,7 +65,7 @@ function journal(overrides: Partial<JournalView> = {}): JournalView {
         teaser: "Build stronger arguments and weigh evidence.",
         declaredDomain: "biology",
         sortOrder: 1,
-        totalStopCount: 7,
+        totalConceptCount: 7,
         searchTerms: []
       }
     ],
@@ -132,11 +132,11 @@ test("beginning a candidate fires one action even under rapid presses", async ()
   expect(chooseMock.mock.calls.length + setActiveMock.mock.calls.length).toBe(1);
 });
 
-test("an accepted candidate renders only catalog title, teaser, playable count, and Begin", async () => {
+test("an accepted candidate renders only catalog title, teaser, Concept count, and Begin", async () => {
   await renderEntry(journal());
   expect(screen.getByText("Critical Thinking")).toBeTruthy();
   expect(screen.getByText("Build stronger arguments and weigh evidence.")).toBeTruthy();
-  expect(screen.getByText("7 playable stops")).toBeTruthy();
+  expect(screen.getByText("7 concepts")).toBeTruthy();
   expect(screen.getByLabelText("Begin")).toBeTruthy();
   expect(screen.queryByText("Biology")).toBeNull();
   expect(screen.queryByText("Expedition: Critical Thinking")).toBeNull();

@@ -281,7 +281,7 @@ test("Explore curation filters adopted candidates then takes the top five, narro
       "sortOrder",
       "teaser",
       "title",
-      "totalStopCount"
+      "totalConceptCount"
     ]
   );
 });
@@ -431,7 +431,7 @@ function fakeSourceExpeditions(input: {
           teaser: `Learn ${summit.label}.`,
           declaredDomain: summitNode?.declaredDomain ?? "",
           sortOrder: 1,
-          totalStopCount: trailNodeIds.size,
+          totalConceptCount: trailNodeIds.size,
           searchTerms: [...new Set(trailNodes.flatMap((node) => [node.label, ...node.aliases]))]
         }];
     });

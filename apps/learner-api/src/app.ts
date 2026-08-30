@@ -217,7 +217,7 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient, o
     })
 
     .get("/leaderboard", auth, async (c) => {
-      return c.json(await loadLeaderboard(sql, c.get("learnerStateRef")));
+      return c.json(await loadLeaderboard(sql, c.get("learnerStateRef"), sourceExpeditions));
     })
 
     .get("/expedition/:enrichmentId", auth, async (c) => {

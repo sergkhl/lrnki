@@ -111,7 +111,7 @@ function qualifiedFixture(): QualifiedSourceExpedition {
       enrichmentId: "enrichment-1",
       title: "Conditional permit",
       declaredDomain: "policy interpretation",
-      totalStopCount: 1,
+      totalConceptCount: 1,
       searchTerms: ["Conditional permit", "Time-limited permit"]
     },
     assets: {

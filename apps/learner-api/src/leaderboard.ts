@@ -1,5 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { getWeeklyLeaderboard, isoWeekRange, lifetimeMasteredCrystalCount, previousIsoWeekKey } from "@lrnki/application";
+import {
+  getWeeklyLeaderboard,
+  isoWeekRange,
+  lifetimeMasteredCrystalCount,
+  previousIsoWeekKey,
+  type SourceExpeditionModule
+} from "@lrnki/application";
 import {
   PostgresCalibrationVerdictStore,
   PostgresConceptLessonStore,
@@ -32,8 +38,14 @@ const PODIUM_RANK = 3;
 // load we also recompute the PRIOR week's final board and idempotently record a `weekly_podium`
 // award if the viewer finished in the top three (`dedupe_key` = prior week key), so a re-entered
 // week never double-awards (AE5). `sql` is the process's shared pool (KTD5).
-export async function loadLeaderboard(sql: DatabaseClient, learnerStateRef: string, now: Date = new Date()): Promise<LeaderboardView> {
+export async function loadLeaderboard(
+  sql: DatabaseClient,
+  learnerStateRef: string,
+  sourceExpeditions: Pick<SourceExpeditionModule, "qualify">,
+  now: Date = new Date()
+): Promise<LeaderboardView> {
   const deps = {
+    sourceExpeditions,
     learnerProfileRead: new PostgresLearnerProfileRead(sql),
     expeditionStore: new PostgresLearnerExpeditionStore(sql),
     awardsStore: new PostgresLearnerAwardsStore(sql),

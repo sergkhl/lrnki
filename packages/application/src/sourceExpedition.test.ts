@@ -668,7 +668,7 @@ test("qualification binds one lowest-id option per Concept and the minimum mixed
     enrichmentId: ENRICHMENT_ID,
     title: "Authoritative summit",
     declaredDomain: "authoritative-domain",
-    totalStopCount: 4,
+    totalConceptCount: 4,
     searchTerms: [
       "Trusted prerequisite",
       "Prerequisite alias",
@@ -766,7 +766,7 @@ test("accepted catalog presentation and source credits are the finished learner 
     teaser: "Build stronger arguments and weigh evidence.",
     declaredDomain: "authoritative-domain",
     sortOrder: 1,
-    totalStopCount: 4,
+    totalConceptCount: 4,
     searchTerms: [
       "Trusted prerequisite",
       "Prerequisite alias",
@@ -1125,7 +1125,7 @@ test("qualification keeps the greatest asset-ready prerequisite-closed sublayer"
       "node-summit"
     ]
   );
-  assert.equal(result.candidate.totalStopCount, 4);
+  assert.equal(result.candidate.totalConceptCount, 4);
 });
 
 test("qualification excludes LLM-grounded branches without suppressing an independent source-ready trail", async () => {

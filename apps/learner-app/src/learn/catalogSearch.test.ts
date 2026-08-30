@@ -3,8 +3,8 @@ import type { CatalogView } from "@/lib/queries";
 import { filterCatalogCandidates } from "./catalogSearch";
 
 const candidates: CatalogView["candidates"] = [
-  { enrichmentId: "carbon", catalogKey: "carbon", title: "Carbon fixation and carbohydrate synthesis", teaser: "Follow light into stored energy.", declaredDomain: "Plant Biology", sortOrder: 1, totalStopCount: 3, searchTerms: ["Photosynthetic pigments"] },
-  { enrichmentId: "tides", catalogKey: "tides", title: "Tidal harmonics", teaser: "Reason about repeating coastal motion.", declaredDomain: "Oceanography", sortOrder: 2, totalStopCount: 2, searchTerms: [] }
+  { enrichmentId: "carbon", catalogKey: "carbon", title: "Carbon fixation and carbohydrate synthesis", teaser: "Follow light into stored energy.", declaredDomain: "Plant Biology", sortOrder: 1, totalConceptCount: 3, searchTerms: ["Photosynthetic pigments"] },
+  { enrichmentId: "tides", catalogKey: "tides", title: "Tidal harmonics", teaser: "Reason about repeating coastal motion.", declaredDomain: "Oceanography", sortOrder: 2, totalConceptCount: 2, searchTerms: [] }
 ];
 
 test("catalog search matches accepted title, teaser, and underlying terms case-insensitively", () => {

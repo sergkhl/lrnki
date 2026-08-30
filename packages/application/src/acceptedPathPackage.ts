@@ -47,7 +47,7 @@ export function createAcceptedPathPackageModule(deps: AcceptedPathPackageModuleD
         source: input.source,
         qualification: {
           declaredDomain: qualification.candidate.declaredDomain,
-          totalStopCount: qualification.candidate.totalStopCount,
+          totalStopCount: qualification.candidate.totalConceptCount,
           trailNodeIds: [...qualification.assets.trailNodeIds].sort(compareText),
           expectedAssets: qualification.assets.expectedAssets
         }
@@ -98,7 +98,7 @@ export function createAcceptedPathPackageModule(deps: AcceptedPathPackageModuleD
           candidate.title !== entry.catalog.title ||
           candidate.teaser !== entry.catalog.teaser ||
           candidate.sortOrder !== entry.catalog.sortOrder ||
-          candidate.totalStopCount !== entry.qualification.totalStopCount
+          candidate.totalConceptCount !== entry.qualification.totalStopCount
         ) {
           throw new Error(
             `Installed path ${JSON.stringify(entry.catalog.catalogKey)} changed in learner projection.`
@@ -125,7 +125,7 @@ function assertInstalledQualification(
   const actualAssets = qualification.assets.expectedAssets;
   if (
     qualification.candidate.declaredDomain !== expected.declaredDomain ||
-    qualification.candidate.totalStopCount !== expected.totalStopCount ||
+    qualification.candidate.totalConceptCount !== expected.totalStopCount ||
     actualAssets.assetSetIdentity !== entry.catalog.acceptedAssetSetIdentity ||
     !sameTextSet(qualification.assets.trailNodeIds, expected.trailNodeIds) ||
     !sameTextSet(actualAssets.currentConceptLessonIds, expected.expectedAssets.currentConceptLessonIds) ||

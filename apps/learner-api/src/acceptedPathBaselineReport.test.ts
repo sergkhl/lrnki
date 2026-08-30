@@ -118,7 +118,7 @@ test("target contract: every Expedition selects all three Study Item families", 
 });
 
 test("target contract: catalog qualification calls the count totalConceptCount", {
-  todo: "U4 must replace the misleading totalStopCount field end to end"
+  todo: "U5 must seal totalConceptCount in accepted package v2 after U4 renamed the learner API"
 }, async () => {
   assert.ok((await reportsPromise).every((report) =>
     report.targetContract.honestConceptCount

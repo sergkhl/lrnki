@@ -90,7 +90,7 @@ export type QualifiedSourceExpeditionCandidate = {
   enrichmentId: string;
   title: string;
   declaredDomain: string;
-  totalStopCount: number;
+  totalConceptCount: number;
   searchTerms: string[];
 };
 
@@ -398,7 +398,7 @@ export function createSourceExpeditionModule(deps: SourceExpeditionModuleDeps) {
         enrichmentId,
         title: summitNode.label,
         declaredDomain: summitNode.declaredDomain,
-        totalStopCount: qualifiedTrail.trailNodeIds.size,
+        totalConceptCount: qualifiedTrail.trailNodeIds.size,
         searchTerms: [...new Set(trailNodes.flatMap((node) => [node.label, ...node.aliases]))]
       },
       assets: {

@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { DerivedGraphEdge, DerivedGraphNode } from "@lrnki/ports";
-import { deriveFlooredExpedition, projectExpeditionSections } from "./expeditionSections";
+import {
+  deriveFlooredExpedition,
+  expeditionRouteAssetMismatchReasons,
+  projectExpeditionSections
+} from "./expeditionSections";
 
 function node(
   derivedNodeId: string,
@@ -81,6 +85,58 @@ test("uncertain edges do not constrain the shared route", () => {
   });
 
   assert.deepEqual(result.steps.map((step) => step.derivedNodeId), ["b", "c", "a"]);
+});
+
+test("an explicit qualified route is projected verbatim instead of planned again", () => {
+  const routePlan = {
+    policyIdentity: "source-expedition-route-test",
+    orderedDerivedNodeIds: ["c", "b", "a"],
+    legs: [{
+      legIndex: 0,
+      anchorDerivedNodeId: "a",
+      derivedNodeIds: ["c", "b", "a"],
+      selectedBonusStudyItemIds: ["matching-b"]
+    }],
+    summitDerivedNodeId: "a"
+  };
+  const studyItems = [{
+    studyItemId: "matching-b",
+    derivedNodeId: "b",
+    itemType: "matching" as const
+  }];
+  const result = projectExpeditionSections({
+    detail: {
+      nodes: [node("a", 1), node("b", 2), node("c", 3)],
+      edges: []
+    },
+    stateByNode: {},
+    routePlan,
+    studyItems
+  });
+  assert.deepEqual(result.steps.map((step) => step.derivedNodeId), ["c", "b", "a"]);
+  assert.equal(result.summit?.derivedNodeId, "a");
+  assert.equal(result.sections[0].hasStudyItems, true);
+});
+
+test("route/detail and selected-bonus drift are explicit consumer mismatches", () => {
+  const reasons = expeditionRouteAssetMismatchReasons({
+    detail: { nodes: [node("a", 1), node("b", 2), node("c", 3)], edges: [] },
+    studyItems: [{ studyItemId: "unselected-impostor", derivedNodeId: "b", itemType: "impostor" }],
+    routePlan: {
+      policyIdentity: "source-expedition-route-test",
+      orderedDerivedNodeIds: ["a", "b", "missing"],
+      legs: [{
+        legIndex: 0,
+        anchorDerivedNodeId: "missing",
+        derivedNodeIds: ["a", "b", "missing"],
+        selectedBonusStudyItemIds: ["missing-matching"]
+      }],
+      summitDerivedNodeId: "missing"
+    }
+  });
+  assert.ok(reasons.includes("route nodes do not equal detail nodes"));
+  assert.ok(reasons.includes("selected bonus missing-matching is missing"));
+  assert.ok(reasons.includes("current non-option Study Items do not equal selected route bonuses"));
 });
 
 test("an empty layer remains an honest empty projection", () => {

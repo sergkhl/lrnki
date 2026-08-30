@@ -18,13 +18,13 @@ export type SelectedCandidate = {
   enrichmentId: string;
   title: string;
   declaredDomain: string;
-  totalStopCount: number;
+  totalConceptCount: number;
   // Which one-tap graded kind the journey will target on this trail (the spec taps that checkpoint
   // by its typed kind, not by any generated concept label).
   gradedKind: GradedKind;
 };
 
-type CatalogCandidate = { enrichmentId: string; title: string; declaredDomain: string; totalStopCount: number };
+type CatalogCandidate = { enrichmentId: string; title: string; declaredDomain: string; totalConceptCount: number };
 
 // Only the first N candidates are probed so a large catalog can't make preflight open-ended.
 const MAX_PROBE_CANDIDATES = 25;
@@ -108,7 +108,7 @@ export async function selectCandidate(opts: {
         enrichmentId: candidate.enrichmentId,
         title: candidate.title,
         declaredDomain: candidate.declaredDomain,
-        totalStopCount: candidate.totalStopCount,
+        totalConceptCount: candidate.totalConceptCount,
         gradedKind
       };
     }

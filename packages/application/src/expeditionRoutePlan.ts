@@ -7,6 +7,7 @@ import type {
   SourceEvidenceReadPort,
   SourceEvidenceRecord
 } from "@lrnki/ports";
+import { SECTION_LINEUP_MAX } from "./recallLineupBudget";
 
 export type ExpeditionRoutePolicy = "source_expedition" | "layer_projection";
 
@@ -110,9 +111,9 @@ type RoutePolicyDefinition = {
 
 const ROUTE_POLICIES: Record<ExpeditionRoutePolicy, RoutePolicyDefinition> = {
   source_expedition: {
-    identity: "source-expedition-route-v1:min3-max5-target4:mixed",
+    identity: `source-expedition-route-v1:min3-max${SECTION_LINEUP_MAX}-target4:mixed`,
     minimumLegConcepts: 3,
-    maximumLegConcepts: 5,
+    maximumLegConcepts: SECTION_LINEUP_MAX,
     targetLegConcepts: 4,
     requireBonusPerLeg: true,
     requireBothBonusFamilies: true,
@@ -123,9 +124,9 @@ const ROUTE_POLICIES: Record<ExpeditionRoutePolicy, RoutePolicyDefinition> = {
   // Source Expedition qualification is moved onto the finished plan in U3. It uses this same
   // algorithm with publication-only source/mix constraints disabled; it is not a route fallback.
   layer_projection: {
-    identity: "layer-projection-route-v1:min3-max5-target4:short-inspection",
+    identity: `layer-projection-route-v1:min3-max${SECTION_LINEUP_MAX}-target4:short-inspection`,
     minimumLegConcepts: 3,
-    maximumLegConcepts: 5,
+    maximumLegConcepts: SECTION_LINEUP_MAX,
     targetLegConcepts: 4,
     requireBonusPerLeg: false,
     requireBothBonusFamilies: false,

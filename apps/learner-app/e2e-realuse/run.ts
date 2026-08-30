@@ -178,7 +178,7 @@ async function orchestrate(runId: string, password: string, authSecret: string):
 
   // 4. Capability preflight against public routes — selects a ready enrichment or fails closed.
   const candidate = await selectCandidate({ apiBase: API_BASE, probeEmail: emails.probe, password });
-  console.log(`[realuse] selected enrichment ${candidate.enrichmentId} (${candidate.totalStopCount} stops).`);
+  console.log(`[realuse] selected enrichment ${candidate.enrichmentId} (${candidate.totalConceptCount} concepts).`);
 
   // 5. Playwright — only public origins + this run's ephemeral addresses/password/selected
   //    metadata. `REALUSE_PASSWORD` is re-added explicitly because `secretFreeEnv` strips every

@@ -7,11 +7,12 @@ execution: code
 
 # Expand Source Expedition Legs and Qualify Mixed Study Items
 
-**Status:** In progress — U0–U3 complete; qualification now binds the family-complete asset set to
-the selected source-cued route and route-sensitive identity; U4 is next
+**Status:** In progress — U0–U4 complete; Study Session, mastery/progress, Recall Challenge, and
+catalog consumers now share the qualified route, selected family mix, and honest Concept count; U5
+is next
 
-**NEXT:** U4 makes Study Session, Recall Challenge, and catalog UI consume that same route and
-family mix, with honest Concept counts and family-aware Guardian lineups.
+**NEXT:** U5 replaces accepted package v1 with the strict route-bearing mixed-family v2 format and
+deletes the option-only package contract.
 
 **Decision state:** Accepted by the owner on 2026-08-29 and amended the same day after design
 review. A normal Leg contains 3–5 Concepts, targeting four. Every Concept keeps one qualified
@@ -606,6 +607,36 @@ The plan is complete only when all of the following are true:
 
 ## Validation Log
 
+### U4 — Shared learner route, mixed Guardians, and honest catalog count — 2026-08-30
+
+- **Shared route projection:** Study Session and Recall Challenge now consume the qualified route
+  directly. One fail-closed contract checks exact detail nodes, Leg concatenation/index/anchors,
+  summit, item scope, and selected non-option IDs before learner evidence or challenge writes.
+  Source journal progress and weekly mastery use the same selected assets; leaderboard qualification
+  remains once per distinct source enrichment and rejects a learner's stale pinned identity.
+- **Trail behavior:** the route's actual lessons/items project `3 × Concept count + selected bonus
+  count` stops, preserving theory → option-select → matching → impostor → capstone order, independent
+  latest-outcome completion, prerequisite gating, resume, crystal growth, and section progress. Pure
+  projection tests prove two 3-Concept Legs at 10 stops each and a 5-Concept/two-bonus Leg at 17.
+- **Guardian behavior:** Leg selection reserves the anchor's eligible non-option item first, then a
+  bonus and distinct Concepts within the unchanged five-ward budget. Summit selection reserves each
+  eligible family, then distinct Legs/Concepts within seven wards. Tests prove mixed Legs, all three
+  summit families, least-exposure/deterministic replay, and a nonempty narrowed summit after a family
+  becomes latest-incorrect; combat, recovery, immutable lineup, and evidence isolation are unchanged.
+- **Learner contract:** `totalConceptCount` replaces `totalStopCount` across Source Expedition
+  candidates, API/query types, learner copy, component/intercepted/native fixtures, and real-use
+  tooling; cards render “concepts.” Package v1 deliberately retains its sealed field until U5.
+- **Validation:** the 155-test focused application suite, focused learner component tests,
+  `pnpm test`, `pnpm test:db`, `pnpm typecheck`, `pnpm lint`, `pnpm accepted-paths validate`,
+  `pnpm accepted-paths report`, and `git diff --check` pass. Database/API evidence exercises the
+  exact four-Concept route and option → matching/impostor segment order. Lint retains ten existing
+  warnings; accepted-package validation retains six named U5 target TODO bodies.
+- **Real-use quality and authority:** milestone U4 learner projection; fixtures are the focused
+  3/5-Concept mixed route outputs and isolated four-Concept database/API source flow; model calls are
+  not applicable; result `PASS` for local behavior. Package v2, regenerated real-source paths,
+  real-backend web, Simulator, deployed, physical-device, production, and release evidence remain
+  unproved and are owned by U5–U8.
+
 ### U3 — Route-bound mixed Source Expedition qualification — 2026-08-30
 
 - **Implementation:** qualification now deterministically replays persisted family admission,
@@ -741,40 +772,22 @@ The plan is complete only when all of the following are true:
 
 ### Planning baseline and design review — 2026-08-29
 
-- **Authority:** Read-only current source, the five committed accepted-package projections, current
-  coordination documents, and primary learning-research sources. No database, model, web, or native
-  run. The `Current repository facts` table owns the baseline counts. For the review, the KTD2/KTD3
-  route planner, `lessonGroundingShape`, and the family admission bars were re-implemented from this
-  plan's text and replayed over the packages; the replay reproduces the plan's own 140/152 pre-gate
-  decline counts and the 140/12/31 lesson-passage split, which is its positive control.
-- **Locked owner choices:** 3–5 Concepts per normal Leg, target four; one option-select per Concept;
-  at least one selected matching/impostor per Leg; both bonus families per Expedition; existing
-  mastery and rewards preserved.
-- **Measured — route feasibility is the plan's load-bearing bet.** Under KTD2/KTD3 the hard
-  "3–5 Concepts and one bonus candidate per Leg" partition has NO solution today for Critical
-  Thinking, Neuroscience, and Probability and Statistics, and only a minimum-Leg-count solution for
-  Machine Learning (7) and Personal Finance (8), which suppresses the target-four rank entirely.
-  Bonus-capable Concepts are 11/31, 7/31, 5/40, 11/37, 9/44. The binding condition is spread, not
-  count: interior gaps between bonus-capable Concepts must be at most 8 and end gaps at most 4;
-  observed longest runs are 12/6/11/7/10. KTD5's veto removal must supply the difference.
-- **Measured — family provenance.** 10 of 39 matching and 21 of 67 impostor bank items carry a
-  source citation on every relationship; 60 of 143 pairs and 66 of 201 truths are honest
-  `generated` rows; 67 of 67 lies are generated and uncited as designed.
-- **Measured — the one-passage lesson is a lesson limit, not a source limit.** Every one of the 140
-  one-passage lessons had at least 2 source evidence passages available and 76 had at least 3 (mean
-  4.24; 6.31 across the 108 published-Concept stops). Passage count tracks lesson SECTION count
-  (1.09/2.00/2.52) and not available evidence (4.24/5.67/6.06). 122 of the 140 came from the normal
-  generator and 18 from the extractive definition fallback; `applications`, `intuition`, and `gist`
-  bodies yield no grounding passage, and each path carries only 11–15 lesson bullets.
-- **Amended on this evidence:** KTD4 admission bar (option-select analogue; a generated-provenance
-  relationship is admissible under an accepted source-support decision); KTD6 Expedition Guardian
-  (best-effort family reservation, provable guarantee moved to KTD7) and Leg anchor precedence; KTD5
-  pre-gate/fallback split, pre-decided per-Leg degrade path, and repair-layer correction; KTD1
-  lowest-ID option-select rule; and a U0 yield probe before U1. Concept Lesson grounding depth left
-  this plan for its own brainstorm.
-- **Handoff invariant:** Implementation must fix route planning and source family admission together.
-  Merely grouping arbitrary current Concepts, removing the option-only filter, or changing catalog
-  copy does not satisfy the plan.
+- **Authority and replay:** read-only source, five committed package projections, coordination docs,
+  and primary research only. A model-free reimplementation of the proposed route/admission bars
+  reproduced the 140/152 pre-gate declines and 140/12/31 lesson-passage split positive control.
+- **Locked choices:** 3–5 Concepts per Leg, target four; one option-select per Concept; non-option
+  practice per Leg; both bonus families per Expedition; existing mastery and rewards preserved.
+- **Feasibility finding:** the original banks could not partition three paths and forced minimum-Leg
+  solutions for two because bonus-capable Concepts were too sparse (longest uncovered runs
+  12/6/11/7/10). U0 therefore had to measure post-veto yield before route implementation.
+- **Grounding finding:** 140 one-passage lessons each had at least two source passages available;
+  scarcity was the lesson projection, not source supply. Family provenance remained honest:
+  generated relationships/truths were not relabeled source, and every lie was generated/uncited.
+- **Amendments and invariant:** family admission uses the option-select analogue; summit family
+  reservation is best effort over learner state; Leg anchor precedes family coverage; blueprint
+  failure stays option-only; lowest-ID option selection is explicit; grounding depth moved to its
+  brainstorm. Route planning and source-family admission had to land together—arbitrary grouping,
+  removing one filter, or changing copy alone could not satisfy the plan.
 
 ## Open findings
 

@@ -217,7 +217,7 @@ export function CandidateCard({ candidate }: Readonly<{ candidate: CandidateCard
     <Card className="gap-3">
       <Text variant="title">{candidate.title}</Text>
       <Text variant="body" color="muted">{candidate.teaser}</Text>
-      <Text variant="caption" color="muted">{candidate.totalStopCount} playable stops</Text>
+      <Text variant="caption" color="muted">{candidate.totalConceptCount} concepts</Text>
       <Button
         busy={pending}
         onPress={begin}
