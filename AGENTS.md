@@ -44,7 +44,7 @@ definitions and repair their references in the same change.
 - A brainstorm may own accepted framing, requirements, and unresolved product decisions. Turn it
   into a plan only after those decisions are resolved enough to implement.
 - Apply the bundled Validation Log mechanics with lrnki's tighter size limits: keep a Validation Log
-  under about 200 lines and a whole plan under about 600 lines.
+  under about 200 lines and a whole plan under about 800 lines.
 - `TODO.md` has exactly `TODO`, `COMPLETED`, and `VALIDATION` sections. Keep zero to seven genuine
   current tasks rather than inventing placeholders to meet the bundled three-task minimum, at most
   eight grouped completed outcomes, and exactly one latest plan-less validation; keep the whole file

@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "repositoryUrl": "https://github.com/sergkhl/agent-workflow-plugins",
   "pluginId": "agent-workflow-core",
-  "releaseTag": "agent-workflow-core--v0.1.0",
-  "commitSha": "23dbf553f9fc4845fd941fd2bf8ce52d783397ae",
-  "pluginVersion": "0.1.0",
-  "contentDigest": "sha256:785e5b82f7b8d3fa2f83bea8815e4c24075de9075698e44a372b2435459270a3",
+  "releaseTag": "agent-workflow-core--v0.3.0",
+  "commitSha": "b69b42b4752ed8db998bda66a236edb69821d4de",
+  "pluginVersion": "0.3.0",
+  "contentDigest": "sha256:61a17ceea6a78b2ab74ac849e693bfc6fcb36078194f87228ead95aa3cd8cc98",
   "managedSymlinks": [
     {
       "path": ".agents/skills/codebase-design",

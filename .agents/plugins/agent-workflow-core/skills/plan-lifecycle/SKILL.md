@@ -110,11 +110,11 @@ A log that is only ever appended to becomes most of its plan.
 
 ## Parallel work
 
-Implementation units are **exclusive unless the owning plan declares them parallel-safe**. A
-declaration names compatible claim identifiers, satisfied prerequisites, and the owned subsystem.
-Without it, do not skip an earlier claimed unit; use a read-only review lane or stop. Worker lanes
-update only their owning plan. The integration lane alone edits the index and `TODO.md`. Do not copy a
-changing active-claim table into a plan or the index — it will race the real registry.
+Implementation units are **sequential and exclusive**: one lane, one unit at a time, in the order the
+plan states. Running more than one lane over a plan is a separate workflow that a repository owns and
+gates behind explicit invocation. This plugin does not ship one — a claim registry and isolated
+working copies are repository mechanics, not portable conventions. A plan does not declare
+parallel-safety unless that workflow is running.
 
 ## Setting this up in a new repository
 

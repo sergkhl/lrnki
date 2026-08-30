@@ -35,8 +35,7 @@ If a batch turns out blocked part-way, record the blocker in the owning plan's `
 rather than halting.
 
 Size each batch by complexity and coupling, not by count. Keep context lean: read the plan you are
-working, not every plan. Implementation units are exclusive unless the owning plan declares them
-parallel-safe.
+working, not every plan. Implementation units are sequential and exclusive.
 
 ## Resuming
 

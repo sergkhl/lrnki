@@ -2,7 +2,24 @@
 
 ## TODO
 
-_None._
+- **Expand Source Expedition Legs and qualify mixed Study Items.** Replace the current 114 singleton
+  Legs with one source-coherent, prerequisite-valid 3–5-Concept route plan. Every Concept keeps its
+  qualified option-select; every Leg gains qualified matching or impostor practice; every Expedition
+  uses all three families; mastery and rewards stay unchanged. The work also owns family-aware
+  Guardians, honest Concept counts, asset identity v3, accepted package v2, replacement five-path
+  packages, model-free reinstall, real-backend web, and fresh Debug iOS Simulator proof.
+  [Plan](./2026-08-29-001-expand-source-expedition-legs-and-mixed-study-items.md). **NEXT:** U0 freezes
+  the current route/item baseline and accepted identities, then probes one path's post-veto mixed-item
+  yield before U1.
+
+- **Shape Concept Lesson grounding depth.** 140 of 183 qualified lessons yield one grounding passage
+  while their Concepts hold four to six verified source evidence passages, so the Study Item
+  generators are starved by the lesson rather than by the Curated Source. The learner-visible depth
+  goal, the lever, and the grounding-eligibility boundary are unresolved, so this is shaping work
+  rather than a plan.
+  [Brainstorm](../brainstorms/2026-08-29-001-concept-lesson-grounding-depth.md). **NEXT:** decide how
+  deep a lesson should be for the learner before choosing a mechanism, and decide whether the work
+  shares the Leg plan's regeneration.
 
 ## COMPLETED
 

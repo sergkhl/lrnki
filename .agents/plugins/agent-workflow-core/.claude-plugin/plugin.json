@@ -1,6 +1,6 @@
 {
   "name": "agent-workflow-core",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "A plan-driven agent workflow: grill a design into a plan, drain a plan index to completion, and keep the documentation set honest. Harness-neutral and project-neutral.",
   "author": {
     "name": "sergkhl",

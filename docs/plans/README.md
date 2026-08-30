@@ -12,6 +12,10 @@ routes shared mechanics through the vendored
 
 ## Active implementation plans (execution order)
 
-_None._
+- [Expand Source Expedition Legs and Qualify Mixed Study Items](./2026-08-29-001-expand-source-expedition-legs-and-mixed-study-items.md)
+  — Ready. Replace singleton terminal-DAG Legs with one 3–5-Concept route authority and qualify
+  matching/impostor coverage without weakening source, key, prerequisite, or mastery contracts.
+  **NEXT:** U0 freezes the current five-package defect and accepted identities in focused tests,
+  then probes one path's post-veto mixed-item yield before U1.
 
 <!-- Lifecycle adoption and overrides: AGENTS.md → Documentation workflow. -->
