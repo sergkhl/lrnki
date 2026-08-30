@@ -6,6 +6,7 @@ import {
   type DerivedGraphNode,
   type ImpostorItem,
   type LessonAbsentNode,
+  type MatchingAssignmentVerdict,
   type MatchingItem,
   type OptionSelectItem,
   type RejectedStudyItem,
@@ -54,6 +55,7 @@ import {
 } from "./verifyMatchingAssignments";
 import {
   DEFAULT_ITEM_VERIFICATION_CONCURRENCY,
+  verifyGuardedItems,
   type VerificationOutcome,
   type VerificationRegeneration
 } from "./verifyGuardedItems";
@@ -71,7 +73,11 @@ import {
   admitSourceConceptLessons,
   type SourceLessonAdmissionResult
 } from "./sourceLessonAdmission";
-import { admitSourceOptionSelectItems } from "./sourceOptionSelectAdmission";
+import {
+  admitSourceStudyItems,
+  settleStrictImpostorTruth,
+  settleStrictMatchingAssignment
+} from "./sourceStudyItemAdmission";
 import { qualifiedSourceExpeditionAssetConfigHash } from "./sourceExpedition";
 import { STUDY_ITEM_BANK_STAGE_GROUP } from "./topicExpeditionStageProfile";
 
@@ -468,8 +474,6 @@ export async function generateStudyItemBank(input: {
   );
 
   // --- Stage 2: item blueprint --------------------------------------------------
-  const fallbackBlueprint = (node: DerivedGraphNode, lesson: ConceptLesson | undefined): StudyItemBlueprint =>
-    structuralPreGateBlueprint(node, lesson);
   let blueprintDone = 0;
   const blueprintByNode = new Map<string, StudyItemBlueprint>();
   const blueprintResults = await studyStage(
@@ -480,12 +484,14 @@ export async function generateStudyItemBank(input: {
         if (!lesson) {
           blueprintDone += 1;
           await reporter.recordProgress({ operationType: "study_items", operationId, stage: STUDY_ITEM_BANK_STAGE_GROUP.studyItemBlueprint.stage, done: blueprintDone });
-          return fallbackBlueprint(node, lesson);
+          return structuralPreGateBlueprint(node, lesson);
         }
         const preGate = structuralPreGateBlueprint(node, lesson);
         try {
           const siblings = siblingsByNode.get(node.derivedNodeId) ?? [];
-          if (!input.studyItemBlueprint) return preGate;
+          if (!input.studyItemBlueprint) {
+            return applyStructuralPreGate(blueprintUnavailableFallback(node), preGate);
+          }
           const planned = await input.studyItemBlueprint.plan({
             declaredDomain: node.declaredDomain,
             node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, aliases: node.aliases },
@@ -495,7 +501,7 @@ export async function generateStudyItemBank(input: {
           });
           return applyStructuralPreGate(normalizeBlueprint(planned, node), preGate);
         } catch {
-          return preGate;
+          return applyStructuralPreGate(blueprintUnavailableFallback(node), preGate);
         } finally {
           blueprintDone += 1;
           await reporter.recordProgress({ operationType: "study_items", operationId, stage: STUDY_ITEM_BANK_STAGE_GROUP.studyItemBlueprint.stage, done: blueprintDone });
@@ -591,12 +597,13 @@ export async function generateStudyItemBank(input: {
   // `attempts[i]` is always `layer.derivedNodes[i]` regardless of response timing; and
   // `verifyGuardedItems` is index-aligned to the PENDING SUBSET, walked here by a cursor in
   // that same order. Persisted order therefore stays a function of node order alone (R4).
-  const mergeVerified = <TSubject, TItem extends StudyItem>(
+  const mergeVerified = <TSubject extends { item: TItem }, TItem extends StudyItem>(
     attempts: readonly NodeAttempt<TSubject>[],
     outcomes: readonly VerificationOutcome<TItem>[],
     itemType: StudyItemType
-  ): { items: StudyItem[]; rejected: RejectedStudyItem[] } => {
+  ): { items: StudyItem[]; candidates: StudyItem[]; rejected: RejectedStudyItem[] } => {
     const items: StudyItem[] = [];
+    const candidates: StudyItem[] = [];
     const rejected: RejectedStudyItem[] = [];
     let cursor = 0;
     attempts.forEach((attempt, index) => {
@@ -608,10 +615,15 @@ export async function generateStudyItemBank(input: {
       if (attempt.kind === "rejected") { record(attempt.reason); return; }
       const outcome = outcomes[cursor];
       cursor += 1;
-      if (outcome.admitted) items.push(outcome.item);
-      else record(outcome.reason);
+      if (outcome.admitted) {
+        items.push(outcome.item);
+        candidates.push(outcome.item);
+      } else {
+        candidates.push(outcome.item ?? attempt.subject.item);
+        record(outcome.reason);
+      }
     });
-    return { items, rejected };
+    return { items, candidates, rejected };
   };
 
   // --- Stage 3: option-select items ---------------------------------------------
@@ -698,31 +710,10 @@ export async function generateStudyItemBank(input: {
       : layer.derivedNodes.map(() => ({ kind: "skipped" as const }));
     const subjects = pendingSubjects(attempts);
     if (graphVersionId !== null) {
-      const admission = subjects.length === 0
-        ? null
-        : await admitSourceOptionSelectItems({
-              candidates: subjects.map((subject) => subject.item),
-              lessons,
-              nodes: sourceSupportNodes,
-              baseConfigHash: input.configHash,
-              sourceEvidenceRead: input.sourceAssetQualification.sourceEvidenceRead,
-              sourceSupportVerifier: input.sourceAssetQualification.sourceSupportVerifier,
-              sourceSupportStage,
-              answerKeyVerifier: input.answerKeyVerification,
-              answerKeyStage: (work, total) => studyStage(
-                STUDY_ITEM_BANK_STAGE_GROUP.optionSelectKeyVerification.stage,
-                work,
-                total
-              ),
-              relatedConceptsForNode: (derivedNodeId) => siblingsByNode.get(derivedNodeId) ?? []
-            });
       return {
-        items: admission?.studyItems ?? [],
-        rejected: [
-          ...rejectedAttempts(attempts, "option_select"),
-          ...(admission?.rejected ?? [])
-        ],
-        candidates: admission?.candidates ?? []
+        items: subjects.map((subject) => subject.item),
+        candidates: subjects.map((subject) => subject.item),
+        rejected: rejectedAttempts(attempts, "option_select")
       };
     }
     const outcomes = subjects.length === 0
@@ -745,7 +736,7 @@ export async function generateStudyItemBank(input: {
             }),
           subjects.length
         );
-    return { ...mergeVerified(attempts, outcomes, "option_select"), candidates: [] };
+    return mergeVerified(attempts, outcomes, "option_select");
   })();
 
   // --- Stage 4: matching items ---------------------------------------------------
@@ -826,10 +817,31 @@ export async function generateStudyItemBank(input: {
       ? []
       : await studyStage(
           STUDY_ITEM_BANK_STAGE_GROUP.matchingAssignmentVerification.stage,
-          () => verifyMatchingAssignments(subjects, {
-            verifier: input.matchingAssignmentVerification,
-            concurrency: verificationConcurrency
-          }),
+          () => graphVersionId === null
+            ? verifyMatchingAssignments(subjects, {
+                verifier: input.matchingAssignmentVerification,
+                concurrency: verificationConcurrency
+              })
+            : verifyGuardedItems<MatchingAssignmentSubject, MatchingAssignmentVerdict[], MatchingItem>(subjects, {
+                concurrency: verificationConcurrency,
+                retainRejectedItem: true,
+                judge: (subject) => input.matchingAssignmentVerification.verify(subject.request),
+                vetoReason: (subject, verdicts) => {
+                  const decision = settleStrictMatchingAssignment(
+                    subject.item,
+                    subject.matchPairOrdinals,
+                    verdicts,
+                    input.matchingAssignmentVerification.model
+                  );
+                  return decision.disposition === "accepted"
+                    ? null
+                    : `source matching assignment verification rejected: ${decision.reasonCode}: ${decision.reason}`;
+                },
+                onUnavailable: (_subject, error) => ({
+                  admitted: false,
+                  reason: `source matching assignment verification unavailable: ${failureText(error)}`
+                })
+              }),
           subjects.length
         );
     return mergeVerified(attempts, outcomes, "matching");
@@ -918,11 +930,27 @@ export async function generateStudyItemBank(input: {
             verifyAnswerKeys(subjects, {
               verifier: input.answerKeyVerification,
               concurrency: verificationConcurrency,
-              vetoReason: (subject, verdicts) => impostorKeyVetoReason(subject.item, verdicts),
+              vetoReason: (subject, verdicts) => {
+                if (graphVersionId === null) return impostorKeyVetoReason(subject.item, verdicts);
+                const decision = settleStrictImpostorTruth(
+                  subject.item,
+                  verdicts,
+                  input.answerKeyVerification.model
+                );
+                return decision.disposition === "accepted"
+                  ? null
+                  : `source impostor key verification rejected: ${decision.reasonCode}: ${decision.reason}`;
+              },
               // Fail closed, unchanged from the judge this replaces and for the same reason
               // ADR-0026 gives: a true "lie" teaches a falsehood, and impostor-absent is the
               // designed safe state.
-              onUnavailable: (_subject, error) => ({ admitted: false, reason: `impostor key verification unavailable: ${failureText(error)}` })
+              onUnavailable: (_subject, error) => ({
+                admitted: false,
+                reason: graphVersionId === null
+                  ? `impostor key verification unavailable: ${failureText(error)}`
+                  : `source impostor key verification unavailable: ${failureText(error)}`
+              }),
+              retainRejectedItem: graphVersionId !== null
             }),
           subjects.length
         );
@@ -940,9 +968,75 @@ export async function generateStudyItemBank(input: {
     matchingStage,
     impostorStage
   ]);
-  for (const result of [optionSelectResult, matchingResult, impostorResult]) {
-    studyItems.push(...result.items);
+  const familyResults = [optionSelectResult, matchingResult, impostorResult];
+  for (const result of familyResults) {
     for (const rejection of result.rejected) reject({ derivedNodeId: rejection.derivedNodeId, canonicalLabel: rejection.canonicalLabel }, rejection.itemType, rejection.reason);
+  }
+  let candidateStudyItems: StudyItem[] = [];
+  if (graphVersionId !== null) {
+    const neutralCandidates = familyResults.flatMap((result) => result.candidates);
+    const guardedCandidates = familyResults.flatMap((result) => result.items);
+    if (guardedCandidates.length > 0) {
+      const admission = await admitSourceStudyItems({
+        candidates: guardedCandidates,
+        lessons,
+        nodes: sourceSupportNodes,
+        baseConfigHash: input.configHash,
+        sourceEvidenceRead: input.sourceAssetQualification.sourceEvidenceRead,
+        sourceSupportVerifier: input.sourceAssetQualification.sourceSupportVerifier,
+        sourceSupportStage,
+        answerKeyVerifier: input.answerKeyVerification,
+        optionAnswerKeyStage: (work, total) => studyStage(
+          STUDY_ITEM_BANK_STAGE_GROUP.optionSelectKeyVerification.stage,
+          work,
+          total
+        ),
+        impostorAnswerKeyStage: (work, total) => studyStage(
+          STUDY_ITEM_BANK_STAGE_GROUP.impostorKeyVerification.stage,
+          work,
+          total
+        ),
+        matchingAssignmentVerifier: input.matchingAssignmentVerification,
+        matchingAssignmentStage: (work, total) => studyStage(
+          STUDY_ITEM_BANK_STAGE_GROUP.matchingAssignmentVerification.stage,
+          work,
+          total
+        ),
+        semanticPrequalification: {
+          matching: {
+            studyItemIds: matchingResult.items.map((item) => item.studyItemId),
+            verifierModel: input.matchingAssignmentVerification.model
+          },
+          impostor: {
+            studyItemIds: impostorResult.items.map((item) => item.studyItemId),
+            verifierModel: input.answerKeyVerification.model
+          }
+        },
+        relatedConceptsForNode: (derivedNodeId) => siblingsByNode.get(derivedNodeId) ?? []
+      });
+      studyItems.push(...admission.studyItems);
+      const settledCandidateById = new Map(admission.candidates.map((candidate) => [
+        candidate.studyItemId,
+        candidate
+      ] as const));
+      candidateStudyItems = neutralCandidates.map((candidate) =>
+        settledCandidateById.get(candidate.studyItemId) ?? candidate
+      );
+      for (const rejection of admission.rejected) {
+        reject(
+          {
+            derivedNodeId: rejection.derivedNodeId,
+            canonicalLabel: rejection.canonicalLabel
+          },
+          rejection.itemType,
+          rejection.reason
+        );
+      }
+    } else {
+      candidateStudyItems = neutralCandidates;
+    }
+  } else {
+    for (const result of familyResults) studyItems.push(...result.items);
   }
 
   const rejected = [...rejectedByNodeType.values()];
@@ -953,7 +1047,7 @@ export async function generateStudyItemBank(input: {
       configHash: input.configHash,
       studyItems,
       ...(graphVersionId !== null
-        ? { candidateStudyItems: optionSelectResult.candidates }
+        ? { candidateStudyItems }
         : {}),
       rejected
     })
@@ -982,18 +1076,35 @@ function structuralPreGateBlueprint(node: DerivedGraphNode, lesson: ConceptLesso
       typePlans: SUPPORTED_STUDY_ITEM_TYPES.map((itemType) => ({ itemType, generate: false as const, reason: "concept lesson is absent for this node" }))
     };
   }
-  // Counts the passages the generator will actually be shown (lessonGroundingShape, rule 18),
-  // so a pre-gate pass can no longer promise grounding that does not exist and a pre-gate
-  // decline can no longer hide grounding that does.
-  const passageCount = lessonGroundingShape(lesson)?.passages.length ?? 0;
+  const hasGrounding = (lessonGroundingShape(lesson)?.passages.length ?? 0) > 0;
   return {
     derivedNodeId: node.derivedNodeId,
     typePlans: SUPPORTED_STUDY_ITEM_TYPES.map((itemType) => {
-      if (itemType === "matching" && passageCount < 3) return { itemType, generate: false as const, reason: `matching requires at least 3 grounding passages; found ${passageCount}` };
-      if (itemType === "impostor" && passageCount < 2) return { itemType, generate: false as const, reason: `impostor requires at least 2 grounding passages; found ${passageCount}` };
-      if (passageCount < 1) return { itemType, generate: false as const, reason: "no lesson grounding passages are available" };
+      if (!hasGrounding) {
+        return {
+          itemType,
+          generate: false as const,
+          reason: "no lesson grounding passages are available"
+        };
+      }
       return { itemType, generate: true as const, facet: "" };
     })
+  };
+}
+
+// Blueprint absence or transport failure is not permission to guess sparse family suitability.
+// The primary option-select remains the explicit fallback; matching and impostor stay closed until
+// an actual blueprint selects them. Structural preconditions are intersected separately above.
+function blueprintUnavailableFallback(node: DerivedGraphNode): StudyItemBlueprint {
+  return {
+    derivedNodeId: node.derivedNodeId,
+    typePlans: SUPPORTED_STUDY_ITEM_TYPES.map((itemType) => itemType === "option_select"
+      ? { itemType, generate: true as const, facet: "" }
+      : {
+          itemType,
+          generate: false as const,
+          reason: "Study Item Blueprint is unavailable; only option-select fallback is permitted"
+        })
   };
 }
 

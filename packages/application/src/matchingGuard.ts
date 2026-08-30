@@ -34,7 +34,10 @@ function containsWordSequence(outer: string[], inner: string[]): boolean {
 
 // True when one side displays the other's whole phrase, in order and contiguously — the shape a
 // learner can pair off by reading alone.
-function matchingPairSidesContainOneAnother(promptText: string, matchText: string): boolean {
+export function matchingPairUsesSurfaceContainmentCue(
+  promptText: string,
+  matchText: string
+): boolean {
   const promptWords = containmentWords(promptText);
   const matchWords = containmentWords(matchText);
   return containsWordSequence(matchWords, promptWords) || containsWordSequence(promptWords, matchWords);
@@ -59,7 +62,7 @@ export function validateMatchingItem(
     if (normalizeOptionText(pair.promptText) === normalizeOptionText(pair.matchText)) {
       return { ok: false, reason: "matching prompt and match text must differ" };
     }
-    if (matchingPairSidesContainOneAnother(pair.promptText, pair.matchText)) {
+    if (matchingPairUsesSurfaceContainmentCue(pair.promptText, pair.matchText)) {
       return { ok: false, reason: "matching prompt and match must not contain one another" };
     }
     // No `generatedPassageFallback` opt-in: matching carries no key verification (D3), so

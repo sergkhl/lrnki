@@ -1,6 +1,7 @@
 import type {
   ConceptLesson,
   OptionSelectItem,
+  StudyItem,
   StudyItemCandidateVerdict,
   StudyItemClaimVerdict
 } from "@lrnki/domain-core";
@@ -39,7 +40,7 @@ import {
   sourceOptionUsesExactReferenceContract
 } from "./sourceOptionExactReference";
 
-export const SOURCE_ASSET_EVALUATION_REPORT_SCHEMA_VERSION = 5 as const;
+export const SOURCE_ASSET_EVALUATION_REPORT_SCHEMA_VERSION = 6 as const;
 export const SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS = 3 as const;
 export const SOURCE_LESSON_EXTRACTIVE_ADMISSION_POLICY =
   "source_lesson_extractive_fields_with_post_settlement_definition_fallback_v3" as const;
@@ -338,6 +339,11 @@ function sourceLessonMaterialField(claim: SourceMaterialClaim): string {
     case "option_select_question_key":
     case "option_select_explanation":
     case "option_select_distractor":
+    case "matching_instruction":
+    case "matching_relationship":
+    case "impostor_truth":
+    case "impostor_reveal":
+    case "impostor_lie":
       throw new Error(
         `Concept Lesson claim ${JSON.stringify(claim.claimKey)} has non-lesson subject ${JSON.stringify(claim.subject.kind)}.`
       );
@@ -551,7 +557,7 @@ export type SourceAssetEvaluationReport = {
       configHash: string;
       generatingModel: string;
     }[];
-    optionSelectAssets: {
+    studyItemAssets: {
       studyItemId: string;
       derivedNodeId: string;
       configHash: string;
@@ -560,7 +566,7 @@ export type SourceAssetEvaluationReport = {
   };
   candidatePayloads: {
     lessons: QualifiedSourceExpedition["assets"]["lessons"];
-    optionSelectItems: QualifiedSourceExpedition["assets"]["studyItems"];
+    studyItems: QualifiedSourceExpedition["assets"]["studyItems"];
   };
   projection: SourceMaterialClaimSet["projection"];
   claims: SourceMaterialClaim[];
@@ -585,10 +591,14 @@ export type SourceAssetEvaluationReport = {
   positiveControls: {
     qualifiedCandidateRows: 1;
     conceptLessonRows: number;
+    studyItemRows: number;
     optionSelectRows: number;
+    matchingRows: number;
+    impostorRows: number;
     projectedClaimRows: number;
     sourceSupportClaimRows: number;
     distractorClaimRows: number;
+    interactionInstructionClaimRows: number;
     referencedEvidenceRows: number;
     resolvedEvidenceRows: number;
     sourceSupportDecisionRows: number;
@@ -612,7 +622,7 @@ export async function evaluateQualifiedSourceExpedition(input: {
   const { qualification } = input;
   const projection = projectSourceMaterialClaims({
     lessons: qualification.assets.lessons,
-    optionSelectItems: qualification.assets.studyItems
+    studyItems: qualification.assets.studyItems
   });
   const sourceSupportEvaluation = await evaluateProjectedSourceSupport({
     projection,
@@ -672,7 +682,7 @@ export async function evaluateQualifiedSourceExpedition(input: {
         configHash: lesson.configHash,
         generatingModel: lesson.generatingModel
       })),
-      optionSelectAssets: qualification.assets.studyItems.map((item) => ({
+      studyItemAssets: qualification.assets.studyItems.map((item) => ({
         studyItemId: item.studyItemId,
         derivedNodeId: item.derivedNodeId,
         configHash: item.configHash,
@@ -681,7 +691,7 @@ export async function evaluateQualifiedSourceExpedition(input: {
     },
     candidatePayloads: {
       lessons: qualification.assets.lessons,
-      optionSelectItems: qualification.assets.studyItems
+      studyItems: qualification.assets.studyItems
     },
     projection: projection.projection,
     claims: projection.claims,
@@ -696,10 +706,16 @@ export async function evaluateQualifiedSourceExpedition(input: {
     positiveControls: {
       qualifiedCandidateRows: 1,
       conceptLessonRows: qualification.assets.lessons.length,
-      optionSelectRows: qualification.assets.studyItems.length,
+      studyItemRows: qualification.assets.studyItems.length,
+      optionSelectRows: qualification.assets.studyItems.filter((item) => item.itemType === "option_select").length,
+      matchingRows: (qualification.assets.studyItems as readonly StudyItem[]).filter((item) => item.itemType === "matching").length,
+      impostorRows: (qualification.assets.studyItems as readonly StudyItem[]).filter((item) => item.itemType === "impostor").length,
       projectedClaimRows: projection.claims.length,
       sourceSupportClaimRows: projection.claims.filter((claim) => claim.purpose === "source_support").length,
       distractorClaimRows: projection.claims.filter((claim) => claim.purpose === "distractor_invalidity").length,
+      interactionInstructionClaimRows: projection.claims.filter((claim) =>
+        claim.purpose === "interaction_instruction"
+      ).length,
       referencedEvidenceRows: joinedEvidence.length,
       resolvedEvidenceRows: joinedEvidence.filter((row) => row.resolved).length,
       sourceSupportDecisionRows: sourceSupport.length,

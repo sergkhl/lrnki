@@ -154,7 +154,7 @@ test("resolved source blocks reclassify fidelity and veto a non-verbatim direct 
   lessonCitation.evidenceQuote = "A sentence that does not occur in the immutable source block.";
   let calls = 0;
   const result = await evaluateProjectedSourceSupport({
-    projection: projectSourceMaterialClaims({ lessons: [lesson], optionSelectItems: [] }),
+    projection: projectSourceMaterialClaims({ lessons: [lesson], studyItems: [] }),
     nodes: qualified.assets.detail.nodes.map((node) => ({
       derivedNodeId: node.derivedNodeId,
       label: node.label,
@@ -188,7 +188,7 @@ test("no-activation report joins payload, evidence, identity, and deterministic 
     generatedAt: "2026-08-25T12:00:00.000Z"
   });
 
-  assert.equal(report.schemaVersion, 5);
+  assert.equal(report.schemaVersion, 6);
   assert.deepEqual(report.activation, {
     sourceSupportVerifierModel: null,
     answerKeyVerifierModel: null
@@ -196,7 +196,16 @@ test("no-activation report joins payload, evidence, identity, and deterministic 
   assert.deepEqual(report.evaluationCalls, { sourceSupport: 0, answerKey: 0, total: 0 });
   assert.equal(report.qualification.assetSetIdentity, "source-expedition-assets-test");
   assert.equal(report.candidatePayloads.lessons.length, 1);
-  assert.equal(report.candidatePayloads.optionSelectItems.length, 1);
+  assert.equal(report.candidatePayloads.studyItems.length, 1);
+  assert.deepEqual(
+    {
+      studyItems: report.positiveControls.studyItemRows,
+      optionSelect: report.positiveControls.optionSelectRows,
+      matching: report.positiveControls.matchingRows,
+      impostor: report.positiveControls.impostorRows
+    },
+    { studyItems: 1, optionSelect: 1, matching: 0, impostor: 0 }
+  );
   assert.equal(report.evidence.length, 1);
   assert.equal(report.evidence[0]?.resolved, true);
   assert.equal(report.evidence[0]?.matchKind, "exact");
@@ -204,6 +213,7 @@ test("no-activation report joins payload, evidence, identity, and deterministic 
   assert.ok(report.positiveControls.projectedClaimRows > 0);
   assert.ok(report.positiveControls.sourceSupportClaimRows > 0);
   assert.equal(report.positiveControls.distractorClaimRows, 3);
+  assert.equal(report.positiveControls.interactionInstructionClaimRows, 0);
   assert.equal(report.positiveControls.resolvedEvidenceRows, 1);
   assert.ok(report.decisions.sourceSupport.every((decision) =>
     decision.disposition === "not_evaluated" &&
@@ -379,7 +389,7 @@ test("distractor invalidity and key uniqueness retain distinct rejection and abs
   const item = qualification.assets.studyItems[0]!;
   const projection = projectSourceMaterialClaims({
     lessons: qualification.assets.lessons,
-    optionSelectItems: qualification.assets.studyItems
+    studyItems: qualification.assets.studyItems
   });
   const distractorClaims = projection.claims.filter((claim) => claim.purpose === "distractor_invalidity");
   const candidates = answerKeyCandidates(item.options);

@@ -49,7 +49,7 @@ export async function admitSourceConceptLessons(input: {
   const projectedCandidates = [...input.candidates];
   const projection = projectSourceMaterialClaims({
     lessons: projectedCandidates,
-    optionSelectItems: []
+    studyItems: []
   });
   const evaluateSourceSupport = () => evaluateProjectedSourceSupport({
     projection,
@@ -193,6 +193,14 @@ function locationKey(location: SourceMaterialClaimLocation): string {
       return location.kind;
     case "option_select_distractor":
       return `${location.kind}:${location.optionIndex}`;
+    case "matching_instruction":
+      return location.kind;
+    case "matching_relationship":
+      return `${location.kind}:${location.pairIndex}`;
+    case "impostor_truth":
+    case "impostor_reveal":
+    case "impostor_lie":
+      return `${location.kind}:${location.statementIndex}`;
   }
 }
 

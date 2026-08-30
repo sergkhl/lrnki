@@ -16,7 +16,7 @@ import type {
 } from "@lrnki/domain-core";
 import { currentOperationContext } from "@lrnki/domain-core/operation-context";
 import { installNodeOperationContext } from "@lrnki/domain-core/operation-context-node";
-import type { ConceptLessonGenerationPort, ConceptLessonRedundancyJudgmentPort, ConceptLessonStorePort, EnrichmentRunStorePort, GraphVersionStorePort, MatchingAssignmentVerificationPort, RunProgressReporterPort, StageErrorDetail, StudyItemBankStorePort, StudyItemGenerationPort, AnswerKeyVerificationPort } from "@lrnki/ports";
+import type { ConceptLessonGenerationPort, ConceptLessonRedundancyJudgmentPort, ConceptLessonStorePort, EnrichmentRunStorePort, GraphVersionStorePort, MatchingAssignmentVerificationPort, RunProgressReporterPort, StageErrorDetail, StudyItemBankStorePort, StudyItemBlueprintPort, StudyItemGenerationPort, AnswerKeyVerificationPort } from "@lrnki/ports";
 import {
   generateStudyItemBank as generateStudyItemBankApplication,
   OPTION_SELECT_GENERATION_ATTEMPTS
@@ -325,8 +325,9 @@ const FIXTURE_OPTION_KEYS = new Set([
 
 // A key-verification stub that admits every local fixture without reading a server key. The
 // option-select fixture constructor above consistently uses one visible truth text, so this double
-// can return the strict true/false matrix U5 now requires from only the key-hidden request. Impostor
-// keeps its older negative-only envelope: its planted lie is false and its other claims are unclear.
+// can return the strict true/false matrix U5 now requires from only the key-hidden request. Source
+// admission also requires every impostor statement to be settled, so the planted lie is false and
+// every fixture truth is true.
 function keyVerifierPassing(): AnswerKeyVerificationPort {
   return {
     model: "mock-verifier",
@@ -335,19 +336,17 @@ function keyVerifierPassing(): AnswerKeyVerificationPort {
         ordinal: candidate.ordinal,
         verdict: input.itemType === "option_select"
           ? FIXTURE_OPTION_KEYS.has(candidate.text) ? "claim_true" as const : "claim_false" as const
-          : FIXTURE_LIE.test(candidate.text) ? "claim_false" as const : "unclear" as const,
+          : FIXTURE_LIE.test(candidate.text) ? "claim_false" as const : "claim_true" as const,
         reason: "stub verdict"
       }));
     }
   };
 }
 
-// A Matching Assignment Verification stub that admits every fixture board by returning `unclear`
-// for every cell. It CANNOT do what `keyVerifierPassing` does and confirm the key, because the
-// presentation deliberately hides which cell is keyed — the match numbering is a text sort, not
-// the pair ordinal. That is the point of the presentation, and this stub is the cheapest proof of
-// it: a stub that could rubber-stamp the diagonal would mean the judge could too. Every test that
-// composes a bank therefore also asserts, incidentally, that an all-`unclear` grid admits (D5/D6).
+// A Matching Assignment Verification stub that settles the canned fixture board from visible
+// semantics rather than presentation position. The fixture deliberately shares one terminal word
+// between each clue and its answer (one/two/three); source admission requires every keyed cell to
+// fit and every non-keyed cell not to fit.
 function matchingVerifierPassing(): MatchingAssignmentVerificationPort {
   return {
     model: "mock-matching-verifier",
@@ -356,10 +355,32 @@ function matchingVerifierPassing(): MatchingAssignmentVerificationPort {
         input.matches.map((match) => ({
           promptOrdinal: prompt.ordinal,
           matchOrdinal: match.ordinal,
-          verdict: "unclear" as const,
+          verdict: terminalWord(prompt.text) === terminalWord(match.text)
+            ? "fits" as const
+            : "does_not_fit" as const,
           reason: "stub verdict"
         }))
       );
+    }
+  };
+}
+
+function terminalWord(text: string): string {
+  return text.trim().toLocaleLowerCase("en").split(/\s+/).at(-1) ?? "";
+}
+
+function allFamilyBlueprint(): StudyItemBlueprintPort {
+  return {
+    model: "mock-study-item-blueprint",
+    async plan(input) {
+      return {
+        derivedNodeId: input.node.derivedNodeId,
+        typePlans: input.supportedItemTypes.map((itemType) => ({
+          itemType,
+          generate: true as const,
+          facet: "fixture coverage"
+        }))
+      };
     }
   };
 }
@@ -371,7 +392,11 @@ type GenerateStudyItemBankTestInput = Omit<
 > & Partial<Pick<
   GenerateStudyItemBankInput,
   "conceptLessonRedundancyJudge" | "sourceAssetQualification"
->>;
+>> & {
+  // Focused negative tests opt into the production absence/failure fallback. Other bank tests
+  // state their old all-family premise explicitly through the test-only blueprint below.
+  useBlueprintUnavailableFallback?: boolean;
+};
 
 function sourceAssetQualificationPassing(): GenerateStudyItemBankInput["sourceAssetQualification"] {
   return {
@@ -408,12 +433,16 @@ function sourceAssetQualificationPassing(): GenerateStudyItemBankInput["sourceAs
 // later bank mechanics, so this local constructor supplies explicit pass-through doubles while
 // allowing focused tests to override either dependency.
 function generateStudyItemBank(input: GenerateStudyItemBankTestInput) {
+  const { useBlueprintUnavailableFallback = false, ...applicationInput } = input;
   return generateStudyItemBankApplication({
-    ...input,
+    ...applicationInput,
+    ...(!useBlueprintUnavailableFallback && applicationInput.studyItemBlueprint === undefined
+      ? { studyItemBlueprint: allFamilyBlueprint() }
+      : {}),
     conceptLessonRedundancyJudge:
-      input.conceptLessonRedundancyJudge ?? redundancyJudgeReturning([]),
+      applicationInput.conceptLessonRedundancyJudge ?? redundancyJudgeReturning([]),
     sourceAssetQualification:
-      input.sourceAssetQualification ?? sourceAssetQualificationPassing()
+      applicationInput.sourceAssetQualification ?? sourceAssetQualificationPassing()
   });
 }
 
@@ -498,7 +527,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-test("a node whose lesson grounds an option-select that passes the guard persists one item and one lesson", async () => {
+test("a source node whose lesson grounds all blueprint-selected families persists three items and one lesson", async () => {
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
   const { store, persisted, candidateStudyItems, persistedRejected } = capturingStore();
   const lessonStore = capturingLessonStore();
@@ -529,9 +558,8 @@ test("a node whose lesson grounds an option-select that passes the guard persist
   assert.equal(result.lessonAbsent.length, 0);
   assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor", "matching", "option_select"]);
   assert.deepEqual(persistedRejected, []);
-  assert.equal(candidateStudyItems.length, 1);
-  assert.equal(candidateStudyItems[0]?.itemType, "option_select");
-  assert.equal(candidateStudyItems[0]?.configHash, "cfg-1");
+  assert.deepEqual(typesFor(candidateStudyItems, "node-c1"), ["impostor", "matching", "option_select"]);
+  assert.ok(candidateStudyItems.every((item) => item.configHash === "cfg-1"));
   assert.equal(
     persisted.find((item) => item.itemType === "option_select")?.configHash,
     qualifiedSourceExpeditionAssetConfigHash("cfg-1")
@@ -563,6 +591,16 @@ test("a node whose lesson grounds an option-select that passes the guard persist
     `enterStage:${STUDY_ITEM_BANK_STAGE_GROUP.sourceMaterialClaimSupport.stage}`,
     `completeStage:${STUDY_ITEM_BANK_STAGE_GROUP.sourceMaterialClaimSupport.stage}`
   ], "lesson and option support own separate brackets; exact-reference truth is deterministic");
+  for (const stage of [
+    STUDY_ITEM_BANK_STAGE_GROUP.matchingAssignmentVerification.stage,
+    STUDY_ITEM_BANK_STAGE_GROUP.impostorKeyVerification.stage
+  ]) {
+    assert.equal(
+      calls.filter((call) => call.method === "enterStage" && call.stage === stage).length,
+      1,
+      `${stage} opens once; source admission consumes the strict generation-stage proof`
+    );
+  }
 });
 
 test("a false-accepting verifier cannot promote a mention into a definition lesson or item", async () => {
@@ -718,7 +756,7 @@ test("a source graph with an unavailable support verifier persists its candidate
   ]);
 });
 
-test("structural blueprint pre-gate rejects matching and impostor when the lesson is too sparse", async () => {
+test("blueprint-unavailable fallback stays option-only even when one passage satisfies the structural pre-gate", async () => {
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
   const { store } = capturingStore();
   const { reporter, calls } = recordingReporter();
@@ -739,7 +777,8 @@ test("structural blueprint pre-gate rejects matching and impostor when the lesso
     conceptLessonStore: capturingLessonStore().store,
     studyItemGeneration: generationReturning({ optionSelect: { "node-c1": osDraft("rules that govern memory", ["Stack", "Register", "Cache"], lessonPassageId("node-c1", 0)) } }),
     studyItemBankStore: store,
-    reporter
+    reporter,
+    useBlueprintUnavailableFallback: true
   });
 
   assert.deepEqual(typesFor(result.studyItems, "node-c1"), ["option_select"]);
@@ -1575,9 +1614,9 @@ test("a vetoed impostor gets one regeneration informed by the offending candidat
           ? FIXTURE_OPTION_KEYS.has(candidate.text) ? "claim_true" as const : "claim_false" as const
           : FIXTURE_LIE.test(candidate.text)
           // First impostor pass: the planted lie is judged TRUE of the node, which is exactly
-          // the item ADR-0026 refuses to ship. Second pass: it is proven false.
+          // the item ADR-0026 refuses to ship. Later passes settle the replacement completely.
           ? (lieIsFalse ? "claim_false" as const : "claim_true" as const)
-          : "unclear" as const,
+          : "claim_true" as const,
         reason: lieIsFalse ? "false for this node" : "actually true of this node"
       }));
     }
@@ -1608,12 +1647,13 @@ test("a vetoed impostor gets one regeneration informed by the offending candidat
     studyItemBankStore: store
   });
 
-  assert.equal(impostorVerifications, 2, "the vetoed item is verified again after regeneration");
+  assert.equal(impostorVerifications, 2,
+    "the strict source gate rechecks the regeneration once and admission consumes that proof");
   assert.equal(retryFeedbacks.length, 2);
   assert.equal(retryFeedbacks[0], undefined, "the generation phase's first attempt carries no feedback");
   // The feedback must NAME the offending candidate — a bare "rejected" tells the generator
   // nothing it can act on, which is the same defect U1 fixed for option-select's blind re-roll.
-  assert.match(retryFeedbacks[1]!, /impostor key verification rejected the item: the planted lie "A plausible-but-false claim\." was not judged false/);
+  assert.match(retryFeedbacks[1]!, /source impostor key verification rejected: impostor_planted_lie_true:.*"A plausible-but-false claim\."/);
   assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor", "matching", "option_select"]);
   assert.deepEqual(persistedRejected, []);
 });
@@ -1624,7 +1664,7 @@ test("an ambiguous matching board is vetoed, regenerated with cell-level feedbac
   // verification could never see it. The fixture generator returns the same board on the retry,
   // so this also pins that the second veto is FINAL: no third round.
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
-  const { store, persisted, persistedRejected } = capturingStore();
+  const { store, persisted, candidateStudyItems, persistedRejected } = capturingStore();
   const matchingFeedbacks: (string | undefined)[] = [];
   let verifications = 0;
   const matchingVerifier: MatchingAssignmentVerificationPort = {
@@ -1673,18 +1713,22 @@ test("an ambiguous matching board is vetoed, regenerated with cell-level feedbac
   assert.equal(matchingFeedbacks[0], undefined, "the generation phase's first attempt carries no feedback");
   // The feedback must name the OFFENDING CELLS, not merely report a rejection: the generator
   // cannot re-choose an aspect it is not told collided.
-  assert.match(matchingFeedbacks[1]!, /matching assignment verification rejected the item: match "Description one" also fits prompt "Clue two", which is keyed to "Description two"/);
+  assert.match(matchingFeedbacks[1]!, /source matching assignment verification rejected: matching_assignment_ambiguous:.*"Clue two" also accepts "Description one"/);
   assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor", "option_select"]);
   const matchingRejection = persistedRejected.find((row) => row.itemType === "matching");
   assert.ok(matchingRejection, "the rejected board is an inspectable rejected row");
-  assert.match(matchingRejection!.reason, /matching assignment verification rejected the item/);
+  assert.match(matchingRejection!.reason, /source matching assignment verification rejected/);
+  assert.equal(
+    candidateStudyItems.some((item) => item.itemType === "matching"),
+    true,
+    "the final guard-valid retry remains inspectable in the neutral candidate artifact"
+  );
 });
 
-test("matching assignment verification unavailable admits the board unverified", async () => {
-  // D6, and the opposite disposition to impostor's: every matching pair still carries a verbatim
-  // mechanical anchor (matching never opted into the generated-passage rung), so its worst
-  // failure is a `partial` grade rather than a taught falsehood. Dropping instead would gut a
-  // third of the bank under the upstream throttling real traffic has already shown.
+test("matching assignment verification unavailable fails closed for a source-derived board", async () => {
+  // Neutral matching retains D6's pass-through disposition. Source qualification is deliberately
+  // stricter under KTD4: exactly one defensible whole-board assignment must resolve, so transport
+  // failure cannot publish the candidate into current Source Expedition assets.
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
   const { store, persisted, persistedRejected } = capturingStore();
   await generateStudyItemBank({
@@ -1703,8 +1747,10 @@ test("matching assignment verification unavailable admits the board unverified",
     studyItemBankStore: store
   });
 
-  assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor", "matching", "option_select"]);
-  assert.deepEqual(persistedRejected, []);
+  assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor", "option_select"]);
+  const matchingRejection = persistedRejected.find((item) => item.itemType === "matching");
+  assert.ok(matchingRejection);
+  assert.match(matchingRejection.reason, /source matching assignment verification unavailable: judge offline/);
 });
 
 test("key verification unavailable drops an impostor but cannot affect exact-reference source options", async () => {
@@ -1740,7 +1786,7 @@ test("key verification unavailable drops an impostor but cannot affect exact-ref
   assert.deepEqual(typesFor(persisted, "node-c1"), ["matching", "option_select"]);
   const impostorRejection = persistedRejected.find((item) => item.itemType === "impostor");
   assert.ok(impostorRejection);
-  assert.match(impostorRejection.reason, /^impostor key verification unavailable: judge offline/);
+  assert.match(impostorRejection.reason, /^source impostor key verification unavailable: judge offline/);
   const optionRejection = persistedRejected.find((item) => item.itemType === "option_select");
   assert.equal(optionRejection, undefined);
   assert.equal(optionVerificationCalls, 0);

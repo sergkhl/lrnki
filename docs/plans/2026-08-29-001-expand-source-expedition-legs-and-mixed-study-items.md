@@ -7,11 +7,11 @@ execution: code
 
 # Expand Source Expedition Legs and Qualify Mixed Study Items
 
-**Status:** In progress — U0–U1 complete; the five-package baseline, post-veto feasibility, and one
-shared deterministic source-cued route authority are proved; U2 is next
+**Status:** In progress — U0–U2 complete; the five-package baseline, shared source-cued route
+authority, and family-complete source Study Item admission are proved; U3 is next
 
-**NEXT:** U2 gives matching and impostor complete source-material admission, removes the false
-passage-count veto, and keeps blueprint unavailability closed to those two families.
+**NEXT:** U3 binds family qualification, minimum bonus selection, and the finished route into one
+route-sensitive Source Expedition result and fails closed with structured mix diagnostics.
 
 **Decision state:** Accepted by the owner on 2026-08-29 and amended the same day after design
 review. A normal Leg contains 3–5 Concepts, targeting four. Every Concept keeps one qualified
@@ -605,6 +605,44 @@ The plan is complete only when all of the following are true:
    remains unrecorded in `BLOCKERS.md`.
 
 ## Validation Log
+
+### U2 — Family-complete source Study Item admission — 2026-08-30
+
+- **Implementation:** `sourceStudyItemAdmission` is now the one source-family boundary for immutable
+  evidence resolution, citation settlement, material support, provenance, unique option/impostor
+  key, and unique matching assignment. Material-claim projection v3 covers every learner-visible
+  option, matching, and impostor field; the option-only admission module is deleted. Accepted
+  generated matching relationships retain honest generated provenance, while unsupported truths,
+  lies, corrections, or relationships remain inspectable rejected candidates.
+- **Generation envelope:** passage-count vetoes are removed; one lesson grounding passage is
+  the structural minimum. Blueprint selection still owns matching/impostor suitability, and absent
+  or failed blueprint evaluation permits only the explicit option-select fallback. Strict matching
+  and impostor verification stays inside the existing one-regeneration stages, then its exact item
+  IDs/model identity are consumed once by final source admission rather than paying a second judge.
+- **Problem-class repair:** the first production-model probe returned `FIX_FIRST` because the
+  matching directive was incorrectly posed as a factual source claim. Assessment-item practice
+  separates directions, prompts/interactions, and scored content
+  ([QTI implementation guide](https://developers.imsglobal.org/spec/qti/v3p0/impl),
+  [QTI beginner's guide](https://developers.imsglobal.org/spec/qti/v3p0/guide)). Projection now
+  retains the directive as `interaction_instruction`, spends no source-support call on it, and
+  still requires accepted support for every relationship. Focused tests freeze that distinction.
+- **Real-use quality:** milestone U2 source-family admission; fixture is the existing Neuroscience
+  Enrichment Run `344ad479-54b7-465c-a7a0-780417ec2c64`; real model calls yes; terminal result
+  `PASS`. The corrected read-only rerun used `kg-source-material-support-verifier` and
+  `kg-independent-judge`: matching item `5f0697bb-ddd9-42c6-a99a-072a4e2cb236`, including one honest
+  generated relationship, was source-supported and uniquely assigned; the known Retrieval Practice
+  impostor `12171844-65e7-43c8-be54-148f1937f266` was rejected for its unsupported dopamine/
+  acetylcholine correction before Answer-Key Verification. Nineteen support calls and zero option
+  truth calls were made. Remaining caveat: this is two-artifact admission evidence, not five-path
+  regeneration, route qualification, or learner delivery. Safe downstream use is U3 qualification.
+- **Validation:** the 50-test focused generation/projection/report/admission suite, `pnpm test`,
+  `pnpm typecheck`, `pnpm lint`, `pnpm test:db`, `pnpm accepted-paths validate`,
+  `pnpm accepted-paths report`, and `git diff --check` pass. Lint retains ten pre-existing warnings;
+  the accepted packages remain the complete valid option-only baseline until U5–U7 replacement.
+- **Authority boundary:** local automated checks, isolated `lrnki_test` reset/database tests, one
+  read-only development-database production-model probe, and direct artifact inspection only. No
+  development-schema reset, package regeneration, real-backend web, native, deployed,
+  physical-device, production, or release evidence was produced.
 
 ### U1 — Shared source-cued Expedition Route Plan — 2026-08-30
 

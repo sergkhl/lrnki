@@ -32,7 +32,7 @@ export type VerificationRegeneration<TSubject> =
 
 export type VerificationOutcome<TItem> =
   | { admitted: true; item: TItem }
-  | { admitted: false; reason: string };
+  | { admitted: false; reason: string; item?: TItem };
 
 // The minimum a subject must carry for this phase. Concrete subjects add whatever their judge
 // and disposition need — a rendered request, a citation rung — and the spec callbacks, typed at
@@ -60,6 +60,10 @@ export type VerificationSpec<TSubject, TVerdict, TItem> = {
   // Disposition when NO verdict resolved. Deliberately per-type and asymmetric (ADR-0026):
   // harm decides, not symmetry.
   onUnavailable: (subject: TSubject, error: unknown) => VerificationOutcome<TItem>;
+  // Source-derived banks retain the last guard-valid neutral candidate even when semantic
+  // qualification rejects it. The default stays false so existing neutral callers and exact
+  // outcome contracts remain byte-for-byte unchanged.
+  retainRejectedItem?: boolean;
 };
 
 export async function verifyGuardedItems<TSubject extends VerifiableSubject<TSubject, TItem>, TVerdict, TItem>(
@@ -74,7 +78,9 @@ export async function verifyGuardedItems<TSubject extends VerifiableSubject<TSub
   // (the descriptor's `stageTag` travels with the call), so the cost report still separates
   // "what generation cost" from "what verification cost".
   const retryIndices = first.flatMap((result, index) => (result.status === "vetoed" ? [index] : []));
-  if (retryIndices.length === 0) return first.map(settled);
+  if (retryIndices.length === 0) {
+    return first.map((result) => settled(result, spec.retainRejectedItem ?? false));
+  }
 
   const regenerated = await mapWithConcurrency(retryIndices, concurrency, async (index) => {
     const vetoed = first[index];
@@ -88,16 +94,23 @@ export async function verifyGuardedItems<TSubject extends VerifiableSubject<TSub
     concurrency
   );
 
-  const outcomes = first.map(settled);
+  const outcomes = first.map((result) => settled(result, spec.retainRejectedItem ?? false));
   let reverifiedCursor = 0;
   for (const entry of regenerated) {
     if (!entry.result.ok) {
-      outcomes[entry.index] = { admitted: false, reason: entry.result.reason };
+      outcomes[entry.index] = {
+        admitted: false,
+        reason: entry.result.reason,
+        ...(spec.retainRejectedItem ? { item: subjects[entry.index].item } : {})
+      };
       continue;
     }
     // The second pass has no third round: a veto here is final, and an unavailable judge here
     // takes the same per-type disposition it would have taken on the first pass.
-    outcomes[entry.index] = settled(reverified[reverifiedCursor]);
+    outcomes[entry.index] = settled(
+      reverified[reverifiedCursor],
+      spec.retainRejectedItem ?? false
+    );
     reverifiedCursor += 1;
   }
   return outcomes;
@@ -105,7 +118,7 @@ export async function verifyGuardedItems<TSubject extends VerifiableSubject<TSub
 
 type PassResult<TItem> =
   | { status: "admitted"; item: TItem }
-  | { status: "vetoed"; reason: string }
+  | { status: "vetoed"; reason: string; item: TItem }
   | { status: "unavailable"; outcome: VerificationOutcome<TItem> };
 
 async function verifyOnce<TSubject extends VerifiableSubject<TSubject, TItem>, TVerdict, TItem>(
@@ -121,14 +134,28 @@ async function verifyOnce<TSubject extends VerifiableSubject<TSubject, TItem>, T
     judge: (subject) => spec.judge(subject),
     onVerdict: (subject, verdict) => {
       const reason = spec.vetoReason(subject, verdict);
-      return reason === null ? { status: "admitted", item: subject.item } : { status: "vetoed", reason };
+      return reason === null
+        ? { status: "admitted", item: subject.item }
+        : { status: "vetoed", reason, item: subject.item };
     },
-    onUnavailable: (subject, error) => ({ status: "unavailable", outcome: spec.onUnavailable(subject, error) })
+    onUnavailable: (subject, error) => {
+      const outcome = spec.onUnavailable(subject, error);
+      return {
+        status: "unavailable",
+        outcome: outcome.admitted || !spec.retainRejectedItem || outcome.item !== undefined
+          ? outcome
+          : { ...outcome, item: subject.item }
+      };
+    }
   });
 }
 
-function settled<TItem>(result: PassResult<TItem>): VerificationOutcome<TItem> {
+function settled<TItem>(result: PassResult<TItem>, retainRejectedItem: boolean): VerificationOutcome<TItem> {
   if (result.status === "admitted") return { admitted: true, item: result.item };
   if (result.status === "unavailable") return result.outcome;
-  return { admitted: false, reason: result.reason };
+  return {
+    admitted: false,
+    reason: result.reason,
+    ...(retainRejectedItem ? { item: result.item } : {})
+  };
 }

@@ -4,7 +4,13 @@ import type {
   ConceptLessonDiagramDescriptor,
   ConceptLessonSection,
   ConceptLessonSectionKind,
+  ImpostorItem,
+  ImpostorLieStatement,
+  ImpostorTruthStatement,
+  MatchingItem,
+  MatchingPair,
   OptionSelectItem,
+  StudyItem,
   StudyItemCitation,
   StudyItemOption
 } from "@lrnki/domain-core";
@@ -65,17 +71,80 @@ const optionFieldTreatment = {
   citation: "exclude"
 } as const satisfies Record<keyof StudyItemOption, ClaimTreatment>;
 
+const matchingFieldTreatment = {
+  studyItemId: "context",
+  graphVersionId: "exclude",
+  enrichmentId: "exclude",
+  derivedNodeId: "context",
+  groundingProvenance: "exclude",
+  generatingModel: "exclude",
+  configHash: "exclude",
+  facet: "context",
+  explorableTerms: "exclude",
+  itemType: "context",
+  question: "project",
+  pairs: "recurse"
+} as const satisfies Record<keyof MatchingItem, ClaimTreatment>;
+
+const matchingPairFieldTreatment = {
+  pairId: "context",
+  matchId: "context",
+  promptText: "project",
+  matchText: "project",
+  citation: "exclude"
+} as const satisfies Record<keyof MatchingPair, ClaimTreatment>;
+
+const impostorFieldTreatment = {
+  studyItemId: "context",
+  graphVersionId: "exclude",
+  enrichmentId: "exclude",
+  derivedNodeId: "context",
+  groundingProvenance: "exclude",
+  generatingModel: "exclude",
+  configHash: "exclude",
+  facet: "context",
+  explorableTerms: "exclude",
+  itemType: "context",
+  question: "context",
+  statements: "recurse"
+} as const satisfies Record<keyof ImpostorItem, ClaimTreatment>;
+
+const impostorTruthFieldTreatment = {
+  statementId: "context",
+  ordinal: "context",
+  text: "project",
+  provenance: "exclude",
+  isImpostor: "select_key",
+  citation: "exclude"
+} as const satisfies Record<keyof ImpostorTruthStatement, ClaimTreatment>;
+
+const impostorLieFieldTreatment = {
+  statementId: "context",
+  ordinal: "context",
+  text: "project",
+  provenance: "exclude",
+  isImpostor: "select_key",
+  reveal: "project",
+  lieSource: "context",
+  siblingLabel: "context"
+} as const satisfies Record<keyof ImpostorLieStatement, ClaimTreatment>;
+
 void lessonFieldTreatment;
 void lessonSectionFieldTreatment;
 void diagramFieldTreatment;
 void optionSelectFieldTreatment;
 void optionFieldTreatment;
+void matchingFieldTreatment;
+void matchingPairFieldTreatment;
+void impostorFieldTreatment;
+void impostorTruthFieldTreatment;
+void impostorLieFieldTreatment;
 
 // Citation fidelity is not part of reference identity: it is derived from the immutable source
 // block at the evidence-read boundary, where byte-exact versus formatting-normalized matching can
 // actually be proven. The v1 projection trusted the intermediate asset's matchKind and therefore
 // could preserve `exact` after Markdown line wrapping made the source-block match normalized.
-export const SOURCE_MATERIAL_CLAIM_PROJECTION = "source_material_claims_v2" as const;
+export const SOURCE_MATERIAL_CLAIM_PROJECTION = "source_material_claims_v3" as const;
 export const SOURCE_CITATION_MATCH_CLASSIFICATION_POLICY =
   "source_citation_match_from_resolved_block_v1" as const;
 export type SourceMaterialClaimProjection = typeof SOURCE_MATERIAL_CLAIM_PROJECTION;
@@ -128,6 +197,31 @@ export type SourceMaterialClaimSubject =
       kind: "option_select_distractor";
       question: string;
       proposedAnswer: string;
+    }
+  | {
+      kind: "matching_instruction";
+      instruction: string;
+    }
+  | {
+      kind: "matching_relationship";
+      instruction: string;
+      promptText: string;
+      matchText: string;
+    }
+  | {
+      kind: "impostor_truth";
+      statement: string;
+    }
+  | {
+      kind: "impostor_reveal";
+      proposedStatement: string;
+      reveal: string;
+      siblingLabel?: string;
+    }
+  | {
+      kind: "impostor_lie";
+      question: string;
+      proposedStatement: string;
     };
 
 // A source-owned structural locator for the exact payload field represented by a claim. Admission
@@ -140,13 +234,18 @@ export type SourceMaterialClaimLocation =
   | { kind: "lesson_diagram_spec"; sectionIndex: number }
   | { kind: "option_select_question_key" }
   | { kind: "option_select_explanation" }
-  | { kind: "option_select_distractor"; optionIndex: number };
+  | { kind: "option_select_distractor"; optionIndex: number }
+  | { kind: "matching_instruction" }
+  | { kind: "matching_relationship"; pairIndex: number }
+  | { kind: "impostor_truth"; statementIndex: number }
+  | { kind: "impostor_reveal"; statementIndex: number }
+  | { kind: "impostor_lie"; statementIndex: number };
 
 export type SourceMaterialClaim = {
   claimKey: string;
   location: SourceMaterialClaimLocation;
-  purpose: "source_support" | "distractor_invalidity";
-  assetKind: "concept_lesson" | "option_select";
+  purpose: "source_support" | "distractor_invalidity" | "interaction_instruction";
+  assetKind: "concept_lesson" | StudyItem["itemType"];
   assetId: string;
   derivedNodeId: string;
   canonicalLabel: string;
@@ -172,7 +271,7 @@ type CitationOccurrence = {
 // for a verifier, never a second hand-authored paraphrase of the claim.
 export function projectSourceMaterialClaims(input: {
   lessons: readonly ConceptLesson[];
-  optionSelectItems: readonly OptionSelectItem[];
+  studyItems: readonly StudyItem[];
   projection?: SourceMaterialClaimProjection;
 }): SourceMaterialClaimSet {
   const projection = input.projection ?? SOURCE_MATERIAL_CLAIM_PROJECTION;
@@ -183,7 +282,7 @@ export function projectSourceMaterialClaims(input: {
   const lessons = [...input.lessons].sort((left, right) =>
     left.conceptLessonId.localeCompare(right.conceptLessonId)
   );
-  const optionSelectItems = [...input.optionSelectItems].sort((left, right) =>
+  const studyItems = [...input.studyItems].sort((left, right) =>
     left.studyItemId.localeCompare(right.studyItemId)
   );
   const canonicalLabelByNode = new Map(
@@ -211,9 +310,21 @@ export function projectSourceMaterialClaims(input: {
       );
     }
   }
-  for (const item of optionSelectItems) {
-    for (const option of item.options) {
-      if (option.isCorrect) recordCitation(item.derivedNodeId, option.citation, "mention");
+  for (const item of studyItems) {
+    if (item.itemType === "option_select") {
+      for (const option of item.options) {
+        if (option.isCorrect) recordCitation(item.derivedNodeId, option.citation, "mention");
+      }
+    } else if (item.itemType === "matching") {
+      for (const pair of item.pairs) {
+        recordCitation(item.derivedNodeId, pair.citation, "mention");
+      }
+    } else {
+      for (const statement of item.statements) {
+        if (!statement.isImpostor) {
+          recordCitation(item.derivedNodeId, statement.citation, "mention");
+        }
+      }
     }
   }
 
@@ -331,7 +442,9 @@ export function projectSourceMaterialClaims(input: {
     });
   }
 
-  for (const item of optionSelectItems) {
+  for (const item of studyItems.filter((candidate): candidate is OptionSelectItem =>
+    candidate.itemType === "option_select"
+  )) {
     const keyed = item.options.filter((option) => option.isCorrect);
     if (keyed.length !== 1) {
       throw new Error(
@@ -395,6 +508,103 @@ export function projectSourceMaterialClaims(input: {
     });
   }
 
+  for (const item of studyItems.filter((candidate): candidate is MatchingItem =>
+    candidate.itemType === "matching"
+  )) {
+    const evidenceKeys = evidenceKeysByNode.get(item.derivedNodeId) ?? [];
+    const canonicalLabel = canonicalLabelByNode.get(item.derivedNodeId);
+    if (!canonicalLabel) {
+      throw new Error(
+        `Source material-claim projection cannot resolve the lesson subject for matching item ${JSON.stringify(item.studyItemId)}.`
+      );
+    }
+    const base = {
+      assetKind: "matching" as const,
+      assetId: item.studyItemId,
+      derivedNodeId: item.derivedNodeId,
+      canonicalLabel,
+      evidenceKeys
+    };
+    addClaim({
+      ...base,
+      purpose: "interaction_instruction",
+      claimKey: `matching:${item.studyItemId}:instruction`,
+      location: { kind: "matching_instruction" },
+      directEvidenceKeys: [],
+      subject: { kind: "matching_instruction", instruction: item.question }
+    });
+    item.pairs.forEach((pair, pairIndex) => addClaim({
+      ...base,
+      purpose: "source_support",
+      claimKey: `matching:${item.studyItemId}:relationship:${pairIndex}`,
+      location: { kind: "matching_relationship", pairIndex },
+      directEvidenceKeys: directEvidenceKeys(item.derivedNodeId, pair.citation),
+      subject: {
+        kind: "matching_relationship",
+        instruction: item.question,
+        promptText: pair.promptText,
+        matchText: pair.matchText
+      }
+    }));
+  }
+
+  for (const item of studyItems.filter((candidate): candidate is ImpostorItem =>
+    candidate.itemType === "impostor"
+  )) {
+    const evidenceKeys = evidenceKeysByNode.get(item.derivedNodeId) ?? [];
+    const canonicalLabel = canonicalLabelByNode.get(item.derivedNodeId);
+    if (!canonicalLabel) {
+      throw new Error(
+        `Source material-claim projection cannot resolve the lesson subject for impostor item ${JSON.stringify(item.studyItemId)}.`
+      );
+    }
+    const base = {
+      assetKind: "impostor" as const,
+      assetId: item.studyItemId,
+      derivedNodeId: item.derivedNodeId,
+      canonicalLabel,
+      evidenceKeys
+    };
+    item.statements.forEach((statement, statementIndex) => {
+      if (statement.isImpostor) {
+        addClaim({
+          ...base,
+          purpose: "distractor_invalidity",
+          claimKey: `impostor:${item.studyItemId}:lie:${statementIndex}`,
+          location: { kind: "impostor_lie", statementIndex },
+          directEvidenceKeys: [],
+          subject: {
+            kind: "impostor_lie",
+            question: item.question,
+            proposedStatement: statement.text
+          }
+        });
+        addClaim({
+          ...base,
+          purpose: "source_support",
+          claimKey: `impostor:${item.studyItemId}:reveal:${statementIndex}`,
+          location: { kind: "impostor_reveal", statementIndex },
+          directEvidenceKeys: [],
+          subject: {
+            kind: "impostor_reveal",
+            proposedStatement: statement.text,
+            reveal: statement.reveal,
+            ...(statement.siblingLabel ? { siblingLabel: statement.siblingLabel } : {})
+          }
+        });
+        return;
+      }
+      addClaim({
+        ...base,
+        purpose: "source_support",
+        claimKey: `impostor:${item.studyItemId}:truth:${statementIndex}`,
+        location: { kind: "impostor_truth", statementIndex },
+        directEvidenceKeys: directEvidenceKeys(item.derivedNodeId, statement.citation),
+        subject: { kind: "impostor_truth", statement: statement.text }
+      });
+    });
+  }
+
   return {
     projection,
     evidence: [...new Map(evidence.map((reference) => [reference.evidenceKey, reference] as const))
@@ -420,6 +630,16 @@ export function renderSourceMaterialClaim(subject: SourceMaterialClaimSubject): 
       return `For learner question ${JSON.stringify(subject.question)} with keyed answer ${JSON.stringify(subject.keyedAnswer)}, explanation: ${JSON.stringify(subject.explanation)}`;
     case "option_select_distractor":
       return `For learner question ${JSON.stringify(subject.question)}, proposed answer: ${JSON.stringify(subject.proposedAnswer)}.`;
+    case "matching_instruction":
+      return `Matching instruction: ${JSON.stringify(subject.instruction)}.`;
+    case "matching_relationship":
+      return `Under matching instruction ${JSON.stringify(subject.instruction)}, prompt ${JSON.stringify(subject.promptText)} maps to ${JSON.stringify(subject.matchText)}.`;
+    case "impostor_truth":
+      return `Impostor-board true statement: ${JSON.stringify(subject.statement)}.`;
+    case "impostor_reveal":
+      return `For proposed false statement ${JSON.stringify(subject.proposedStatement)}, corrective reveal: ${JSON.stringify(subject.reveal)}${subject.siblingLabel ? `; related subject ${JSON.stringify(subject.siblingLabel)}` : ""}.`;
+    case "impostor_lie":
+      return `For learner question ${JSON.stringify(subject.question)}, proposed false statement: ${JSON.stringify(subject.proposedStatement)}.`;
   }
 }
 

@@ -36,6 +36,7 @@ export type AnswerKeyVerificationSpec<TItem> = {
   concurrency?: number;
   vetoReason: (subject: AnswerKeyVerificationSubject<TItem>, verdicts: readonly StudyItemCandidateVerdict[]) => string | null;
   onUnavailable: (subject: AnswerKeyVerificationSubject<TItem>, error: unknown) => VerificationOutcome<TItem>;
+  retainRejectedItem?: boolean;
 };
 
 // A verdict the judge never returned for an ordinal is `unclear`, never an error and never a
@@ -57,7 +58,10 @@ export async function verifyAnswerKeys<TItem>(
     ...(spec.concurrency === undefined ? {} : { concurrency: spec.concurrency }),
     judge: (subject) => spec.verifier.verify(subject.request),
     vetoReason: spec.vetoReason,
-    onUnavailable: spec.onUnavailable
+    onUnavailable: spec.onUnavailable,
+    ...(spec.retainRejectedItem === undefined
+      ? {}
+      : { retainRejectedItem: spec.retainRejectedItem })
   });
 }
 

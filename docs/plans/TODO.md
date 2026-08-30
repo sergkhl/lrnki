@@ -11,9 +11,9 @@
   [Plan](./2026-08-29-001-expand-source-expedition-legs-and-mixed-study-items.md). U0 froze the exact
   five-package defect/identity baseline and proved the hard mixed-Leg partition feasible after
   passage-count veto removal; U1 replaced terminal-cone sectioning with the shared deterministic
-  source-cued route authority. **NEXT:** U2 gives matching and impostor complete source-material
-  admission and removes the false passage-count veto without opening the blueprint-unavailable
-  fallback.
+  source-cued route authority; U2 added family-complete source admission and removed the false
+  passage-count veto while keeping blueprint failure option-only. **NEXT:** U3 binds qualification,
+  minimum bonus selection, and the finished route into one route-sensitive Source Expedition result.
 
 - **Shape Concept Lesson grounding depth.** 140 of 183 qualified lessons yield one grounding passage
   while their Concepts hold four to six verified source evidence passages, so the Study Item

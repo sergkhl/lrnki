@@ -1,7 +1,7 @@
 import type {
   ConceptLesson,
   EvidenceMatchKind,
-  OptionSelectItem,
+  StudyItem,
   StudyItemCitation
 } from "@lrnki/domain-core";
 
@@ -17,9 +17,9 @@ export type ResolvedSourceCitationEvidence = {
 
 export function settleSourceCitationMatchKinds(input: {
   lessons?: readonly ConceptLesson[];
-  optionSelectItems?: readonly OptionSelectItem[];
+  studyItems?: readonly StudyItem[];
   evidence: readonly ResolvedSourceCitationEvidence[];
-}): { lessons: ConceptLesson[]; optionSelectItems: OptionSelectItem[] } {
+}): { lessons: ConceptLesson[]; studyItems: StudyItem[] } {
   const matchByCitation = new Map(
     input.evidence
       .filter((row): row is ResolvedSourceCitationEvidence & {
@@ -43,15 +43,37 @@ export function settleSourceCitationMatchKinds(input: {
           : {})
       }))
     })),
-    optionSelectItems: (input.optionSelectItems ?? []).map((item) => ({
-      ...item,
-      options: item.options.map((option) => ({
-        ...option,
-        ...(option.citation
-          ? { citation: settleCitation(option.citation) }
-          : {})
-      }))
-    }))
+    studyItems: (input.studyItems ?? []).map((item): StudyItem => {
+      if (item.itemType === "option_select") {
+        return {
+          ...item,
+          options: item.options.map((option) => ({
+            ...option,
+            ...(option.citation
+              ? { citation: settleCitation(option.citation) }
+              : {})
+          }))
+        };
+      }
+      if (item.itemType === "matching") {
+        return {
+          ...item,
+          pairs: item.pairs.map((pair) => ({
+            ...pair,
+            citation: settleCitation(pair.citation) ?? pair.citation
+          }))
+        };
+      }
+      return {
+        ...item,
+        statements: item.statements.map((statement) => statement.isImpostor
+          ? statement
+          : {
+              ...statement,
+              citation: settleCitation(statement.citation) ?? statement.citation
+            })
+      };
+    })
   };
 }
 

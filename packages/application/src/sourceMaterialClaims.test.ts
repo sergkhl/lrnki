@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { ConceptLesson, OptionSelectItem } from "@lrnki/domain-core";
+import type {
+  ConceptLesson,
+  ImpostorItem,
+  MatchingItem,
+  OptionSelectItem
+} from "@lrnki/domain-core";
 import {
   projectSourceMaterialClaims,
   renderSourceMaterialClaim
@@ -84,10 +89,62 @@ const item: OptionSelectItem = {
   ]
 };
 
-test("projects every material source-asset field without losing qualifiers or citation identity", () => {
-  const result = projectSourceMaterialClaims({ lessons: [lesson], optionSelectItems: [item] });
+const matching: MatchingItem = {
+  studyItemId: "matching-authorization",
+  graphVersionId: "graph-1",
+  enrichmentId: "enrichment-1",
+  derivedNodeId: "node-authorization",
+  groundingProvenance: "source_cep",
+  generatingModel: "test-generator",
+  configHash: "qualified:test",
+  explorableTerms: [],
+  itemType: "matching",
+  question: "Match each authorization aspect to its consequence.",
+  pairs: ["deadline", "renewal", "expiry"].map((name, index) => ({
+    pairId: `pair-${index}`,
+    matchId: `match-${index}`,
+    promptText: name,
+    matchText: `consequence ${index}`,
+    citation: authorizationCitation
+  }))
+};
 
-  assert.equal(result.projection, "source_material_claims_v2");
+const impostor: ImpostorItem = {
+  studyItemId: "impostor-authorization",
+  graphVersionId: "graph-1",
+  enrichmentId: "enrichment-1",
+  derivedNodeId: "node-authorization",
+  groundingProvenance: "source_cep",
+  generatingModel: "test-generator",
+  configHash: "qualified:test",
+  explorableTerms: [],
+  itemType: "impostor",
+  question: "Which statement is false?",
+  statements: [
+    ...["truth one", "truth two", "truth three"].map((text, ordinal) => ({
+      statementId: `truth-${ordinal}`,
+      ordinal,
+      text,
+      isImpostor: false as const,
+      provenance: "source" as const,
+      citation: authorizationCitation
+    })),
+    {
+      statementId: "lie",
+      ordinal: 3,
+      text: "The authorization never expires.",
+      isImpostor: true,
+      provenance: "generated",
+      reveal: "It expires at the stated deadline unless renewed.",
+      lieSource: "generated"
+    }
+  ]
+};
+
+test("projects every material source-asset field without losing qualifiers or citation identity", () => {
+  const result = projectSourceMaterialClaims({ lessons: [lesson], studyItems: [item] });
+
+  assert.equal(result.projection, "source_material_claims_v3");
   assert.equal(result.evidence.length, 1, "the shared section/key citation is one evidence row");
   assert.equal(result.evidence[0]?.passageKind, "definition");
   assert.equal(
@@ -134,11 +191,11 @@ test("projection is deterministic across asset input order and renders only exac
   const secondLesson = { ...lesson, conceptLessonId: "lesson-z-copy" };
   const first = projectSourceMaterialClaims({
     lessons: [secondLesson, lesson],
-    optionSelectItems: [item]
+    studyItems: [item]
   });
   const second = projectSourceMaterialClaims({
     lessons: [lesson, secondLesson],
-    optionSelectItems: [item]
+    studyItems: [item]
   });
   assert.deepEqual(first, second);
 
@@ -152,4 +209,36 @@ test("projection is deterministic across asset input order and renders only exac
   assert.match(rendered, /Does the condition still apply/);
   assert.match(rendered, /Only while the stated exception is absent/);
   assert.match(rendered, /Both the condition and exception are material/);
+});
+
+test("matching relationships and impostor truths, lie, and reveal have typed lossless locations", () => {
+  const result = projectSourceMaterialClaims({
+    lessons: [lesson],
+    studyItems: [matching, impostor]
+  });
+  const matchingClaims = result.claims.filter((claim) => claim.assetKind === "matching");
+  assert.equal(matchingClaims.length, 4);
+  assert.deepEqual(matchingClaims.map((claim) => claim.location), [
+    { kind: "matching_instruction" },
+    { kind: "matching_relationship", pairIndex: 0 },
+    { kind: "matching_relationship", pairIndex: 1 },
+    { kind: "matching_relationship", pairIndex: 2 }
+  ]);
+  assert.equal(matchingClaims[0]?.purpose, "interaction_instruction");
+  assert.ok(matchingClaims.slice(1).every((claim) => claim.purpose === "source_support"));
+  assert.ok(matchingClaims.slice(1).every((claim) => claim.directEvidenceKeys.length === 1));
+
+  const impostorClaims = result.claims.filter((claim) => claim.assetKind === "impostor");
+  assert.equal(impostorClaims.length, 5);
+  assert.equal(impostorClaims.filter((claim) => claim.purpose === "source_support").length, 4);
+  assert.equal(impostorClaims.filter((claim) => claim.purpose === "distractor_invalidity").length, 1);
+  assert.deepEqual(impostorClaims.map((claim) => claim.location), [
+    { kind: "impostor_truth", statementIndex: 0 },
+    { kind: "impostor_truth", statementIndex: 1 },
+    { kind: "impostor_truth", statementIndex: 2 },
+    { kind: "impostor_lie", statementIndex: 3 },
+    { kind: "impostor_reveal", statementIndex: 3 }
+  ]);
+  const reveal = impostorClaims.find((claim) => claim.subject.kind === "impostor_reveal");
+  assert.match(reveal?.statement ?? "", /expires at the stated deadline unless renewed/);
 });

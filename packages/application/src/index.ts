@@ -323,9 +323,14 @@ export {
   type SourceLessonAdmissionResult
 } from "./sourceLessonAdmission";
 export {
-  admitSourceOptionSelectItems,
-  type SourceOptionSelectAdmissionResult
-} from "./sourceOptionSelectAdmission";
+  admitSourceStudyItems,
+  settleStrictImpostorTruth,
+  settleStrictMatchingAssignment,
+  type SourceStudyItemAdmissionResult,
+  type SourceStudyItemSemanticDecision,
+  type SourceStudyItemSemanticPrequalification,
+  type SourceStudyItemSemanticReason
+} from "./sourceStudyItemAdmission";
 export {
   SOURCE_OPTION_EXACT_REFERENCE_ADMISSION_POLICY,
   sourceOptionExactReferenceContractReasons,
