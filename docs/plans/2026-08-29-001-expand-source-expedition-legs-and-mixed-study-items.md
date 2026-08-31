@@ -7,11 +7,13 @@ execution: code
 
 # Expand Source Expedition Legs and Qualify Mixed Study Items
 
-**Status:** In progress — U0–U5 complete; the strict v2 package contract now seals and validates the
-same route, selected family mix, asset identity, and honest Concept count; U6 is next
+**Status:** Abandoned on 2026-08-31. U0–U5 shipped, but U6–U8 depended on regenerating the five
+packages with production models, and the owner has abandoned model generation of learner knowledge.
+Superseded by
+[Simplify the Learner Runtime Around Directly Authored Expeditions](./2026-08-31-001-retire-model-generation-for-authored-expeditions.md),
+whose U0 deletes this file in a commit of its own. Nothing here is live work.
 
-**NEXT:** U6 regenerates, inspects, qualifies, and exports the five replacement v2 packages in
-manifest order against one shared live Concept registry.
+**NEXT:** Nothing. Do not start U6.
 
 **Decision state:** Accepted by the owner on 2026-08-29 and amended the same day after design
 review. A normal Leg contains 3–5 Concepts, targeting four. Every Concept keeps one qualified
