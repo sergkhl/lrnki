@@ -688,6 +688,22 @@ importers:
         specifier: 'catalog:'
         version: 6.0.3
 
+  packages/learner-runtime:
+    dependencies:
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.9.2
+      tsx:
+        specifier: 'catalog:'
+        version: 4.21.0
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
   packages/ports:
     dependencies:
       '@lrnki/domain-core':

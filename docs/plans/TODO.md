@@ -8,9 +8,10 @@
   and Expo presentation behind one two-method learner-runtime module and one versioned learner
   aggregate, then atomically cut over and delete generation-era architecture.
   [Plan](./2026-08-31-001-retire-model-generation-for-authored-expeditions.md). U0 preserved the full
-  baseline and abandoned U6 snapshot in `4ae809e`, committed the replacement authority in `212cf90`,
-  and removed the abandoned plan standalone. **NEXT:** U1 establishes the private direct-content
-  authority and qualifies Critical Thinking without model, package, installer, or database access.
+  baseline and abandoned U6 snapshot in `4ae809e`, then U1 added the direct qualifier and a
+  source-inspected Critical Thinking Expedition without model/package/installer/database access.
+  **NEXT:** U2 implements the private runtime and its in-memory/Postgres aggregate adapters without
+  exposing a second live learner path.
 
 ## COMPLETED
 

@@ -7,12 +7,13 @@ execution: code
 
 # Simplify the Learner Runtime Around Directly Authored Expeditions
 
-**Status:** In progress — U0 complete. The abandoned U6 generation work is recoverable in commit
+**Status:** In progress — U0–U1 complete. The abandoned U6 generation work is recoverable in commit
 `4ae809e`; its plan was committed as Abandoned with this replacement in `212cf90`, then removed in a
-standalone reference-repair commit. U1 is next.
+standalone reference-repair commit. The private direct-content authority now qualifies Critical
+Thinking; the legacy runtime remains the sole live authority. U2 is next.
 
-**NEXT:** U1 establishes the private direct-content authority and qualifies one complete Critical
-Thinking Expedition without model, build-time model, database, package, or installer access.
+**NEXT:** U2 implements the learner runtime against the in-memory aggregate, then adds the test-only
+Postgres adapter without exposing a second live learner path.
 
 **Decision state:** Accepted by the owner on 2026-08-31. This plan replaces the earlier retirement
 design rather than amending it. The earlier direction was correct about deleting model-generated
@@ -372,11 +373,10 @@ Rewrite `CONTEXT.md` as a glossary for Authored Expedition, Leg, Stop, Lesson, A
 Path, Guardian, and Learner State. Remove graph, extraction, model-operation, generation, enrichment,
 Concept, and inspection terms after their code disappears.
 
-Retain both current brainstorms during U0:
+Brainstorm disposition:
 
-- re-home lesson depth and teaching quality from
-  `2026-08-29-001-concept-lesson-grounding-depth.md` into `content/AUTHORING.md` and the real-use
-  rubric before deleting it;
+- U1 re-homed lesson-depth and teaching-quality requirements into `content/AUTHORING.md` and this
+  plan's real-use rubric, then deleted the superseded lesson-depth brainstorm;
 - retain `2026-08-19-001-architecture-deepening-review.md` until navigation, Support interaction,
   persisted loading, and reader-seam findings are implemented or explicitly re-homed.
 
@@ -406,6 +406,8 @@ Acceptance: code and planning history are recoverable; index, TODO, and plan agr
 remains `_None._` unless an owner-only action appears.
 
 ### U1 — Establish direct authored content
+
+**Status:** Complete on 2026-08-31.
 
 - Add the source schema, loader, qualifier, canonical revision, `content/AUTHORING.md`, and
   `pnpm content:check` wired into `pnpm check`.
@@ -577,6 +579,28 @@ This plan closes only when all are true:
 - **Qualification:** Local automated, test-Postgres, local build, and intercepted-web baseline only.
   No real-backend, native, deployed, distributable, physical-device, production, or content-quality
   claim. The initial DB failure remains part of the record even though it did not reproduce.
+
+### U1 — private direct-content authority and Critical Thinking (2026-08-31)
+
+- **Scope:** Added the legacy-independent `@lrnki/learner-runtime` content seam, direct tracked
+  catalog/Expedition/source authorities, authoring rubric, canonical revisions, structured refusal,
+  startup loader, and Critical Thinking. The legacy API/app remains the sole live learner path.
+- **Structural result:** `pnpm content:check` accepted one Expedition all-or-nothing at catalog
+  revision `142f9ab13d0e0cb3c6dc57886df43d3ff8c3720d1cc33b3ee699c035443ecd0a` and content revision
+  `e90178e53bfa7b55032e25827663acd9c8a13d21066c845b95ac00596d25f2f6`. The source copy is
+  byte-identical to the retained legacy fixture. The focused suite passed 14/14 refusal, identity,
+  projection, and startup tests; no legacy/model/database package is imported.
+- **Semantic inspection:** `PASS` for six lesson sections, four option-select activities, one
+  matching activity, one impostor activity, two Support Paths, and the Leg/Expedition Guardian
+  pools against the local primer. One initial `FIX_FIRST`—`confounder` pointed to an unrelated
+  sampling repair—was replaced with an earlier common-cause activity before PASS.
+- **Repository gate:** `pnpm check` passed with content qualification first, schema parity, all
+  typechecks/tests, the existing 10 lint warnings and no errors, both builds, and 70/70 intercepted
+  scenarios.
+- **Qualification:** Structural/direct-inspection and legacy intercepted-web evidence only. The
+  browser run exercises the still-canonical legacy client, not the private new content path. No
+  database content, real-backend, native, deployed, distributable, physical-device, production,
+  external-fact, or arbitrary-source claim.
 
 ## Open findings
 

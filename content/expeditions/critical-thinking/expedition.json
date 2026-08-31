@@ -1,0 +1,352 @@
+{
+  "schemaVersion": 1,
+  "key": "critical-thinking",
+  "title": "Critical Thinking",
+  "teaser": "Make reasoning visible, test it against evidence, and revise confidence without pretending to certainty.",
+  "declaredDomain": "Reasoning and decision-making",
+  "audience": "Adult learners building practical reasoning habits",
+  "sourceCredits": [
+    {
+      "title": "Critical Thinking primer",
+      "author": "lrnki project",
+      "license": "Project-owned internal playtest source",
+      "note": "Accepted as a local authoring basis without independent external fact verification."
+    }
+  ],
+  "legs": [
+    {
+      "key": "reasoning-foundations",
+      "title": "From claims to warranted conclusions",
+      "stops": [
+        {
+          "key": "argument-structure",
+          "label": "See the support structure",
+          "requires": [],
+          "difficultyBand": 1,
+          "lesson": {
+            "sections": [
+              {
+                "key": "claims-and-support",
+                "title": "Separate what is claimed from what supports it",
+                "body": "A claim is something that can be accepted or rejected. An argument adds structure: one or more claims act as reasons for another claim, the conclusion. When you evaluate reasoning, first mark those roles. Nearby sentences, a confident tone, or a word such as ‘therefore’ are clues, but the actual support relationship decides which role each claim plays.",
+                "sourceAnchor": {
+                  "heading": "1. Claims, Reasons, Conclusions, and Arguments",
+                  "quote": "An **argument** is a set of claims in which one or more claims are offered as support for another."
+                },
+                "explorableTerms": []
+              },
+              {
+                "key": "charitable-reconstruction",
+                "title": "Reconstruct only what the reasoning needs",
+                "body": "Every premise is not always spoken aloud. Supply an implicit premise only when it is needed to connect a stated reason to the conclusion, and choose the weakest plausible version. This makes the reasoning intelligible without turning it into an easier, more extreme target. Then set examples, background details, and emotional wording aside before judging the support.",
+                "sourceAnchor": {
+                  "heading": "1. Claims, Reasons, Conclusions, and Arguments",
+                  "quote": "A charitable reconstruction uses the weakest plausible assumption needed to connect the stated reason to the conclusion."
+                },
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "identify-conclusion",
+              "prompt": "A traveler says: ‘The northern road is closed by flooding. The southern road remains open. Therefore, we should take the southern road.’ Which claim is the conclusion?",
+              "options": [
+                {
+                  "key": "northern-road-closed",
+                  "text": "The northern road is closed by flooding."
+                },
+                {
+                  "key": "southern-road-open",
+                  "text": "The southern road remains open."
+                },
+                {
+                  "key": "take-southern-road",
+                  "text": "We should take the southern road."
+                },
+                {
+                  "key": "usable-road-needed",
+                  "text": "A usable road is needed to reach the destination."
+                }
+              ],
+              "answerKey": "take-southern-road",
+              "explanation": {
+                "text": "The two road conditions are offered as reasons. The proposed action—take the southern road—is the claim those reasons support, so it is the conclusion.",
+                "sourceAnchor": {
+                  "heading": "1. Claims, Reasons, Conclusions, and Arguments",
+                  "quote": "The road conditions are reasons. The proposed choice is the conclusion."
+                }
+              }
+            },
+            {
+              "family": "matching",
+              "key": "map-argument-parts",
+              "prompt": "Match each reasoning role to what it does.",
+              "pairs": [
+                {
+                  "key": "claim-role",
+                  "left": "Claim",
+                  "right": "A statement that can be accepted or rejected"
+                },
+                {
+                  "key": "reason-role",
+                  "left": "Reason",
+                  "right": "A claim offered in support of another claim"
+                },
+                {
+                  "key": "conclusion-role",
+                  "left": "Conclusion",
+                  "right": "The claim the reasons are intended to support"
+                }
+              ],
+              "explanation": {
+                "text": "Claims become an argument through their roles: reasons supply support and the conclusion is what that support is meant to establish.",
+                "sourceAnchor": {
+                  "heading": "1. Claims, Reasons, Conclusions, and Arguments",
+                  "quote": "The supporting claims are **reasons** or **premises**. The supported claim is the **conclusion**."
+                }
+              }
+            }
+          ],
+          "supportPaths": []
+        },
+        {
+          "key": "evidence-quality",
+          "label": "Judge how much the evidence earns",
+          "requires": ["argument-structure"],
+          "difficultyBand": 2,
+          "lesson": {
+            "sections": [
+              {
+                "key": "inductive-strength",
+                "title": "Let the conclusion match the uncertainty",
+                "body": "Most practical inferences make a conclusion more or less probable rather than guaranteeing it. Ask how many plausible alternatives remain after seeing the evidence. Strong inductive evidence rules out important alternatives and supports a conclusion within a stated population, setting, and time. The conclusion should say ‘probably,’ ‘often,’ or ‘under these conditions’ when certainty is not earned.",
+                "sourceAnchor": {
+                  "heading": "3. Induction, Evidence, and Uncertainty",
+                  "quote": "An inductive argument is **strong** when its evidence gives substantial support to its conclusion."
+                },
+                "explorableTerms": []
+              },
+              {
+                "key": "representative-evidence",
+                "title": "A large sample can still answer the wrong question",
+                "body": "Sample size narrows random noise, but representativeness determines which population the result can describe. A large volunteer poll may precisely measure its volunteers while missing quieter groups. Recover the support relationship first, then inspect selection, nonresponse, wording, and whether the target population matches the sample before accepting the conclusion.",
+                "sourceAnchor": {
+                  "heading": "3. Induction, Evidence, and Uncertainty",
+                  "quote": "Sample size matters, but representativeness matters too."
+                },
+                "explorableTerms": [
+                  {
+                    "term": "support relationship",
+                    "supportPathKey": "review-support-relationship"
+                  }
+                ]
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "evaluate-sample",
+              "prompt": "Which study best supports a cautious conclusion about weekly public-transport use among commuters in one city during the survey month?",
+              "options": [
+                {
+                  "key": "random-city-commuters",
+                  "text": "A large random sample drawn from that city’s commuter registry, with nonresponse reported"
+                },
+                {
+                  "key": "transit-fan-volunteers",
+                  "text": "A much larger voluntary poll shared by a public-transport fan group"
+                },
+                {
+                  "key": "different-city-riders",
+                  "text": "A random sample of riders in a different city five years earlier"
+                },
+                {
+                  "key": "one-memorable-commuter",
+                  "text": "A detailed interview with one especially memorable commuter"
+                }
+              ],
+              "answerKey": "random-city-commuters",
+              "explanation": {
+                "text": "The registry sample is closest to the named population, place, and period, and it exposes nonresponse. A larger biased sample can be more precise while still describing the wrong population.",
+                "sourceAnchor": {
+                  "heading": "3. Induction, Evidence, and Uncertainty",
+                  "quote": "A very large biased sample can give a precise estimate of the wrong population."
+                }
+              }
+            },
+            {
+              "family": "option_select",
+              "key": "test-common-cause",
+              "prompt": "Ice-cream sales and sunburn cases both rise during the same weeks. Which alternative should be tested before claiming that buying ice cream causes sunburn?",
+              "options": [
+                {
+                  "key": "sunny-weather-common-cause",
+                  "text": "Hot, sunny weather may increase both ice-cream purchases and sun exposure."
+                },
+                {
+                  "key": "sales-prove-causation",
+                  "text": "The association itself proves that ice-cream purchases cause sunburn."
+                },
+                {
+                  "key": "reverse-cause-certain",
+                  "text": "Sunburn must cause people to buy ice cream."
+                },
+                {
+                  "key": "ignore-weekly-pattern",
+                  "text": "A repeated weekly pattern makes alternative explanations irrelevant."
+                }
+              ],
+              "answerKey": "sunny-weather-common-cause",
+              "explanation": {
+                "text": "Sunny weather is a plausible common cause: it can increase both the proposed cause and the outcome, creating an association without the claimed causal link.",
+                "sourceAnchor": {
+                  "heading": "5. Causal Reasoning",
+                  "quote": "Severity is a **confounder**: a factor related to both the proposed cause and the outcome that can create or distort an association."
+                }
+              }
+            },
+            {
+              "family": "impostor",
+              "key": "spot-evidence-impostor",
+              "prompt": "Two statements respect evidence limits. One overclaims. Find the impostor.",
+              "statements": [
+                {
+                  "key": "random-selection-reduces-bias",
+                  "text": "Random selection can reduce selection bias, though nonresponse can still distort a result.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "anecdote-shows-possibility",
+                  "text": "An anecdote can show that something can happen without establishing how common it is.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "size-cures-bias",
+                  "text": "Once a sample is very large, selection bias no longer matters.",
+                  "kind": "impostor"
+                }
+              ],
+              "explanation": {
+                "text": "Size does not repair selection into the wrong population. It can make the wrong estimate look impressively precise, so the third statement is the impostor.",
+                "sourceAnchor": {
+                  "heading": "3. Induction, Evidence, and Uncertainty",
+                  "quote": "A very large biased sample can give a precise estimate of the wrong population."
+                }
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "review-support-relationship",
+              "term": "support relationship",
+              "sectionKey": "representative-evidence",
+              "steps": [
+                {
+                  "stopKey": "argument-structure",
+                  "activityKey": "identify-conclusion"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "causal-claims",
+          "label": "Test the causal story",
+          "requires": ["evidence-quality"],
+          "difficultyBand": 3,
+          "lesson": {
+            "sections": [
+              {
+                "key": "association-vs-cause",
+                "title": "Association leaves several causal stories open",
+                "body": "When two variables move together, the observation alone does not tell you whether the first causes the second, the second causes the first, a third factor affects both, or the pattern is accidental. A causal judgment needs a comparison that separates those stories and a defined contrast: what change, compared with what alternative, for whom and over what period?",
+                "sourceAnchor": {
+                  "heading": "5. Causal Reasoning",
+                  "quote": "A **correlation** or association means that two variables are related in observed data. It does not by itself establish which variable causes the other, whether a third factor affects both, or whether the pattern is accidental."
+                },
+                "explorableTerms": []
+              },
+              {
+                "key": "confounding-and-comparison",
+                "title": "Look for a common cause before intervening",
+                "body": "A confounder is related to both the proposed cause and the outcome, so it can create or distort their association. In the fire example, severity brings both more emergency vehicles and more damage; sending fewer vehicles would not remove the common cause. Compare credible alternatives, check that the proposed cause comes first, and ask whether an intervention changes the outcome as predicted.",
+                "sourceAnchor": {
+                  "heading": "5. Causal Reasoning",
+                  "quote": "Severity is a **confounder**: a factor related to both the proposed cause and the outcome that can create or distort an association."
+                },
+                "explorableTerms": [
+                  {
+                    "term": "confounder",
+                    "supportPathKey": "review-evidence-quality"
+                  }
+                ]
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "diagnose-fire-correlation",
+              "prompt": "Neighborhood fires with more emergency vehicles also show more property damage. Which explanation best blocks the claim that sending more vehicles causes more damage?",
+              "options": [
+                {
+                  "key": "severity-common-cause",
+                  "text": "More severe fires cause both a larger emergency response and more damage."
+                },
+                {
+                  "key": "vehicles-always-protect",
+                  "text": "Emergency vehicles can never be involved in property damage."
+                },
+                {
+                  "key": "correlation-proves-reverse",
+                  "text": "The correlation proves that damage summons vehicles after the fire ends."
+                },
+                {
+                  "key": "all-associations-accidental",
+                  "text": "Every association in observational data is accidental."
+                }
+              ],
+              "answerKey": "severity-common-cause",
+              "explanation": {
+                "text": "Fire severity is a plausible common cause of both variables. The association therefore does not show that reducing the response would reduce damage.",
+                "sourceAnchor": {
+                  "heading": "5. Causal Reasoning",
+                  "quote": "Fire severity causes both the number of vehicles and the damage."
+                }
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "review-evidence-quality",
+              "term": "confounder",
+              "sectionKey": "confounding-and-comparison",
+              "steps": [
+                {
+                  "stopKey": "evidence-quality",
+                  "activityKey": "test-common-cause"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "guardianActivityKeys": [
+        "map-argument-parts",
+        "spot-evidence-impostor",
+        "test-common-cause",
+        "diagnose-fire-correlation"
+      ]
+    }
+  ],
+  "expeditionGuardianActivityKeys": [
+    "identify-conclusion",
+    "map-argument-parts",
+    "spot-evidence-impostor",
+    "test-common-cause",
+    "diagnose-fire-correlation"
+  ]
+}
