@@ -408,7 +408,9 @@ test("an unsupported corrective reveal rejects the impostor before key-verifier 
   const answerCalls: Parameters<AnswerKeyVerificationPort["verify"]>[0][] = [];
   const result = await admit([impostorCandidate()], {
     sourceSupportVerifier: sourceVerifier((claim) =>
-      claim.includes("corrective reveal") ? "unsupported" : "supported"
+      claim === "The source says an unsigned permit expires before noon."
+        ? "unsupported"
+        : "supported"
     ),
     answerKeyVerifier: answerVerifier(undefined, answerCalls)
   });

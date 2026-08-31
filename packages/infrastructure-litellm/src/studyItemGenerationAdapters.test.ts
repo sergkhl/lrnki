@@ -76,21 +76,18 @@ test("generateOptionSelect labels the correct answer 'generated' on a generated-
   assert.equal(draft.question, "Which statement accurately describes Ownership?");
 });
 
-test("generateImpostor assembles a draft: three cited truths + one generated impostor (sibling-sourced)", async () => {
+test("generateImpostor assembles a draft and conservatively owns neural lie provenance", async () => {
   const calls: { toolName: string; messages: { content: string }[]; maxRetries?: number; tags?: string[] }[] = [];
   const client = {
     async call(input: { toolName: string; messages: { content: string }[]; maxRetries?: number; tags?: string[] }) {
       calls.push(input);
       return {
-        question: "Which statement about the Heap is false?",
         truth1Text: "The heap allocates at runtime.", truth1PassageId: "b1", truth1Quote: "the heap allocates at runtime",
         truth2Text: "The heap stores dynamically sized data.", truth2PassageId: "b1", truth2Quote: "the heap allocates",
         truth3Text: "The heap holds long-lived allocations.", truth3PassageId: "b1", truth3Quote: "at runtime",
         lieText: "The heap is a LIFO region for call frames.",
-        reveal: "The LIFO statement is false; that is actually true of the Stack.",
-        lieSource: "sibling",
-        siblingLabel: "Stack",
-        explorableTerms: []
+        revealPassageId: "b1",
+        revealEvidenceQuote: "the heap allocates at runtime"
       };
     }
   } as unknown as LiteLlmForcedToolClient;
@@ -110,27 +107,36 @@ test("generateImpostor assembles a draft: three cited truths + one generated imp
     assert.ok(truth.citation, "truth carries a citation");
   }
   assert.equal(draft.lie.text, "The heap is a LIFO region for call frames.");
-  assert.equal(draft.lie.lieSource, "sibling");
-  assert.equal(draft.lie.siblingLabel, "Stack");
+  assert.deepEqual(draft.lie.revealCitation, {
+    passageId: "b1",
+    evidenceQuote: "the heap allocates at runtime"
+  });
+  assert.equal(draft.lie.lieSource, "generated");
+  assert.equal(draft.lie.siblingLabel, undefined);
   assert.equal(calls[0].toolName, "submit_impostor_item");
   assert.equal(calls[0].maxRetries, 4);
   assert.deepEqual(calls[0].tags, ["impostor-generation"]);
   assert.ok(calls[0].messages.some((m) => m.content.includes("Stack")));
+  const rendered = calls[0].messages.map((message) => message.content).join("\n");
+  assert.match(rendered, /application owns the fixed learner prompt/);
+  assert.match(rendered, /never infer or name an inverse, category, contrast, qualifier, or taxonomy/);
+  assert.match(rendered, /display the selected passage's complete text as the learner-visible correction/);
+  assert.match(rendered, /never choose a passage whose full text is distracting, incomplete, or unrelated/);
+  assert.match(rendered, /conservatively treats every planted lie as freshly generated/);
+  assert.match(rendered, /do not claim the lie is true of one/);
+  assert.doesNotMatch(rendered, /zero to five explorableTerms/);
 });
 
-test("generateImpostor with lieSource 'generated' returns siblingLabel undefined", async () => {
+test("generateImpostor without neighbors still returns generated provenance", async () => {
   const client = {
     async call() {
       return {
-        question: "Which is false?",
         truth1Text: "t1", truth1PassageId: "p0", truth1Quote: "tracks which binding frees a value",
         truth2Text: "t2", truth2PassageId: "p0", truth2Quote: "tracks which binding",
         truth3Text: "t3", truth3PassageId: "p0", truth3Quote: "frees a value",
         lieText: "a fresh misconception",
-        reveal: "The fourth is invented and false.",
-        lieSource: "generated",
-        siblingLabel: "",
-        explorableTerms: []
+        revealPassageId: "p0",
+        revealEvidenceQuote: "tracks which binding frees a value"
       };
     }
   } as unknown as LiteLlmForcedToolClient;
@@ -178,22 +184,45 @@ test("Answer-Key Verification renders an owner-neutral, key-free option-select r
   assert.deepEqual(verdicts.map((verdict) => verdict.verdict), ["claim_true", "claim_false"]);
 });
 
+test("standalone impostor verification never turns an accurate narrower description into the planted lie", async () => {
+  const calls: { messages: { content: string }[] }[] = [];
+  const client = {
+    async call(input: { messages: { content: string }[] }) {
+      calls.push(input);
+      return { verdicts: [
+        { ordinal: 0, verdict: "claim_true", reason: "an accurate component remains true" }
+      ] };
+    }
+  } as unknown as LiteLlmForcedToolClient;
+  await createAnswerKeyVerificationPort(client).verify({
+    itemType: "impostor",
+    declaredDomain: "software engineering",
+    subject: { canonicalLabel: "Code review", aliases: [] },
+    candidates: [{ ordinal: 0, text: "Code review is the practice of checking changes for defects." }],
+    groundingPassages: [{ passageId: "definition:0", kind: "definition", text: "Code review examines proposed changes before integration." }],
+    relatedConcepts: [{ label: "Testing", snippet: "Executes software to reveal defects." }]
+  });
+
+  const rendered = calls[0].messages.map((message) => message.content).join("\n");
+  assert.match(rendered, /accurate component, special case, narrower description, or related practice.*remains claim_true/);
+  assert.match(rendered, /could reasonably be read either as a true partial description or as a false exhaustive identity, return unclear/);
+  assert.doesNotMatch(rendered, /The item asks:/);
+});
+
 test("impostorValidator rejects a missing third truth (fail-closed, rule 6)", () => {
   assert.throws(() => impostorValidator.parse({
-    question: "Q?",
     truth1Text: "a", truth1PassageId: "p", truth1Quote: "q",
     truth2Text: "b", truth2PassageId: "p", truth2Quote: "q",
-    lieText: "c", reveal: "r", lieSource: "generated", siblingLabel: ""
+    lieText: "c", revealPassageId: "p", revealEvidenceQuote: "q"
   }));
 });
 
-test("impostorValidator rejects arguments missing reveal", () => {
+test("impostorValidator rejects arguments missing the corrective witness", () => {
   assert.throws(() => impostorValidator.parse({
-    question: "Q?",
     truth1Text: "a", truth1PassageId: "p", truth1Quote: "q",
     truth2Text: "b", truth2PassageId: "p", truth2Quote: "q",
     truth3Text: "c", truth3PassageId: "p", truth3Quote: "q",
-    lieText: "d", lieSource: "generated", siblingLabel: ""
+    lieText: "d", revealPassageId: "p"
   }));
 });
 

@@ -6,17 +6,17 @@ import {
   type ImpostorTruthStatement
 } from "@lrnki/domain-core";
 import { normalizeOptionText, resolveGroundingCitation, type CitationRung, type StudyItemGuardGrounding } from "./optionSelectGuard";
-import { validateItemExplorableTerms } from "./explorableTerms";
 
 // Deterministic impostor guard (U4, R1/R5/R6/R8, ADR-0026). Promotes an impostor draft to a
 // persistable item ONLY when it satisfies provable structural and provenance guarantees, and
 // rejects with a distinct reason otherwise. This is the rule-16-permitted veto: it enforces
 // checkable properties — exactly one keyed lie, three truths that each trace verbatim to the
-// node's grounding, and a `generated` impostor that carries NO source citation — never a
-// lexical opinion about whether the lie READS as plausible or the reveal TEACHES. That
-// semantic quality is judged only by the rule-14 human pass (U8). The guard mutates nothing
-// and imports no graph/enrichment write port (R13). Failing it is NOT a run failure: the node
-// is simply recorded impostor-absent (R9, U5).
+// node's grounding, a code-owned question, a correction copied from resolved grounding, and a
+// `generated` impostor that carries NO source citation — never a lexical opinion about whether
+// the lie READS as plausible or the correction TEACHES. That semantic quality stays with source
+// support, answer-key verification, and direct real-use inspection. The guard mutates nothing and
+// imports no graph/enrichment write port (R13). Failing it is NOT a run failure: the node is simply
+// recorded impostor-absent (R9, U5).
 
 // The build-time context the guard needs to assemble a persistable ImpostorItem: the item
 // identity + grounding provenance, plus the passages each true statement must trace to. Shared
@@ -45,10 +45,28 @@ export function validateImpostorItem(
     return { ok: false, reason: `impostor requires exactly 3 true statements, got ${truths.length}` };
   }
 
-  // (2) a non-empty reveal (R6 — a wrong guess must never leave a misconception unresolved).
-  if (!draft.lie.reveal.trim()) {
-    return { ok: false, reason: "impostor carries no reveal" };
+  // (2) a generation-selected target grounding PASSAGE becomes the learner-visible correction
+  // itself (R6). The lie remains honestly uncited. The model's quote verifies its passage choice,
+  // but cannot shorten the learner correction to an unhelpful fragment: the complete passage text
+  // has one application-owned projection for source and generated groundings alike. Source
+  // admission still judges whether that complete correction materially supports the item; the
+  // model cannot append a second paraphrase or choose the learner-visible span.
+  const selectedRevealPassage = grounding.passages.find(
+    (passage) => passage.passageId === draft.lie.revealCitation.passageId
+  );
+  const resolvedReveal = resolveGroundingCitation(
+    grounding.passages,
+    draft.lie.revealCitation,
+    grounding.derivedNodeId,
+    { generatedPassageFallback: true }
+  );
+  if (!resolvedReveal) {
+    return { ok: false, reason: "impostor reveal citation does not verify against grounding" };
   }
+  if (!selectedRevealPassage) {
+    return { ok: false, reason: "impostor reveal citation does not identify target grounding" };
+  }
+  const revealWitness = selectedRevealPassage.text;
 
   // (3) lieSource present, with siblingLabel non-empty IFF the lie is sibling-sourced.
   const siblingLabel = draft.lie.siblingLabel?.trim();
@@ -72,7 +90,7 @@ export function validateImpostorItem(
   // draft's claim — fail-closed labeling. The lie object carries no citation, labeled
   // `generated` (a source-cited impostor is the honesty inversion this guard blocks).
   const builtTruths: ImpostorTruthStatement[] = [];
-  let citationRung: CitationRung = "verbatim";
+  let citationRung: CitationRung = resolvedReveal.rung;
   for (const statement of truths) {
     if (!statement.citation) {
       return { ok: false, reason: "impostor true statement carries no grounding citation" };
@@ -94,7 +112,7 @@ export function validateImpostorItem(
     text: draft.lie.text,
     isImpostor: true,
     provenance: "generated",
-    reveal: draft.lie.reveal,
+    reveal: revealWitness,
     lieSource: draft.lie.lieSource,
     ...(draft.lie.lieSource === "sibling" ? { siblingLabel: siblingLabel! } : {})
   };
@@ -121,8 +139,10 @@ export function validateImpostorItem(
       generatingModel: grounding.generatingModel,
       configHash: grounding.configHash,
       ...(grounding.facet ? { facet: grounding.facet } : {}),
-      explorableTerms: validateItemExplorableTerms(draft.explorableTerms ?? [], draft.question, grounding.canonicalLabel),
-      question: draft.question,
+      // The stem has no generated clause and introduces no explorable term beyond the owning
+      // Concept label, which is intentionally excluded from term affordances.
+      explorableTerms: [],
+      question: `Which statement about ${grounding.canonicalLabel} is false?`,
       statements: built
     }
   };

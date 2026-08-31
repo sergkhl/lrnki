@@ -71,7 +71,6 @@ function impostorItem(id: string): StudyItemView {
         { statementId: "s-lie", text: "The impostor statement", provenance: "generated" }
       ],
       reveal: "The fake claimed the opposite.",
-      lieSource: "generated",
       explorableTerms: []
     }
   };

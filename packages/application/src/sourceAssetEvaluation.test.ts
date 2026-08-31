@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type {
   ConceptLesson,
+  MatchingItem,
   OptionSelectItem,
   StudyItemCandidateVerdict
 } from "@lrnki/domain-core";
@@ -14,6 +15,7 @@ import type {
 } from "@lrnki/ports";
 import type { QualifiedSourceExpedition } from "./sourceExpedition";
 import {
+  DEFAULT_SOURCE_MATERIAL_CLAIM_SUPPORT_CONCURRENCY,
   evaluateProjectedSourceSupport,
   evaluateQualifiedSourceExpedition,
   SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS,
@@ -190,6 +192,115 @@ test("resolved source blocks reclassify fidelity and veto a non-verbatim direct 
     result.decisions.map((decision) => [decision.disposition, decision.reasonCode]),
     [["rejected", "source_citation_not_verbatim"]]
   );
+});
+
+test("source support bounds independent claim concurrency without changing draw or decision order", async () => {
+  const baseLesson = qualifiedFixture().assets.lessons[0]!;
+  const lessons = Array.from(
+    { length: DEFAULT_SOURCE_MATERIAL_CLAIM_SUPPORT_CONCURRENCY + 2 },
+    (_unused, index): ConceptLesson => ({
+      ...structuredClone(baseLesson),
+      conceptLessonId: `lesson-${index}`,
+      derivedNodeId: `node-${index}`,
+      canonicalLabel: `Conditional permit ${index}`
+    })
+  );
+  const projection = projectSourceMaterialClaims({ lessons, studyItems: [] });
+  const sourceClaims = projection.claims.filter((claim) => claim.purpose === "source_support");
+  assert.equal(sourceClaims.length, lessons.length);
+
+  let active = 0;
+  let maximumActive = 0;
+  let entered = 0;
+  let releaseFirstWave!: () => void;
+  const firstWave = new Promise<void>((resolve) => {
+    releaseFirstWave = resolve;
+  });
+  const activeClaimKeys = new Set<string>();
+  const result = await evaluateProjectedSourceSupport({
+    projection,
+    nodes: lessons.map((lesson) => ({
+      derivedNodeId: lesson.derivedNodeId,
+      label: lesson.canonicalLabel,
+      aliases: [],
+      declaredDomain: "policy interpretation"
+    })),
+    sourceEvidenceRead,
+    sourceSupportVerifier: {
+      model: "bounded-source-support-test",
+      async verify(request) {
+        assert.equal(activeClaimKeys.has(request.claim.claimKey), false, "draws for one claim stay sequential");
+        activeClaimKeys.add(request.claim.claimKey);
+        active += 1;
+        maximumActive = Math.max(maximumActive, active);
+        entered += 1;
+        if (entered === DEFAULT_SOURCE_MATERIAL_CLAIM_SUPPORT_CONCURRENCY) releaseFirstWave();
+        await firstWave;
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        active -= 1;
+        activeClaimKeys.delete(request.claim.claimKey);
+        return { disposition: "supported", reason: "The source block supports the exact claim." };
+      }
+    }
+  });
+
+  assert.equal(maximumActive, DEFAULT_SOURCE_MATERIAL_CLAIM_SUPPORT_CONCURRENCY);
+  assert.equal(result.calls, sourceClaims.length * SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS);
+  assert.deepEqual(
+    result.decisions.map((decision) => decision.claimKey),
+    sourceClaims.map((claim) => claim.claimKey)
+  );
+  assert.ok(result.decisions.every((decision) =>
+    decision.samples.map((sample) => sample.draw).join(",") === "1,2,3"
+  ));
+});
+
+test("source support identifies a matching relationship as an assessment transformation", async () => {
+  const matching: MatchingItem = {
+    studyItemId: "matching-1",
+    graphVersionId: "graph-1",
+    enrichmentId: "enrichment-1",
+    derivedNodeId: "node-1",
+    groundingProvenance: "source_cep",
+    generatingModel: "generator-test",
+    configHash: "qualified:test",
+    explorableTerms: [],
+    itemType: "matching",
+    question: "Match each permit condition to its consequence.",
+    pairs: ["signed", "deadline", "renewal"].map((promptText, index) => ({
+      pairId: `pair-${index}`,
+      matchId: `match-${index}`,
+      promptText,
+      matchText: `consequence-${index}`,
+      citation
+    }))
+  };
+  const evaluationKinds: string[] = [];
+  const result = await evaluateProjectedSourceSupport({
+    projection: projectSourceMaterialClaims({
+      lessons: [qualifiedFixture().assets.lessons[0]!],
+      studyItems: [matching]
+    }),
+    nodes: [{
+      derivedNodeId: "node-1",
+      label: "Conditional permit",
+      aliases: [],
+      declaredDomain: "policy interpretation"
+    }],
+    sourceEvidenceRead,
+    sourceSupportVerifier: {
+      model: "matching-scope-test",
+      async verify(request) {
+        if (request.claim.claimKey.includes(":relationship:")) {
+          evaluationKinds.push(request.claim.evaluationKind);
+        }
+        return { disposition: "supported", reason: "The supplied block entails the relationship." };
+      }
+    }
+  });
+
+  assert.equal(result.decisions.filter((decision) => decision.claimKey.includes(":relationship:")).length, 3);
+  assert.deepEqual([...new Set(evaluationKinds)], ["matching_relationship"]);
 });
 
 test("no-activation report joins payload, evidence, identity, and deterministic exact-reference truth with zero calls", async () => {

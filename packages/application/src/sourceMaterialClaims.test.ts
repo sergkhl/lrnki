@@ -136,7 +136,8 @@ const impostor: ImpostorItem = {
       isImpostor: true,
       provenance: "generated",
       reveal: "It expires at the stated deadline unless renewed.",
-      lieSource: "generated"
+      lieSource: "sibling",
+      siblingLabel: "Permanent authorization"
     }
   ]
 };
@@ -144,7 +145,7 @@ const impostor: ImpostorItem = {
 test("projects every material source-asset field without losing qualifiers or citation identity", () => {
   const result = projectSourceMaterialClaims({ lessons: [lesson], studyItems: [item] });
 
-  assert.equal(result.projection, "source_material_claims_v3");
+  assert.equal(result.projection, "source_material_claims_v6");
   assert.equal(result.evidence.length, 1, "the shared section/key citation is one evidence row");
   assert.equal(result.evidence[0]?.passageKind, "definition");
   assert.equal(
@@ -162,15 +163,29 @@ test("projects every material source-asset field without losing qualifiers or ci
     sectionKind: "definition",
     sectionText: "Authorization is valid only until 17:00 UTC, unless the issuer renews it."
   });
-  assert.match(section?.statement ?? "", /only until 17:00 UTC, unless the issuer renews it/);
+  assert.equal(
+    section?.statement,
+    "Authorization is valid only until 17:00 UTC, unless the issuer renews it.",
+    "a lesson section is already an exact material claim; metadata stays in typed fields"
+  );
   assert.deepEqual(section?.location, { kind: "lesson_section_text", sectionIndex: 0 });
   assert.deepEqual(section?.directEvidenceKeys, [result.evidence[0]?.evidenceKey]);
 
   const bullet = result.claims.find((claim) => claim.claimKey.endsWith("item:0"));
   assert.equal(bullet?.subject.kind, "lesson_section_item");
+  assert.equal(
+    bullet?.statement,
+    "At 17:01 UTC, the unrenewed authorization is no longer valid.",
+    "a lesson list item is judged as exactly the learner-visible field; its section stays typed metadata"
+  );
   assert.deepEqual(bullet?.evidenceKeys, [result.evidence[0]?.evidenceKey]);
   assert.deepEqual(bullet?.directEvidenceKeys, [], "generated section items do not masquerade as direct quotes");
   assert.deepEqual(bullet?.location, { kind: "lesson_section_item", sectionIndex: 0, itemIndex: 0 });
+
+  const caption = result.claims.find((claim) => claim.claimKey.endsWith("diagram:caption"));
+  const spec = result.claims.find((claim) => claim.claimKey.endsWith("diagram:spec"));
+  assert.equal(caption?.statement, "Validity changes at the stated deadline.");
+  assert.equal(spec?.statement, "Show valid before 17:00 UTC and invalid afterward unless renewed.");
 
   const questionKey = result.claims.find((claim) => claim.subject.kind === "option_select_question_key");
   assert.deepEqual(questionKey?.subject, {
@@ -227,6 +242,12 @@ test("matching relationships and impostor truths, lie, and reveal have typed los
   assert.equal(matchingClaims[0]?.purpose, "interaction_instruction");
   assert.ok(matchingClaims.slice(1).every((claim) => claim.purpose === "source_support"));
   assert.ok(matchingClaims.slice(1).every((claim) => claim.directEvidenceKeys.length === 1));
+  assert.equal(matchingClaims[1]?.statement, 'Matching prompt "deadline" maps to "consequence 0".');
+  assert.doesNotMatch(
+    matchingClaims[1]?.statement ?? "",
+    /Match each authorization aspect/,
+    "interaction scaffolding stays out of the source-support assertion"
+  );
 
   const impostorClaims = result.claims.filter((claim) => claim.assetKind === "impostor");
   assert.equal(impostorClaims.length, 5);
@@ -240,5 +261,15 @@ test("matching relationships and impostor truths, lie, and reveal have typed los
     { kind: "impostor_reveal", statementIndex: 3 }
   ]);
   const reveal = impostorClaims.find((claim) => claim.subject.kind === "impostor_reveal");
-  assert.match(reveal?.statement ?? "", /expires at the stated deadline unless renewed/);
+  assert.deepEqual(reveal?.subject, {
+    kind: "impostor_reveal",
+    proposedStatement: "The authorization never expires.",
+    reveal: "It expires at the stated deadline unless renewed.",
+    siblingLabel: "Permanent authorization"
+  });
+  assert.equal(
+    reveal?.statement,
+    "It expires at the stated deadline unless renewed.",
+    "false-statement and sibling metadata stay out of the exact learner-visible reveal claim"
+  );
 });

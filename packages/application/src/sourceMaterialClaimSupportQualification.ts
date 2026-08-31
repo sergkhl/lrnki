@@ -118,7 +118,11 @@ export async function qualifySourceMaterialClaimSupport(input: {
         const verdict = await input.verifier.verify({
           declaredDomain: source.declaredDomain,
           subject: source.subject,
-          claim: { claimKey: testCase.id, statement: testCase.claim },
+          claim: {
+            claimKey: testCase.id,
+            statement: testCase.claim,
+            evaluationKind: "assertion"
+          },
           evidence: evidence.map((row, index) => ({
             evidenceKey: `${testCase.id}:evidence:${index}`,
             passageKind: "mention",

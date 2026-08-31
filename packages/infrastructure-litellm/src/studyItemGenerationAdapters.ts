@@ -144,7 +144,6 @@ export const studyImpostorGenerationDescriptor: NeuralStageDescriptor<
   templateData: studyItemTemplateData,
   mapResult: (args) => ({
     itemType: "impostor",
-    question: args.question,
     // Rebind the flat wire fields (see the impostor schema note in toolSchemas.ts)
     // into the domain truths array; the persisted contract is unchanged.
     truths: [
@@ -154,11 +153,15 @@ export const studyImpostorGenerationDescriptor: NeuralStageDescriptor<
     ] as ImpostorItemDraft["truths"],
     lie: {
       text: args.lieText,
-      reveal: args.reveal,
-      lieSource: args.lieSource,
-      ...(args.siblingLabel ? { siblingLabel: args.siblingLabel } : {})
-    },
-    explorableTerms: args.explorableTerms
+      revealCitation: {
+        passageId: args.revealPassageId,
+        evidenceQuote: args.revealEvidenceQuote
+      },
+      // The neural contract carries no mechanically verified witness that the lie is true of
+      // a sibling. Fail closed on learner-visible provenance instead of trusting a generated
+      // label that could produce a false "Actually true of …" correction in the client.
+      lieSource: "generated"
+    }
   })
 };
 

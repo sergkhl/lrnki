@@ -194,7 +194,7 @@ function trailSession(opts: { withoutLesson?: boolean; includeLocked?: boolean; 
     studySegmentsByNode: {
       n1: [
         { kind: "option_select", item: { studyItemId: "i1", derivedNodeId: "n1", question: "Q?", explanation: "Grounded explanation.", groundingProvenance: "generated", options: [], explorableTerms: [] } },
-        { kind: "impostor", item: { studyItemId: "i2", derivedNodeId: "n1", question: "Which is false?", groundingProvenance: "generated", statements: [], reveal: "Reveal", lieSource: "generated", explorableTerms: [] } }
+        { kind: "impostor", item: { studyItemId: "i2", derivedNodeId: "n1", question: "Which is false?", groundingProvenance: "generated", statements: [], reveal: "Reveal", explorableTerms: [] } }
       ]
     },
     lessonByNode: opts.withoutLesson ? {} : { n1: { derivedNodeId: "n1", canonicalLabel: "Ownership", sections: [], explorableTerms: [] } },

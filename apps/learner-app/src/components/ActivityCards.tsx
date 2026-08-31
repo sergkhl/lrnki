@@ -163,11 +163,6 @@ export function ImpostorBody({
             {result.correct ? "Correct. You spotted the fake." : "Not quite. That statement is true."}
           </Text>
           <Text variant="label" color="muted" className="mt-1 font-normal">{item.reveal}</Text>
-          {item.lieSource === "sibling" && item.siblingLabel ? (
-            <Text variant="caption" color="muted" className="mt-1">
-              Actually true of <Text variant="caption" className="font-medium">{item.siblingLabel}</Text>.
-            </Text>
-          ) : null}
         </View>
       ) : null}
     </Card>

@@ -619,17 +619,18 @@ export const matchingSchema: JsonSchema = toForcedToolSchema(matchingValidator);
 // --- Impostor generation: submit_impostor_item (U3, R3/R5/R6/R7) ----------
 // One four-statement auto-graded item per node: three TRUE statements (each cited by
 // passage id + quote, verified verbatim at the guard) and exactly ONE planted lie.
-// The lie is preferentially a true fact about one provided neighbor concept,
-// rewritten as if it were about THIS node; when no clean neighbor lie exists, a freshly
-// minted plausible misconception. The wire schema is FULLY FLAT — numbered scalar truth
+// Neighbor descriptions may shape a plausible contrast, but the wire contract carries no
+// mechanically verified sibling-truth witness. The application therefore labels every neural
+// lie conservatively as a freshly generated misconception and never projects a sibling claim.
+// The wire schema is FULLY FLAT — numbered scalar truth
 // fields, no nested array, no nullable field. Measured 2026-07-10 against the production
 // extractor (MiMo v2.5): a nested `truths` array was intermittently emitted as a
-// stringified JSON blob, and a trailing nullable `siblingLabel` truncated generation right
-// before the literal `null` (0/8 usable); the flat non-nullable shape passed 10/10.
+// stringified JSON blob, and a trailing nullable field truncated generation right before its
+// literal `null` (0/8 usable); the flat non-nullable shape passed 10/10.
 // (Earlier real-use regeneration had already flattened the truth/lie OBJECTS for the same
 // invalid-JSON class on the prior generator.) The adapter immediately rebinds these scalar
 // fields into the domain truths array and `lie` object, so the persisted contract is
-// unchanged. `siblingLabel` uses the empty string when lieSource is 'generated'.
+// unchanged.
 // Domain-neutral rubric language only (AGENTS rule 17): the schema names no fixture and lists
 // no exemplars. The deterministic guard (U4) enforces structure; this schema only enforces
 // SHAPE fail-closed (rule 6) — lie validity is judged by the neural cross-family judge.
@@ -641,7 +642,6 @@ const impostorTruthFields = (ordinal: "first" | "second" | "third") => ({
 });
 
 export const impostorValidator = z.object({
-  question: z.string().min(1).describe("One self-contained prompt asking the learner to pick the false statement among the four. Do not reference 'the passage' or 'the source'."),
   truth1Text: impostorTruthFields("first").text,
   truth1PassageId: impostorTruthFields("first").citationPassageId,
   truth1Quote: impostorTruthFields("first").citationEvidenceQuote,
@@ -652,10 +652,8 @@ export const impostorValidator = z.object({
   truth3PassageId: impostorTruthFields("third").citationPassageId,
   truth3Quote: impostorTruthFields("third").citationEvidenceQuote,
   lieText: z.string().min(1).describe("The single planted lie: a statement that reads plausibly true of the learning node but is false for that node."),
-  reveal: z.string().min(1).describe("Post-answer explanation naming why the lie is false. When the lie is a fact mis-attributed from a neighboring topic, state that it is actually true of that named topic."),
-  lieSource: z.enum(["sibling", "generated"]).describe("'sibling' when the lie is a true fact about one provided neighboring topic rewritten as if about this node. 'generated' when no clean neighboring-topic lie existed and the lie is a freshly minted plausible misconception."),
-  siblingLabel: z.string().describe("When lieSource is 'sibling', the exact label of the neighboring topic the lie was drawn from; when lieSource is 'generated', the empty string."),
-  explorableTerms: itemExplorableTerms
+  revealPassageId: z.string().min(1).describe("The exact passageId of the target node grounding passage whose complete text directly corrects the planted lie and will become the learner-visible correction."),
+  revealEvidenceQuote: z.string().min(1).describe("Any exact substring copied from the selected reveal grounding passage to verify the passage choice. The application persists that passage's complete text, not this fragment, as the learner-visible correction; for source-grounded passages copy the substring verbatim.")
 }).strict();
 
 export const impostorSchema: JsonSchema = toForcedToolSchema(impostorValidator);
@@ -670,7 +668,7 @@ export const impostorSchema: JsonSchema = toForcedToolSchema(impostorValidator);
 export const answerKeyVerificationValidator = z.object({
   verdicts: z.array(z.object({
     ordinal: z.number().int().describe("The candidate's number, exactly as listed in the prompt."),
-    verdict: z.enum(["claim_true", "claim_false", "unclear"]).describe("'claim_true' when the candidate is a correct claim about the learning node. 'claim_false' when it is incorrect for that node. 'unclear' when it cannot be decided from the provided context and general knowledge of the declared domain."),
+    verdict: z.enum(["claim_true", "claim_false", "unclear"]).describe("'claim_true' when the candidate is a correct claim about the learning node, including an accurate narrower description. 'claim_false' only when the candidate's asserted content is materially incorrect for that node. 'unclear' when it cannot be decided or when ambiguous wording could be either a true partial description or a false exhaustive identity."),
     reason: z.string().min(1).describe("One terse justification for this candidate, grounded in the node context, the other candidates, the grounding passages, and the sibling labels.")
   }).strict())
 }).strict();

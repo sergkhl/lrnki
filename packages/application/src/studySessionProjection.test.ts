@@ -93,7 +93,7 @@ function impostorItem(derivedNodeId: string): StudyItem {
         text: "The planted lie",
         isImpostor: true,
         provenance: "generated",
-        reveal: "The fourth statement is false; it is actually true of Borrowing.",
+        reveal: "The grounded correction explains why the fourth statement is false.",
         lieSource: "sibling",
         siblingLabel: "Borrowing"
       }
@@ -454,16 +454,16 @@ test("the study-item mapper dispatches on item type (KTD4 extensibility seam)", 
   assert.equal(studyItemViewToSheet(view).kind, "option_select");
 });
 
-test("studyItemToView maps an impostor item to a view exposing statements, reveal, lieSource, siblingLabel", () => {
+test("studyItemToView maps an impostor item without exposing unwitnessed sibling provenance", () => {
   const view = studyItemToView(impostorItem("scope"));
   assert.equal(view.kind, "impostor");
   if (view.kind !== "impostor") return;
   assert.equal(view.item.statements.length, 4);
   // statements sorted by id (not always-last impostor): the impostor sorts to its id position.
   assert.deepEqual(view.item.statements.map((s) => s.statementId), ["s-scope-1", "s-scope-2", "s-scope-3", "s-scope-4"]);
-  assert.equal(view.item.reveal, "The fourth statement is false; it is actually true of Borrowing.");
-  assert.equal(view.item.lieSource, "sibling");
-  assert.equal(view.item.siblingLabel, "Borrowing");
+  assert.equal(view.item.reveal, "The grounded correction explains why the fourth statement is false.");
+  assert.equal("lieSource" in view.item, false);
+  assert.equal("siblingLabel" in view.item, false);
   assert.equal(studyItemViewToSheet(view).kind, "impostor");
 });
 

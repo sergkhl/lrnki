@@ -114,7 +114,6 @@ export function sessionFixture(overrides: Partial<StudySession> = {}): StudySess
               { statementId: "s2", text: "Borrowing moves ownership", provenance: "generated" as const }
             ],
             reveal: "Borrowing never moves ownership.",
-            lieSource: "generated",
             explorableTerms: []
           }
         }

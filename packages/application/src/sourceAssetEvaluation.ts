@@ -39,9 +39,18 @@ import {
   sourceOptionExactReferenceContractReasons,
   sourceOptionUsesExactReferenceContract
 } from "./sourceOptionExactReference";
+import { mapWithConcurrency } from "./mapWithConcurrency";
 
 export const SOURCE_ASSET_EVALUATION_REPORT_SCHEMA_VERSION = 6 as const;
 export const SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS = 3 as const;
+// Claims are independent evaluation units, while the unanimous draws within one claim remain
+// ordered and short-circuit on the first refusal. The bounded mapper preserves projection order,
+// so throughput does not make persisted decisions response-order dependent.
+// Source claims are independent jobs; the three acceptance draws inside one claim remain
+// sequential and short-circuit on refusal. Eight-wide matches the established lesson-generation
+// ceiling while preserving report order and the exact call/decision contract. This is execution
+// capacity only and deliberately stays outside Study Item Bank identity.
+export const DEFAULT_SOURCE_MATERIAL_CLAIM_SUPPORT_CONCURRENCY = 8 as const;
 export const SOURCE_LESSON_EXTRACTIVE_ADMISSION_POLICY =
   "source_lesson_extractive_fields_with_post_settlement_definition_fallback_v3" as const;
 
@@ -191,43 +200,49 @@ export async function evaluateProjectedSourceSupport(input: {
   });
   const evidenceByKey = new Map(evidence.map((row) => [row.evidenceKey, row] as const));
   const nodeById = new Map(input.nodes.map((node) => [node.derivedNodeId, node] as const));
-  let calls = 0;
-  const decisions: SourceSupportDecision[] = [];
-
-  for (const claim of input.projection.claims.filter((candidate) => candidate.purpose === "source_support")) {
+  const claimResults = await mapWithConcurrency(
+    input.projection.claims.filter((candidate) => candidate.purpose === "source_support"),
+    DEFAULT_SOURCE_MATERIAL_CLAIM_SUPPORT_CONCURRENCY,
+    async (claim): Promise<{ calls: number; decision: SourceSupportDecision }> => {
     const evidenceRows = claim.evidenceKeys.flatMap((evidenceKey) => {
       const row = evidenceByKey.get(evidenceKey);
       return row ? [row] : [];
     });
     if (claim.evidenceKeys.length === 0) {
-      decisions.push(sourceSupportDecision(
-        claim,
-        "rejected",
-        "missing_source_evidence",
-        "The projected material claim has no admitted source evidence reference.",
-        input.sourceSupportVerifier?.model ?? null
-      ));
-      continue;
+      return {
+        calls: 0,
+        decision: sourceSupportDecision(
+          claim,
+          "rejected",
+          "missing_source_evidence",
+          "The projected material claim has no admitted source evidence reference.",
+          input.sourceSupportVerifier?.model ?? null
+        )
+      };
     }
     if (readError !== null) {
-      decisions.push(sourceSupportDecision(
-        claim,
-        "not_evaluated",
-        "source_evidence_read_unavailable",
-        readError,
-        input.sourceSupportVerifier?.model ?? null
-      ));
-      continue;
+      return {
+        calls: 0,
+        decision: sourceSupportDecision(
+          claim,
+          "not_evaluated",
+          "source_evidence_read_unavailable",
+          readError,
+          input.sourceSupportVerifier?.model ?? null
+        )
+      };
     }
     if (evidenceRows.length !== claim.evidenceKeys.length || evidenceRows.some((row) => !row.resolved)) {
-      decisions.push(sourceSupportDecision(
-        claim,
-        "rejected",
-        "unresolved_source_evidence",
-        "At least one admitted source evidence reference did not resolve to its exact resource/block pair.",
-        input.sourceSupportVerifier?.model ?? null
-      ));
-      continue;
+      return {
+        calls: 0,
+        decision: sourceSupportDecision(
+          claim,
+          "rejected",
+          "unresolved_source_evidence",
+          "At least one admitted source evidence reference did not resolve to its exact resource/block pair.",
+          input.sourceSupportVerifier?.model ?? null
+        )
+      };
     }
     const directEvidenceRows = claim.directEvidenceKeys.flatMap((evidenceKey) => {
       const row = evidenceByKey.get(evidenceKey);
@@ -237,14 +252,16 @@ export async function evaluateProjectedSourceSupport(input: {
       directEvidenceRows.length !== claim.directEvidenceKeys.length ||
       directEvidenceRows.some((row) => row.matchKind === "none")
     ) {
-      decisions.push(sourceSupportDecision(
-        claim,
-        "rejected",
-        "source_citation_not_verbatim",
-        "A learner-visible source citation did not match its immutable source block byte-exactly or after the approved formatting normalization.",
-        input.sourceSupportVerifier?.model ?? null
-      ));
-      continue;
+      return {
+        calls: 0,
+        decision: sourceSupportDecision(
+          claim,
+          "rejected",
+          "source_citation_not_verbatim",
+          "A learner-visible source citation did not match its immutable source block byte-exactly or after the approved formatting normalization.",
+          input.sourceSupportVerifier?.model ?? null
+        )
+      };
     }
     if (claim.assetKind === "concept_lesson") {
       const materialField = sourceLessonMaterialField(claim);
@@ -252,25 +269,29 @@ export async function evaluateProjectedSourceSupport(input: {
         row.blockText !== null && evidenceQuoteMatches(row.blockText, materialField)
       );
       if (!appearsInAdmittedSource) {
-        decisions.push(sourceSupportDecision(
-          claim,
-          "rejected",
-          "source_lesson_field_not_extractive",
-          "The exact learner-visible lesson field is not a formatting-normalized substring of any admitted source block.",
-          input.sourceSupportVerifier?.model ?? null
-        ));
-        continue;
+        return {
+          calls: 0,
+          decision: sourceSupportDecision(
+            claim,
+            "rejected",
+            "source_lesson_field_not_extractive",
+            "The exact learner-visible lesson field is not a formatting-normalized substring of any admitted source block.",
+            input.sourceSupportVerifier?.model ?? null
+          )
+        };
       }
     }
     if (!input.sourceSupportVerifier) {
-      decisions.push(sourceSupportDecision(
-        claim,
-        "not_evaluated",
-        "source_support_verifier_not_activated",
-        "No source-support verifier was activated for this operation.",
-        null
-      ));
-      continue;
+      return {
+        calls: 0,
+        decision: sourceSupportDecision(
+          claim,
+          "not_evaluated",
+          "source_support_verifier_not_activated",
+          "No source-support verifier was activated for this operation.",
+          null
+        )
+      };
     }
     const node = nodeById.get(claim.derivedNodeId);
     if (!node) {
@@ -279,7 +300,13 @@ export async function evaluateProjectedSourceSupport(input: {
     const request = {
       declaredDomain: node.declaredDomain,
       subject: { canonicalLabel: node.label, aliases: [...node.aliases] },
-      claim: { claimKey: claim.claimKey, statement: claim.statement },
+      claim: {
+        claimKey: claim.claimKey,
+        statement: claim.statement,
+        evaluationKind: claim.subject.kind === "matching_relationship"
+          ? "matching_relationship" as const
+          : "assertion" as const
+      },
       evidence: evidenceRows.map((row) => ({
         evidenceKey: row.evidenceKey,
         passageKind: row.passageKind,
@@ -288,10 +315,11 @@ export async function evaluateProjectedSourceSupport(input: {
         direct: claim.directEvidenceKeys.includes(row.evidenceKey)
       }))
     };
+    let claimCalls = 0;
     const samples: SourceSupportSample[] = [];
     for (let draw = 1; draw <= SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS; draw += 1) {
       try {
-        calls += 1;
+        claimCalls += 1;
         const verdict = await input.sourceSupportVerifier.verify(request);
         samples.push({ draw, disposition: verdict.disposition, reason: nonEmptyReason(verdict.reason) });
         // Learner admission requires unanimous support. Once one draw refuses, later draws cannot
@@ -303,25 +331,30 @@ export async function evaluateProjectedSourceSupport(input: {
       }
     }
     const refusal = samples.find((sample) => sample.disposition !== "supported");
-    decisions.push(sourceSupportDecision(
-      claim,
-      refusal?.disposition === "unsupported"
-        ? "rejected"
-        : refusal
-          ? "not_evaluated"
-          : "accepted",
-      refusal?.disposition === "unsupported"
-        ? "source_support_rejected"
-        : refusal?.disposition === "unclear"
-          ? "source_support_unclear"
-          : refusal?.disposition === "unavailable"
-            ? "source_support_verifier_unavailable"
-            : "source_support_verified",
-      refusal?.reason ?? `${samples.length}/${SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS} support draws unanimously entailed every material part.`,
-      input.sourceSupportVerifier.model,
-      samples
-    ));
-  }
+    return {
+      calls: claimCalls,
+      decision: sourceSupportDecision(
+        claim,
+        refusal?.disposition === "unsupported"
+          ? "rejected"
+          : refusal
+            ? "not_evaluated"
+            : "accepted",
+        refusal?.disposition === "unsupported"
+          ? "source_support_rejected"
+          : refusal?.disposition === "unclear"
+            ? "source_support_unclear"
+            : refusal?.disposition === "unavailable"
+              ? "source_support_verifier_unavailable"
+              : "source_support_verified",
+        refusal?.reason ?? `${samples.length}/${SOURCE_MATERIAL_CLAIM_SUPPORT_ACCEPTANCE_DRAWS} support draws unanimously entailed every material part.`,
+        input.sourceSupportVerifier.model,
+        samples
+      )
+    };
+  });
+  const calls = claimResults.reduce((total, result) => total + result.calls, 0);
+  const decisions = claimResults.map((result) => result.decision);
 
   return { evidence, decisions, calls };
 }

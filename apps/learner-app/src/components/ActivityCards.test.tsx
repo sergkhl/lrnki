@@ -1,6 +1,6 @@
 import { expect, jest, test } from "@jest/globals";
 import { fireEvent, render, screen } from "@testing-library/react-native";
-import { OptionSelectBody } from "./ActivityCards";
+import { ImpostorBody, OptionSelectBody } from "./ActivityCards";
 import { sessionFixture } from "@/learn/sessionFixture";
 import type { LearnerGradingResult } from "@/lib/api";
 
@@ -8,6 +8,16 @@ function optionItem() {
   const segment = sessionFixture().studySegmentsByNode.n1[0];
   if (segment.kind !== "option_select") throw new Error("fixture changed");
   return segment.item;
+}
+
+function impostorItem() {
+  const segment = sessionFixture().studySegmentsByNode.n1[1];
+  if (segment.kind !== "impostor") throw new Error("fixture changed");
+  return {
+    ...segment.item,
+    lieSource: "sibling" as const,
+    siblingLabel: "Borrowing"
+  };
 }
 
 test("an ungraded tile selects and submits once", async () => {
@@ -42,4 +52,29 @@ test("a pending grade disables further picks without hiding options", async () =
   await fireEvent.press(screen.getByLabelText("Borrowing"));
   expect(onSelect).not.toHaveBeenCalled();
   expect(screen.getByLabelText("Assignment")).toBeTruthy();
+});
+
+test("an impostor reveal never turns unwitnessed sibling metadata into learner copy", async () => {
+  const item = impostorItem();
+  const result: LearnerGradingResult = {
+    kind: "selection",
+    graded: true,
+    correct: true,
+    chosenId: "s2",
+    keyedCorrectId: "s2"
+  } as LearnerGradingResult;
+
+  await render(
+    <ImpostorBody
+      item={item}
+      selectedId="s2"
+      result={result}
+      disabled={false}
+      presentedOrder={["s1", "s2"]}
+      onSelect={jest.fn()}
+    />
+  );
+
+  expect(screen.getByText("Borrowing never moves ownership.")).toBeTruthy();
+  expect(screen.queryByText(/Actually true of/)).toBeNull();
 });

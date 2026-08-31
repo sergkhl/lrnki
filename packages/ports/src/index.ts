@@ -301,7 +301,11 @@ export interface SourceMaterialClaimSupportVerificationPort {
   verify(input: {
     declaredDomain: string;
     subject: { canonicalLabel: string; aliases: string[] };
-    claim: { claimKey: string; statement: string };
+    claim: {
+      claimKey: string;
+      statement: string;
+      evaluationKind: "assertion" | "matching_relationship";
+    };
     evidence: {
       evidenceKey: string;
       passageKind: "definition" | "mention";
@@ -1094,10 +1098,13 @@ export interface StudyItemGenerationPort {
   }): Promise<MatchingItemDraft>;
   // Impostor generation (R3/R5/R6/R7). Takes the same grounding + siblings as option-select
   // and returns a pre-verification ImpostorItemDraft: three grounded truths each citing a
-  // passage and exactly one planted lie — preferentially a true fact about one provided
-  // neighbor mis-attributed to this node, else a freshly minted misconception, labeled
-  // generated with no citation — plus a reveal and the model's `lieSource` choice. The
-  // deterministic guard (U4) re-derives provenance; this port never decides it.
+  // passage and exactly one planted lie. Neighbor descriptions are contrast context for a
+  // plausible misconception, but the lie is labeled generated and carries no citation — plus a
+  // target-grounding correction witness. The deterministic
+  // guard owns the fixed question, verifies the witness, projects the selected passage's complete
+  // text as the learner-visible correction, and re-derives provenance. The production neural adapter also labels the lie
+  // conservatively as generated because this port carries no verified sibling-truth witness; it
+  // never authorizes a learner-visible sibling claim or supplies a second correction paraphrase.
   generateImpostor(input: {
     declaredDomain: string;
     node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };

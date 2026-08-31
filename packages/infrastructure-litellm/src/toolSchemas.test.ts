@@ -431,17 +431,23 @@ test("impostor schema binds three flat truths and scalar lie fields, and is regi
     assert.equal(properties[`truth${n}Quote`].type, "string");
   }
   assert.ok(properties.lieText);
-  assert.ok(properties.reveal);
-  assert.equal(properties.siblingLabel.type, "string");
+  assert.equal(properties.question, undefined);
+  assert.equal(properties.reveal, undefined);
+  assert.equal(properties.explorableTerms, undefined);
+  assert.ok(properties.revealPassageId);
+  assert.ok(properties.revealEvidenceQuote);
+  assert.match(String(properties.revealEvidenceQuote.description), /passage's complete text.*learner-visible correction/);
+  assert.equal(properties.lieSource, undefined);
+  assert.equal(properties.siblingLabel, undefined);
 });
 
-test("impostorValidator rejects a non-closed lieSource enum", () => {
+test("impostorValidator rejects model-owned sibling provenance", () => {
   assert.throws(() => impostorValidator.parse({
-    question: "Q?",
     truth1Text: "a", truth1PassageId: "p", truth1Quote: "q",
     truth2Text: "b", truth2PassageId: "p", truth2Quote: "q",
     truth3Text: "c", truth3PassageId: "p", truth3Quote: "q",
-    lieText: "d", reveal: "r", lieSource: "neighbor", siblingLabel: ""
+    lieText: "d", revealPassageId: "p", revealEvidenceQuote: "q",
+    lieSource: "sibling", siblingLabel: "Neighbor"
   }));
 });
 

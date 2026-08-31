@@ -77,7 +77,8 @@ export type StudyOptionSelectView = {
 // The serializable Impostor view that rides down the projection (R10/R11). Four statements
 // the learner reads; the keyed answer (which is the impostor) is resolved SERVER-SIDE at
 // grading time, never read off this payload. Statements are sorted by id so the impostor is
-// not positionally predictable.
+// not positionally predictable. Persisted lie-source metadata is deliberately absent: without
+// a verified sibling-truth witness it cannot authorize an "Actually true of …" learner claim.
 export type StudyImpostorView = {
   studyItemId: string;
   derivedNodeId: string;
@@ -89,8 +90,6 @@ export type StudyImpostorView = {
     provenance: "source" | "generated";
   }[];
   reveal: string;
-  lieSource: "sibling" | "generated";
-  siblingLabel?: string;
   // Explorable Term affordances advertised by this question stem (see StudyOptionSelectView).
   explorableTerms: ExplorableTermView[];
 };
@@ -225,8 +224,6 @@ export function studyItemToView(item: StudyItem, supportFor: ExplorableTermSuppo
             .sort((a, b) => a.statementId.localeCompare(b.statementId))
             .map((statement) => ({ statementId: statement.statementId, text: statement.text, provenance: statement.provenance })),
           reveal: lie.reveal,
-          lieSource: lie.lieSource,
-          ...(lie.siblingLabel ? { siblingLabel: lie.siblingLabel } : {}),
           explorableTerms: itemTerms()
         }
       };

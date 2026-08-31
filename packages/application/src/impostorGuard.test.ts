@@ -53,15 +53,16 @@ function truth(text: string, evidenceQuote: string, passageId = "blk-1"): Impost
 function draftOf(truths: ImpostorTruthDraft[], overrides: Partial<ImpostorItemDraft> = {}): ImpostorItemDraft {
   return {
     itemType: "impostor",
-    question: "Which statement about the Heap is false?",
     truths: truths as ImpostorItemDraft["truths"],
     lie: {
       text: "The heap is a LIFO region for call frames.",
-      reveal: "The LIFO claim is false; that is actually true of the Stack.",
+      revealCitation: {
+        passageId: "blk-1",
+        evidenceQuote: "A heap allocates memory at runtime"
+      },
       lieSource: "sibling",
       siblingLabel: "Stack"
     },
-    explorableTerms: [],
     ...overrides
   };
 }
@@ -85,9 +86,14 @@ test("AE3 happy path: three verbatim-cited truths + one generated impostor → o
   const impostors = result.item.statements.filter((s) => s.isImpostor);
   assert.equal(impostors.length, 1);
   assert.equal(impostors[0].provenance, "generated");
-  assert.equal(impostors[0].reveal, "The LIFO claim is false; that is actually true of the Stack.");
+  assert.equal(
+    impostors[0].reveal,
+    "A heap allocates memory at runtime and stores dynamically sized data for long-lived allocations."
+  );
   assert.equal(impostors[0].lieSource, "sibling");
   assert.equal(impostors[0].siblingLabel, "Stack");
+  assert.equal(result.item.question, "Which statement about Heap is false?");
+  assert.deepEqual(result.item.explorableTerms, []);
   // truths' citations resolve from the matched passage, byte-exact
   for (const truthStatement of result.item.statements.filter((s) => !s.isImpostor)) {
     assert.ok(truthStatement.citation && truthStatement.citation.provenance === "source");
@@ -122,7 +128,11 @@ test("wrong truth count → reject", () => {
 
 test("impostor text equal to a truth after normalization → reject", () => {
   const result = validateImpostorItem(
-    draftOf(threeTruths, { lie: { text: "  THE HEAP allocates at runtime.  ", reveal: "r", lieSource: "generated" } }),
+    draftOf(threeTruths, { lie: {
+      text: "  THE HEAP allocates at runtime.  ",
+      revealCitation: { passageId: "blk-1", evidenceQuote: "A heap allocates memory at runtime" },
+      lieSource: "generated"
+    } }),
     sourceGrounding()
   );
   assert.equal(result.ok, false);
@@ -130,19 +140,28 @@ test("impostor text equal to a truth after normalization → reject", () => {
   assert.match(result.reason, /identical to a true statement/i);
 });
 
-test("empty reveal → reject", () => {
+test("a reveal citation that does not resolve against target grounding → reject", () => {
   const result = validateImpostorItem(
-    draftOf(threeTruths, { lie: { text: "The heap is a LIFO region.", reveal: "   ", lieSource: "generated" } }),
+    draftOf(threeTruths, { lie: {
+      text: "The heap is a LIFO region.",
+      revealCitation: { passageId: "missing", evidenceQuote: "an uncited correction" },
+      lieSource: "generated"
+    } }),
     sourceGrounding()
   );
   assert.equal(result.ok, false);
   if (result.ok) return;
-  assert.match(result.reason, /reveal/i);
+  assert.match(result.reason, /reveal citation does not verify/i);
 });
 
 test("lieSource 'sibling' with no siblingLabel → reject", () => {
   const result = validateImpostorItem(
-    draftOf(threeTruths, { lie: { text: "The heap is a LIFO region.", reveal: "r", lieSource: "sibling", siblingLabel: undefined } }),
+    draftOf(threeTruths, { lie: {
+      text: "The heap is a LIFO region.",
+      revealCitation: { passageId: "blk-1", evidenceQuote: "A heap allocates memory at runtime" },
+      lieSource: "sibling",
+      siblingLabel: undefined
+    } }),
     sourceGrounding()
   );
   assert.equal(result.ok, false);
@@ -152,7 +171,12 @@ test("lieSource 'sibling' with no siblingLabel → reject", () => {
 
 test("lieSource 'generated' with a siblingLabel → reject", () => {
   const result = validateImpostorItem(
-    draftOf(threeTruths, { lie: { text: "The heap is a LIFO region.", reveal: "r", lieSource: "generated", siblingLabel: "Stack" } }),
+    draftOf(threeTruths, { lie: {
+      text: "The heap is a LIFO region.",
+      revealCitation: { passageId: "blk-1", evidenceQuote: "A heap allocates memory at runtime" },
+      lieSource: "generated",
+      siblingLabel: "Stack"
+    } }),
     sourceGrounding()
   );
   assert.equal(result.ok, false);
@@ -162,7 +186,11 @@ test("lieSource 'generated' with a siblingLabel → reject", () => {
 
 test("lieSource 'generated' with no siblingLabel → ok (fresh misconception)", () => {
   const result = validateImpostorItem(
-    draftOf(threeTruths, { lie: { text: "The heap is a LIFO region.", reveal: "r", lieSource: "generated" } }),
+    draftOf(threeTruths, { lie: {
+      text: "The heap is a LIFO region.",
+      revealCitation: { passageId: "blk-1", evidenceQuote: "A heap allocates memory at runtime" },
+      lieSource: "generated"
+    } }),
     sourceGrounding()
   );
   assert.equal(result.ok, true);
@@ -181,7 +209,14 @@ test("generated-origin node: a truth citing a generated lesson passage verifies 
         truth("Ownership enforces single responsibility.", "enforces single responsibility", "dn-2:definition:0"),
         truth("Ownership decides when a value is dropped.", "frees a value", "dn-2:definition:0")
       ],
-      { lie: { text: "Ownership is reference counting at runtime.", reveal: "r", lieSource: "generated" } }
+      { lie: {
+        text: "Ownership is reference counting at runtime.",
+        revealCitation: {
+          passageId: "dn-2:definition:0",
+          evidenceQuote: "Ownership tracks which binding frees a value"
+        },
+        lieSource: "generated"
+      } }
     ),
     generatedGrounding()
   );
@@ -190,6 +225,10 @@ test("generated-origin node: a truth citing a generated lesson passage verifies 
   for (const truthStatement of result.item.statements.filter((s) => !s.isImpostor)) {
     assert.ok(truthStatement.citation && truthStatement.citation.provenance === "generated");
   }
+  assert.equal(
+    result.item.statements.find((statement) => statement.isImpostor)?.reveal,
+    "Ownership tracks which binding frees a value and enforces single responsibility."
+  );
 });
 
 // --- Citation resolution ladder (plan 2026-08-05-001 D9) ----------------------------------
@@ -216,7 +255,11 @@ test("ladder rung 2 reaches the impostor guard: truths quoting the wrong generat
         truth("Ownership transfers on a move.", "Ownership transfers when a value is moved", "dn-2:s0"),
         truth("Ownership decides when a value is dropped.", "frees a value", "dn-2:s1")
       ],
-      { lie: { text: "Ownership is reference counting at runtime.", reveal: "r", lieSource: "generated" } }
+      { lie: {
+        text: "Ownership is reference counting at runtime.",
+        revealCitation: { passageId: "dn-2:s0", evidenceQuote: "Ownership tracks which binding frees a value" },
+        lieSource: "generated"
+      } }
     ),
     twoGeneratedPassages()
   );
@@ -238,7 +281,11 @@ test("rung 3: one paraphrased truth admits the item and marks the whole item fal
         truth("Ownership is reference counting.", "ownership is reference counting at runtime", "dn-2:s0"),
         truth("Ownership transfers on a move.", "Ownership transfers when a value is moved", "dn-2:s1")
       ],
-      { lie: { text: "Ownership pins a value to a core.", reveal: "r", lieSource: "generated" } }
+      { lie: {
+        text: "Ownership pins a value to a core.",
+        revealCitation: { passageId: "dn-2:s0", evidenceQuote: "Ownership tracks which binding frees a value" },
+        lieSource: "generated"
+      } }
     ),
     twoGeneratedPassages()
   );
@@ -262,7 +309,11 @@ test("an unknown passageId still rejects every truth, fallback or not", () => {
         truth("Ownership is reference counting.", "ownership is reference counting", "dn-2:nobody-cited-this"),
         truth("Ownership transfers on a move.", "Ownership transfers when a value is moved", "dn-2:s1")
       ],
-      { lie: { text: "Ownership pins a value to a core.", reveal: "r", lieSource: "generated" } }
+      { lie: {
+        text: "Ownership pins a value to a core.",
+        revealCitation: { passageId: "dn-2:s0", evidenceQuote: "Ownership tracks which binding frees a value" },
+        lieSource: "generated"
+      } }
     ),
     twoGeneratedPassages()
   );

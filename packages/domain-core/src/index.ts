@@ -1607,10 +1607,11 @@ export type ImpostorLieStatement = ImpostorStatementBase & {
 export type ImpostorStatement = ImpostorTruthStatement | ImpostorLieStatement;
 
 // Impostor item — auto-graded studying (R1). Four statements, exactly one the keyed
-// impostor (the learner selects the lie). The `reveal` names the impostor and why it is
-// false; for a sibling-sourced lie it states the fact is actually true of `siblingLabel`
-// (R6). `lieSource` records whether the lie was a mis-attributed sibling fact or a freshly
-// minted misconception (R3). A click writes a deterministic `graded(auto)` row, no judge.
+// impostor (the learner selects the lie). The `reveal` is the resolved target-grounding
+// correction selected during generation (R6). `lieSource` and optional `siblingLabel`
+// record whether the lie was a mis-attributed sibling fact or a freshly minted misconception
+// (R3); they never authorize learner copy beyond the target correction. A click writes a
+// deterministic `graded(auto)` row, no judge.
 export type ImpostorItem = StudyItemBase & {
   itemType: "impostor";
   question: string;
@@ -1671,17 +1672,19 @@ export type ImpostorTruthDraft = {
 
 export type ImpostorLieDraft = {
   text: string;
-  reveal: string;
+  // Generation-time witness selecting the grounding passage for the learner-visible correction.
+  // The planted lie stays uncited; the guard verifies this draft citation and persists the complete
+  // selected passage as the reveal, so neither a fragment nor a second model-written paraphrase can
+  // add unsupported facts, omit the corrective context, or expose internal evidence language.
+  revealCitation: { passageId: string; evidenceQuote: string };
   lieSource: "sibling" | "generated";
   siblingLabel?: string;
 };
 
 export type ImpostorItemDraft = {
   itemType: "impostor";
-  question: string;
   truths: [ImpostorTruthDraft, ImpostorTruthDraft, ImpostorTruthDraft];
   lie: ImpostorLieDraft;
-  explorableTerms: string[];
 };
 
 export type MatchingPairDraft = {

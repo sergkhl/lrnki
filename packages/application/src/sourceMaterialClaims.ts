@@ -144,7 +144,7 @@ void impostorLieFieldTreatment;
 // block at the evidence-read boundary, where byte-exact versus formatting-normalized matching can
 // actually be proven. The v1 projection trusted the intermediate asset's matchKind and therefore
 // could preserve `exact` after Markdown line wrapping made the source-block match normalized.
-export const SOURCE_MATERIAL_CLAIM_PROJECTION = "source_material_claims_v3" as const;
+export const SOURCE_MATERIAL_CLAIM_PROJECTION = "source_material_claims_v6" as const;
 export const SOURCE_CITATION_MATCH_CLASSIFICATION_POLICY =
   "source_citation_match_from_resolved_block_v1" as const;
 export type SourceMaterialClaimProjection = typeof SOURCE_MATERIAL_CLAIM_PROJECTION;
@@ -617,13 +617,18 @@ export function projectSourceMaterialClaims(input: {
 export function renderSourceMaterialClaim(subject: SourceMaterialClaimSubject): string {
   switch (subject.kind) {
     case "lesson_section":
-      return `Lesson section (${subject.sectionKind}) material claim: ${JSON.stringify(subject.sectionText)}`;
+      // The port already receives the claim key, learning subject, and declared domain as
+      // separate fields. Keep every Concept Lesson semantic target byte-for-byte equal to the
+      // one learner-visible field being settled instead of making the judge disentangle it from
+      // a redundant metadata wrapper. The typed subject retains section/caption context for
+      // deterministic settlement and inspection without turning that metadata into another claim.
+      return subject.sectionText;
     case "lesson_section_item":
-      return `Within lesson section (${subject.sectionKind}) ${JSON.stringify(subject.sectionText)}, material item: ${JSON.stringify(subject.itemText)}`;
+      return subject.itemText;
     case "lesson_diagram_caption":
-      return `Within lesson section (${subject.sectionKind}) ${JSON.stringify(subject.sectionText)}, diagram caption: ${JSON.stringify(subject.caption)}`;
+      return subject.caption;
     case "lesson_diagram_spec":
-      return `Within lesson section (${subject.sectionKind}) ${JSON.stringify(subject.sectionText)} and caption ${JSON.stringify(subject.caption)}, diagram specification: ${JSON.stringify(subject.spec)}`;
+      return subject.spec;
     case "option_select_question_key":
       return `For learner question ${JSON.stringify(subject.question)}, the keyed answer is ${JSON.stringify(subject.keyedAnswer)}.`;
     case "option_select_explanation":
@@ -633,11 +638,18 @@ export function renderSourceMaterialClaim(subject: SourceMaterialClaimSubject): 
     case "matching_instruction":
       return `Matching instruction: ${JSON.stringify(subject.instruction)}.`;
     case "matching_relationship":
-      return `Under matching instruction ${JSON.stringify(subject.instruction)}, prompt ${JSON.stringify(subject.promptText)} maps to ${JSON.stringify(subject.matchText)}.`;
+      // The instruction is projected separately as interaction scaffolding. Keep this support
+      // target to the semantic relationship the learner must assign; otherwise a verifier can
+      // incorrectly require the source itself to contain an assessment instruction.
+      return `Matching prompt ${JSON.stringify(subject.promptText)} maps to ${JSON.stringify(subject.matchText)}.`;
     case "impostor_truth":
       return `Impostor-board true statement: ${JSON.stringify(subject.statement)}.`;
     case "impostor_reveal":
-      return `For proposed false statement ${JSON.stringify(subject.proposedStatement)}, corrective reveal: ${JSON.stringify(subject.reveal)}${subject.siblingLabel ? `; related subject ${JSON.stringify(subject.siblingLabel)}` : ""}.`;
+      // The reveal is the one learner-visible corrective field being source-settled. The planted
+      // false statement and optional sibling origin remain typed context for inspection; including
+      // either in the support statement asks the verifier to source-support deliberately false or
+      // non-visible metadata and can reject an otherwise exact corrective witness.
+      return subject.reveal;
     case "impostor_lie":
       return `For learner question ${JSON.stringify(subject.question)}, proposed false statement: ${JSON.stringify(subject.proposedStatement)}.`;
   }

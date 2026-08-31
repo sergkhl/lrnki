@@ -343,7 +343,7 @@ test("dropping any shared admission descriptor changes Graph Enrichment identity
 // when their Model Assignment is preserved. Non-behavioral refactors must not perturb them.
 test("default operation config hashes are stable across the registry derivation", () => {
   assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-cf5536ca7609");
-  assert.equal(scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG), "learner-scaffold-generation-25c065547f8a");
+  assert.equal(scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG), "learner-scaffold-generation-014464b7b1d8");
   assert.equal(syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG), "synthetic-topic-generation-3286a5adf7a3");
 });
 

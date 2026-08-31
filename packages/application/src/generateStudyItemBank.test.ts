@@ -244,14 +244,16 @@ function impDraftFrom(passages: { passageId: string; text: string }[]): Impostor
   const p = passages[0];
   return {
     itemType: "impostor",
-    question: "Which statement is false?",
     truths: [
       { text: "True statement one.", citation: { passageId: p.passageId, evidenceQuote: p.text } },
       { text: "True statement two.", citation: { passageId: p.passageId, evidenceQuote: p.text } },
       { text: "True statement three.", citation: { passageId: p.passageId, evidenceQuote: p.text } }
     ],
-    lie: { text: "A planted lie about this node.", reveal: "The fourth statement is false.", lieSource: "generated" },
-    explorableTerms: []
+    lie: {
+      text: "A planted lie about this node.",
+      revealCitation: { passageId: p.passageId, evidenceQuote: p.text },
+      lieSource: "generated"
+    }
   };
 }
 
@@ -1168,14 +1170,16 @@ test("an option-select guard miss gets one INFORMED retry carrying the first att
       const p = input.groundingPassages[0];
       return {
         itemType: "impostor",
-        question: "Which is false?",
         truths: [
           { text: "t1", citation: { passageId: p.passageId, evidenceQuote: p.text } },
           { text: "t2", citation: { passageId: p.passageId, evidenceQuote: p.text } },
           { text: "t3", citation: { passageId: p.passageId, evidenceQuote: p.text } }
         ],
-        lie: { text: "a lie", reveal: "The fourth is false.", lieSource: "generated" },
-        explorableTerms: []
+        lie: {
+          text: "a lie",
+          revealCitation: { passageId: p.passageId, evidenceQuote: p.text },
+          lieSource: "generated"
+        }
       };
     },
     async generateMatching(input) {
@@ -1497,7 +1501,6 @@ test("a minted llm_grounded node on a source graph remains an inspection-only ca
 function impDraftCiting(passageId: string, quote: string, opts: { lieSource?: "sibling" | "generated"; siblingLabel?: string } = {}): ImpostorItemDraft {
   return {
     itemType: "impostor",
-    question: "Which statement is false?",
     truths: [
       { text: "Truth one about the node.", citation: { passageId, evidenceQuote: quote } },
       { text: "Truth two about the node.", citation: { passageId, evidenceQuote: quote } },
@@ -1505,11 +1508,10 @@ function impDraftCiting(passageId: string, quote: string, opts: { lieSource?: "s
     ],
     lie: {
       text: "A plausible-but-false claim.",
-      reveal: "The fourth is false.",
+      revealCitation: { passageId, evidenceQuote: quote },
       lieSource: opts.lieSource ?? "generated",
       ...(opts.siblingLabel ? { siblingLabel: opts.siblingLabel } : {})
-    },
-    explorableTerms: []
+    }
   };
 }
 
