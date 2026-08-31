@@ -7,12 +7,12 @@ execution: code
 
 # Simplify the Learner Runtime Around Directly Authored Expeditions
 
-**Status:** In progress — U0 baseline and history preservation are complete. The abandoned U6
-generation work is recoverable in commit `4ae809e`; committing this replacement coordination state
-and later deleting the abandoned plan standalone are the remaining U0 steps.
+**Status:** In progress — U0 complete. The abandoned U6 generation work is recoverable in commit
+`4ae809e`; its plan was committed as Abandoned with this replacement in `212cf90`, then removed in a
+standalone reference-repair commit. U1 is next.
 
-**NEXT:** Commit this replacement plan and its coordination state, then delete the abandoned plan in
-a standalone commit. U1 follows.
+**NEXT:** U1 establishes the private direct-content authority and qualifies one complete Critical
+Thinking Expedition without model, build-time model, database, package, or installer access.
 
 **Decision state:** Accepted by the owner on 2026-08-31. This plan replaces the earlier retirement
 design rather than amending it. The earlier direction was correct about deleting model-generated
@@ -390,8 +390,7 @@ Units execute sequentially. No two units may be in progress at once.
 
 ### U0 — Preserve history and repair coordination
 
-**Status:** In progress — implementation history is preserved; plan coordination and standalone
-abandoned-plan deletion remain.
+**Status:** Complete on 2026-08-31.
 
 - [x] Re-resolve dirty-tree ownership: 30 non-document U6 paths, three tracked planning documents,
   and one untracked replacement plan.
@@ -399,7 +398,7 @@ abandoned-plan deletion remain.
   reruns.
 - [x] Commit only the 30 abandoned non-document paths in `4ae809e`; never use `git add -A`.
 - [x] Replace the target plan, retain the old plan's Abandoned state, and align index/TODO altitude.
-- [ ] Commit this plan/coordination batch, then delete the old plan in a later standalone commit with
+- [x] Commit this plan/coordination batch, then delete the old plan in a later standalone commit with
   index and reference repairs.
 - [x] Do not create ADR-0042 and do not delete either brainstorm.
 
@@ -572,7 +571,9 @@ This plan closes only when all are true:
   `pnpm test:db` (three runs total); `git diff --cached --check`.
 - **Result:** `pnpm check` passed, including 70/70 intercepted-web scenarios. The first DB run passed
   migration tests but failed one of 124 Postgres tests; two unchanged complete reruns passed. The
-  30-path non-document snapshot was committed as `4ae809e` with clean cached whitespace.
+  30-path non-document snapshot was committed as `4ae809e` with clean cached whitespace. The
+  replacement coordination state was committed in `212cf90`; the abandoned plan was then removed
+  standalone after its brainstorm and index references were repaired.
 - **Qualification:** Local automated, test-Postgres, local build, and intercepted-web baseline only.
   No real-backend, native, deployed, distributable, physical-device, production, or content-quality
   claim. The initial DB failure remains part of the record even though it did not reproduce.

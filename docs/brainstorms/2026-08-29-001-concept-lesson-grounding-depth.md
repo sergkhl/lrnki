@@ -8,7 +8,7 @@ date: 2026-08-29
 
 **Status:** Shaping. The problem is measured and accepted; the design decisions below are unresolved,
 so this is not yet a plan. It was split out of
-[the Source Expedition Leg plan](../plans/2026-08-29-001-expand-source-expedition-legs-and-mixed-study-items.md)
+the abandoned Source Expedition Leg plan retained in commit `212cf90`
 on 2026-08-29 because it changes the Concept Lesson contract, which that plan must not do.
 
 ## Question
