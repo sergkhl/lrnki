@@ -29,6 +29,7 @@ export {
 } from "./PostgresAcceptedPathPackages";
 export { PostgresLearnerRecallChallengeStore } from "./PostgresLearnerRecallChallengeStore";
 export { PostgresLearnerProfileRead, PostgresLearnerAwardsStore } from "./PostgresLearnerProfileStores";
+export { PostgresLearnerStateStore } from "./PostgresLearnerStateStore";
 export { PostgresRunProgressReporter } from "./PostgresRunProgressReporter";
 export { PostgresOperationTimelineRead } from "./PostgresOperationTimelineRead";
 export { PostgresJourneyLineageRead } from "./PostgresJourneyLineageRead";

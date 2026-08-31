@@ -925,6 +925,16 @@ CREATE TABLE "response_log" (
       ))
 );
 --> statement-breakpoint
+CREATE TABLE "learner_journey_state" (
+	"learner_ref" text PRIMARY KEY NOT NULL,
+	"state" jsonb NOT NULL,
+	"state_version" bigint DEFAULT 0 NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "learner_journey_state_state_object_check" CHECK (jsonb_typeof(state) = 'object'),
+	CONSTRAINT "learner_journey_state_state_version_check" CHECK (state_version >= 0)
+);
+--> statement-breakpoint
 CREATE TABLE "operation_run_stages" (
 	"operation_run_stage_id" uuid PRIMARY KEY NOT NULL,
 	"operation_run_id" uuid NOT NULL,
@@ -1067,6 +1077,7 @@ ALTER TABLE "response_log" ADD CONSTRAINT "response_log_learner_state_ref_fkey" 
 ALTER TABLE "response_log" ADD CONSTRAINT "response_log_study_item_id_fkey" FOREIGN KEY ("study_item_id") REFERENCES "public"."study_items"("study_item_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "response_log" ADD CONSTRAINT "response_log_derived_node_id_fkey" FOREIGN KEY ("derived_node_id") REFERENCES "public"."derived_graph_nodes"("derived_node_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "response_log" ADD CONSTRAINT "response_log_scaffold_step_id_fkey" FOREIGN KEY ("scaffold_step_id") REFERENCES "public"."learner_scaffold_steps"("scaffold_step_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "learner_journey_state" ADD CONSTRAINT "learner_journey_state_learner_ref_fkey" FOREIGN KEY ("learner_ref") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "operation_run_stages" ADD CONSTRAINT "operation_run_stages_operation_run_id_fkey" FOREIGN KEY ("operation_run_id") REFERENCES "public"."operation_runs"("operation_run_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "account_userId_idx" ON "account" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "session_userId_idx" ON "session" USING btree ("user_id");--> statement-breakpoint

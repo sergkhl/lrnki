@@ -7,13 +7,14 @@ execution: code
 
 # Simplify the Learner Runtime Around Directly Authored Expeditions
 
-**Status:** In progress — U0–U1 complete. The abandoned U6 generation work is recoverable in commit
+**Status:** In progress — U0–U2 complete. The abandoned U6 generation work is recoverable in commit
 `4ae809e`; its plan was committed as Abandoned with this replacement in `212cf90`, then removed in a
 standalone reference-repair commit. The private direct-content authority now qualifies Critical
-Thinking; the legacy runtime remains the sole live authority. U2 is next.
+Thinking, and the private two-method learner runtime is complete against in-memory and test-Postgres
+adapters; the legacy runtime remains the sole live authority. U3 is next.
 
-**NEXT:** U2 implements the learner runtime against the in-memory aggregate, then adds the test-only
-Postgres adapter without exposing a second live learner path.
+**NEXT:** U3 atomically cuts learner-api and Expo over to the direct content/runtime seam, performs
+the guarded local reset, and deletes the generation-era system only after the replacement is live.
 
 **Decision state:** Accepted by the owner on 2026-08-31. This plan replaces the earlier retirement
 design rather than amending it. The earlier direction was correct about deleting model-generated
@@ -423,6 +424,8 @@ input produces the same revision; no server-private key appears in a learner pro
 
 ### U2 — Build learner runtime and adapters privately
 
+**Status:** Complete on 2026-08-31.
+
 - Implement `read` and `dispatch` against an in-memory adapter.
 - Port prerequisite/calibration closure, grading, mastery, restoration, Support reuse, Guardian
   combat/selection, formations, rewards, leaderboard, and navigation memory to authored keys.
@@ -601,6 +604,32 @@ This plan closes only when all are true:
   browser run exercises the still-canonical legacy client, not the private new content path. No
   database content, real-backend, native, deployed, distributable, physical-device, production,
   external-fact, or arbitrary-source claim.
+
+### U2 — private learner runtime and aggregate adapters (2026-08-31)
+
+- **Scope:** Added the legacy-independent state schema, in-memory and Postgres stores, two-method
+  runtime, authored-key projections, acquisition/calibration/Support/Guardian/reward/leaderboard
+  transitions, and a test-only Hono composition. No production learner route was changed.
+- **Runtime result:** The focused package suite passed 28/28 tests: 14 direct-content tests and 14
+  runtime tests covering all three graders, mastery and restoration, Support evidence, Guardian
+  lifecycle, rewards, leaderboard, content mismatch, stale versions, duplicate request replay,
+  concurrency, isolation, and corrupt-state refusal. Pre-answer projections expose no answer key.
+- **Persistence result:** The intermediate code-first baseline contains the legacy 59 relations plus
+  private `learner_journey_state`. Six focused live-test-Postgres tests passed for user existence,
+  lazy zero state, versions, concurrent first writes, cross-runtime optimistic concurrency,
+  rollback, corrupt JSON, cascade, and zero-state leaderboard inclusion. The complete `pnpm
+  test:db` gate passed after resetting only `lrnki_test`; local `lrnki` was not reset.
+- **Vertical result:** One test-only authenticated Hono slice completed Critical Thinking lessons,
+  all activity families, Support open/hide/restore/reuse, a Leg Guardian, the Expedition Guardian,
+  leaderboard reads, hostile-body identity rejection, and second-learner isolation. It is not a
+  second live route.
+- **Repository gate:** `pnpm check` passed: content/schema checks, typechecks, all unit tests, the
+  existing 10 lint warnings and no errors, Admin Lab and Expo builds, and 70/70 legacy
+  intercepted-web scenarios.
+- **Qualification:** Local automated, test-Postgres, test-only API-composition, build, and legacy
+  intercepted-web evidence only. The 70 browser scenarios still exercise the legacy live contract;
+  they do not prove cutover. No local-development reset, real-backend, native, deployed,
+  distributable, physical-device, production, or new external-quality claim.
 
 ## Open findings
 

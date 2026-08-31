@@ -10,8 +10,9 @@
   [Plan](./2026-08-31-001-retire-model-generation-for-authored-expeditions.md). U0 preserved the full
   baseline and abandoned U6 snapshot in `4ae809e`, then U1 added the direct qualifier and a
   source-inspected Critical Thinking Expedition without model/package/installer/database access.
-  **NEXT:** U2 implements the private runtime and its in-memory/Postgres aggregate adapters without
-  exposing a second live learner path.
+  U2 added the private runtime, aggregate adapters, and complete test-only Critical Thinking vertical
+  without exposing a second live learner path. **NEXT:** U3 atomically cuts over API and Expo,
+  performs the guarded local reset, and deletes the generation-era system.
 
 ## COMPLETED
 

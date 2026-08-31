@@ -5,5 +5,6 @@ export * from "./derivedGraph.js";
 export * from "./learningAssets.js";
 export * from "./sourceExpeditionCatalog.js";
 export * from "./learnerState.js";
+export * from "./learnerJourney.js";
 export * from "./operations.js";
 export * from "./inspectionViews.js";

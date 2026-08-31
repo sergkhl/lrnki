@@ -1,5 +1,5 @@
 {
-  "id": "d8d1e896-04f7-418f-afa8-721e7ea9941a",
+  "id": "f99f59a8-ae62-4807-8c07-e53ca66ce5c0",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -6199,6 +6199,75 @@
         "response_log_check1": {
           "name": "response_log_check1",
           "value": "(\n        study_item_id IS NOT NULL\n        AND derived_node_id IS NOT NULL\n        AND scaffold_step_id IS NULL\n      ) OR (\n        study_item_id IS NULL\n        AND derived_node_id IS NULL\n        AND scaffold_step_id IS NOT NULL\n      )"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.learner_journey_state": {
+      "name": "learner_journey_state",
+      "schema": "",
+      "columns": {
+        "learner_ref": {
+          "name": "learner_ref",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "state": {
+          "name": "state",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "state_version": {
+          "name": "state_version",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "0"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "learner_journey_state_learner_ref_fkey": {
+          "name": "learner_journey_state_learner_ref_fkey",
+          "tableFrom": "learner_journey_state",
+          "tableTo": "user",
+          "columnsFrom": [
+            "learner_ref"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "learner_journey_state_state_object_check": {
+          "name": "learner_journey_state_state_object_check",
+          "value": "jsonb_typeof(state) = 'object'"
+        },
+        "learner_journey_state_state_version_check": {
+          "name": "learner_journey_state_state_version_check",
+          "value": "state_version >= 0"
         }
       },
       "isRLSEnabled": false

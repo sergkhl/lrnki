@@ -46,6 +46,7 @@ export function trackLearner(learnerRef: string): string {
 //   - Better Auth's `session` and `account` cascade on the `user` delete, but are removed
 //     explicitly so this function is complete on its own, not reliant on cascade side effects.
 export async function deleteLearner(sql: Sql, learnerRef: string): Promise<void> {
+  await sql`DELETE FROM learner_journey_state WHERE learner_ref = ${learnerRef}`;
   await sql`DELETE FROM recall_challenges WHERE learner_state_ref = ${learnerRef}`;
   await sql`DELETE FROM response_log WHERE learner_state_ref = ${learnerRef}`;
   await sql`DELETE FROM learner_scaffold_detours WHERE learner_state_ref = ${learnerRef}`;

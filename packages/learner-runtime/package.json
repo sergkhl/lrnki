@@ -4,7 +4,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./content-node": "./src/contentNode.ts"
+    "./content-node": "./src/contentNode.ts",
+    "./runtime": "./src/runtimeNode.ts"
   },
   "scripts": {
     "content:check": "tsx src/contentCheckCli.ts",

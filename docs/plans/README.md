@@ -13,9 +13,9 @@ routes shared mechanics through the vendored
 ## Active implementation plans (execution order)
 
 - [Simplify the Learner Runtime Around Directly Authored Expeditions](./2026-08-31-001-retire-model-generation-for-authored-expeditions.md)
-  — In progress; U0–U1 complete. Make directly authored documents
+  — In progress; U0–U2 complete. Make directly authored documents
   the sole content authority, build one two-method learner runtime over one persisted aggregate, and
-  atomically cut over before deleting generation-era architecture. **NEXT:** U2 implements the
-  private runtime and in-memory/Postgres aggregate adapters.
+  atomically cut over before deleting generation-era architecture. **NEXT:** U3 switches the API and
+  Expo client, performs the guarded local reset, and deletes the superseded system in one cutover.
 
 <!-- Lifecycle adoption and overrides: AGENTS.md → Documentation workflow. -->

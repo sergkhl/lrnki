@@ -26,6 +26,7 @@
     "@lrnki/infrastructure-ingestion": "workspace:*",
     "@lrnki/infrastructure-litellm": "workspace:*",
     "@lrnki/infrastructure-postgres": "workspace:*",
+    "@lrnki/learner-runtime": "workspace:*",
     "@lrnki/ports": "workspace:*",
     "better-auth": "catalog:",
     "hono": "catalog:",
