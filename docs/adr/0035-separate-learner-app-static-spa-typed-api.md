@@ -1,27 +1,21 @@
-# Separate the Learner App into a universal Expo app over a typed learner API
+# Use one universal Expo app over a typed Hono learner API
 
 Status: Accepted
 
 ## Decision
 
-Learner delivery has two apps behind one typed contract:
+Learner delivery has two apps behind one typed contract: a long-lived Hono API that authenticates and
+delegates to learner-runtime, and one universal Expo rendering layer for web and native. The app
+imports learner-api DTOs only and does not import runtime, persistence, or authored server documents.
 
-- apps/learner-api is the long-lived Hono process whose validated routes map to application use-cases
-  and derive learner identity from the request credential.
-- apps/learner-app is one universal Expo rendering layer for native and web, consuming that API
-  through the generated Hono client.
+The web artifact is a client-rendered static SPA. Native/web differences stay behind file-level
+adapters. PostgreSQL and the API remain server-side; there is no Admin Lab, worker, model service, or
+second learner content route.
 
-The web artifact is a client-rendered single-shell SPA. Static hosting serves the same shell for
-dynamic Expedition and Guardian routes so the server-rendered tree cannot disagree with runtime
-route state. Native and web platform differences stay behind file-level adapters with one interface.
-
-Self-hosted identity belongs to
-[ADR-0041](0041-own-learner-identity-with-self-hosted-better-auth.md). Admin Lab remains an operator
-surface and serves no learner route. The web artifact deploys to static hosting; learner-api runs
-beside PostgreSQL and LiteLLM according to the root README deployment runbook.
+Self-hosted identity follows [ADR-0041](0041-own-learner-identity-with-self-hosted-better-auth.md), and
+the deployed public route follows [ADR-0040](0040-serve-public-api-only-from-the-deployed-container.md).
 
 ## Context
 
-Admin Lab and the learner experience have different users, trust boundaries, and deployment needs.
-One universal learner rendering layer avoids separate mobile and web products while the typed API
-keeps persistence and application behavior server-owned.
+One universal presentation avoids separate web and mobile products, while the typed server boundary
+keeps identity, grading, atomic progress, and private answers outside the client.

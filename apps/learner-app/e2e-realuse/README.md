@@ -1,115 +1,77 @@
-# Real-backend web e2e (opt-in, one command)
+# Real-backend web gate
 
-A durable, opt-in gate that drives the production Expo web export against a **REAL** supervisor-free
-learner-api over Postgres — nothing is intercepted. It is the integration counterpart to the
-committed `../e2e/` suite (which mocks the API and runs inside `pnpm check`). Because it needs live
-Postgres and a ready catalog enrichment, it is **NOT** part of `pnpm check`.
+This opt-in gate drives a production-format Expo web export against the current learner-api over
+the local development Postgres database. Nothing is intercepted. It complements the intercepted
+suite in `../e2e/` and is intentionally outside `pnpm check` because it needs the repository `.env`
+and a live local database.
 
-It proves one thin persisted spine — real auth, catalog selection, Study Session, one graded answer,
-and persistence — on a phone and a desktop viewport. It performs **no generation** and makes **no
-LiteLLM call**: it selects an existing ready enrichment by capability.
+## Run
 
-## Run it
-
-From the repo root, with the repo `.env` providing `DATABASE_URL`:
+From the repository root:
 
 ```bash
 pnpm e2e:web:realuse
 ```
 
-That single command (`e2e-realuse/run.ts`) does everything:
+The runner:
 
-1. Loads `.env` into its own process and prints a safe run id.
-2. Verifies the API/web ports are free (fails rather than reusing an unknown process).
-3. Exports the production web bundle baked against the real API origin.
-4. Starts a **supervisor-free** learner-api (`realuseServer.ts`) over real Postgres and the shared
-   static server for the export.
-5. Runs capability **preflight** (`preflight.ts`): registers a disposable probe learner over public
-   routes, reads `/catalog`, and selects the first ready enrichment with a reachable one-tap graded
-   stop. An empty/unsuitable catalog fails with an actionable message and starts no journey.
-6. Runs Playwright (`realuse.spec.ts`) on phone (Pixel 7) + desktop.
-7. **Always** (success or failure) deletes exactly this run's three reserved learners and stops its
-   children.
+1. loads `.env` into its own process and creates a safe run id plus ephemeral credentials;
+2. refuses occupied API or web ports rather than reusing unknown processes;
+3. exports the production Expo web bundle against the run's API origin;
+4. starts the normal authored-content learner-api and a loopback static server;
+5. signs up a disposable probe, reads the direct catalog, and selects its first Expedition;
+6. drives the probe through the full public HTTP journey in all five authored Expeditions;
+7. runs Playwright phone and desktop journeys for stale-session recovery, private grading, Support,
+   persistence, rewards, and leaderboard presentation; and
+8. on success or failure, removes exactly the probe, phone, and desktop learners for that run and
+   stops its children.
 
-### First-time setup
+The full HTTP journey covers adoption replay, stale versions, every activity family, wrong-to-right
+grading, lesson reads, calibration and restoration, Support open/hide/restore/referenced grading,
+Guardian lock/retreat/resume/abandon/shield/recovery/first win/rematch/final win, rewards, board
+points, content privacy, and sign-out/sign-in persistence. It completes Critical Thinking and one
+full Leg plus Guardian in each remaining Expedition. Phone and desktop separately prove the real
+Expo seam and two-learner isolation.
+
+Install Chromium once if needed:
 
 ```bash
-pnpm --filter @lrnki/learner-app e2e:setup   # one-time: playwright install chromium
+pnpm --filter @lrnki/learner-app e2e:setup
 ```
 
-### If cleanup ever fails
-
-The runner prints an exact retry command with the run id:
+If exact cleanup fails, rerun only cleanup with the printed run id:
 
 ```bash
 pnpm --filter @lrnki/learner-app run e2e:realuse -- --cleanup-run=<runId>
 ```
 
-This derives only the three exact reserved addresses
-(`realuse-{probe,phone,desktop}-<runId>@realuse.invalid`) and performs no other step. It cannot
-express a prefix or wildcard delete. The reserved shape is on the sign-up EMAIL because the learner
-ref is now Better Auth's generated `user.id` (ADR-0041), which nothing outside the library chooses —
-and because the phone/desktop learners register inside the browser, so the runner never sees their
-ids at all.
+That command can derive only the three exact reserved `.invalid` addresses; it accepts no wildcard
+or prefix deletion.
 
-## Env vars (optional)
+## Optional environment
 
-| Var | Default | Purpose |
-|---|---|---|
-| `REALUSE_API_PORT` | `8790` | Supervisor-free learner-api port (loopback). |
-| `REALUSE_WEB_PORT` | `8091` | Static-server port; the browser Origin + API CORS use `http://127.0.0.1:<port>`. |
+| Variable | Default | Purpose |
+|---|---:|---|
+| `REALUSE_API_PORT` | `8790` | Loopback learner-api port. |
+| `REALUSE_WEB_PORT` | `8091` | Loopback static server and browser origin port. |
 
-The runner sets `REALUSE_RUN_ID`, `REALUSE_PASSWORD`, `REALUSE_API_BASE`, `REALUSE_EMAIL_{PHONE,DESKTOP}`,
-and the selected `REALUSE_ENRICHMENT_*` / `REALUSE_GRADED_KIND` for the Playwright process. It also
-mints a per-run `BETTER_AUTH_SECRET` for the API child, so this gate never handles the deployment's
-signing key and runs before one exists. No pre-seeded learner is required and no credential is
-committed.
+Web and API must use the same host and different ports. Cookies are host-scoped but not port-scoped,
+so `127.0.0.1:<web>` to `127.0.0.1:<api>` exercises the credentialed cross-origin path while
+remaining same-site. Do not mix `localhost` and `127.0.0.1`.
 
-## Safety properties
+## Safety and qualification
 
-- **No secret reaches the wrong child.** The base child env strips every secret-shaped key; only the
-  API re-adds `DATABASE_URL`. The browser/export/static/Playwright processes never see a database or
-  provider secret; the API never sees a LiteLLM/Expo secret.
-- **No model call.** The API entrypoint composes the same Hono app without the generation
-  supervisors, and the journey only reads a ready enrichment.
-- **No credential leakage.** Playwright tracing is off (a trace captures request headers, which now
-  carry the session cookie); only failure screenshots and sanitized diagnostics land in gitignored
-  `tmp/`. The suite asserts the page itself can read neither the cookie nor any stored mirror.
-- **Exact-name teardown.** Cleanup is derived from the current migration's learner FK graph
-  (`@lrnki/infrastructure-postgres/test-support`) and only ever deletes the three reserved names.
+- Only learner-api receives `DATABASE_URL`. The export, static server, browser, and Playwright child
+  do not receive database or secret-shaped environment variables.
+- A per-run Better Auth secret is generated; no deployment signing key is needed.
+- Browser traces are disabled because they can contain session cookies. Failure screenshots and
+  sanitized diagnostics are gitignored.
+- The page proves it cannot read the HTTP-only session cookie or a token-like storage key.
+- All learning content comes from the checked-in direct catalog accepted at API startup. There is no
+  model, generation supervisor, installer, publication, or content database involved.
+- The gate is local real-backend evidence. It is not deployed, native, distributable, or physical
+  device evidence.
 
-## Gotchas
-
-- **The supervisor-free API can log Better Auth's missing-client-IP warning.** Direct loopback
-  requests have no proxy-supplied address, so this isolated per-run process falls back to one
-  per-path rate-limit bucket. That is expected here: the gate runs sequentially and then exits.
-  The deployed Caddy path overwrites `X-Forwarded-For` with the real client address, and the API
-  suite separately proves that distinct forwarded addresses use distinct buckets.
-- **Web and API must share a HOST, differing only in port.** The session is a cookie, and cookies
-  are scoped by host and ignore port — so `127.0.0.1:<web>` ↔ `127.0.0.1:<api>` is same-SITE (the
-  `SameSite=Lax` cookie rides the XHR) while still cross-ORIGIN (the credentialed CORS path stays
-  under test). Using `localhost` for one side and `127.0.0.1` for the other makes them cross-site
-  and the whole gate fails signed out, with no CORS error to point at it.
-- **CORS is exact-match and credentialed.** The API's `LEARNER_WEB_ORIGIN` is set to the browser's
-  origin string exactly; a credentialed request can never widen to `*`.
-- **`--clear` on export is required.** Metro caches the inlined `EXPO_PUBLIC_LEARNER_API_URL`.
-- **The catalog must already contain a suitable ready enrichment.** This suite never generates one;
-  preflight fails closed when none exists.
-- **`dist-realuse` only goes stale by hand.** `run.ts` re-exports the bundle on every run, so the
-  one-command path cannot judge an old build. A *hand-driven* session that starts `realuseServer.ts`
-  and serves an existing `dist-realuse` can, and it fails silently — rebuild with the same export
-  command `run.ts` uses, baked against whatever `REALUSE_API_PORT` you started the API on.
-- **Restart a hand-started API after editing a `.prompt`.** Prompt files are cached by path in module
-  state; see `packages/infrastructure-litellm/README.md`.
-
-## Real-backend app behaviours worth not rediscovering
-
-Three behaviours that make a hand-driven or scripted journey fail in a way that looks like an app
-defect:
-
-- **The Guardian arrival dialog owns the pointer when a Leg falls** — drive the dialog, not the trail
-  node behind it.
-- **`activate` needs the calling learner's own `learner_expeditions` row**, not merely an existing
-  expedition.
-- **A theory read is only recorded for the learner's active expedition**, so reads against any other
-  expedition leave no trace and no error.
+The direct loopback process can emit Better Auth's missing-client-IP warning because no trusted proxy
+supplies an address. Runs are sequential and ephemeral, so the warning does not invalidate this
+gate. The deployed proxy contract is qualified separately.

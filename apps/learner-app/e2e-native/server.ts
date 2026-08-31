@@ -1,55 +1,54 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
-import { CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY } from "@lrnki/application";
-import { answerGuardianSelection, applyGuardianLifecycle, guardianView } from "./guardianFixture";
+import { dirname, resolve } from "node:path";
+import {
+  loadQualifiedCatalogOrThrow,
+  qualifiedExpeditionDocument,
+  type LearnerActivityProjection
+} from "@lrnki/learner-runtime/content-node";
+import {
+  createLearnerRuntime,
+  MemoryLearnerStateStore,
+  type LearnerCommand,
+  type LearnerRuntime,
+  type LearnerTransitionResult
+} from "@lrnki/learner-runtime/runtime";
+
 import { E2E_FIXTURE_EMAIL, E2E_FIXTURE_PASSWORD } from "../src/lib/e2eFixture";
 
-// Deterministic loopback fixture server for the native Maestro gate (plan 2026-07-15-001 U5, R15-R16).
-// It serves REAL learner-api response SHAPES — captured once from the supervisor-free API over a
-// genuine production enrichment ("Vesicular transport", Cell Biology: a 12-lesson expedition with a
-// long Theory activity and available Explorable Terms) and frozen under `scenario/`. The purpose of
-// the native gate is Android layout, touch scrolling, Support Path dialog reachability, and Crystal
-// Guardian obelisk rendering, so the upstream data is deterministic here while the APK and UI are
-// real; the separate real-use WEB suite owns live backend integration. This binds to host loopback
-// ONLY; the Android emulator reaches it through the `10.0.2.2` host alias. It is never pointed at
-// production or the real-use database.
-//
-// Session reads replay those frozen captures. The Guardian challenge is the one stateful surface,
-// because the ward states this gate exists to look at are only reachable by answering — and its
-// combat rules come from the production fold, not from this file (see `guardianFixture.ts`).
-//
-// Identity is faked at the WIRE level, not stubbed in the app: the flow drives the real sign-in
-// UI, the real `authClient`, and the real `@better-auth/expo` SecureStore mirror, and this server
-// answers with the response shapes and `Set-Cookie` a real Better Auth would. So a break in the
-// app's cookie handling still fails here; only the identity authority behind it is deterministic.
+// The native rig drives the real Expo APK against the real authored-content qualifier and learner
+// runtime in memory. Only Better Auth's wire identity and Postgres are replaced. This keeps the
+// Support/Guardian response shapes, grading, revisions, and command behavior owned by production
+// code while remaining deterministic and isolated from every database.
 
 const here = dirname(fileURLToPath(import.meta.url));
-const scenario = (name: string): unknown => JSON.parse(readFileSync(join(here, "scenario", `${name}.json`), "utf8"));
-
-const SESSION = scenario("session");
-// The capture predates the reversible topic-generation capability. Compose the one current
-// application-owned policy into the wire fixture instead of freezing a duplicate client flag.
-const JOURNAL = {
-  ...(scenario("journal") as Record<string, unknown>),
-  capabilities: { syntheticTopicGeneration: CURRENT_LEARNER_KNOWLEDGE_AVAILABILITY.syntheticTopicGeneration }
-};
-const CATALOG = scenario("catalog");
-const EXPEDITION = scenario("expedition");
-const LEADERBOARD = scenario("leaderboard");
-
-// Fixture-only login shared with the e2e-build gate. The server
-// accepts exactly this address/password on Better Auth's credential sign-in route and answers with
-// a session cookie; every authed read is then served regardless of cookie value (the fixture
-// models one pre-existing learner, whose frozen journal a fresh sign-up could not plausibly have).
+const repoRoot = resolve(here, "../../..");
 const PORT = Number(process.env.NATIVE_FIXTURE_PORT ?? 8799);
-
-// `@better-auth/expo` only persists a `Set-Cookie` whose name carries the default `better-auth`
-// prefix and a `session_token`/`session_data` suffix — anything else is dropped silently and the
-// app returns to the gate with no error to read. No `Secure` flag: the emulator reaches this over
-// cleartext http, which is also how the real API behaves when its base URL is http.
+const LEARNER_REF = "native-capture";
+const EXPEDITION_KEY = "critical-thinking";
 const SESSION_COOKIE = "better-auth.session_token";
+const SESSION_TOKEN = "native-fixture-session-token";
+
+const SESSION = {
+  session: {
+    id: "native-fixture-session",
+    userId: LEARNER_REF,
+    token: SESSION_TOKEN,
+    expiresAt: "2099-01-01T00:00:00.000Z",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z"
+  },
+  user: {
+    id: LEARNER_REF,
+    name: "Native Capture",
+    email: E2E_FIXTURE_EMAIL,
+    emailVerified: false,
+    image: null,
+    profileComplete: true,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z"
+  }
+};
 
 const CORS = {
   "access-control-allow-origin": "*",
@@ -57,13 +56,25 @@ const CORS = {
   "access-control-allow-headers": "content-type,cookie,expo-origin,x-skip-oauth-proxy"
 };
 
+type Fixture = Readonly<{
+  runtime: LearnerRuntime;
+  legChallengeId: string;
+  expeditionChallengeId: string;
+}>;
+
+function transport(value: unknown): unknown {
+  return JSON.parse(JSON.stringify(value, (_key, nested: unknown) =>
+    typeof nested === "bigint" ? nested.toString() : nested
+  ));
+}
+
 function send(res: ServerResponse, status: number, body: unknown, setCookie?: string): void {
   res.writeHead(status, {
     "content-type": "application/json",
     ...CORS,
     ...(setCookie ? { "set-cookie": setCookie } : {})
   });
-  res.end(JSON.stringify(body));
+  res.end(JSON.stringify(transport(body)));
 }
 
 async function readBody(req: IncomingMessage): Promise<unknown> {
@@ -77,89 +88,265 @@ async function readBody(req: IncomingMessage): Promise<unknown> {
   }
 }
 
+async function bootstrapFixture(): Promise<Fixture> {
+  const catalog = await loadQualifiedCatalogOrThrow(resolve(repoRoot, "content"));
+  const document = qualifiedExpeditionDocument(catalog, EXPEDITION_KEY);
+  if (!document) throw new Error(`native fixture is missing ${EXPEDITION_KEY}`);
+  const store = new MemoryLearnerStateStore([{ learnerRef: LEARNER_REF, displayName: "Native Capture" }]);
+  const runtime = createLearnerRuntime({
+    catalog,
+    stateStore: store,
+    now: (() => {
+      let tick = 0;
+      return () => new Date(Date.UTC(2026, 7, 31, 0, 0, tick++));
+    })()
+  });
+
+  let requestSequence = 0;
+  const dispatch = async (command: LearnerCommand): Promise<Extract<LearnerTransitionResult, { status: "applied" }>> => {
+    const current = await store.read(LEARNER_REF);
+    if (!current.found) throw new Error("native fixture learner disappeared");
+    const result = await runtime.dispatch(LEARNER_REF, {
+      requestId: `native-bootstrap-${++requestSequence}`,
+      expectedStateVersion: current.stateVersion,
+      command
+    });
+    if (result.status !== "applied") {
+      throw new Error(`native bootstrap ${command.kind} was ${result.status}${result.status === "refused" ? `:${result.reason}` : ""}`);
+    }
+    return result;
+  };
+
+  await dispatch({ kind: "adopt_expedition", expeditionKey: EXPEDITION_KEY });
+  await dispatch({ kind: "activate_expedition", expeditionKey: EXPEDITION_KEY });
+
+  for (const leg of document.legs) {
+    for (const stop of leg.stops) {
+      await dispatch({ kind: "record_lesson_read", expeditionKey: EXPEDITION_KEY, stopKey: stop.key });
+      const read = await runtime.read(LEARNER_REF, { kind: "expedition", expeditionKey: EXPEDITION_KEY });
+      if (read.status !== "ok" || read.view.kind !== "expedition") {
+        throw new Error(`native bootstrap could not project Stop ${stop.key}`);
+      }
+      const publicStop = read.view.expedition.legs
+        .flatMap((candidate) => candidate.stops)
+        .find((candidate) => candidate.key === stop.key);
+      if (!publicStop) throw new Error(`native bootstrap projection lost Stop ${stop.key}`);
+      for (const activity of stop.activities) {
+        const projected = publicStop.activities.find((candidate) => candidate.key === activity.key);
+        if (!projected) throw new Error(`native bootstrap projection lost Activity ${activity.key}`);
+        if (activity.family === "option_select") {
+          await dispatch({
+            kind: "answer_option_select",
+            expeditionKey: EXPEDITION_KEY,
+            stopKey: stop.key,
+            activityKey: activity.key,
+            chosenOptionKey: activity.answerKey,
+            source: { kind: "trail" }
+          });
+        } else if (activity.family === "impostor") {
+          const answer = activity.statements.find((statement) => statement.kind === "impostor")?.key;
+          if (!answer) throw new Error(`native bootstrap Activity ${activity.key} has no impostor`);
+          await dispatch({
+            kind: "answer_impostor",
+            expeditionKey: EXPEDITION_KEY,
+            stopKey: stop.key,
+            activityKey: activity.key,
+            chosenStatementKey: answer,
+            source: { kind: "trail" }
+          });
+        } else {
+          await dispatch({
+            kind: "answer_matching",
+            expeditionKey: EXPEDITION_KEY,
+            stopKey: stop.key,
+            activityKey: activity.key,
+            matches: publicMatchingAnswers(activity.pairs, projected),
+            source: { kind: "trail" }
+          });
+        }
+      }
+    }
+  }
+
+  const legKey = document.legs[0]?.key;
+  if (!legKey) throw new Error("native fixture Expedition has no Leg");
+  const firstLeg = await dispatch({
+    kind: "create_guardian",
+    expeditionKey: EXPEDITION_KEY,
+    scope: { kind: "leg", legKey }
+  });
+  if (!firstLeg.effect.challengeId) throw new Error("native bootstrap Leg Guardian has no id");
+  await winGuardian(runtime, store, document, firstLeg.effect.challengeId, dispatch);
+
+  const rematch = await dispatch({
+    kind: "create_guardian",
+    expeditionKey: EXPEDITION_KEY,
+    scope: { kind: "leg", legKey }
+  });
+  const summit = await dispatch({
+    kind: "create_guardian",
+    expeditionKey: EXPEDITION_KEY,
+    scope: { kind: "expedition" }
+  });
+  if (!rematch.effect.challengeId || !summit.effect.challengeId) {
+    throw new Error("native bootstrap Guardian identity missing");
+  }
+  return {
+    runtime,
+    legChallengeId: rematch.effect.challengeId,
+    expeditionChallengeId: summit.effect.challengeId
+  };
+}
+
+function publicMatchingAnswers(
+  pairs: ReadonlyArray<Readonly<{ left: string; right: string }>>,
+  projected: LearnerActivityProjection
+): Array<{ leftKey: string; rightKey: string }> {
+  if (projected.family !== "matching") throw new Error("matching Activity projection changed family");
+  return pairs.map((pair) => {
+    const left = projected.left.find((entry) => entry.text === pair.left);
+    const right = projected.right.find((entry) => entry.text === pair.right);
+    if (!left || !right) throw new Error("matching Activity projection lost an authored pair");
+    return { leftKey: left.key, rightKey: right.key };
+  });
+}
+
+async function winGuardian(
+  runtime: LearnerRuntime,
+  store: MemoryLearnerStateStore,
+  document: NonNullable<ReturnType<typeof qualifiedExpeditionDocument>>,
+  challengeId: string,
+  dispatch: (command: LearnerCommand) => Promise<Extract<LearnerTransitionResult, { status: "applied" }>>
+): Promise<void> {
+  for (;;) {
+    const read = await runtime.read(LEARNER_REF, {
+      kind: "guardian",
+      expeditionKey: EXPEDITION_KEY,
+      challengeId
+    });
+    if (read.status !== "ok" || read.view.kind !== "guardian") {
+      throw new Error(`native bootstrap could not read Guardian ${challengeId}`);
+    }
+    if (read.view.state === "won") return;
+    const projected = read.view.currentActivity;
+    const authored = document.legs
+      .flatMap((leg) => leg.stops)
+      .flatMap((stop) => stop.activities)
+      .find((activity) => activity.key === projected.key);
+    if (!authored) throw new Error(`native bootstrap lost Guardian Activity ${projected.key}`);
+    if (authored.family === "option_select") {
+      await dispatch({
+        kind: "answer_guardian_selection",
+        expeditionKey: EXPEDITION_KEY,
+        challengeId,
+        activityKey: authored.key,
+        chosenKey: authored.answerKey
+      });
+    } else if (authored.family === "impostor") {
+      const chosenKey = authored.statements.find((statement) => statement.kind === "impostor")?.key;
+      if (!chosenKey) throw new Error(`native bootstrap Guardian Activity ${authored.key} has no impostor`);
+      await dispatch({
+        kind: "answer_guardian_selection",
+        expeditionKey: EXPEDITION_KEY,
+        challengeId,
+        activityKey: authored.key,
+        chosenKey
+      });
+    } else {
+      for (const pair of publicMatchingAnswers(authored.pairs, projected)) {
+        await dispatch({
+          kind: "answer_guardian_matching_pair",
+          expeditionKey: EXPEDITION_KEY,
+          challengeId,
+          activityKey: authored.key,
+          ...pair
+        });
+      }
+    }
+    const current = await store.read(LEARNER_REF);
+    if (!current.found) throw new Error("native fixture learner disappeared during Guardian bootstrap");
+  }
+}
+
+async function main(): Promise<void> {
+const fixture = await bootstrapFixture();
+
 const server = createServer(async (req, res) => {
   const method = req.method ?? "GET";
   const pathname = new URL(req.url ?? "/", `http://localhost:${PORT}`).pathname;
-
   if (method === "OPTIONS") {
     res.writeHead(204, CORS);
     res.end();
     return;
   }
 
-  // Identity: Better Auth's credential sign-in, the one route any rig drives (ADR-0041). Accept
-  // exactly the injected address/password and hand back the session cookie the Expo plugin
-  // mirrors into SecureStore. Google is never involved — no rig automates a consent screen.
   if (method === "POST" && pathname === "/auth/sign-in/email") {
     const body = (await readBody(req)) as { email?: string; password?: string } | undefined;
     if (body?.email !== E2E_FIXTURE_EMAIL || body?.password !== E2E_FIXTURE_PASSWORD) {
       return send(res, 401, { code: "INVALID_EMAIL_OR_PASSWORD", message: "Invalid email or password" });
     }
-    const { session, user } = SESSION as { session: { token: string }; user: unknown };
-    return send(res, 200, { redirect: false, token: session.token, user }, `${SESSION_COOKIE}=${session.token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`);
+    return send(
+      res,
+      200,
+      { redirect: false, token: SESSION_TOKEN, user: SESSION.user },
+      `${SESSION_COOKIE}=${SESSION_TOKEN}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`
+    );
   }
-
-  // The session read answers 200-with-null when the app carries no cookie, which is what makes
-  // `launchApp: clearState: true` land on the sign-in gate rather than straight in the Journal.
-  // Any cookie value is then accepted: the fixture models exactly one learner.
   if (method === "GET" && pathname === "/auth/get-session") {
-    const signedIn = (req.headers.cookie ?? "").includes(SESSION_COOKIE);
-    return send(res, 200, signedIn ? SESSION : null);
+    return send(res, 200, (req.headers.cookie ?? "").includes(SESSION_COOKIE) ? SESSION : null);
   }
-
   if (method === "GET" && pathname === "/health") return send(res, 200, { ok: true });
-  if (method === "GET" && pathname === "/journal") return send(res, 200, JOURNAL);
-  if (method === "GET" && pathname === "/catalog") return send(res, 200, CATALOG);
-  if (method === "GET" && pathname === "/leaderboard") return send(res, 200, LEADERBOARD);
-  // The long-Theory session is served for any expedition id the flow opens (the fixture models one).
-  if (method === "GET" && pathname.startsWith("/expedition/")) return send(res, 200, EXPEDITION);
-
-  // --- Crystal Guardian. The ONLY stateful part of this
-  // fixture: a five-ward Leg challenge whose combat state is folded by the production pure
-  // functions, so the native gate can reach entry, partial, miss, Last Stand, and Final Ward on a
-  // real APK. See `guardianFixture.ts`. ------------------------------------------------------
-  if (method === "GET" && pathname.startsWith("/challenge/")) {
-    const view = guardianView(pathname.slice("/challenge/".length));
-    if (view) return send(res, 200, { view });
-  }
-
-  if (method === "POST" && pathname === "/challenge/answer") {
-    const body = (await readBody(req)) as
-      | { challengeId?: string; attemptRef?: string; studyItemId?: string; chosenId?: string; responseDurationMs?: number }
-      | undefined;
-    if (!body?.challengeId || !body.attemptRef || !body.studyItemId || !body.chosenId) return send(res, 400, { error: "bad_request" });
-    const result = answerGuardianSelection({
-      challengeId: body.challengeId,
-      attemptRef: body.attemptRef,
-      studyItemId: body.studyItemId,
-      chosenId: body.chosenId,
-      responseDurationMs: body.responseDurationMs ?? null
+  if (method === "GET" && pathname === "/fixture") {
+    return send(res, 200, {
+      expeditionKey: EXPEDITION_KEY,
+      legChallengeId: fixture.legChallengeId,
+      expeditionChallengeId: fixture.expeditionChallengeId
     });
-    return send(res, result.answered ? 200 : 409, result);
   }
-
-  if (method === "POST" && (pathname === "/challenge/retreat" || pathname === "/challenge/resume" || pathname === "/challenge/abandon")) {
-    const body = (await readBody(req)) as { challengeId?: string; operationRef?: string } | undefined;
-    if (!body?.challengeId || !body.operationRef) return send(res, 400, { error: "bad_request" });
-    const kind = pathname.slice("/challenge/".length) as "retreat" | "resume" | "abandon";
-    const result = applyGuardianLifecycle({ kind, challengeId: body.challengeId, operationRef: body.operationRef });
-    return send(res, result.applied ? 200 : 404, result);
+  if (method === "GET" && pathname === "/journal") {
+    return send(res, 200, await fixture.runtime.read(LEARNER_REF, { kind: "journal" }));
   }
-
-  // Non-graded writes the flow may issue while traversing Theory. Deterministic acks; these leave
-  // the frozen session untouched, so a re-read returns the same session.
-  if (method === "POST" && (pathname === "/study/lesson-read" || pathname === "/expedition/choose" || pathname === "/expedition/activate")) {
-    await readBody(req);
-    return send(res, 200, { ok: true });
+  if (method === "GET" && pathname === "/catalog") {
+    return send(res, 200, await fixture.runtime.read(LEARNER_REF, { kind: "catalog" }));
+  }
+  if (method === "GET" && pathname === "/leaderboard") {
+    return send(res, 200, await fixture.runtime.read(LEARNER_REF, { kind: "leaderboard" }));
+  }
+  if (method === "GET" && pathname.startsWith("/expedition/")) {
+    const expeditionKey = decodeURIComponent(pathname.slice("/expedition/".length));
+    return send(res, 200, await fixture.runtime.read(LEARNER_REF, { kind: "expedition", expeditionKey }));
+  }
+  if (method === "GET" && pathname.startsWith("/guardian/")) {
+    const [, , expeditionKey, challengeId] = pathname.split("/");
+    if (!expeditionKey || !challengeId) return send(res, 404, { error: "not_found" });
+    return send(res, 200, await fixture.runtime.read(LEARNER_REF, {
+      kind: "guardian",
+      expeditionKey: decodeURIComponent(expeditionKey),
+      challengeId: decodeURIComponent(challengeId)
+    }));
+  }
+  if (method === "POST" && pathname === "/game/commands") {
+    const body = (await readBody(req)) as {
+      requestId?: string;
+      expectedStateVersion?: string;
+      command?: LearnerCommand;
+    } | undefined;
+    if (!body?.requestId || !/^\d+$/.test(body.expectedStateVersion ?? "") || !body.command) {
+      return send(res, 400, { error: "bad_request" });
+    }
+    return send(res, 200, await fixture.runtime.dispatch(LEARNER_REF, {
+      requestId: body.requestId,
+      expectedStateVersion: BigInt(body.expectedStateVersion!),
+      command: body.command
+    }));
   }
 
   await readBody(req);
-  send(res, 404, { error: "not_found", method, pathname });
+  return send(res, 404, { error: "not_found", method, pathname });
 });
 
-// Loopback bind (R15/security): reachable from the emulator via 10.0.2.2, never on a public iface.
 server.listen(PORT, "127.0.0.1", () => {
-  console.log(`[native-fixture] serving learner-api shapes on http://127.0.0.1:${PORT} (emulator: http://10.0.2.2:${PORT})`);
+  console.log(`[native-fixture] authored runtime on http://127.0.0.1:${PORT} (emulator http://10.0.2.2:${PORT})`);
 });
 
 const shutdown = (): void => {
@@ -168,3 +355,9 @@ const shutdown = (): void => {
 };
 process.on("SIGTERM", shutdown);
 process.on("SIGINT", shutdown);
+}
+
+void main().catch((error: unknown) => {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
+});

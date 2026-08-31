@@ -34,14 +34,14 @@ const RIM_WIDTH = 2.5;
 
 export function CrystalSpecimen({
   species,
-  derivedNodeId,
+  identityKey,
   material,
   growthFraction,
   size = 40,
   ariaLabel
 }: Readonly<{
   species: CrystalSpecies;
-  derivedNodeId: string;
+  identityKey: string;
   material: CrystalMaterial;
   growthFraction: number;
   size?: number;
@@ -60,7 +60,7 @@ export function CrystalSpecimen({
     >
       <CrystalSpecimenGroup
         species={species}
-        derivedNodeId={derivedNodeId}
+        identityKey={identityKey}
         material={material}
         growthFraction={growthFraction}
       />
@@ -74,17 +74,17 @@ export function CrystalSpecimen({
 // it; it never mirrors, because the light source is fixed upper-left.
 export function CrystalSpecimenGroup({
   species,
-  derivedNodeId,
+  identityKey,
   material,
   growthFraction
 }: Readonly<{
   species: CrystalSpecies;
-  derivedNodeId: string;
+  identityKey: string;
   material: CrystalMaterial;
   growthFraction: number;
 }>) {
   const spec = crystalSpec(species);
-  const { scale } = crystalVariationFor(derivedNodeId);
+  const { scale } = crystalVariationFor(identityKey);
   const transform = `translate(50, ${MINERAL_GROUND_Y}) scale(${scale}) translate(-50, -${MINERAL_GROUND_Y})`;
 
   // A fogged slot sits in unopened ground: it shows silhouette and nothing else, so a Leg the

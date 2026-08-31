@@ -1,92 +1,70 @@
-# Android runtime-reliability flow (plan 2026-07-15-001 U5, R17-R18). Drives the REAL standalone
-# e2e-profile APK against the deterministic loopback fixture (10.0.2.2) — real React Native
-# primitives, real Yoga layout, real gesture dispatch; only the upstream data is mocked.
-#
-# U6 sensitivity result (AGENTS.md "Validation authority") scopes what this flow is AUTHORITY for:
-#   1. Support Path dialog — ADOPTED automatic authority. Opening a contextual term dialog must show
-#      its title, body, and close/footer action, and closing must return to the same Theory activity
-#      (the measured dialog-geometry regression, commit 0b1c9d3). Its negative control fails this
-#      block deterministically 3/3, so these assertions are a trustworthy gate.
-#   2. Theory scroll — NAVIGATION only, NOT a proven gate. The real device swipe is needed to reach
-#      the Support Paths panel and open the dialog, but its negative control (the touch-responder
-#      regression, commit ddc0ec9) fails only intermittently on the emulator, so the touch-responder
-#      class stays PHYSICALLY owned (docs/plans/BLOCKERS.md) and is not narrowed by this flow.
-# The e2e-only button calls the real email sign-in route with the shared fixture identity.
-# Selectors are accessibility labels and app-owned testIDs, never generated prose or coordinates.
+# Retained Android Support Path authority. The real e2e APK talks to the authored qualifier and
+# learner runtime through the loopback fixture; only identity persistence and Postgres are replaced.
+# The body and footer assertions are the negative-control-sensitive oracle for the historical
+# narrow-dialog collapse. Trail scrolling remains navigation evidence only.
 appId: com.globesoul.lrnki
 ---
 - launchApp:
     clearState: true
-
-# --- One-tap fixture sign-in still drives the real auth client and cookie mirror. The dedicated
-# signin flow owns manual email/password coverage; Google's consent screen is never automated. ---
 - assertVisible: "Choose your explorer"
 - tapOn:
     id: "gate-e2e-signin"
-- assertVisible: "Choose an expedition"
+- assertVisible: "Expedition journal"
 
-# --- Open the shared long-Theory expedition through the real Explore/Catalog UI (R17) ---
-- scrollUntilVisible:
-    element:
-      id: "candidate-012c74c3-c197-43e6-810c-072786ed9ee9"
-    direction: DOWN
-- tapOn:
-    id: "candidate-012c74c3-c197-43e6-810c-072786ed9ee9"
+# The deterministic fixture has completed scored Stops, so a fresh app state must surface the
+# retained first-visit board celebration. Dismiss it before navigating away from the journal.
+- assertVisible: "You climbed the board!"
+- tapOn: "Close"
 
-# The trail: open the Theory ("Field notes") activity by its typed checkpoint, not by label.
+- tapOn: "Resume trail"
+- assertVisible: "See the support structure"
+
+- swipe:
+    direction: UP
+    duration: 600
+- swipe:
+    direction: UP
+    duration: 600
+- swipe:
+    direction: UP
+    duration: 600
+- swipe:
+    direction: UP
+    duration: 600
+- swipe:
+    direction: UP
+    duration: 600
+- swipe:
+    direction: UP
+    duration: 600
+- swipe:
+    direction: UP
+    duration: 600
+- swipe:
+    direction: UP
+    duration: 600
 - assertVisible:
-    id: "checkpoint-theory-available"
+    id: "support-path-review-support-relationship"
 - tapOn:
-    id: "checkpoint-theory-available"
-
-# --- Theory scroll (NAVIGATION, not a proven gate — see header + AGENTS.md): a real device swipe
-# over long Theory content reaches the post-content Support Paths panel to open the dialog. The
-# fixed header (Field notes) + footer (Continue) reachability are cheap sanity checks, not the
-# adopted authority (the touch-responder negative control is emulator-flaky). scrollUntilVisible
-# issues DEVICE swipes. The panel is a real view (large-target equivalent of the inline Explorable
-# Term, which is a non-queryable nested text span). ---
-- assertVisible: "Field notes"
-- scrollUntilVisible:
-    element:
-      id: "support-path-add-phospholipid bilayer"
-      enabled: true
-    direction: DOWN
-    timeout: 20000
-    visibilityPercentage: 100
-    centerElement: true
-- assertVisible:
-    id: "support-path-add-phospholipid bilayer"
+    id: "support-path-review-support-relationship"
     enabled: true
-- takeScreenshot: support-path-exact-action-ready
-- assertVisible: "Continue"      # footer control reachable after the long scroll
-- assertVisible: "Field notes"   # fixed header still present
 
-# --- Support Path dialog (R17 / AE7): tapping the Explorable Term affordance opens the contextual
-# dialog; its title, body, and close action must all be reachable (the measured dialog-geometry
-# assertion). ---
-- tapOn:
-    id: "support-path-add-phospholipid bilayer"
-    enabled: true
-- assertVisible: "Support paths"                 # dialog title (OverlayHeader)
-- assertVisible: "Add support path"              # dialog body/primary action reachable
-- assertVisible: "Keep exploring"               # dialog footer close action reachable
+# Negative-control-sensitive dialog oracle: title alone is insufficient.
+- assertVisible: "Support Path"
+- assertVisible: "This branch reuses ordinary acquisition evidence.*"
+- assertVisible: "Keep exploring"
+- takeScreenshot: authored-support-path-dialog
 - tapOn: "Keep exploring"
 
-# Closing returns the learner to the SAME Theory activity (not a dead/blank surface). Assert the
-# dialog-only action is gone ("Add support path" exists only in the dialog; the panel's own term
-# buttons carry a "Support paths: …" label, so that phrase is not a valid dialog-dismissed signal).
-- assertVisible: "Field notes"
-- assertNotVisible: "Add support path"
+# Closing restores the same authored trail, not a blank or stale generation surface.
+- assertVisible:
+    id: "support-path-review-support-relationship"
+- assertNotVisible: "This branch reuses ordinary acquisition evidence.*"
 
-# --- Board via the menu path (plan 2026-07-16-003 D8d): the sequenced menu→board handoff must
-# render dialog CONTENT, not a blank card (the Android entering-animation vs portal-teardown
-# race, H2). Back out of the Theory activity and the trail to the journal, open the menu, open
-# the board, and assert both the dialog title and a fixture-owned entry row painted. Scrim
-# dimness stays human-judged on the emulator (D8: no automated scrim assertion). ---
-- back                                    # close the Theory activity
-- back                                    # leave the trail back to the journal
-- assertVisible: "Choose an expedition"
+# The retained board opens through the real menu/portal path and paints content.
+- back
+- assertVisible: "Expedition journal"
 - tapOn: "Menu"
 - tapOn: "View the board"
-- assertVisible: "This week’s climbers"   # board dialog title painted
-- assertVisible: "Bruce.Moore"            # fixture entry row painted (content, not just the shell)
+- assertVisible: "This week’s climbers"
+- assertVisible: "Native Capture.*"

@@ -2,17 +2,19 @@ import { expect, jest, test } from "@jest/globals";
 import { fireEvent, render, screen } from "@testing-library/react-native";
 import { PortalHost } from "@rn-primitives/portal";
 import { LeaderboardDialog } from "./LeaderboardDialog";
-import type { LeaderboardView } from "@/lib/api";
+import type { LeaderboardView } from "@/lib/queries";
 import { learnerTerm } from "@/learn/vocabulary";
 
 export function boardFixture(overrides: Partial<LeaderboardView> = {}): LeaderboardView {
   return {
+    kind: "leaderboard",
     weekKey: "2026-W28",
     entries: Array.from({ length: 10 }, (_, index) => ({
       id: `entry-${index}`,
       rank: index + 1,
       name: index === 4 ? "scout" : `Rival ${index}`,
       isViewer: index === 4,
+      isRival: index !== 4,
       points: 100 - index * 7,
       badges: { podiums: index === 1 ? 1 : 0 }
     })),
@@ -20,6 +22,7 @@ export function boardFixture(overrides: Partial<LeaderboardView> = {}): Leaderbo
     viewerPoints: 72,
     viewerRank: 5,
     masteredCrystalCount: 12,
+    division: { name: "Foothills", threshold: 10, nextThreshold: 30 },
     podiumEarnedForPreviousWeek: false,
     ...overrides
   } as LeaderboardView;

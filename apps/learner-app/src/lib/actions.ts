@@ -1,183 +1,29 @@
-import type { InferResponseType } from "hono/client";
-import type { MatchingAttemptTrace } from "@lrnki/application/projection";
-import type { Verdict } from "@lrnki/domain-core";
+import type { LearnerCommandDto, LearnerTransitionDto } from "./api";
 import { api, queryClient } from "./api";
-import { expeditionQuery, journalQuery } from "./queries";
-import type { LearnerGradingResult, LearnerMatchingAttemptResult, LearnerMatchingResult } from "./api";
+import { learnerScopeKey } from "./queries";
+import { clientUuid } from "./uuid";
 
-export type { LearnerGradingResult, LearnerMatchingAttemptResult, LearnerMatchingResult };
+export type { LearnerCommandDto, LearnerTransitionDto };
 
-// The SPA replacement for the deleted server actions: same names and result shapes, but
-// every call is a typed API request and identity comes from the bearer token (R2) — no
-// learnerStateRef leaves the client. `refreshLearnerExpedition` becomes Query
-// invalidation, the SPA's `revalidatePath`.
-
-// Invalidations reference the exported query definitions (KTD3): the learner-scope prefix
-// and every read's key have exactly one source of truth, so a key change cannot leave a
-// mutation refreshing a stale string array.
-export async function refreshLearnerExpedition(input: { enrichmentId: string }): Promise<void> {
-  await Promise.all([
-    queryClient.invalidateQueries({ queryKey: expeditionQuery(input.enrichmentId).queryKey }),
-    queryClient.invalidateQueries({ queryKey: journalQuery.queryKey })
-  ]);
-}
-
-export async function refreshJournal(): Promise<void> {
-  await queryClient.invalidateQueries({ queryKey: journalQuery.queryKey });
-}
-
-export async function chooseCandidateExpedition(input: { enrichmentId: string }): Promise<void> {
-  await api.expedition.choose.$post({ json: input });
-  await refreshJournal();
-}
-
-export async function setActiveExpedition(input: { learnerExpeditionId: string }): Promise<void> {
-  await api.expedition.activate.$post({ json: input });
-  await refreshJournal();
-}
-
-export async function startTopicExpedition(input: { topic: string }): Promise<void> {
-  await api.expedition.start.$post({ json: input });
-  await refreshJournal();
-}
-
-export async function retryTopicExpedition(input: { learnerExpeditionId: string }): Promise<void> {
-  await api.expedition.retry.$post({ json: input });
-  await refreshJournal();
-}
-
-export async function submitLearnerOptionSelect(input: { enrichmentId: string; studyItemId: string; chosenOptionId: string }): Promise<LearnerGradingResult> {
-  const res = await api.study["option-select"].$post({ json: input });
-  return (await res.json()) as LearnerGradingResult;
-}
-
-export async function submitLearnerImpostor(input: { enrichmentId: string; studyItemId: string; chosenStatementId: string }): Promise<LearnerGradingResult> {
-  const res = await api.study.impostor.$post({ json: input });
-  return (await res.json()) as LearnerGradingResult;
-}
-
-export async function submitLearnerMatching(input: { enrichmentId: string; studyItemId: string; trace: MatchingAttemptTrace }): Promise<LearnerMatchingResult> {
-  const res = await api.study.matching.$post({ json: input });
-  return (await res.json()) as LearnerMatchingResult;
-}
-
-export async function validateLearnerMatchingAttempt(input: { enrichmentId: string; studyItemId: string; promptId: string; matchId: string }): Promise<LearnerMatchingAttemptResult> {
-  const res = await api.study["matching-attempt"].$post({ json: input });
-  return (await res.json()) as LearnerMatchingAttemptResult;
-}
-
-export async function setLearnerVerdict(input: { enrichmentId: string; derivedNodeId: string; verdict: Verdict }): Promise<void> {
-  await api.study.verdict.$post({ json: input });
-}
-
-// Clearing a verdict IS recording "learn" — same route, same semantics as before.
-export async function clearLearnerVerdict(input: { enrichmentId: string; derivedNodeId: string }): Promise<void> {
-  await api.study.verdict.$post({ json: { ...input, verdict: "learn" } });
-}
-
-export async function markLearnerLessonRead(input: { enrichmentId: string; derivedNodeId: string }): Promise<void> {
-  await api.study["lesson-read"].$post({ json: input });
-}
-
-// --- Recall Challenges (plan 2026-07-13-003 U5, KTD7) ------------------------------------
-// Thin typed calls over the neutral `/challenge/*` lifecycle. Result shapes derive
-// mechanically from the hono AppType (success AND refusal arms), so a server contract
-// change surfaces as a type error here. Callers mint attemptRef/operationRef UUIDs ONCE
-// per submission and reuse them across retries (KTD2 idempotency); the fight screen owns
-// query invalidation because only it knows when a scope's durable state changed.
-
-export type ChallengeCreateResult = InferResponseType<typeof api.challenge.create.$post>;
-export type ChallengeAnswerResult = InferResponseType<typeof api.challenge.answer.$post>;
-export type ChallengeLifecycleResult = InferResponseType<typeof api.challenge.retreat.$post>;
-
-export async function createChallengeAction(input: {
-  enrichmentId: string;
-  scopeKind: "section" | "enrichment";
-  anchorDerivedNodeId: string;
-}): Promise<ChallengeCreateResult> {
-  const res = await api.challenge.create.$post({ json: input });
-  return (await res.json()) as ChallengeCreateResult;
-}
-
-export async function answerChallengeSelectionAction(input: {
-  challengeId: string;
-  attemptRef: string;
-  studyItemId: string;
-  chosenId: string;
-  responseDurationMs: number | null;
-}): Promise<ChallengeAnswerResult> {
-  const res = await api.challenge.answer.$post({ json: input });
-  return (await res.json()) as ChallengeAnswerResult;
-}
-
-export async function answerChallengeMatchingPairAction(input: {
-  challengeId: string;
-  attemptRef: string;
-  studyItemId: string;
-  promptId: string;
-  chosenMatchId: string;
-  responseDurationMs: number | null;
-}): Promise<ChallengeAnswerResult> {
-  const res = await api.challenge["matching-pair"].$post({ json: input });
-  return (await res.json()) as ChallengeAnswerResult;
-}
-
-export async function challengeLifecycleAction(
-  kind: "retreat" | "resume" | "abandon",
-  input: { challengeId: string; operationRef: string }
-): Promise<ChallengeLifecycleResult> {
-  const res = await api.challenge[kind].$post({ json: input });
-  return (await res.json()) as ChallengeLifecycleResult;
-}
-
-// --- Learner-Scoped Scaffold Detours (plan 2026-07-12-002 U5) ----------------------------
-// A term source is a lesson section (keyed by its node) or a question stem (keyed by the item);
-// both resolve to the parent Concept Marker server-side. Identity comes from the bearer token.
-export type ScaffoldTermSource =
-  | { kind: "lesson"; derivedNodeId: string }
-  | { kind: "study_item"; studyItemId: string };
-
-export type RequestScaffoldOutcome =
-  | { created: true; detourId: string; status: "generating" | "ready" | "failed" | "hidden" }
-  | { created: false; reason: string };
-
-export async function requestScaffoldDetour(input: { enrichmentId: string; source: ScaffoldTermSource; term: string }): Promise<RequestScaffoldOutcome> {
-  const res = await api.scaffold.request.$post({ json: input });
-  const body = (await res.json()) as RequestScaffoldOutcome;
-  if (res.ok && body.created) await refreshLearnerExpedition({ enrichmentId: input.enrichmentId });
-  return body;
-}
-
-export async function retryScaffoldDetour(input: { enrichmentId: string; detourId: string }): Promise<void> {
-  await api.scaffold.retry.$post({ json: { detourId: input.detourId } });
-  await refreshLearnerExpedition({ enrichmentId: input.enrichmentId });
-}
-
-export async function hideScaffoldDetour(input: { enrichmentId: string; detourId: string }): Promise<void> {
-  await api.scaffold.hide.$post({ json: { detourId: input.detourId } });
-  await refreshLearnerExpedition({ enrichmentId: input.enrichmentId });
-}
-
-export async function submitScaffoldOptionSelect(input: { enrichmentId: string; scaffoldStepId: string; chosenOptionId: string }): Promise<LearnerGradingResult> {
-  const res = await api.scaffold["option-select"].$post({ json: { scaffoldStepId: input.scaffoldStepId, chosenOptionId: input.chosenOptionId } });
-  const result = (await res.json()) as LearnerGradingResult;
-  await refreshLearnerExpedition({ enrichmentId: input.enrichmentId });
-  return result;
-}
-
-export async function markScaffoldLessonRead(input: { enrichmentId: string; scaffoldStepId: string }): Promise<void> {
-  await api.scaffold["lesson-read"].$post({ json: { scaffoldStepId: input.scaffoldStepId } });
-  await refreshLearnerExpedition({ enrichmentId: input.enrichmentId });
-}
-
-// Grade a learner-owned reference Support Step against its PINNED (possibly superseded) neutral
-// option-select (KTD9). The server resolves the answer key from the reference step's immutable
-// item identity and appends ordinary neutral `(study_item_id, derived_node_id)` evidence — the
-// client never sees or stores a key. Refreshing lets the authoritative pinned completion replace
-// the sheet's optimistic marker.
-export async function submitScaffoldReferenceOptionSelect(input: { enrichmentId: string; scaffoldStepId: string; chosenOptionId: string }): Promise<LearnerGradingResult> {
-  const res = await api.scaffold["reference-option-select"].$post({ json: { scaffoldStepId: input.scaffoldStepId, chosenOptionId: input.chosenOptionId } });
-  const result = (await res.json()) as LearnerGradingResult;
-  await refreshLearnerExpedition({ enrichmentId: input.enrichmentId });
+export async function dispatchLearnerCommand(input: Readonly<{
+  expectedStateVersion: string;
+  command: LearnerCommandDto;
+  requestId?: string;
+}>): Promise<LearnerTransitionDto> {
+  const response = await api.game.commands.$post({
+    json: {
+      requestId: input.requestId ?? clientUuid(),
+      expectedStateVersion: input.expectedStateVersion,
+      command: input.command
+    }
+  });
+  const body = await response.json();
+  if (!response.ok) throw new Error(`command transport refused: ${response.status}`);
+  const result = body as LearnerTransitionDto;
+  if (result.status === "applied") {
+    await queryClient.invalidateQueries({ queryKey: learnerScopeKey });
+  } else if (result.status === "stale" || result.status === "content_changed") {
+    await queryClient.invalidateQueries({ queryKey: learnerScopeKey });
+  }
   return result;
 }

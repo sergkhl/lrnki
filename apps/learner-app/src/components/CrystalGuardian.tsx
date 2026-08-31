@@ -9,8 +9,6 @@ import {
   type CrystalPalette,
   type CrystalSpecies
 } from "@/learn/crystalLibrary";
-import { guardianScopeTitle, learnerTerm } from "@/learn/vocabulary";
-import type { RecallChallengeView } from "@lrnki/application/projection";
 import { colors } from "@/ui";
 
 // The Crystal Guardian (plan 2026-07-13-003 U5, KTD9; rebuilt as the Ward Obelisk by plan
@@ -68,7 +66,7 @@ export function CrystalGuardian({
   shieldTotal,
   size = 220
 }: Readonly<{
-  scopeKind: RecallChallengeView["scopeKind"];
+  scopeKind: "leg" | "expedition";
   phase: GuardianPhase;
   wardTotal: number;
   wardsRemaining: number;
@@ -76,15 +74,15 @@ export function CrystalGuardian({
   shieldTotal: number;
   size?: number;
 }>) {
-  const ward: CrystalSpecies = scopeKind === "enrichment" ? "summitWard" : "legWard";
+  const ward: CrystalSpecies = scopeKind === "expedition" ? "summitWard" : "legWard";
   const auraColor = phase === "recovery" ? colors.destructive : colors["gem-soft"];
   const ringColor = phase === "recovery" ? colors.destructive : colors["cavern-edge"];
   const obelisk = guardianObeliskLayout({ ward, wardTotal, wardsRemaining });
   const frameContour = materialFor(ward, "collected").contour;
   const label =
-    `${guardianScopeTitle(scopeKind)}: ${wardsRemaining} of ${wardTotal} ${learnerTerm("guardianWards").toLowerCase()}, ` +
-    `${learnerTerm("guardianShield").toLowerCase()} ${shieldRemaining} of ${shieldTotal}` +
-    (phase === "recovery" ? `, ${learnerTerm("guardianLastStand")}` : "");
+    `${scopeKind === "expedition" ? "Expedition Guardian" : "Leg Guardian"}: ` +
+    `${wardsRemaining} of ${wardTotal} wards, shield ${shieldRemaining} of ${shieldTotal}` +
+    (phase === "recovery" ? ", Last Stand" : "");
   return (
     <View className="items-center">
       <Svg accessibilityRole="image" accessibilityLabel={label} viewBox="0 0 100 134" width={size} height={(size * 134) / 100}>

@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { test } from "@jest/globals";
-import { difficultyBand } from "@lrnki/application/projection";
 import {
   CONCEPT_SPECIES,
   CRYSTAL_CAP_Y,
@@ -135,14 +134,7 @@ test("gloss strength rises along the material ladder and only collected takes a 
 });
 
 test("crystalForBand is total over the five bands and never returns an earned-only shape", () => {
-  const byBand = new Map<number, CrystalSpecies>();
-  for (const difficulty of [null, 0, 0.1, 0.25, 0.3, 0.5, 0.62, 0.75, 0.9, 1]) {
-    byBand.set(difficultyBand(difficulty), crystalForBand(difficultyBand(difficulty)));
-  }
-  assert.deepEqual([...byBand.keys()].sort(), [1, 2, 3, 4, 5]);
   assert.deepEqual([1, 2, 3, 4, 5].map(crystalForBand), [...CONCEPT_SPECIES]);
-  // Null difficulty resolves through the SHARED banding's tie-break-low contract.
-  assert.equal(crystalForBand(difficultyBand(null)), "band1");
   // Out-of-contract bands clamp into the concept range rather than reaching an earned shape.
   for (const band of [-3, 0, 6, 99]) {
     assert.ok(!(EARNED_SPECIES as readonly string[]).includes(crystalForBand(band)));

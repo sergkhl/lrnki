@@ -1,24 +1,18 @@
-# Serve inspection through read-model ports and learner projection through application use-cases
+# Serve learner projections through one runtime boundary
 
 Status: Accepted
 
 ## Decision
 
-Pure inspection surfaces use read-only ports that return finished **Inspection Read Models**. The
-storage adapter owns queries and row stitching; UI code does not embed SQL or JSON_TABLE access.
+All learner reads and transitions cross the `LearnerRuntime` boundary. It combines qualified authored
+content with validated Learner State and returns finished discriminated views; neither Hono nor Expo
+stitches persistence rows or content documents.
 
-Learner-facing projections combine persisted reads with adaptation compute such as mastery
-composition, node classification, frontier selection, and path projection. They are application
-use-cases rather than read-model ports, so all consuming UIs share one orchestration boundary.
-
-Source interfaces own the current location and exact shape of both boundaries.
-
-Neither boundary exposes raw persistence rows to UI code. Valid absence may return `undefined`; real
-database errors propagate to the application error boundary. Environment-specific demo or empty
-fallbacks remain UI-shell concerns.
+The Hono adapter derives identity, validates transport, and maps results. The Expo app consumes only
+typed learner-api DTOs. There is no general inspection surface or read-model port for deleted content
+pipelines.
 
 ## Context
 
-Inspection is a storage projection, while learner projection is read-and-compute orchestration. A
-single generic read layer would either add shallow application pass-throughs or duplicate adaptation
-logic in each UI. The split preserves inward dependencies and assigns each responsibility once.
+Learner projections require policy and computation, not raw storage reads. A single deep runtime seam
+keeps grading, state transitions, and projections consistent across transport and test adapters.

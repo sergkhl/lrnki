@@ -1,0 +1,296 @@
+{
+  "schemaVersion": 1,
+  "key": "neuroscience-of-memory-and-attention",
+  "title": "Neuroscience of Memory and Attention",
+  "teaser": "Connect neural evidence to cautious cognitive explanations and design learning around attention and retrieval.",
+  "declaredDomain": "Cognitive neuroscience of memory and attention",
+  "audience": "Adult learners interpreting neuroscience and learning claims",
+  "sourceCredits": [
+    {
+      "title": "Neuroscience of Memory and Attention primer",
+      "author": "lrnki project",
+      "license": "Project-owned internal playtest source",
+      "note": "Accepted as a local authoring basis without independent external fact verification or clinical advice."
+    }
+  ],
+  "legs": [
+    {
+      "key": "evidence-attention-and-retrieval",
+      "title": "From measured signals to useful learning design",
+      "stops": [
+        {
+          "key": "levels-of-explanation",
+          "label": "Keep measurement and explanation distinct",
+          "requires": [],
+          "difficultyBand": 2,
+          "lesson": {
+            "sections": [
+              {
+                "key": "signal-representation-and-cause",
+                "title": "A measured difference is one link in an explanation",
+                "body": "Neural measurements expose different spatial, temporal, and causal properties. Decoding can show that information is available in a measured signal without proving that the region is necessary or that another system reads the same code. Blood-oxygen changes are not action potentials, and perturbations that support causal conclusions can still affect a wider network. A mature explanation connects the task's problem, a possible representation and transformation, an implementing circuit, and discriminating behavioral and neural evidence. Do not substitute evidence from one level for another.",
+                "sourceAnchor": {
+                  "heading": "1. Connecting Neural Signals to Cognitive Explanations",
+                  "quote": "evidence at one level should not be silently substituted for evidence at another."
+                },
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "interpret-blood-oxygen-signal",
+              "prompt": "An fMRI study finds a larger blood-oxygen-level signal in one condition. Which conclusion is warranted from that result alone?",
+              "options": [
+                {
+                  "key": "measurement-differs",
+                  "text": "The measured blood-oxygen-related signal differs under the study's conditions"
+                },
+                {
+                  "key": "more-neuron-firing-certain",
+                  "text": "Every neuron in the region fired more action potentials"
+                },
+                {
+                  "key": "region-causes-ability",
+                  "text": "The region is proven to be the sole cause of the mental ability"
+                },
+                {
+                  "key": "better-performance-certain",
+                  "text": "The larger signal necessarily means better performance"
+                }
+              ],
+              "answerKey": "measurement-differs",
+              "explanation": {
+                "text": "The observation is a difference in a blood-oxygen-related measurement. Inferring action-potential rate, necessity, a sole cause, or better performance requires additional evidence and alternatives.",
+                "sourceAnchor": {
+                  "heading": "1. Connecting Neural Signals to Cognitive Explanations",
+                  "quote": "blood oxygenation over seconds, not action potentials directly."
+                }
+              }
+            },
+            {
+              "family": "matching",
+              "key": "match-explanation-levels",
+              "prompt": "Match each part of a mature explanation to the question it asks.",
+              "pairs": [
+                {
+                  "key": "function-level",
+                  "left": "Functional problem",
+                  "right": "What must the system accomplish?"
+                },
+                {
+                  "key": "representation-level",
+                  "left": "Representation and transformation",
+                  "right": "What information and operation could solve it?"
+                },
+                {
+                  "key": "implementation-level",
+                  "left": "Circuit and plasticity",
+                  "right": "How could neural systems implement it?"
+                },
+                {
+                  "key": "evidence-level",
+                  "left": "Predicted evidence",
+                  "right": "What behavior and signal should follow?"
+                }
+              ],
+              "explanation": {
+                "text": "A strong account links the problem, a representational solution, a possible implementation, and observations that distinguish it from alternatives rather than collapsing all four into a region name.",
+                "sourceAnchor": {
+                  "heading": "1. Connecting Neural Signals to Cognitive Explanations",
+                  "quote": "A mature explanation links four questions."
+                }
+              }
+            }
+          ],
+          "supportPaths": []
+        },
+        {
+          "key": "attention-and-working-memory",
+          "label": "Protect the operation that matters",
+          "requires": ["levels-of-explanation"],
+          "difficultyBand": 3,
+          "lesson": {
+            "sections": [
+              {
+                "key": "selection-control-and-load",
+                "title": "Attention selects; working memory keeps goals usable",
+                "body": "Selective attention biases competition toward information relevant to current goals, while salient or learned distractions can capture priority. Working memory keeps information functionally available for ongoing action; its load depends on structure, interference, and prior knowledge rather than one universal item count. What is called multitasking often switches task rules and goals instead of performing two demanding control operations at once. Reduce irrelevant competition and externalize intermediate states, but retain the comparison, explanation, or retrieval that produces learning. A measurement of effort is not itself proof that the useful operation occurred.",
+                "sourceAnchor": {
+                  "heading": "4. Working Memory and Cognitive Control",
+                  "quote": "Working memory is the temporary availability of information for ongoing cognition."
+                },
+                "explorableTerms": [
+                  {
+                    "term": "measurement",
+                    "supportPathKey": "review-measurement-limits"
+                  }
+                ]
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "reduce-irrelevant-competition",
+              "prompt": "A novice must compare three unfamiliar mechanisms. Which redesign best protects the intended reasoning without removing it?",
+              "options": [
+                {
+                  "key": "stable-terms-external-table",
+                  "text": "Use stable terms and an external comparison table, then ask the learner to explain the diagnostic difference"
+                },
+                {
+                  "key": "add-notification-stream",
+                  "text": "Add frequent unrelated notifications to train general concentration"
+                },
+                {
+                  "key": "remove-all-comparison",
+                  "text": "Remove the comparison and show only the correct label"
+                },
+                {
+                  "key": "switch-rules-every-line",
+                  "text": "Require a different task rule on every sentence"
+                }
+              ],
+              "answerKey": "stable-terms-external-table",
+              "explanation": {
+                "text": "Stable terminology and an external representation reduce maintenance and distraction while preserving the productive operation: comparing and explaining the mechanisms.",
+                "sourceAnchor": {
+                  "heading": "4. Working Memory and Cognitive Control",
+                  "quote": "Reducing all difficulty is not desirable; reducing irrelevant"
+                }
+              }
+            },
+            {
+              "family": "impostor",
+              "key": "spot-attention-impostor",
+              "prompt": "Two statements respect capacity and selection. One overclaims. Find the impostor.",
+              "statements": [
+                {
+                  "key": "switching-has-costs",
+                  "text": "Switching demanding tasks can require rules and goals to be retrieved again.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "selection-target-matters",
+                  "text": "Attention can strengthen learning of the wrong relationship if the wrong structure is selected.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "practice-removes-all-bottlenecks",
+                  "text": "Enough practice makes every pair of demanding tasks free of shared bottlenecks.",
+                  "kind": "impostor"
+                }
+              ],
+              "explanation": {
+                "text": "Practice may make component operations more efficient, but overlapping control and response-selection demands can still create bottlenecks. Everyday multitasking often hides rapid switching.",
+                "sourceAnchor": {
+                  "heading": "3. Selective Attention as Biased Competition",
+                  "quote": "rapid switching rather than simultaneous high-level processing."
+                }
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "review-measurement-limits",
+              "term": "measurement",
+              "sectionKey": "selection-control-and-load",
+              "steps": [
+                {
+                  "stopKey": "levels-of-explanation",
+                  "activityKey": "interpret-blood-oxygen-signal"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "retrieval-for-learning",
+          "label": "Retrieve in the form knowledge will be used",
+          "requires": ["attention-and-working-memory"],
+          "difficultyBand": 4,
+          "lesson": {
+            "sections": [
+              {
+                "key": "diagnostic-retrieval-design",
+                "title": "Use retrieval to expose and strengthen the target relation",
+                "body": "Retrieval is active and cue-dependent: familiarity or immediate recognition does not prove future independent access. Practice retrieval in the form required by the goal—recall for production, discrimination for confusable alternatives, and explanation or application for relationships. Delay some attempts enough to require reconstruction and provide timely corrective feedback. Manage working-memory demand so the learner can perform that operation, and judge the design by delayed criterion-relevant performance rather than by fluency or a neural signal alone.",
+                "sourceAnchor": {
+                  "heading": "8. Retrieval, Reinstatement, and Reconsolidation",
+                  "quote": "Retrieval itself promotes learning."
+                },
+                "explorableTerms": [
+                  {
+                    "term": "working-memory demand",
+                    "supportPathKey": "review-working-memory-load"
+                  }
+                ]
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "choose-diagnostic-practice",
+              "prompt": "The goal is to distinguish two easily confused mechanisms in new cases. Which practice best matches that criterion?",
+              "options": [
+                {
+                  "key": "delayed-discrimination-with-feedback",
+                  "text": "After a delay, classify varied new cases and explain the diagnostic feature, then receive corrective feedback"
+                },
+                {
+                  "key": "immediate-rereading",
+                  "text": "Immediately reread the same highlighted definitions until they feel familiar"
+                },
+                {
+                  "key": "recognize-heading-only",
+                  "text": "Recognize the chapter heading while the full answer remains visible"
+                },
+                {
+                  "key": "measure-activation-only",
+                  "text": "Measure neural activation without testing the intended distinction"
+                }
+              ],
+              "answerKey": "delayed-discrimination-with-feedback",
+              "explanation": {
+                "text": "Varied discrimination and explanation rehearse the relationship that the learner must later use. Delay requires reconstruction, and feedback corrects plausible errors before they become familiar.",
+                "sourceAnchor": {
+                  "heading": "10. Designing Learning with Mechanistic Restraint",
+                  "quote": "Fourth, retrieve the knowledge in the form in which it will be used."
+                }
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "review-working-memory-load",
+              "term": "working-memory demand",
+              "sectionKey": "diagnostic-retrieval-design",
+              "steps": [
+                {
+                  "stopKey": "attention-and-working-memory",
+                  "activityKey": "reduce-irrelevant-competition"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "guardianActivityKeys": [
+        "match-explanation-levels",
+        "spot-attention-impostor",
+        "reduce-irrelevant-competition",
+        "choose-diagnostic-practice"
+      ]
+    }
+  ],
+  "expeditionGuardianActivityKeys": [
+    "interpret-blood-oxygen-signal",
+    "match-explanation-levels",
+    "spot-attention-impostor",
+    "reduce-irrelevant-competition",
+    "choose-diagnostic-practice"
+  ]
+}

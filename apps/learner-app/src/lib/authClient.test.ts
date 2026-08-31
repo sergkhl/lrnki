@@ -22,7 +22,17 @@ function loadAuthClient(os: "web" | "android") {
   // `require` inside `isolateModules`, not `await import`: the runner is CJS, so a dynamic
   // import throws "A dynamic import callback was invoked without --experimental-vm-modules".
   jest.isolateModules(() => {
-    jest.doMock("react-native", () => ({ Platform: { OS: os } }));
+    jest.doMock("react-native", () => {
+      const actual = jest.requireActual<typeof import("react-native")>("react-native");
+      // Expo SDK 57 installs lazy fetch globals in the Jest preset. Keep the two RN native-module
+      // seams those getters may resolve during module cleanup; spreading the RN namespace would
+      // eagerly invoke every deprecated getter and require device-only modules.
+      return {
+        NativeModules: actual.NativeModules,
+        TurboModuleRegistry: actual.TurboModuleRegistry,
+        Platform: { ...actual.Platform, OS: os }
+      };
+    });
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     loaded = require("./authClient") as typeof import("./authClient");
   });

@@ -178,6 +178,7 @@ export const commandEffectSchema = z
     challengeId: nonEmptySchema.nullable(),
     correct: z.boolean().nullable(),
     revealKey: nonEmptySchema.nullable(),
+    feedback: nonEmptySchema.nullable(),
     newlyCompletedStop: z.boolean(),
     pointsAwarded: z.number().int().min(0).max(5),
     firstGuardianWin: z.boolean()

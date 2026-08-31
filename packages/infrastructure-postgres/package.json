@@ -13,9 +13,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@lrnki/domain-core": "workspace:*",
     "@lrnki/learner-runtime": "workspace:*",
-    "@lrnki/ports": "workspace:*",
     "drizzle-orm": "catalog:",
     "postgres": "catalog:",
     "zod": "catalog:"

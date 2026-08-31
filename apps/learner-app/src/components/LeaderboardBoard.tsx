@@ -1,14 +1,17 @@
 import { View } from "react-native";
 import { Award, Target } from "lucide-react-native";
 import { divisionForMasteredCrystals } from "@/learn/division";
-import type { BoardEntry, ChaseTarget } from "@lrnki/learner-api/rival-simulation";
+import type { LeaderboardView } from "@/lib/queries";
 import { Badge, Text, colors } from "@/ui";
 import { learnerTerm } from "@/learn/vocabulary";
 
 // The board projection (R3): a ranked list of real learners and seeded rivals, the viewer's row
 // highlighted, durable award flair rendered beside real rows. Presentational only — the query
 // assembles the entries and the chase.
-export function LeaderboardBoard({ entries, weekKey, masteredCrystalCount }: { entries: BoardEntry[]; weekKey: string; masteredCrystalCount?: number }) {
+type BoardEntry = LeaderboardView["entries"][number];
+type ChaseTarget = NonNullable<LeaderboardView["chase"]>;
+
+export function LeaderboardBoard({ entries, weekKey, masteredCrystalCount }: { entries: readonly BoardEntry[]; weekKey: string; masteredCrystalCount?: number }) {
   const division = masteredCrystalCount === undefined ? null : divisionForMasteredCrystals(masteredCrystalCount);
   return (
     <View className="gap-2">

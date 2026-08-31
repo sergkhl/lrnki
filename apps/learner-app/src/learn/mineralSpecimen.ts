@@ -7,8 +7,6 @@
 // `crystalLibrary.ts` imports from here (never the reverse), so this module stays free of
 // art data and there is exactly one growth clip in the app.
 
-import { type TrailCluster } from "@lrnki/application/projection";
-
 export type MineralPoint = readonly [number, number];
 
 // Below this displayed size a crystal's silhouette cannot be read; compact surfaces must use
@@ -73,45 +71,6 @@ export function clipPolygonBelow(points: readonly MineralPoint[], cutY: number):
     }
   }
   return output;
-}
-
-// --- Honest compact progress ----------------------------------------------------------
-//
-// One learner-owned derivation for every compact surface, so known ground can never
-// inflate the crystal count: a completion bar communicates completed ground, while
-// adjacent text names collected crystals and known ground separately.
-
-export type FormationProgress = {
-  totalGround: number;
-  completedGround: number;
-  collectedCrystals: number;
-  knownGround: number;
-  // completedGround / totalGround (0 for an empty scope) — the Progress bar fraction.
-  completionFraction: number;
-};
-
-export function formationProgress(concepts: readonly Pick<TrailCluster, "state" | "isKnownSkipped">[]): FormationProgress {
-  const totalGround = concepts.length;
-  const completedGround = concepts.filter((concept) => concept.state === "mastered").length;
-  const collectedCrystals = concepts.filter((concept) => concept.state === "mastered" && !concept.isKnownSkipped).length;
-  const knownGround = concepts.filter((concept) => concept.isKnownSkipped).length;
-  return {
-    totalGround,
-    completedGround,
-    collectedCrystals,
-    knownGround,
-    completionFraction: totalGround === 0 ? 0 : completedGround / totalGround
-  };
-}
-
-// The shared compact copy: exact counts, crystals and known ground named separately.
-export function formationProgressLine(progress: FormationProgress): string {
-  const parts = [
-    `${progress.completedGround} of ${progress.totalGround} ground complete`,
-    `${progress.collectedCrystals} ${progress.collectedCrystals === 1 ? "crystal" : "crystals"}`
-  ];
-  if (progress.knownGround > 0) parts.push(`${progress.knownGround} known`);
-  return parts.join(" · ");
 }
 
 function round2(value: number): number {

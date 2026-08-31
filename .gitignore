@@ -20,25 +20,9 @@ test-results/
 .DS_Store
 next-env.d.ts
 
-# Curated text fixtures are version-controlled (AGENTS rule 10). Large binary
-# formats (Gate 2 Docling sources) stay out of git; they are re-downloadable.
-fixtures/pdf/
-fixtures/docx/
-fixtures/pptx/
-
 # Disposable local e2e/preview APKs — never committed or distributed (cleartext e2e artifact)
 apps/learner-app/lrnki-learner-*.apk
 
 # Native projects are generated in-tree by `expo run:android` / `expo run:ios` (prebuild)
 apps/learner-app/android/
 apps/learner-app/ios/
-
-# Claude Design sync (design-sync skill): staged converter scripts, generated
-# bundle output, machine-local caches, and the fork's node_modules link. The
-# durable inputs under .design-sync/ (config.json, NOTES.md, conventions.md,
-# previews/, overrides/, fonts/) ARE committed.
-.ds-sync/
-ds-bundle/
-.design-sync/.cache/
-.design-sync/learnings/
-.design-sync/node_modules

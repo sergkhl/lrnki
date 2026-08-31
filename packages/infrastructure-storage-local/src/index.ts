@@ -1,1 +1,0 @@
-export { LocalFileSourceObjectStorageAdapter } from "./LocalFileSourceObjectStorageAdapter";

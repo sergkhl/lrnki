@@ -2,8 +2,6 @@ import { expect, test } from "@jest/globals";
 import { render, screen } from "@testing-library/react-native";
 import { CrystalGuardian, type GuardianPhase } from "./CrystalGuardian";
 import { OBELISK_APEX_Y, OBELISK_BASE_Y } from "@/learn/guardianObelisk";
-import { learnerTerm } from "@/learn/vocabulary";
-import type { RecallChallengeView } from "@lrnki/application/projection";
 
 // U2 rendering contract (plan 2026-07-31-002, KTD1–KTD9). The Guardian is ONE stable body whose
 // ordered segments ARE the ward count — the separate ward arc and the three-crystal cluster are
@@ -16,7 +14,7 @@ import type { RecallChallengeView } from "@lrnki/application/projection";
 // the Crystal Formation reward's beat, and `GuardianPhase` is the two drawn states only.
 
 type GuardianProps = Readonly<{
-  scopeKind: RecallChallengeView["scopeKind"];
+  scopeKind: "leg" | "expedition";
   phase: GuardianPhase;
   wardTotal: number;
   wardsRemaining: number;
@@ -26,7 +24,7 @@ type GuardianProps = Readonly<{
 
 function guardian(overrides: Partial<GuardianProps> = {}) {
   const props: GuardianProps = {
-    scopeKind: "section",
+    scopeKind: "leg",
     phase: "active",
     wardTotal: 5,
     wardsRemaining: 5,
@@ -121,13 +119,13 @@ test("a one-ward Guardian is the complete body rather than a lone fragment", asy
 
 test("the Expedition Guardian renders seven wards under its own summit ward crown", async () => {
   const rendered = await render(
-    guardian({ scopeKind: "enrichment", wardTotal: 7, wardsRemaining: 4 })
+    guardian({ scopeKind: "expedition", wardTotal: 7, wardsRemaining: 4 })
   );
   expect(segmentCount("resolved")).toBe(3);
   expect(segmentCount("current")).toBe(1);
   expect(segmentCount("queued")).toBe(3);
   const trident = pathOf("guardian-ward-emblem");
-  await rendered.rerender(guardian({ scopeKind: "section", wardTotal: 7, wardsRemaining: 4 }));
+  await rendered.rerender(guardian({ scopeKind: "leg", wardTotal: 7, wardsRemaining: 4 }));
   const diamond = pathOf("guardian-ward-emblem");
   // Shape, not hue, is what separates the two duels: the summit's trident and the Leg's
   // diamond come from the crystal library's own silhouettes.
@@ -140,13 +138,13 @@ test("the Expedition Guardian renders seven wards under its own summit ward crow
 // visible title "Expedition Guardian" over a figure whose accessible label said "Crystal
 // Guardian" — the Leg's name. Sighted and assistive readers must be told the same thing.
 test("the summit figure announces itself by its own scope title", async () => {
-  const rendered = await render(guardian({ scopeKind: "enrichment", wardTotal: 7, wardsRemaining: 7 }));
+  const rendered = await render(guardian({ scopeKind: "expedition", wardTotal: 7, wardsRemaining: 7 }));
   expect(
-    screen.getByLabelText(`${learnerTerm("guardianSummitTitle")}: 7 of 7 wards, shield 3 of 3`)
+    screen.getByLabelText("Expedition Guardian: 7 of 7 wards, shield 3 of 3")
   ).toBeTruthy();
-  await rendered.rerender(guardian({ scopeKind: "section", wardTotal: 5, wardsRemaining: 5 }));
+  await rendered.rerender(guardian({ scopeKind: "leg", wardTotal: 5, wardsRemaining: 5 }));
   expect(
-    screen.getByLabelText(`${learnerTerm("guardianTitle")}: 5 of 5 wards, shield 3 of 3`)
+    screen.getByLabelText("Leg Guardian: 5 of 5 wards, shield 3 of 3")
   ).toBeTruthy();
 });
 
@@ -173,7 +171,7 @@ test("spending a shield leaves every ward exactly where it was", async () => {
 test("the whole figure is one labeled image carrying the exact ward and shield counts", async () => {
   await render(guardian({ wardTotal: 5, wardsRemaining: 3, shieldRemaining: 2 }));
   expect(
-    screen.getByLabelText(`${learnerTerm("guardianTitle")}: 3 of 5 wards, shield 2 of 3`)
+    screen.getByLabelText("Leg Guardian: 3 of 5 wards, shield 2 of 3")
   ).toBeTruthy();
   // Segments are never separate accessibility elements — the figure label and the visible
   // status line in GuardianStage are the concise state authority.
@@ -186,7 +184,7 @@ test("Last Stand names itself in the accessible label", async () => {
   await render(guardian({ phase: "recovery", wardTotal: 5, wardsRemaining: 2, shieldRemaining: 0 }));
   expect(
     screen.getByLabelText(
-      `${learnerTerm("guardianTitle")}: 2 of 5 wards, shield 0 of 3, ${learnerTerm("guardianLastStand")}`
+      "Leg Guardian: 2 of 5 wards, shield 0 of 3, Last Stand"
     )
   ).toBeTruthy();
 });

@@ -68,6 +68,7 @@ function baseEffect(
     challengeId: null,
     correct: null,
     revealKey: null,
+    feedback: null,
     newlyCompletedStop: false,
     pointsAwarded: 0,
     firstGuardianWin: false
@@ -434,6 +435,7 @@ function acquisitionCommand(
         : null,
       correct: graded.correct,
       revealKey: graded.revealKey,
+      feedback: location.activity.explanation.text,
       newlyCompletedStop: completion.newlyCompleted,
       pointsAwarded: completion.points
     }
@@ -748,6 +750,7 @@ export function applyLearnerCommand(input: ApplyCommandInput): ApplyCommandResul
         challengeId: challenge.challengeId,
         correct,
         revealKey,
+        feedback: location.activity.explanation.text,
         firstGuardianWin: firstWin
       }
     };

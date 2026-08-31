@@ -1,6 +1,5 @@
-// The pure half of the board navigation memory seam (KTD5, ADR-0032 "the client may
-// remember navigation state"). Storage lives in `src/lib/navMemory` per platform; the
-// classifier is pure so the seam decisions are unit-tested without a device.
+// The pure half of the board navigation memory seam. Policy lives in `navigationMemory`; the
+// platform `navMemory` files contain only raw storage adapters.
 
 export type BoardSeen = { weekKey: string; rank: number | null; points: number };
 export type BoardNow = { weekKey: string; rank: number | null; points: number };

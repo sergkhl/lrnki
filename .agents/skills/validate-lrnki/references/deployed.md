@@ -1,34 +1,20 @@
 # Deployed validation
 
-Use this layer only when the claim names a published artifact or deployed service. First distinguish
-the target below; “deployed” is not a single interchangeable environment.
+Use deployed evidence only when the user authorizes the target and any writes. A health check or read
+does not authorize sign-up, mutation, reset, deployment, or release.
 
-## Published web artifact with intercepted API read
+For an authorized read-only route, identify the exact hostname, deployed revision/image, catalog
+revision, and API health result. Run the deployed Playwright configuration only when its owning
+environment and credentials are explicitly in scope:
 
-The current deterministic Pages smoke is configured in
-[`playwright.deployed.config.ts`](../../../../apps/learner-app/playwright.deployed.config.ts).
+```sh
+pnpm e2e:web:deployed
+```
 
-1. Run `pnpm e2e:web:deployed` from the repository root.
-2. Record the public URL and the deployed revision or deployment run being exercised.
-3. Read the selected Playwright cases and inspect failure artifacts under gitignored `tmp/`.
-4. Report this as published-bundle evidence with an intercepted API read. It does not prove the
-   deployed API, a real signed-in session, Postgres, or production persistence.
+The public topology is Caddy to the one learner-api container. Validate both container health and the
+public TLS route when deploying through `scripts/deploy-learner-api.sh`; a green public `/health`
+alone does not prove the newly built container, migration, auth callbacks, learner commands, or Expo
+artifact.
 
-## Deployed API or full deployed path
-
-There is no generic command whose success proves every deployed path. Select an owning route, plan,
-or smoke for the exact claim and inspect the root [deployment guide](../../../../README.md#deployment)
-before acting.
-
-- Verify the running revision or artifact identity; local HEAD and a successful local build do not
-  prove what is deployed.
-- For a visible-flow claim, obtain browser evidence at the public origin. An HTTP response or backend
-  receipt does not prove the rendered state.
-- For a persistence claim, use a uniquely identifiable, authorized record and verify the before and
-  after state without broad production mutation.
-- State whether the browser used an intercepted response, a real deployed API, or production data.
-  Keep those outcomes separate even when they share the same public URL.
-- Do not use a local restore, emulator fixture, or local real-backend run as deployed evidence.
-
-Load [real-use quality](real-use-quality.md) when the deployed run is intended to establish actual
-user usefulness rather than availability alone.
+Never reset a shared/production database or publish a build without explicit authority. Qualify the
+exact deployed reads/writes performed and keep local, emulator, and deployed evidence separate.

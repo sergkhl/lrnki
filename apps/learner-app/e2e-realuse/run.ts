@@ -6,14 +6,15 @@ import { dirname, resolve } from "node:path";
 import { createDatabaseClient } from "@lrnki/infrastructure-postgres";
 import { cleanupReservedLearners, reservedLearnerEmails } from "@lrnki/infrastructure-postgres/test-support";
 import { selectCandidate } from "./preflight";
+import { runFullJourney } from "./fullJourney";
 
-// The ONE opt-in real-backend web gate command (plan 2026-07-15-001 U2). It loads the repo `.env`
-// into its OWN process (the learner-app script uses `tsx --env-file`), owns the generated run id +
-// ephemeral password, prints only the safe run id, starts a supervisor-free learner-api over real
-// Postgres + a shared static server for the production Expo export, runs capability preflight and
-// Playwright, and — on success OR failure — deletes exactly this run's three reserved learners and
-// stops its children. No DATABASE_URL or provider secret ever reaches the browser/export/static
-// processes; the API never receives a LiteLLM/Expo secret. See e2e-realuse/README.md.
+// The one opt-in real-backend web gate command. It loads the repo `.env` into its own process, owns
+// the generated run id + ephemeral password, prints only the safe run id, starts the authored
+// learner-api over real Postgres + a shared static server for the production Expo export, runs the
+// complete HTTP journey plus Playwright, and — on success OR failure — deletes exactly this run's
+// three reserved learners and stops its children. No DATABASE_URL or signing secret reaches the
+// browser/export/static
+// processes. See e2e-realuse/README.md.
 
 const here = dirname(fileURLToPath(import.meta.url));
 const appRoot = resolve(here, "..");
@@ -41,7 +42,7 @@ const WEB_ORIGIN = `http://127.0.0.1:${WEB_PORT}`;
 // pnpm / tsx keep the vars they need while no secret leaks; each child then re-adds only what it
 // requires (the API alone re-adds DATABASE_URL). Denylist over allowlist keeps the toolchain
 // working while still proving secret ABSENCE (R4/AE5).
-const SECRET_KEY_RE = /(SECRET|TOKEN|API_KEY|APIKEY|PASSWORD|DATABASE_URL|LITELLM|OPENROUTER|DEEPSEEK|ANTHROPIC|OPENAI|EXPO_TOKEN|_KEY$)/i;
+const SECRET_KEY_RE = /(SECRET|TOKEN|API_KEY|APIKEY|PASSWORD|DATABASE_URL|EXPO_TOKEN|_KEY$)/i;
 function secretFreeEnv(): NodeJS.ProcessEnv {
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(process.env)) {
@@ -160,7 +161,7 @@ async function orchestrate(runId: string, password: string, authSecret: string):
   //    the only one that receives this run's signing secret. `BETTER_AUTH_URL` is the loopback
   //    API base, which is also what makes Better Auth drop the cookie's `Secure` flag (it derives
   //    that from the base URL's scheme), so an http rig gets a usable cookie without any override.
-  spawnGroup(tsxBin, ["src/realuseServer.ts"], learnerApiRoot, {
+  spawnGroup(tsxBin, ["src/index.ts"], learnerApiRoot, {
     ...base,
     DATABASE_URL: process.env.DATABASE_URL,
     LEARNER_API_PORT: String(API_PORT),
@@ -176,11 +177,21 @@ async function orchestrate(runId: string, password: string, authSecret: string):
   });
   await waitForHttp(`${WEB_ORIGIN}/`, "static server");
 
-  // 4. Capability preflight against public routes — selects a ready enrichment or fails closed.
+  // 4. Preflight against public routes — selects the first all-or-nothing qualified Expedition.
   const candidate = await selectCandidate({ apiBase: API_BASE, probeEmail: emails.probe, password });
-  console.log(`[realuse] selected enrichment ${candidate.enrichmentId} (${candidate.totalConceptCount} concepts).`);
+  console.log(`[realuse] selected authored Expedition ${candidate.expeditionKey}.`);
 
-  // 5. Playwright — only public origins + this run's ephemeral addresses/password/selected
+  // 5. Complete the full game through authenticated public HTTP before browser presentation. The
+  //    driver reads checked-in private keys only in this Node test process; the API still grades
+  //    every answer and the learner projection remains key-free.
+  await runFullJourney({
+    apiBase: API_BASE,
+    email: emails.probe,
+    password,
+    sessionCookie: candidate.sessionCookie
+  });
+
+  // 6. Playwright — only public origins + this run's ephemeral addresses/password/selected
   //    metadata. `REALUSE_PASSWORD` is re-added explicitly because `secretFreeEnv` strips every
   //    PASSWORD-shaped key: the denylist exists to keep REPO secrets out of children, and this is
   //    a run-scoped credential deleted at teardown — the same explicit re-add DATABASE_URL gets
@@ -193,10 +204,9 @@ async function orchestrate(runId: string, password: string, authSecret: string):
     REALUSE_EMAIL_PHONE: emails.phone,
     REALUSE_EMAIL_DESKTOP: emails.desktop,
     REALUSE_WEB_PORT: String(WEB_PORT),
-    REALUSE_ENRICHMENT_ID: candidate.enrichmentId,
-    REALUSE_ENRICHMENT_TITLE: candidate.title,
-    REALUSE_ENRICHMENT_DOMAIN: candidate.declaredDomain,
-    REALUSE_GRADED_KIND: candidate.gradedKind
+    REALUSE_EXPEDITION_KEY: candidate.expeditionKey,
+    REALUSE_EXPEDITION_TITLE: candidate.title,
+    REALUSE_EXPEDITION_DOMAIN: candidate.declaredDomain
   });
 }
 

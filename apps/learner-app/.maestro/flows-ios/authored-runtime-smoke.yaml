@@ -1,0 +1,100 @@
+# Debug-simulator integration smoke for the directly authored learner runtime. The runner supplies
+# an explicit Expo development-client URL because clearState intentionally erases the client's
+# remembered Metro endpoint. clearKeychain is equally intentional: iOS preserves Keychain entries
+# across an app reinstall, so clearState alone does not return Better Auth to the gate.
+appId: com.globesoul.lrnki
+---
+- launchApp:
+    clearState: true
+    clearKeychain: true
+- openLink: ${IOS_DEV_CLIENT_URL}
+- waitForAnimationToEnd:
+    timeout: 10000
+- extendedWaitUntil:
+    visible: "Choose your explorer"
+    timeout: 60000
+
+# Exercise the keyboard and visible refusal before establishing the fixture session.
+- tapOn:
+    id: "gate-email"
+- inputText: ${LEARNER_EMAIL}
+- pressKey: ENTER
+- tapOn:
+    id: "gate-password"
+- inputText: wrong-fixture-password
+- pressKey: ENTER
+- tapOn:
+    id: "gate-enter"
+- assertVisible: ".*email and password.*match an explorer.*"
+- tapOn:
+    id: "gate-password"
+- eraseText
+- inputText: ${LEARNER_PASSWORD}
+- pressKey: ENTER
+- tapOn:
+    id: "gate-enter"
+
+# The fixture contains scored Stops, so the retained first-visit board celebration is expected.
+# A freshly reset simulator can offer to save the successful password before XCUITest exposes the
+# app hierarchy again. Dismiss that system sheet when present; repeat runs may not show it.
+- tapOn:
+    text: "Not Now"
+    optional: true
+- extendedWaitUntil:
+    visible: "You climbed the board!"
+    timeout: 30000
+- takeScreenshot: ios-authored-journal-celebration
+- tapOn: "Close"
+- assertVisible: "Expedition journal"
+
+- tapOn: "Resume trail"
+- assertVisible: "See the support structure"
+- scrollUntilVisible:
+    element:
+      id: "support-path-review-support-relationship"
+    direction: DOWN
+    timeout: 30000
+    speed: 60
+    visibilityPercentage: 100
+- tapOn:
+    id: "support-path-review-support-relationship"
+    enabled: true
+- assertVisible: "Support Path"
+- assertVisible: "This branch reuses ordinary acquisition evidence.*"
+- assertVisible: "Keep exploring"
+- takeScreenshot: ios-authored-support-path
+- tapOn: "Keep exploring"
+- assertVisible:
+    id: "support-path-review-support-relationship"
+
+- openLink: lrnki://guardian/${EXPEDITION_KEY}/${GUARDIAN_CHALLENGE_ID}
+- assertVisible: "Leg Guardian"
+- assertVisible: ".*wards remain.*"
+- assertVisible: "Shield 3/3.*"
+- takeScreenshot: ios-authored-leg-guardian
+
+- openLink: lrnki://guardian/${EXPEDITION_KEY}/${SUMMIT_CHALLENGE_ID}
+- assertVisible: "Expedition Guardian"
+- assertVisible: ".*wards remain.*"
+- assertVisible: "Shield 3/3.*"
+- takeScreenshot: ios-authored-expedition-guardian
+
+- tapOn: "Retreat to trail"
+- extendedWaitUntil:
+    visible: "Expedition journal"
+    timeout: 30000
+- tapOn: "Expedition journal"
+- assertVisible: "Expedition journal"
+- tapOn: "Menu"
+- tapOn: "View the board"
+- assertVisible: "This week’s climbers"
+- assertVisible: "Native Capture.*"
+- takeScreenshot: ios-authored-leaderboard
+- tapOn: "Close"
+
+# A no-reset process restart must preserve the authenticated session and return to the Journal.
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "Expedition journal"
+    timeout: 30000

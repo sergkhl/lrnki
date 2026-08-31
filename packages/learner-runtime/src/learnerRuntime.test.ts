@@ -261,7 +261,13 @@ test("adoption, activation, reads, and public projections use authored keys with
   const catalogRead = await runtime.read("learner-a", { kind: "catalog" });
   assert.equal(catalogRead.status, "ok");
   assert.equal(catalogRead.view.kind, "catalog");
-  assert.deepEqual(catalogRead.view.expeditions.map((entry) => entry.expeditionKey), ["critical-thinking"]);
+  assert.deepEqual(catalogRead.view.expeditions.map((entry) => entry.expeditionKey), [
+    "critical-thinking",
+    "probability-and-statistics",
+    "personal-finance",
+    "machine-learning",
+    "neuroscience-of-memory-and-attention"
+  ]);
   assert.equal(catalogRead.view.expeditions[0].adopted, false);
 
   await harness.adopt();

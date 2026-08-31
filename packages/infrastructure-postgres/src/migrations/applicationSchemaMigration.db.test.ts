@@ -58,32 +58,32 @@ test("the application-schema migrator owns the complete database state matrix", 
 
   await t.test("legacy schema fails before mutating its objects or data", async () => {
     await resetSchemas(control);
-    await control`CREATE TABLE public.source_resources (id integer PRIMARY KEY, marker text NOT NULL)`;
-    await control`CREATE TABLE public.operation_runs (id integer PRIMARY KEY)`;
-    await control`INSERT INTO public.source_resources (id, marker) VALUES (1, 'keep-legacy')`;
+    await control`CREATE TABLE public.obsolete_relation_a (id integer PRIMARY KEY, marker text NOT NULL)`;
+    await control`CREATE TABLE public.obsolete_relation_b (id integer PRIMARY KEY)`;
+    await control`INSERT INTO public.obsolete_relation_a (id, marker) VALUES (1, 'keep-legacy')`;
 
     const applicationName = `migration-legacy-${process.pid}`;
     await expectResetRequired(
       withApplicationName(databaseUrl, applicationName),
       "legacy-schema"
     );
-    const rows = await control<{ marker: string }[]>`SELECT marker FROM public.source_resources`;
+    const rows = await control<{ marker: string }[]>`SELECT marker FROM public.obsolete_relation_a`;
     assert.deepEqual(Array.from(rows), [{ marker: "keep-legacy" }]);
     assert.equal(await publicRelationCount(control), 2);
     await assertClientClosed(control, applicationName);
   });
 
-  await t.test("partial schema fails before mutating its surviving sentinel", async () => {
+  await t.test("partial authored-runtime schema fails before mutating its surviving relation", async () => {
     await resetSchemas(control);
-    await control`CREATE TABLE public.source_resources (id integer PRIMARY KEY, marker text NOT NULL)`;
-    await control`INSERT INTO public.source_resources (id, marker) VALUES (1, 'keep-partial')`;
+    await control`CREATE TABLE public."user" (id integer PRIMARY KEY, marker text NOT NULL)`;
+    await control`INSERT INTO public."user" (id, marker) VALUES (1, 'keep-partial')`;
 
     const applicationName = `migration-partial-${process.pid}`;
     await expectResetRequired(
       withApplicationName(databaseUrl, applicationName),
       "partial-schema"
     );
-    const rows = await control<{ marker: string }[]>`SELECT marker FROM public.source_resources`;
+    const rows = await control<{ marker: string }[]>`SELECT marker FROM public."user"`;
     assert.deepEqual(Array.from(rows), [{ marker: "keep-partial" }]);
     assert.equal(await publicRelationCount(control), 1);
     await assertClientClosed(control, applicationName);
@@ -93,8 +93,9 @@ test("the application-schema migrator owns the complete database state matrix", 
     await t.test(`stale ${staleCase} fails without touching public data`, async () => {
       await resetSchemas(control);
       await ensureApplicationSchemaCurrent(databaseUrl, migrationsFolder);
-      await control`CREATE TABLE public.migration_state_marker (marker text NOT NULL)`;
-      await control`INSERT INTO public.migration_state_marker (marker) VALUES ('keep-stale')`;
+      await control`
+        INSERT INTO public."user" (id, name, email, email_verified, created_at, updated_at)
+        VALUES ('keep-stale', 'keep-stale', 'keep-stale@test.invalid', false, now(), now())`;
       if (staleCase === "hash") {
         await control`UPDATE drizzle.__drizzle_migrations SET hash = 'stale-hash'`;
       } else {
@@ -106,8 +107,8 @@ test("the application-schema migrator owns the complete database state matrix", 
         withApplicationName(databaseUrl, applicationName),
         "stale-baseline"
       );
-      const rows = await control<{ marker: string }[]>`SELECT marker FROM public.migration_state_marker`;
-      assert.deepEqual(Array.from(rows), [{ marker: "keep-stale" }]);
+      const rows = await control<{ name: string }[]>`SELECT name FROM public."user" WHERE id = 'keep-stale'`;
+      assert.deepEqual(Array.from(rows), [{ name: "keep-stale" }]);
       await assertClientClosed(control, applicationName);
     });
   }

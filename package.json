@@ -9,17 +9,15 @@
     "pnpm": "11.4.0"
   },
   "scripts": {
-    "dev:admin": "pnpm --filter @lrnki/admin-lab dev",
     "dev:api": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --no-build learner-api && docker compose -f docker-compose.yml -f docker-compose.dev.yml watch --no-up learner-api",
     "dev:api:rebuild": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build learner-api && docker compose -f docker-compose.yml -f docker-compose.dev.yml watch --no-up learner-api",
     "dev:learner": "pnpm --filter @lrnki/learner-app dev",
     "dev:learner:local": "scripts/dev-learner-app.sh web",
     "dev:android": "scripts/dev-learner-app.sh android",
     "dev:ios": "scripts/dev-learner-app.sh ios",
-    "build": "pnpm --filter @lrnki/admin-lab build && pnpm --filter @lrnki/learner-app export:web",
+    "build": "pnpm --filter @lrnki/learner-api build && pnpm --filter @lrnki/learner-app export:web",
     "build:android": "scripts/build-learner-android.sh",
     "build:android:dev": "scripts/build-learner-android.sh development",
-    "start": "pnpm --filter @lrnki/admin-lab start",
     "lint": "eslint .",
     "test": "pnpm -r --sort --if-present run test",
     "test:db": "scripts/test-db.sh",
@@ -30,20 +28,20 @@
     "e2e:web:deployed": "pnpm --filter @lrnki/learner-app e2e:deployed",
     "e2e:web:realuse": "pnpm --filter @lrnki/learner-app e2e:realuse",
     "e2e:native:maestro": "pnpm --filter @lrnki/learner-app e2e:native:maestro",
+    "e2e:native:maestro:ios": "pnpm --filter @lrnki/learner-app e2e:native:maestro:ios",
     "tmp:clean": "node scripts/cleanup-tmp.mjs --days 3",
     "clean:macos": "scripts/cleanup-macos-dev.py",
     "db:generate": "scripts/regenerate-initial-migration.sh",
     "db:check": "scripts/check-drizzle-schema.sh",
     "db:migrate": "scripts/migrate-db.sh",
-    "db:reset": "scripts/reset-db.sh",
-    "accepted-paths": "pnpm --filter @lrnki/learner-api accepted-paths",
-    "seed:accepted-paths": "scripts/seed-accepted-paths.sh",
-    "worker:kg": "pnpm --filter @lrnki/kg-worker worker:kg"
+    "db:reset": "scripts/reset-db.sh"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "eslint": "catalog:",
-    "eslint-config-next": "catalog:",
+    "eslint-plugin-react": "catalog:",
+    "eslint-plugin-react-hooks": "catalog:",
+    "typescript-eslint": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:"
   }

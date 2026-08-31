@@ -1,5 +1,5 @@
 import { Trophy } from "lucide-react-native";
-import type { LeaderboardView } from "@/lib/api";
+import type { LeaderboardView } from "@/lib/queries";
 import { ChaseBanner, LeaderboardBoard } from "./LeaderboardBoard";
 import { Dialog, DialogBody, OverlayHeader, colors } from "@/ui";
 import { learnerTerm } from "@/learn/vocabulary";

@@ -2,12 +2,11 @@ import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { NATIVE_CHALLENGE_ID, NATIVE_SUMMIT_CHALLENGE_ID } from "./guardianFixture";
 import { E2E_FIXTURE_EMAIL, E2E_FIXTURE_PASSWORD } from "../src/lib/e2eFixture";
 import appConfig from "../app.config";
 
-// Native Maestro runner (plan 2026-07-15-001 U5). It owns the loopback
-// fixture server lifetime, APK installation, the Maestro process, and evidence paths. It passes the
+// Native Maestro runner. It owns the loopback fixture server lifetime, APK installation, the
+// Maestro process, and evidence paths. It passes the
 // shared fixture identity only to the dedicated manual sign-in flow. It fails BEFORE UI execution
 // when any prerequisite is missing, with an exact setup command.
 // The APK and UI are real; only the upstream data service is deterministic (KTD7). Run:
@@ -26,12 +25,16 @@ const APK = process.env.NATIVE_APK ?? join(appRoot, "lrnki-learner-e2e.apk");
 // Read from the canonical Expo config rather than restated here, so the id this runner uninstalls
 // is by construction the one the APK installs as.
 const APP_ID = appConfig.android?.package ?? fail("app.config.ts does not define android.package.");
-// The whole flows directory: each file is one scenario with the claim documented in this rig's
-// README, and mixing an
-// unproven visual-evidence capture into the adopted-authority flow would blur what a green run
-// means. Maestro reports them as separate entries.
-const FLOWS = join(appRoot, ".maestro", "flows");
-const EVIDENCE = resolve(appRoot, "..", "..", "tmp", "2026-07-15-durable-learner-e2e-gates", "native");
+// One Maestro PROCESS per flow, not one directory-batch process. A fresh driver session keeps an
+// opaque driver failure in one scenario from poisoning later scenarios and makes the README's
+// evidence boundary mechanically true. Keep the order explicit: auth first, the adopted Support
+// authority second, and judgment-only Guardian screenshots last.
+const FLOWS = [
+  "signin.yaml",
+  "android-runtime-reliability.yaml",
+  "crystal-guardian-obelisk.yaml"
+].map((name) => ({ name: name.replace(/\.yaml$/, ""), path: join(appRoot, ".maestro", "flows", name) }));
+const EVIDENCE = resolve(appRoot, "..", "..", "tmp", "2026-08-31-authored-learner-runtime", "native");
 
 function fail(message: string): never {
   console.error(`\n[native] ${message}\n`);
@@ -71,11 +74,17 @@ function readyDevices(adb: string): string[] {
 
 function preflight(): { adb: string; maestro: string; device: string } {
   const sdk = process.env.ANDROID_HOME ?? process.env.ANDROID_SDK_ROOT ?? join(process.env.HOME ?? "", "Library/Android/sdk");
-  const adb = which("adb") ?? join(sdk, "platform-tools", "adb");
-  if (!existsSync(adb)) fail(`adb not found. Install the Android SDK platform-tools or set ANDROID_HOME. Looked at ${adb}.`);
+  const adb = process.env.NATIVE_ADB ?? which("adb") ?? join(sdk, "platform-tools", "adb");
+  if (!existsSync(adb)) {
+    fail(`adb not found. Install platform-tools or set NATIVE_ADB to an exact binary. Looked at ${adb}.`);
+  }
 
-  const maestro = which("maestro") ?? join(process.env.HOME ?? "", ".maestro/bin/maestro");
-  if (!existsSync(maestro)) fail("maestro not found. Install it: curl -fsSL https://get.maestro.mobile.dev | bash");
+  const maestro = process.env.NATIVE_MAESTRO
+    ?? which("maestro")
+    ?? join(process.env.HOME ?? "", ".maestro/bin/maestro");
+  if (!existsSync(maestro)) {
+    fail("maestro not found. Install it or set NATIVE_MAESTRO to an exact CLI binary.");
+  }
 
   const ready = readyDevices(adb);
   if (ready.length === 0) fail("no booted Android emulator/device. Start one: $ANDROID_HOME/emulator/emulator -avd <name>");
@@ -115,7 +124,13 @@ function installApk(adb: string, device: string): { ok: boolean; out: string } {
 }
 
 let server: ChildProcess | null = null;
-function startFixture(): Promise<void> {
+type FixtureMeta = Readonly<{
+  expeditionKey: string;
+  legChallengeId: string;
+  expeditionChallengeId: string;
+}>;
+
+function startFixture(): Promise<FixtureMeta> {
   const tsx = join(appRoot, "..", "..", "node_modules", ".bin", "tsx");
   server = spawn(tsx, [join(here, "server.ts")], {
     stdio: "inherit",
@@ -127,7 +142,11 @@ function startFixture(): Promise<void> {
     const poll = async (): Promise<void> => {
       try {
         const res = await fetch(`http://127.0.0.1:${FIXTURE_PORT}/health`);
-        if (res.ok) return resolvePromise();
+        if (res.ok) {
+          const meta = await fetch(`http://127.0.0.1:${FIXTURE_PORT}/fixture`);
+          if (!meta.ok) return reject(new Error("fixture metadata endpoint refused"));
+          return resolvePromise(await meta.json() as FixtureMeta);
+        }
       } catch {
         /* not up yet */
       }
@@ -151,7 +170,7 @@ async function main(): Promise<void> {
 
   console.log(`[native] fixture login ${E2E_FIXTURE_EMAIL} (fixture-only password withheld)`);
 
-  await startFixture();
+  const fixture = await startFixture();
 
   // Emulator reaches the host fixture via 10.0.2.2; nothing else is needed for host loopback.
   console.log(`[native] installing ${APK}`);
@@ -161,24 +180,44 @@ async function main(): Promise<void> {
     fail(`adb install failed:\n${install.out}`);
   }
 
-  console.log(`[native] running Maestro flows in ${FLOWS}`);
-  const maestroRun = spawnSync(
-    maestro,
-    [
-      "--device", device,
-      "test", FLOWS,
-      "-e", `LEARNER_EMAIL=${E2E_FIXTURE_EMAIL}`,
-      "-e", `LEARNER_PASSWORD=${E2E_FIXTURE_PASSWORD}`,
-      "-e", `GUARDIAN_CHALLENGE_ID=${NATIVE_CHALLENGE_ID}`,
-      "-e", `SUMMIT_CHALLENGE_ID=${NATIVE_SUMMIT_CHALLENGE_ID}`,
-      "--format", "junit",
-      "--output", join(EVIDENCE, "maestro-report.xml")
-    ],
-    { stdio: "inherit", cwd: EVIDENCE, env: { ...process.env, MAESTRO_DRIVER_STARTUP_TIMEOUT: "60000" } }
-  );
+  for (const flow of FLOWS) {
+    if (!existsSync(flow.path)) {
+      stopFixture();
+      fail(`Maestro flow is missing at ${flow.path}.`);
+    }
+    console.log(`[native] running ${flow.name} in a fresh Maestro session`);
+    const maestroRun = spawnSync(
+      maestro,
+      [
+        "--device", device,
+        "test", flow.path,
+        "-e", `LEARNER_EMAIL=${E2E_FIXTURE_EMAIL}`,
+        "-e", `LEARNER_PASSWORD=${E2E_FIXTURE_PASSWORD}`,
+        "-e", `EXPEDITION_KEY=${fixture.expeditionKey}`,
+        "-e", `GUARDIAN_CHALLENGE_ID=${fixture.legChallengeId}`,
+        "-e", `SUMMIT_CHALLENGE_ID=${fixture.expeditionChallengeId}`,
+        "--format", "JUNIT",
+        "--output", join(EVIDENCE, `maestro-${flow.name}.xml`)
+      ],
+      {
+        stdio: "inherit",
+        cwd: EVIDENCE,
+        timeout: 5 * 60_000,
+        env: { ...process.env, MAESTRO_DRIVER_STARTUP_TIMEOUT: "60000" }
+      }
+    );
+
+    if (maestroRun.error) {
+      stopFixture();
+      fail(`Maestro ${flow.name} could not complete: ${maestroRun.error.message}. Evidence under ${EVIDENCE}.`);
+    }
+    if (maestroRun.status !== 0) {
+      stopFixture();
+      fail(`Maestro ${flow.name} failed (exit ${maestroRun.status}). Evidence under ${EVIDENCE}.`);
+    }
+  }
 
   stopFixture();
-  if (maestroRun.status !== 0) fail(`Maestro flow failed (exit ${maestroRun.status}). Evidence under ${EVIDENCE}.`);
   console.log(`\n[native] PASS. Evidence under ${EVIDENCE}.`);
   process.exit(0);
 }

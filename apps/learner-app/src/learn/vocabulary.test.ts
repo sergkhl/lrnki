@@ -1,60 +1,23 @@
 import assert from "node:assert/strict";
 import { test } from "@jest/globals";
-import { LEARNER_VOCABULARY, learnerTerm, lessonSectionHeading, type LearnerVocabularyKey } from "./vocabulary";
 
-const USED_KEYS = [
-  "routeName",
-  "learnerRefLabel",
-  "learnerRefPlaceholder",
-  "enterAction",
-  "theoryStop",
-  "question",
-  "matching",
-  "spotTheFake",
-  "capstone",
-  "nextStop",
-  "mastered",
-  "frontier",
-  "locked",
-  "known",
-  "examine",
-  "continueAction",
-  "returnToTrail",
-  "skipKnown",
-  "unskipKnown",
-  "groundedBadge",
-  "topicDoor",
-  "generatingProgress",
-  "summit",
-  "bootstrapLoading",
-  "sessionValidating",
-  "sessionErrorTitle",
-  "sessionErrorBody",
-  "retryAction",
-  "journalLoading",
-  "journalErrorTitle",
-  "journalErrorBody",
-  "catalogLoading",
-  "catalogErrorTitle",
-  "catalogErrorBody",
-  "expeditionLoading",
-  "expeditionErrorTitle",
-  "expeditionErrorBody",
-  "expeditionUnavailable"
-] satisfies LearnerVocabularyKey[];
+import {
+  LEARNER_VOCABULARY,
+  learnerTerm,
+  termSupportActionLabel,
+  type LearnerVocabularyKey
+} from "./vocabulary";
 
-test("learnerTerm returns text for every learner UI key", () => {
-  for (const key of USED_KEYS) {
-    assert.equal(learnerTerm(key), LEARNER_VOCABULARY[key]);
-    assert.notEqual(learnerTerm(key).trim(), "");
+test("the retained learner vocabulary is complete and nonempty", () => {
+  for (const [key, value] of Object.entries(LEARNER_VOCABULARY)) {
+    assert.equal(learnerTerm(key as LearnerVocabularyKey), value);
+    assert.notEqual(value.trim(), "");
   }
 });
 
-test("lessonSectionHeading maps section kinds to learner-facing headings", () => {
-  assert.equal(lessonSectionHeading("gist"), "In a nutshell");
-  assert.equal(lessonSectionHeading("intuition"), "Intuition");
-  assert.equal(lessonSectionHeading("definition"), "Definition");
-  assert.equal(lessonSectionHeading("examples"), "Examples");
-  assert.equal(lessonSectionHeading("applications"), "Where it applies");
-  assert.equal(lessonSectionHeading("formulas"), "Formulas");
+test("an Explorable Term receives an exact accessible Support action", () => {
+  assert.equal(
+    termSupportActionLabel("support relationship"),
+    "Open the authored Support Path for support relationship"
+  );
 });

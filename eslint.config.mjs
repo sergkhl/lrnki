@@ -1,11 +1,18 @@
-import nextVitals from "eslint-config-next/core-web-vitals";
-import nextTypescript from "eslint-config-next/typescript";
+import react from "eslint-plugin-react";
+import reactHooks from "eslint-plugin-react-hooks";
+import tseslint from "typescript-eslint";
 
-const eslintConfig = [
+const repositoryImportPatterns = [
+  "@lrnki/*/src/*",
+  "../../packages/*",
+  "../../../packages/*",
+  "../../apps/*",
+  "../../../apps/*"
+];
+
+export default tseslint.config(
   {
     ignores: [
-      ".next/**",
-      "**/.next/**",
       "node_modules/**",
       "**/node_modules/**",
       "dist/**",
@@ -14,51 +21,47 @@ const eslintConfig = [
       "**/dist-e2e/**",
       "dist-realuse/**",
       "**/dist-realuse/**",
-      // Claude Design sync owns `ds-bundle/` as generated, gitignored preview output.
-      "ds-bundle/**",
       "coverage/**",
       "**/coverage/**",
       ".data/**",
       ".cache/**",
       ".local/**",
-      // `.gitignore`'s `tmp/` matches any depth, so generated artifacts legitimately land in
-      // `apps/*/tmp/` too (rule 10) — the Playwright HTML report among them. Both forms are
-      // needed here, exactly as for `dist` above.
       "tmp/**",
       "**/tmp/**",
       "**/.tsbuildinfo",
       "pnpm-lock.yaml"
     ]
   },
-  ...nextVitals,
-  ...nextTypescript,
+  ...tseslint.configs.recommended,
   {
-    // Expo/Metro/Tailwind/Jest config files are CommonJS by toolchain contract.
-    files: ["apps/learner-app/*.config.js", "apps/learner-app/jest.setup.js", "apps/learner-app/src/ui/tokens.js"],
-    rules: { "@typescript-eslint/no-require-imports": "off" }
+    files: ["**/*.{tsx,jsx}"],
+    plugins: { react, "react-hooks": reactHooks },
+    settings: { react: { version: "detect" } },
+    rules: {
+      ...react.configs.flat.recommended.rules,
+      ...reactHooks.configs.flat.recommended.rules,
+      "react/react-in-jsx-scope": "off",
+      "react/prop-types": "off"
+    }
   },
   {
-    settings: { next: { rootDir: "apps/admin-lab" } },
+    files: ["**/*.{ts,tsx,mts,cts}"],
     rules: {
       "no-restricted-imports": [
         "error",
-        {
-          patterns: [
-            "@lrnki/*/src/*",
-            "../../packages/*",
-            "../../../packages/*",
-            "../../apps/*",
-            "../../../apps/*"
-          ]
-        }
+        { patterns: repositoryImportPatterns }
       ]
     }
   },
   {
-    // Learner interaction boundary (plan 2026-07-10-003 R3): learner surfaces render
-    // interactive and text primitives only through the app-owned UI module. Composed
-    // with (not replacing) the repository path restrictions above, because a later
-    // `no-restricted-imports` entry overrides earlier ones for matching files.
+    files: [
+      "apps/learner-app/*.config.js",
+      "apps/learner-app/jest.setup.js",
+      "apps/learner-app/src/ui/tokens.js"
+    ],
+    rules: { "@typescript-eslint/no-require-imports": "off" }
+  },
+  {
     files: ["apps/learner-app/src/**/*.{ts,tsx}"],
     ignores: ["apps/learner-app/src/ui/**"],
     rules: {
@@ -71,13 +74,9 @@ const eslintConfig = [
               message: "Import BottomSheet from @/ui so dismissal, safe-area, and layer behavior stay app-owned."
             },
             {
-              // Safe-area framing is a property of the surface that owns a device edge, not of
-              // its callers: delegating it is how the Crystal Formation header ended up under
-              // the status bar while its two sibling full-screen surfaces hand-rolled the inset.
-              // `SafeAreaProvider` stays importable — the root layout must still mount it.
               name: "react-native-safe-area-context",
               importNames: ["useSafeAreaInsets", "useSafeArea", "SafeAreaView", "SafeAreaInsetsContext"],
-              message: "Safe-area insets are owned by the @/ui surfaces (Screen, FullScreenDialog, SideSheet, BottomSheet). Do not hand-roll them on a consumer."
+              message: "Safe-area insets are owned by the @/ui surfaces."
             },
             {
               name: "react-native",
@@ -92,29 +91,19 @@ const eslintConfig = [
                 "Text",
                 "TextInput"
               ],
-              message: "Import the app-owned equivalent from @/ui instead (learner interaction boundary)."
+              message: "Import the app-owned equivalent from @/ui."
             }
           ],
-          patterns: [
-            "@lrnki/*/src/*",
-            "../../packages/*",
-            "../../../packages/*",
-            "../../apps/*",
-            "../../../apps/*"
-          ]
+          patterns: repositoryImportPatterns
         }
       ]
     }
   },
   {
-    // Playwright web-acceptance suite (plan 2026-07-14-001 U5): Node test files, not React
-    // surfaces. `react-hooks/rules-of-hooks` false-positives on Playwright's `use()` fixture
-    // callback, and the learner interaction boundary (RN primitive restrictions) does not apply
-    // to a browser-driving test harness that never renders the app.
-    // Also covers the opt-in real-use scaffold in e2e-realuse/ (plan 2026-07-14-001 U6).
     files: [
       "apps/learner-app/e2e/**/*.ts",
       "apps/learner-app/e2e-realuse/**/*.ts",
+      "apps/learner-app/e2e-native/**/*.ts",
       "apps/learner-app/playwright.config.ts"
     ],
     rules: {
@@ -122,6 +111,4 @@ const eslintConfig = [
       "no-restricted-imports": "off"
     }
   }
-];
-
-export default eslintConfig;
+);

@@ -6,162 +6,120 @@ Keep one canonical definition for every fact:
 - `README.md` owns setup, commands, deployment, and shared-host runbooks.
 - `CONTEXT.md` owns project language and ambiguity resolution.
 - `docs/adr/` owns current durable architectural decisions and rationale.
-- Source types own implemented interfaces; the internal Drizzle schema in
-  `packages/infrastructure-postgres/src/schema/` owns persisted data shapes. The generated `0000`
-  migration, snapshot, and journal are mechanical artifacts and are never edited or applied by hand
+- Source types own implemented interfaces. The Drizzle schema in
+  `packages/infrastructure-postgres/src/schema/` owns persisted shapes; generated migration,
+  snapshot, and journal files are mechanical artifacts and are never edited or applied by hand
   ([ADR-0039](docs/adr/0039-own-persisted-shape-in-code-first-drizzle-schema.md)).
-- A linked file in `docs/brainstorms/` owns accepted problem framing, requirements, and scope until
-  that work is completed or abandoned.
-- A linked ready/in-progress file in `docs/plans/` owns active implementation design and, in its
-  `## Validation Log`, the validation record for its own implementation units.
-- `docs/plans/TODO.md` owns current work, grouped completed outcomes, and the latest validation for
-  work no plan owns.
-- `docs/plans/BLOCKERS.md` owns unresolved manual actions required from the user.
+- `content/catalog.json` owns catalog membership and order. Each tracked
+  `content/expeditions/<key>/expedition.json` and `source.md` pair owns one complete authored
+  Expedition and its project-owned source basis.
+- A linked brainstorm owns accepted framing only until its decisions are implemented, abandoned, or
+  re-homed. A linked ready/in-progress plan owns active implementation design and its Validation Log.
+- `docs/plans/TODO.md` owns current work and rolling completed outcomes;
+  `docs/plans/BLOCKERS.md` owns unresolved user-only actions.
 
-Do not restate another document's content. Link to its canonical definition. Delete superseded
-definitions and repair their references in the same change.
+Do not restate another document's content. Link to its authority. Delete superseded definitions and
+repair their references in the same change.
 
 ## Documentation workflow
 
-- Adopt the vendored [`plan-lifecycle`](.agents/plugins/agent-workflow-core/skills/plan-lifecycle/SKILL.md)
-  skill for shared plan-index, status-altitude, closure, and Validation Log mechanics. The rules
-  below are lrnki-specific additions or overrides.
-- `docs/plans/RELEASE.md` is not adopted and must not be created by this workflow. Skip bundled
-  instructions that refer to it until a later explicit workflow decision creates that authority;
-  apply the remaining lifecycle mechanics.
-- `CONTEXT.md` is a glossary only. Keep each project-specific term to one or two sentences; put
-  behavior, data shape, implementation, and validation elsewhere.
-- Keep an ADR only for a decision that is hard to reverse, surprising without its context, and the
-  result of a real trade-off. Keep one decision per ADR, state current policy and rationale, and omit
-  implementation walkthroughs, rollout history, validation transcripts, and exact interfaces or
-  persisted shapes. Delete a fully superseded ADR and repair inbound links; never reuse its number.
-- Accepted ADRs bind shipped behavior, and ADR numbers do not define precedence. An agent must not
-  silently ignore a conflicting ADR: report the contradiction, run an authorized non-production
-  experiment, or propose an amendment or replacement. A replacement states the changed invariant
-  and repairs every affected reference in the same change. Reversible algorithms, limits, exact
-  interfaces, and exact persisted shapes belong to source or an active plan unless they satisfy the
-  ADR retention test above.
-- A brainstorm may own accepted framing, requirements, and unresolved product decisions. Turn it
-  into a plan only after those decisions are resolved enough to implement.
-- Apply the bundled Validation Log mechanics with lrnki's tighter size limits: keep a Validation Log
-  under about 200 lines and a whole plan under about 800 lines.
-- `TODO.md` has exactly `TODO`, `COMPLETED`, and `VALIDATION` sections. Keep zero to seven genuine
-  current tasks rather than inventing placeholders to meet the bundled three-task minimum, at most
-  eight grouped completed outcomes, and exactly one latest plan-less validation; keep the whole file
-  under about 150 lines. Conditional future ideas do not belong in `TODO.md`.
-- Never link retained documentation to gitignored `tmp/`. Git history archives deleted detail, but
-  any knowledge that must remain discoverable needs a live canonical owner before deletion. Preserve
-  an uncommitted plan or validation record in history before deleting it, and commit consolidation
-  separately from the detailed record it replaces.
+- Apply the vendored
+  [`plan-lifecycle`](.agents/plugins/agent-workflow-core/skills/plan-lifecycle/SKILL.md) skill when
+  reading or writing `docs/plans/`. lrnki does not adopt `docs/plans/RELEASE.md`; never create it.
+- Keep `CONTEXT.md` a glossary: one or two sentences per project term, with behavior and exact shapes
+  elsewhere.
+- Retain an ADR only for a hard-to-reverse, surprising decision with a real trade-off. Keep one
+  decision per ADR, state current policy and rationale, and omit implementation walkthroughs and
+  validation transcripts. Delete a fully superseded ADR and repair inbound links; never reuse its
+  number.
+- Accepted ADRs bind shipped behavior. Report a conflict rather than silently choosing one side.
+- Keep a plan under about 800 lines and its Validation Log under about 200 lines.
+- `TODO.md` has exactly `TODO`, `COMPLETED`, and `VALIDATION` sections, zero to seven current tasks,
+  at most eight grouped completed outcomes, and exactly one latest plan-less validation. Keep it
+  under about 150 lines.
+- Never link retained documentation to gitignored `tmp/`. Preserve an uncommitted plan or validation
+  record in Git history before deleting it, then commit consolidation separately from the record it
+  replaces.
 
 ## Validation authority
 
-- Intercepted web, real-backend web, native emulator or simulator, deployed, and physical-device
-  evidence each prove only the layer they actually exercise; none substitutes for another.
-- A native scenario earns automatic authority for one regression class only after a behavior-only
-  negative control fails at the intended assertion and a user-recorded physical pass correlates it.
-  Current Android scenario claims and rig mechanics live in
-  `apps/learner-app/e2e-native/README.md`.
-- Agents may initiate emulator or simulator runs on a tooling-capable host. Physical-device runs
-  remain user-initiated; record a concrete unresolved user action in `docs/plans/BLOCKERS.md`
-  rather than claiming evidence that was not produced.
-- Before running or qualifying lrnki evidence, apply
-  `.agents/skills/validate-lrnki/SKILL.md`; it routes to the smallest relevant environment reference
-  and owns execution, failure-triage, and claim-qualification workflow. Owning test READMEs and
-  source retain current scenario claims and rig mechanics.
+- Intercepted web, real-backend web, native emulator/simulator, deployed, distributable, and
+  physical-device evidence each prove only the layer they exercise; none substitutes for another.
+- A native scenario gains automatic authority for one regression class only when its owning README
+  records an intended behavior-only negative-control failure and a correlated user-recorded physical
+  pass. Current Android claims live in `apps/learner-app/e2e-native/README.md`.
+- Agents may initiate emulator or simulator runs on a capable host. Physical-device runs remain
+  user-initiated and belong in `docs/plans/BLOCKERS.md` only when a plan actually requires them.
+- Before running or qualifying evidence, apply `.agents/skills/validate-lrnki/SKILL.md` and its
+  smallest relevant environment reference.
+- Structural qualification proves structure and exact anchor existence, not teaching quality or
+  semantic support. Inspect every learner-visible lesson, answer, explanation, pair, impostor reveal,
+  Support target, Guardian pool, and source anchor against its local primer. Record `FIX_FIRST` for
+  unsupported material claims, incorrect or non-unique keys, prerequisite leakage, unhelpful Support,
+  or an incoherent route; repair every `FIX_FIRST` before acceptance.
+- Every zero-row or absence assertion needs a positive control over the same inspection seam.
 
 ## Rules
 
-1. This is greenfield development. Breaking changes are allowed; do not preserve compatibility
-   unless explicitly requested.
+1. This is greenfield development. Breaking changes and guarded local development/test database
+   resets are allowed; do not preserve compatibility unless explicitly requested.
 
-2. Enforce [ADR-0001](docs/adr/0001-adopt-greenfield-deep-module-architecture.md).
+2. Enforce [ADR-0001](docs/adr/0001-adopt-greenfield-deep-module-architecture.md). Prefer one deep
+   learner-runtime interface to transport-shaped helpers or duplicated policy.
 
-3. Use the project language in [CONTEXT.md](CONTEXT.md) and enforce
-   [ADR-0002](docs/adr/0002-define-learner-neutral-core-concept-graph.md).
+3. Use the project language in [CONTEXT.md](CONTEXT.md).
 
-4. Prioritize real curated source fixtures across mixed domains and formats.
+4. Enforce [ADR-0042](docs/adr/0042-author-expeditions-directly-without-runtime-models.md). Codex CLI
+   is an offline author only: the repository contains no model client, model port, prompt, compiler,
+   package, installer, or model call in build/runtime. Authors write the exact runtime document.
 
-5. Route LLM calls through LiteLLM aliases and the owning ports. Production extraction uses
-   Xiaomi MiMo v2.5 with reasoning disabled unless an experiment states otherwise; the
-   alias → deployment mapping in `litellm/config.yaml` (`router_settings.model_group_alias`)
-   is the source of truth.
+5. Follow [content/AUTHORING.md](content/AUTHORING.md). Run `pnpm content:check`; never weaken a
+   catalog refusal or check in a second content representation. Content must qualify all-or-nothing
+   in CI and learner-api startup.
 
-6. Enforce [ADR-0006](docs/adr/0006-use-forced-named-tool-schemas.md).
+6. Human-readable authored keys are the only content identifiers. Array order is instructional
+   order; prerequisites, Support destinations, difficulty, and Guardian pools are explicit. Runtime
+   code must not derive a competing route.
 
-7. Enforce [ADR-0003](docs/adr/0003-use-postgres-json-table-artifact-store.md).
+7. Keep answer keys server-private. The Expo app imports only learner-api DTOs and never imports
+   learner-runtime, content documents, Postgres types, or grading state.
 
-8. Enforce [ADR-0039](docs/adr/0039-own-persisted-shape-in-code-first-drizzle-schema.md).
+8. Enforce [ADR-0003](docs/adr/0003-use-postgres-json-table-artifact-store.md),
+   [ADR-0039](docs/adr/0039-own-persisted-shape-in-code-first-drizzle-schema.md), and
+   [ADR-0041](docs/adr/0041-own-learner-identity-with-self-hosted-better-auth.md). Better Auth owns
+   identity; one validated learner aggregate owns application state.
 
-9. Database resets and re-initialization are allowed without approval during development.
+9. `DATABASE_URL` lives in the repo-root `.env` and is not auto-loaded by the shell or test runner.
+   Use `node --env-file=.env …`, `tsx --env-file=.env …`, or explicitly export it before DB commands.
+   Run `pnpm test:db` for DB-backed automated tests; it resets and targets only `lrnki_test` through
+   `TEST_DATABASE_URL`, never the development database.
 
-10. Stable curated sources belong in `fixtures/`; generated artifacts, reports, and scratch outputs
-    belong in gitignored `tmp/`.
+10. Tracked learner sources and documents belong under `content/`; reports, screenshots, generated
+    build artifacts, and scratch output belong in gitignored `tmp/`.
 
-11. Enforce [ADR-0013](docs/adr/0013-verify-quality-by-real-source-inspection.md).
-
-12. Enforce [ADR-0011](docs/adr/0011-retain-minimal-admin-lab.md).
-
-13. Prioritize real-use quality evaluation and run real extraction with production LLM calls.
-
-14. After every important behavior-changing milestone, follow the
-    [real-use quality route](.agents/skills/validate-lrnki/references/real-use-quality.md) in the
-    validation skill. A green suite is not quality evidence.
-    A model reassignment invalidates prior quality evidence for every affected consumer; re-run the
-    relevant gates or record them as unqualified. A Provider Route change alone preserves that
-    evidence only when every reachable route mechanically resolves to the same Model Assignment;
-    qualify provider contract and reachability operationally. Undeclared or ambiguous quantization
-    fails closed as route-sensitive Model Assignment identity. Every zero-row inspection assertion
-    must carry a positive control over the same rows in the same query.
-    For source-backed learner readiness, `FIX_FIRST` means an unsupported learner-visible material
-    claim, an incorrect or non-unique key, leakage across a trusted prerequisite, or no coherent
-    completable route. Sparse coverage, explicit asset absence, uncertain edges, and non-material
-    ordering, difficulty, wording, or recall imperfections are safe incompleteness when they cannot
-    change source support, grading, prerequisite closure, or completion; record them without
-    weakening an admission gate.
-    `DATABASE_URL` lives in the repo-root `.env`; the shell and test runner do not auto-load it, so
-    `process.env.DATABASE_URL` reads empty until you do. Load it before DB-touching commands
-    (`node --env-file=.env …`, `tsx --env-file=.env …`, or `set -a; . ./.env; set +a`). Never defer
-    a real-use gate by claiming `DATABASE_URL` is unavailable. DB-backed automated tests are the
-    exception: run `pnpm test:db`, which resets and targets only `lrnki_test`; test files must opt
-    in through `TEST_DATABASE_URL` and must never use the development `DATABASE_URL`.
-
-15. Admin Lab web UI uses shadcn base-ui components; graph visualization uses Cytoscape. For the
-    learner surface, enforce
-    [ADR-0035](docs/adr/0035-separate-learner-app-static-spa-typed-api.md).
-
-16. A deterministic gate over neural output may hard-veto only a provable guarantee. Heuristic
-    lexical or surface-pattern gates require an explicit measured module and must be removed when
-    they cause false negatives. Schema fail-closed behavior does not imply semantic rejection of
-    well-formed output.
-
-17. Extraction and judge prompts, including forced-tool `description` fields, remain domain-neutral.
-    Never tune with fixture concepts or expected fixture outcomes.
-
-18. Delete a superseded code path, schema, prompt, port, type, dependency, export, script, config
-    field, or documentation definition in the same change that replaces it. Keep one source of truth
-    per fact; any second representation must be mechanically generated.
-
-19. Enforce
+11. Enforce [ADR-0013](docs/adr/0013-verify-quality-by-real-source-inspection.md) and
     [ADR-0028](docs/adr/0028-measure-non-deterministic-quality-with-non-deterministic-methods.md).
+    A green deterministic suite does not establish authored teaching quality.
 
-20. Enforce [ADR-0012](docs/adr/0012-embeddings-permitted-except-prerequisite-derivation.md).
+12. A deterministic qualifier may hard-veto only a provable structural guarantee. Semantic source
+    support remains direct judgment; do not encode heuristic lexical proxies as truth.
 
-21. Before fixing a real-use defect, name its established problem class and research recognized best
-    practices. Prefer a conventional root-cause solution. Record why a bespoke approach is necessary
-    if established methods conflict with this architecture or the learner-neutral contract.
+13. Delete a superseded path, schema, dependency, export, script, config field, or documentation
+    definition in the same cutover that replaces it. Keep one source of truth; any second
+    representation must be mechanically generated.
 
-22. Prioritize the Learner App's game UX and enforce
-    [ADR-0032](docs/adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
-    Before implementing a new mechanic, record its learner-visible goal, mastery relationship,
-    challenge curve, likely distractions, and the focused real-use evidence that will judge it. If
-    the mechanic proposes graded evidence as acquisition-mastery evidence, stop for the review that
-    ADR-0032 requires; the planning checklist does not authorize that change.
+14. Before fixing a real-use defect, name its established problem class and research recognized best
+    practices. Prefer a conventional root-cause solution; record why a bespoke solution is necessary.
 
-23. Run `docker compose` for the shared environment only from the deploy checkout on its host, and
-    always detached (`-d`). Never from inside an agent container that binds the workspace at a
-    different path than the host does — compose sends the daemon *its* paths, so every relative bind
-    source resolves somewhere the daemon cannot see
-    ([ADR-0040](docs/adr/0040-serve-public-api-only-from-the-deployed-container.md)). The file binds
-    fail closed on that; `watch` and `down` are not protected, and an attached `up` takes the whole
-    stack down with its terminal.
+15. Prioritize the Learner App game experience and enforce
+    [ADR-0032](docs/adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md). Before adding
+    a mechanic, record its learner-visible goal, mastery relationship, challenge curve, distractions,
+    and focused real-use evidence. Graded Guardian evidence must never become acquisition mastery.
+
+16. Enforce [ADR-0035](docs/adr/0035-separate-learner-app-static-spa-typed-api.md). Hono authenticates
+    and maps transport; learner-runtime owns reads/transitions; Expo owns presentation.
+
+17. Run shared-host Compose only from the deploy checkout on its host and always detached. Never run
+    it inside an agent container whose workspace path differs from the Docker daemon's host path
+    ([ADR-0040](docs/adr/0040-serve-public-api-only-from-the-deployed-container.md)). File binds fail
+    closed on `up`; `watch` and `down` are not protected, and attached `up` stops with its terminal.

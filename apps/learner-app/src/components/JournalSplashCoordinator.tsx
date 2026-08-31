@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { LeaderboardView } from "@/lib/api";
+import type { LeaderboardView } from "@/lib/queries";
 import { classifySeam, type SeamChange } from "@/learn/seamClassifier";
 import { chooseSplash, type SplashEvent } from "@/learn/splashPriority";
 import { readBoardSeen, writeBoardSeen } from "@/lib/navMemory";

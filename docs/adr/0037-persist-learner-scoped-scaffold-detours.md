@@ -1,31 +1,18 @@
-# Persist learner-scoped Scaffold Detours outside the neutral graph
+# Persist only authored Support visibility in Learner State
 
 Status: Accepted
 
 ## Decision
 
-Scaffold Detours persist in learner-scoped tables that are structurally separate from the
-Learner-Neutral Core Concept Graph, Derived Graph Layers, and neutral Study Item Bank. Their generation
-dependencies cannot write those neutral assets, so personalized support cannot leak into mastery,
-prerequisite gating, or rewards by convention alone.
+Support Paths are authored content that explicitly reference existing option-select Activities in
+other Stops. Learner State persists only whether a named path is open or hidden; it never persists a
+generated branch, copied lesson, search result, or alternate answer key.
 
-One learner's repeated request for the same term under the same parent reuses a durable detour.
-Publication is atomic: a complete safe branch becomes visible, while a failed attempt exposes no
-partial branch.
-
-A Support Step is either a reference to exact existing neutral study identities or immutable generated
-learner-scoped content. Exact reuse creates a reference rather than a cloned Concept; generated steps
-pass the source-less synthesis policy in
-[ADR-0030](0030-confidence-gated-synthesis.md).
-
-Reference steps retain neutral response identity and evidence semantics. Generated steps use a
-scaffold-scoped response identity, and every neutral mastery, progress, reward, and Recall Challenge
-fold excludes those observations. Exact payloads, lifecycle states, and constraints belong to source
-types and the Drizzle schema under
-[ADR-0039](0039-own-persisted-shape-in-code-first-drizzle-schema.md).
+Answering through Support uses the referenced Activity's ordinary acquisition identity. It may repair
+that target Stop's evidence, but the branch itself cannot award parent progress, Guardian evidence,
+or duplicate score.
 
 ## Context
 
-A learner may need a missing sub-concept while studying the current stop. Durable, structurally
-separate detours make that support replayable without creating a second neutral graph or allowing
-personalized content to redefine shared knowledge.
+The learner needs immediate repair without a generation lifecycle or a second knowledge system.
+Explicit references make Support inspectable, deterministic, replay-safe, and small in persistence.

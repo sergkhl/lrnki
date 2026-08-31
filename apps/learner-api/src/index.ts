@@ -1,23 +1,15 @@
+import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
+import { loadQualifiedCatalogOrThrow } from "@lrnki/learner-runtime/content-node";
+
 import { createLearnerApp } from "./app";
 import { authSql, sharedSql } from "./db";
-import { startScaffoldGenerationSupervisor } from "./scaffoldGenerationSupervisor";
-import { startTopicGenerationSupervisor } from "./topicGenerationSupervisor";
 
+const contentRoot = fileURLToPath(new URL("../../../content/", import.meta.url));
+const catalog = await loadQualifiedCatalogOrThrow(contentRoot);
 const port = Number(process.env.LEARNER_API_PORT ?? 8787);
-const app = createLearnerApp(sharedSql(), authSql());
+const app = createLearnerApp(sharedSql(), authSql(), { catalog });
 
 serve({ fetch: app.fetch, port }, (info) => {
   console.log(`learner-api listening on :${info.port}`);
 });
-
-// The relocated topic-generation supervisor (R4): same claim/fencing/staleness semantics,
-// now living in the one long-lived learner process. The application-owned availability policy
-// makes this a no-op while fully anchor-less Synthetic Topic Generation is paused.
-if (!startTopicGenerationSupervisor()) {
-  console.log("learner topic generation is paused");
-}
-
-// The scaffold-detour generation supervisor (plan 2026-07-12-002 U3): drains requested Scaffold
-// Detours through the same process-level scheduler.
-startScaffoldGenerationSupervisor();

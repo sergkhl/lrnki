@@ -1,466 +1,253 @@
-# Lrnki
+# lrnki
 
-Turns curated learning resources into a Learner-Neutral Core Concept Graph, derives prerequisite
-structure and study assets from it, and serves them to a learner app as a playable expedition.
+lrnki is a universal Expo learner app backed by a Hono API, Better Auth, PostgreSQL, and a directly
+authored Expedition catalog. Codex CLI authors tracked content offline; neither builds nor runtime
+processes call Codex or another model.
 
-## Documentation
+The repository has five workspaces:
 
-- [AGENTS.md](AGENTS.md) — engineering workflow and enforcement rules
-- [CONTEXT.md](CONTEXT.md) — project language and ambiguity resolution
-- [docs/adr/](docs/adr/README.md) — durable architectural decisions
-- [docs/plans/](docs/plans/README.md) — active plans, live TODO, and blockers
+- `packages/learner-runtime` — content qualification plus the two-method learner game runtime;
+- `packages/infrastructure-postgres` — Better Auth schema and the learner aggregate adapter;
+- `apps/learner-api` — authenticated Hono transport and startup composition;
+- `apps/learner-app` — Expo web, Android, and iOS presentation;
+- the repository root — content, deployment, validation, and coordination.
 
-## Workspace
+## Requirements
 
-Apps:
+- Node.js 22 or newer;
+- pnpm 11.4.0;
+- Docker with Compose;
+- PostgreSQL client tools (`psql`) for migration/reset checks;
+- platform SDKs only for the native platform being exercised.
 
-- `apps/kg-worker`: extraction, Concept Canonicalization, graph-version build, and enrichment CLI
-- `apps/learner-api`: typed learner HTTP API (Hono)
-- `apps/learner-app`: universal Expo learner app (web + Android)
-- `apps/admin-lab`: Next.js operator inspection surface
+Install dependencies:
 
-Packages:
-
-- `packages/domain-core`: learner-neutral Concepts, Concept Evidence Profiles, and graph versions
-- `packages/ports`: explicit application boundaries
-- `packages/application`: use-cases, projections, and orchestration
-- `packages/infrastructure-ingestion`: structured text, HTML, and Docling parser adapters
-- `packages/infrastructure-litellm`: forced named tool-call gateway and stage descriptors
-- `packages/infrastructure-postgres`: code-first persisted schema, its generated baseline, and the
-  one schema migrator
-- `packages/infrastructure-storage-local`: local curated-source object store adapter
-
-## Commands
-
-```bash
-cp .env.example .env
-docker compose up -d postgres litellm
+```sh
 pnpm install
-set -a; . ./.env; set +a   # the shell does not auto-load .env; DB commands need DATABASE_URL
-pnpm db:migrate
-pnpm dev:admin      # Admin Lab (Next.js)
-pnpm dev:learner    # Learner app web (Expo, no browser auto-open)
 ```
 
-### Concept Canonicalization and graph publication
+Create local configuration:
 
-Publication is an explicit two-command handoff under
-[ADR-0017](docs/adr/0017-split-extraction-runs-from-graph-version-builds.md). Pass the inspected,
-successful Extraction Run IDs in the intended order:
-
-```bash
-pnpm worker:kg canonicalize-concepts [--exact-label-only] [--base <graphVersionId>] <runId>...
-pnpm worker:kg inspect-concept-canonicalization <artifactId> [--json]
-pnpm worker:kg build-graph-version --canonicalization <artifactId> [--base <graphVersionId>] <runId>...
+```sh
+cp .env.example .env
+openssl rand -base64 32
 ```
 
-`canonicalize-concepts` defaults to semantic mode, runs the configured embedding proposer and
-identity adjudicator, then prints the immutable artifact ID and a stable decision summary.
-`--exact-label-only` records the attributable no-neural mode. Inspect the summary or full JSON before
-publication.
+Put the generated value in `BETTER_AUTH_SECRET`. Keep `BETTER_AUTH_URL=http://localhost:8787` for
+local development. Google credentials are optional; email/password auth and every automated rig work
+without them.
 
-`build-graph-version` makes no model or embedding calls. Its base version and ordered run list must
-exactly match the selected artifact; unknown, malformed, mismatched, or registry-conflicting inputs
-fail closed. When extending a graph, pass the same `--base` to both commands. These commands use the
-database and, in semantic mode, LiteLLM, so load the repo-root `.env` as shown above before running
-them.
+## Directly authored content
 
-### Curated-source learner readiness
+The only content authorities are:
 
-Supplied documents enter only through Source Registration. The manifest CLI is the current operator
-adapter; a future search or curation service must supply the same provenance, Declared Domain, bytes,
-and normalized document through the source-owned
-[`SourceRegistrationStorePort`](packages/ports/src/index.ts), never inject text into a downstream
-prompt or learner-asset stage.
-
-Use one source at a time to keep model spend bounded. Registration and every worker command below
-write to the database selected by the loaded repo-root `.env`; extraction, semantic canonicalization,
-enrichment, and study-asset generation make real production-model calls. Do not point this sequence
-at production without explicit authorization.
-
-```bash
-pnpm worker:kg register-from-manifest <manifest.json>
-pnpm worker:kg list-sources
-pnpm worker:kg run-extraction <sourceResourceId>
-# Canonicalize, inspect, and publish the successful run with the commands above.
-pnpm worker:kg enrich-graph-version <graphVersionId>
-pnpm worker:kg generate-study-items <enrichmentId>
-pnpm --filter @lrnki/learner-api evaluate:source-assets -- \
-  --enrichment-id=<enrichmentId> --output=tmp/source-assets.json
+```text
+content/catalog.json
+content/expeditions/<expeditionKey>/expedition.json
+content/expeditions/<expeditionKey>/source.md
 ```
 
-The evaluator is read-only over learner assets, makes the production source-support calls, and writes
-its joined payload/evidence/decision/cost report only under gitignored `tmp/`. It is quality evidence,
-not a standing oracle or an activation step. The exact current readiness and asset-identity contract
-is source-owned by
-[`sourceExpedition.ts`](packages/application/src/sourceExpedition.ts); the current capability holdouts
-are source-owned by
-[`learnerKnowledgeAvailability.ts`](packages/application/src/learnerKnowledgeAvailability.ts).
-Qualified candidates appear through the learner API without an operator approval or moderation
-step, and qualification is rechecked atomically at adoption, activation, and read time. Stable
-diagnostic and external read-through inputs are documented in
-[`fixtures/README.md`](fixtures/README.md).
+`catalog.json` owns membership and order. Each Expedition document owns the exact runtime route,
+lessons, activities, Support Paths, source disclosures, and Guardian pools. Its colocated primer is
+the project-owned authoring and inspection basis. No content is compiled, installed, published to
+Postgres, or requalified from a second representation.
 
-`docker compose up -d --build` starts the stack. Compose brings the application schema to current
-through the one-shot `migrate` service after PostgreSQL becomes healthy, and starts the learner API
-only after that migration and LiteLLM both succeed.
+Follow [content/AUTHORING.md](content/AUTHORING.md), then run:
 
-**Google sign-in does not work from `pnpm dev:learner` against the deployed API**, and no setting
-fixes it: `localhost:8881` is cross-site with `api.lrnki.globesoul.com`, so the browser drops the
-OAuth state cookie and every callback fails with `state_mismatch`
-([ADR-0041](docs/adr/0041-own-learner-identity-with-self-hosted-better-auth.md)). Email + password —
-the path the rigs drive — is unaffected. To exercise Google, run the API yourself so that it shares
-the web origin's host *and* scheme:
-
-```bash
-pnpm dev:api            # the learner-api container, published on :8787 for this machine only
-pnpm dev:learner:local  # web on :8881, pointed at it (--clear: Metro inlines and caches the origin)
+```sh
+pnpm content:check
 ```
 
-One-time setup: register `http://localhost:8787/auth/callback/google` as an authorized redirect URI
-on the Google client — Google exempts `localhost` from its https-only rule. The first API run needs
-`pnpm dev:api:rebuild`; subsequent runs use the fast command above. See the canonical
-[API dev loop](#api-dev-loop) for rebuild and live-reload behavior.
+The same all-or-nothing qualifier runs in `pnpm check` and before learner-api begins listening. It
+checks structure and exact source-anchor existence; direct source inspection remains required for
+semantic support and teaching quality.
 
-**An ambient `NODE_ENV` in your shell breaks `pnpm build`.** Next.js reads it directly, so a value
-exported by a shell profile or left over from an earlier command sends the Admin Lab build down a
-configuration path it was never meant to take, and the failure reads as a Next.js defect rather than
-an environment one. Leave `NODE_ENV` unset and let each tool choose its own.
+Current catalog order:
 
-The `caddy` service is behind the `public` profile, so that command **skips it** on a development
-machine — Caddy only makes sense where `api.lrnki.globesoul.com` resolves, and anywhere else it
-retries ACME against the real VPS forever. The shared host opts in with `COMPOSE_PROFILES=public` in
-its `.env`; `scripts/deploy-learner-api.sh` names `caddy` explicitly, which activates the profile on
-its own, so the deploy works with or without that variable.
+1. Critical Thinking
+2. Probability and Statistics
+3. Personal Finance
+4. Machine Learning
+5. Neuroscience of Memory and Attention
 
-Run the quality checks:
+## Local development
 
-```bash
+Start or rebuild the API container once, then attach the fast source/content watcher:
+
+```sh
+pnpm dev:api:rebuild
+```
+
+For later runs with no dependency or Dockerfile changes:
+
+```sh
+pnpm dev:api
+```
+
+Both commands keep the API in the Compose container. The development overlay publishes only
+`127.0.0.1:8787`; there is no shadow host API. Source changes under `apps/learner-api/src`,
+`packages/`, or `content/` sync and restart the container. A lockfile or image-input change requires
+`pnpm dev:api:rebuild`.
+
+Run Expo web in another terminal:
+
+```sh
+pnpm dev:learner:local
+```
+
+Native development uses the same API origin:
+
+```sh
+pnpm dev:android
+pnpm dev:ios
+```
+
+The Android wrapper boots or detects an emulator/device and establishes `adb reverse` when the API
+origin is loopback. A physical-device run is still user-initiated evidence; attaching a device does
+not make an automated run physical-device acceptance.
+
+## Learner API
+
+Every learner read derives `learnerRef` from the Better Auth session. Public reads are:
+
+- `GET /journal`
+- `GET /catalog`
+- `GET /expedition/:expeditionKey`
+- `GET /guardian/:expeditionKey/:challengeId`
+- `GET /leaderboard`
+
+All mutations use `POST /game/commands` with a closed command union, `requestId`, and
+`expectedStateVersion`. Hono validates/authenticates and delegates; private grading, idempotency,
+stale-version refusal, mastery, Guardian combat, rewards, and leaderboard state belong to
+`@lrnki/learner-runtime`. The Expo app imports only learner-api DTOs and receives no pre-answer key.
+
+## Database
+
+The exact valid public relation manifest is:
+
+```text
+account
+learner_journey_state
+session
+user
+verification
+```
+
+The first four are Better Auth tables. `learner_journey_state` is one versioned JSONB aggregate per
+user; its payload is parsed fail-closed by learner-runtime on every load and proposed transition.
+Authored content is never stored in PostgreSQL.
+
+The Drizzle schema owns persisted shape. The `0000` SQL, snapshot, and journal are generated as one
+baseline and must not be edited by hand.
+
+Useful commands:
+
+```sh
+pnpm db:check      # compare the generated baseline with the Drizzle schema; no DB write
+pnpm db:migrate    # apply only to empty schema or verify the exact current baseline
+pnpm db:generate   # regenerate the one greenfield baseline after a schema edit
+pnpm test:db       # reset and test lrnki_test only
+```
+
+### Guarded development reset
+
+Schema changes use an explicit reset during greenfield development. Before resetting, resolve the
+actual endpoint, database name, and row counts; the command intentionally destroys accounts,
+sessions, journey progress, challenges, awards, and every application row in the named database.
+
+```sh
+pnpm db:reset
+```
+
+The script refuses any database except exactly `lrnki` or `lrnki_test`, confirms the connected name,
+drops only the application schemas, and reapplies the sole baseline. It is not a shared-host or
+production reset runbook. A shared or production reset requires separate explicit owner authority.
+
+`DATABASE_URL` is read from `.env` by repository wrappers; the shell and generic test runner do not
+load it automatically. DB-backed tests use `TEST_DATABASE_URL` and refuse any database except
+`lrnki_test`.
+
+## Validation
+
+Fast and full gates:
+
+```sh
+pnpm typecheck
+pnpm test
+pnpm lint
+pnpm build
+pnpm e2e:web
 pnpm check
+pnpm test:db
 ```
 
-`pnpm check` includes the intercepted production-web Playwright gate (`pnpm e2e:web`), which mocks
-the API and runs deterministically. The OAuth-return case can also be rerun manually against the
-deployed Pages artifact; it intercepts the deployed bundle's session read, performs no sign-in or
-real API request, and touches no database:
+`pnpm check` runs temporary-output cleanup, content and schema parity, typechecks, deterministic
+tests, lint, API/Expo builds, and the fully intercepted phone/desktop web suite. It does not touch the
+development database and does not substitute for real-backend, native, deployed, or physical-device
+evidence.
 
-```bash
-pnpm e2e:web:deployed
+Real-backend web:
+
+```sh
+pnpm e2e:web:realuse
 ```
 
-Two heavier suites are **opt-in** and not part of `pnpm check`; the evidence boundaries are defined
-in [AGENTS.md](AGENTS.md#validation-authority), and the single agent workflow entry point is the
-[validation skill](.agents/skills/validate-lrnki/SKILL.md):
+This uses real Better Auth, Hono, `lrnki`, and server-side grading. The owning contract is
+[apps/learner-app/e2e-realuse/README.md](apps/learner-app/e2e-realuse/README.md).
 
-```bash
-pnpm e2e:web:realuse    # real supervisor-free API over Postgres, no generation
-pnpm e2e:native:maestro # real Android APK on an emulator, deterministic loopback fixture
+Android emulator evidence:
+
+```sh
+scripts/build-learner-android.sh e2e
+pnpm e2e:native:maestro
+EXPO_PUBLIC_LEARNER_API_URL=http://127.0.0.1:8799 pnpm dev:ios
+pnpm e2e:native:maestro:ios
 ```
 
-The real-backend web gate needs live Postgres with at least one ready catalog enrichment; it
-selects one by capability, never generates, and cleans up its disposable learners on success or
-failure. See [apps/learner-app/e2e-realuse/README.md](apps/learner-app/e2e-realuse/README.md).
+The owning scenario claims, APK requirements, 320 dp rig, and negative-control procedure are in
+[apps/learner-app/e2e-native/README.md](apps/learner-app/e2e-native/README.md). Keep the iOS Debug
+Metro process running while its Maestro command executes. Android emulator, iOS Debug simulator,
+deployed, distributable, and physical-device results remain separately named evidence classes.
 
-The native gate drives a standalone e2e-profile APK on a booted Android emulator with Maestro.
-Its current scenario claims, prerequisites, and setup are in
-[apps/learner-app/e2e-native/README.md](apps/learner-app/e2e-native/README.md).
+## Authentication
 
-Reclaim developer-toolchain disk space on a macOS host — orphaned iOS simulator runtimes, Xcode
-build products, and package-manager caches:
+`BETTER_AUTH_SECRET` is mandatory and the API refuses to boot without it. Rotating it signs every
+learner out. `BETTER_AUTH_URL` is the API's own public origin and must match the Google web-client
+callback `${BETTER_AUTH_URL}/auth/callback/google`. One web-type Google client serves web and native;
+native returns through the app deep link after the server callback.
 
-```bash
-pnpm clean:macos              # interactive picker; nothing is removed until you confirm
-pnpm clean:macos --json       # print what it found and exit; never removes anything
-```
-
-The picker starts with the reversible targets checked — anything a lockfile or a re-download
-restores — and leaves the costly ones (Gradle caches, iOS DeviceSupport, erasing simulators)
-unchecked. The Android AVD and Docker are reported but never modified, and a target macOS will not
-let the tool remove is shown as blocked rather than counted toward the total.
-`scripts/cleanup-macos-dev.py` explains why each target is or is not collectable; `--help` lists the
-non-interactive flags.
-
-## Database schema
-
-Persisted shape is code-first: edit the internal Drizzle schema, regenerate the sole baseline, and
-reset rather than add a second migration
-([ADR-0039](docs/adr/0039-own-persisted-shape-in-code-first-drizzle-schema.md)). Four commands cover
-the whole loop:
-
-```bash
-pnpm db:generate   # after editing packages/infrastructure-postgres/src/schema/ — offline
-pnpm db:check      # offline drift gate; already runs inside `pnpm check`
-pnpm db:migrate    # bring DATABASE_URL's database to current
-pnpm db:reset      # drop + recreate its public/drizzle schemas, then migrate
-```
-
-`db:migrate` and `db:reset` need `DATABASE_URL`, which the shell does not auto-load
-(`set -a; . ./.env; set +a`). `db:generate` replaces the SQL, snapshot, and journal together —
-review all three, never hand-edit them, and never apply the SQL with `psql`.
-
-The migrator applies the baseline to an empty database and is a no-op on a current one. Every other
-state stops it **before any DDL** and names itself — `legacy-schema`, `partial-schema`,
-`stale-baseline`, `metadata-without-schema`, or `unexpected-history`
-([ADR-0039](docs/adr/0039-own-persisted-shape-in-code-first-drizzle-schema.md) holds the normative
-state machine). The operator response is the same for all five: reset.
-
-Locally that is `pnpm db:reset`. On the shared environment it is the cutover runbook below. A deploy
-never resolves these states by itself, and no fix is ever a volume deletion — `postgres_data` also
-holds LiteLLM's database and its virtual keys.
-
-### Accepted Source Expedition packages
-
-After a Source Expedition passes its owning plan's real-use gate and accepted publication, seal its
-current global closure from the guarded development database:
-
-```bash
-pnpm accepted-paths export --catalog-key=critical-thinking
-pnpm accepted-paths validate --allow-partial  # zero or more authoring-time v2 packages
-pnpm accepted-paths validate                  # exact complete manifest set; no database access
-pnpm accepted-paths report                    # read-only route/item/grounding baseline
-pnpm seed:accepted-paths                      # destructive model-free reset + complete install
-```
-
-Export overwrites the current package file and records its v2 format plus SHA-256 in the
-accepted-path manifest. The complete validator checks canonical serialization, source bytes,
-package digests, relational closure, cross-package Concept identity, the exact 3–5-Concept route,
-anchors and summit, prerequisite order, one lesson and option-select per Concept, selected
-matching/impostor membership, and every selected family's child rows before a reset is possible.
-`seed:accepted-paths` names the exact guarded database/endpoint, discards its users, sessions,
-learner paths, responses, awards, and progress, installs no learner, makes no model call, and
-publishes the catalog only after every installed package re-qualifies to the same route and asset
-identity under the current runtime contract. It accepts only `lrnki` or `lrnki_test`; shared-host
-installation remains the manual cutover workflow below.
+Local email/password accounts are disposable. A greenfield database reset invalidates every cookie;
+the app must recover through a fresh sign-up/sign-in rather than a compatibility reader.
 
 ## Deployment
 
-Runbook for the topology decided in
-[ADR-0035](docs/adr/0035-separate-learner-app-static-spa-typed-api.md) and
-[ADR-0011](docs/adr/0011-retain-minimal-admin-lab.md).
+The base Compose topology contains only:
 
-| Surface | URL | How it deploys |
-| --- | --- | --- |
-| Learner web | `https://lrnki.globesoul.com` | `.github/workflows/deploy-learner-web.yml` on push to `main` |
-| Learner API | `https://api.lrnki.globesoul.com` | `scripts/deploy-learner-api.sh` (manual, run on the VPS) |
+- PostgreSQL;
+- one-shot migration verification/application;
+- learner-api;
+- optional profiled Caddy.
 
-Both hostnames are stable and hardcoded in the single file that consumes each (workflow
-`EXPO_PUBLIC_LEARNER_API_URL`, the `apps/learner-api/src/app.ts` CORS default,
-`scripts/docker/caddy/Caddyfile`).
+The learner API has no host-published port in the base file. On the shared host, Caddy is the only
+public route to the container under [ADR-0040](docs/adr/0040-serve-public-api-only-from-the-deployed-container.md).
+Set deployment secrets and the real `BETTER_AUTH_URL`; use `COMPOSE_PROFILES=public` only on the host
+whose DNS points to Caddy.
 
-There is one shared learner environment during testing, so `pnpm --filter @lrnki/learner-app start`
-needs no configuration. `EXPO_PUBLIC_LEARNER_API_URL` is the single opt-in override for pointing the
-app at some other API.
+Deploy from the saved deploy checkout on that host:
 
-**Containers.** Plain `docker compose` runs `lrnki-postgres` (5433), `lrnki-litellm` (4000),
-`lrnki-docling` (5001), `lrnki-caddy` (80/443), and `lrnki-learner-api`, which carries the generation
-supervisors and **publishes no port** — reach it from inside:
-
-```bash
-docker exec lrnki-learner-api node -e '…fetch("http://127.0.0.1:8787"…)'
+```sh
+scripts/deploy-learner-api.sh
 ```
 
-### API dev loop
+The script refuses a running Compose watcher, optionally fast-forwards Git, builds the API/Caddy
+images, waits for Postgres, runs the fail-closed one-shot migrator, then recreates and verifies the
+API and public TLS route. A refused migration leaves the previous API running. It never resets a
+database.
 
-The public hostname has exactly one upstream, the `learner-api` container
-([ADR-0040](docs/adr/0040-serve-public-api-only-from-the-deployed-container.md)). Local development
-edits on the host and runs in that container through the loopback-only `docker-compose.dev.yml`
-overlay; it never starts a competing host API:
+Run Compose only from the host checkout and always detached. Do not run shared-host Compose inside a
+container that mounts the checkout at another path: Docker resolves bind sources in the daemon's
+host filesystem. The tracked file binds use `create_host_path: false` to fail instead of silently
+creating wrong directories.
 
-```bash
-pnpm dev:api:rebuild  # first setup or an offline lockfile/build-input change: build, start, watch
-pnpm dev:api          # normal loop: start the existing image without building, then watch
-```
-
-`pnpm dev:api` deliberately fails instead of silently building when no existing image is available.
-At watcher startup, host files under `apps/learner-api/src` and `packages/` are synchronized into the
-container; a later saved edit syncs and restarts it in ~1–3s without changing the image (a brief 502
-during restart is expected). A `pnpm-lock.yaml` change made while watch is active triggers the real
-image rebuild it requires. If that file changed while watch was stopped, use
-`pnpm dev:api:rebuild` before resuming.
-
-`litellm/config.yaml` is also a learner-API image build input: operation hashes resolve the exact
-model, provider, and fallback topology from that file. After changing it, reload LiteLLM as below
-and run `pnpm dev:api:rebuild`; source sync alone leaves the API calculating stale identities.
-
-Both commands start Compose services detached and leave only the file watcher in the foreground. If
-the watcher is not on screen, changes are not syncing; ending it leaves the detached API running.
-Stop it before deploying: `scripts/deploy-learner-api.sh` refuses while one is attached because a
-later sync would overwrite the image it just deployed.
-
-The Caddyfile is baked into the built caddy image rather than bind-mounted (reason in
-`scripts/docker/caddy/Dockerfile`), so a Caddy config change needs
-`docker compose up -d --build caddy`.
-
-**Every compose lifecycle command for the shared environment must be detached and must run from this
-checkout on its host.** The local watcher above is only a foreground observer after its detached
-start; do not attach it on the shared host. A bare `docker compose up` is attached: it takes the
-whole stack down when its terminal or SSH session ends, which is how the shared environment went
-dark on 2026-08-05. Running compose from an agent container that binds the workspace at a different
-prefix is the other half of the same rule — the file binds set `create_host_path: false` and refuse
-such a caller by name, but `watch` and `down` are not protected
-([ADR-0040](docs/adr/0040-serve-public-api-only-from-the-deployed-container.md), `AGENTS.md` rule 23).
-
-**API deploy** — from the repo checkout on the VPS (drives the local Docker daemon):
-
-```bash
-scripts/deploy-learner-api.sh   # git pull → build → migrate (verified) → up learner-api caddy → probe container, then public /health
-```
-
-The `learner-api` container reads `DATABASE_URL` and `LITELLM_BASE_URL` from compose;
-`LITELLM_API_KEY`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GOOGLE_CLIENT_ID`, and
-`GOOGLE_CLIENT_SECRET` come from the repo-root `.env`. The deploy brings the schema to current
-through the one-shot `migrate` service and aborts before touching the API if that container exits
-nonzero, so a healthy old API can never report a successful deploy over a failed migration. A
-migration that reports reset-required is never resolved by the deploy — it waits for the explicit
-reset runbook. Learner sessions are Better Auth rows in `session`
-([ADR-0041](docs/adr/0041-own-learner-identity-with-self-hosted-better-auth.md)) and survive
-restarts; `BETTER_AUTH_SECRET` signs their cookies, so **rotating it signs every learner out**.
-`BETTER_AUTH_URL` must be the API's public origin. Better Auth derives both the Google redirect URI
-it advertises (`${BETTER_AUTH_URL}/auth/callback/google`) and, from that URL's *scheme*, whether
-session cookies carry `Secure` — so the `.env.example` dev default left on this host deploys an API
-that health-checks green and serves the whole credential path while Google rejects the callback and
-every session cookie ships without `Secure` over HTTPS. Nothing errors, because a wrong base URL
-still resolves. The deploy now asserts the shipped value against the origin it serves and fails
-loudly on a mismatch; `curl -sSI` the `Set-Cookie` from a sign-up if you need to confirm by hand.
-
-**The deploy does not reload LiteLLM.** It rebuilds `learner-api` and `caddy` only (`migrate` runs
-the learner-api image, so it needs no build of its own).
-`litellm/config.yaml` is a read-only bind read once at process start, and `store_model_in_db` is
-unset, so the file is authoritative *only at that moment* — a commit that repoints a
-`model_group_alias` leaves the running router serving the previous model, with no error anywhere,
-because the alias still resolves. That is a silent stale deploy, and it happened: the
-`kg-independent-judge` → `deepseek-v4-flash-0731` swap of 2026-08-07 did not take effect on the
-shared host until 2026-08-08, so every judge call in between ran the model it replaced. After a
-deploy whose range touches `litellm/config.yaml`, reload it and confirm the new deployment is
-actually served:
-
-```bash
-docker compose up -d --force-recreate --no-deps litellm   # never `down -v`: it holds LiteLLM's keys
-curl -s -H "Authorization: Bearer $LITELLM_API_KEY" http://127.0.0.1:4000/models | grep -c <new-model>
-```
-
-A `200` from `/models` is not evidence the config is current — check for the deployment by name. The
-`/models` response proves which deployment groups were loaded. For a served call,
-`LiteLLM_SpendLogs.model_group` identifies the requested public alias or direct deployment group,
-`model_id` resolves the selected loaded deployment through `/model/info`, and
-`response->>'provider'` identifies the hosting provider. The `model` column proves the underlying
-base model, but cannot distinguish primary and backup deployment groups that deliberately share it.
-
-Before changing an OpenRouter-backed route in the canonical
-[`litellm/config.yaml`](litellm/config.yaml), probe every provider with the complete effective
-production-client body, including sampling fields and the exact forced-tool schema. With
-`require_parameters: true`, OpenRouter can reject a provider before inference when any request
-parameter is unsupported. A successful LiteLLM response can therefore be a fallback and does not
-prove the primary ran. After reloading a route, send uniquely tagged calls and require matching
-SpendLogs `model_group`, `model_id`, and `response->>'provider'` attribution before accepting the
-cutover.
-
-An owning plan may omit `require_parameters` only when the catalog filter rejects a candidate and a
-provider-pinned served-call matrix qualifies every effective production descriptor without it.
-Keep the complete request body, exact quantization and `only`/`order` pin, internal fallback off,
-strict forced tool/schema checks, and reasoning check. Record unsupported sampling controls as
-best-effort rather than claiming the provider enforces them; the exception qualifies only the exact
-provider, model assignment, and descriptor matrix that was exercised.
-
-**Shared schema cutover** — the only response to a reset-required deploy, and deliberately manual.
-It **discards the application data** in database `lrnki` (greenfield: no backup or data migration is
-an acceptance dependency) and preserves everything else. From the repo checkout on the VPS:
-
-```bash
-docker compose stop learner-api                      # stop the writers
-docker compose exec -T postgres \
-  psql -U lrnki -d lrnki -X -v ON_ERROR_STOP=1 < scripts/reset-app-schema.sql
-scripts/deploy-learner-api.sh                        # migrate applies 0000 once, then the API
-```
-
-Never pipe that `psql` into anything — a pipeline reports the last command's status, which would
-hide the guard. `scripts/reset-app-schema.sql` aborts on any database other than `lrnki`/`lrnki_test`
-(exit 3) and drops only the `public` and `drizzle` schemas, so the `litellm` database sharing the
-`postgres_data` volume survives. **Never `docker compose down -v`**: that destroys LiteLLM's virtual
-keys, and a dead `sk-…` then fails generation with `401` while `LITELLM_MASTER_KEY` still works.
-
-Then confirm the cutover, including that the separate LiteLLM database survived:
-
-```bash
-docker compose exec -T postgres psql -U lrnki -d lrnki -X -Atqc \
-  'select count(*) from drizzle.__drizzle_migrations;'          # exactly 1
-curl -fsS https://api.lrnki.globesoul.com/health
-curl -fsS -H "Authorization: Bearer ${LITELLM_API_KEY}" http://127.0.0.1:4000/models >/dev/null
-```
-
-plus one authenticated learner read/write against the API.
-
-**Verifying a rebuild** — `learner-api` can look rebuilt and not be, in two independent ways:
-
-- **Never pipe the build.** `docker compose up -d --build --no-deps learner-api | tail` reports
-  *tail's* exit code, so a build that died on `no space left on device` still looks like exit 0.
-  Reclaim with `docker builder prune -f`.
-- **The container's `.Created` is not the image's.** Prove the recreate by comparing
-  `docker inspect lrnki-learner-api --format '{{.Image}}'` against
-  `docker image inspect lrnki-learner-api:latest --format '{{.Id}}'`. A stale container serves the
-  previous behaviour while every probe passes.
-
-**Telling a dead LiteLLM key from an upstream problem** — LiteLLM's virtual keys live in its own
-database inside the shared `postgres_data` volume, so a re-initialised volume leaves the `sk-…` in
-`.env` pointing at a key that no longer exists. The two failures are distinguishable:
-
-| Symptom | Cause | Remedy |
-| --- | --- | --- |
-| Generation `401` while `LITELLM_MASTER_KEY` still works | Dead virtual key — the master key is validated from config rather than the key table, and that asymmetry is the tell | Mint one via `POST /key/generate` with the master key, write it to `.env`, and **recreate** the container: container env is fixed at creation, so `docker restart` will not pick it up |
-| `429 "No deployments available"` | Upstream provider rate limit, not a key problem | Wait and retry; read the run against the [real-use throttling signatures](.agents/skills/validate-lrnki/references/real-use-quality.md#throttled-runs) |
-
-Keep any `.env` backup **outside the repo**: `.gitignore` covers `.env` but not `.env.bak-*`.
-
-**Reading `docker logs lrnki-litellm`** — tell host-run tools from the container by **source IP, not
-message text**: the container is `172.18.0.5`, anything on the host (admin-lab, kg-worker) is the
-gateway `172.18.0.1`. A host process reads `.env` once at start, so a session started before a key
-repair keeps presenting the dead key while the container has already picked up the new one — and the
-two are identical in the message text.
-
-**Web deploy** — automatic on push to `main`. `lrnki.globesoul.com` is attached as the Pages custom
-domain, so the default `sergkhl.github.io/lrnki/` URL 301s to it, and **Enforce HTTPS** is on.
-
-**Mobile builds (Android)** — `.github/workflows/build-learner-android.yml`
-(`workflow_dispatch`) runs `scripts/build-learner-android.sh` on a GitHub runner (`eas build
---local`, authenticated by the `EXPO_TOKEN` repo secret) and uploads the APK as a workflow
-artifact; download and sideload it. Profiles come from `apps/learner-app/eas.json`: `preview`
-(default; standalone APK against the live API) and `development` (dev client for `expo start`).
-Local fallback on a machine with Java 17 + the Android SDK (`EXPO_TOKEN` is read from the
-repo-root `.env`, else the environment):
-
-```bash
-pnpm build:android       # preview profile
-pnpm build:android:dev   # development profile
-```
-
-**Native dev loop** — build, install, and launch a development build on a connected device (else
-the emulator/simulator) and start Metro with the dev client. Both target the local API, so start it
-first:
-
-```bash
-pnpm dev:api        # the learner-api they point at
-pnpm dev:android    # needs Java 17 + Android SDK
-pnpm dev:ios        # needs macOS + Xcode
-```
-
-`expo run:*` generates `apps/learner-app/android/` and `ios/` in-tree (gitignored); no `EXPO_TOKEN`
-needed. These and `dev:learner:local` all go through `scripts/dev-learner-app.sh`, which points the
-app at whatever `BETTER_AUTH_URL` names in `.env` — deliberately the same value the API signs and
-advertises to Google, since a build pointed anywhere else cannot complete the sign-in leg
-([ADR-0041](docs/adr/0041-own-learner-identity-with-self-hosted-better-auth.md)). Android also gets
-an `adb reverse` for that port, so `localhost` inside the device means this machine; that works on a
-USB-attached physical device too, where the `10.0.2.2` emulator alias does not. With no device
-attached the script boots an AVD (`ANDROID_AVD`, else the first one) and blocks until it answers as
-booted — `expo run:android` installs as soon as a serial appears, and treats every emulator as ready
-whether or not it is. Because a quick-boot guest can still drop `system_server` during the build
-that follows, the script re-runs once when the install fails with `Can't find service: package`, and
-never for any other reason. Debug builds permit
-cleartext HTTP, so no config change is needed. Export `EXPO_PUBLIC_LEARNER_API_URL` to override —
-that is how you point a native build at the deployed API, which nothing binds locally
-([ADR-0040](docs/adr/0040-serve-public-api-only-from-the-deployed-container.md)).
-
-EAS iOS builds (distributable artifacts) — future work.
-
-## Out of scope
-
-Course planning, OCR, multimodal interpretation, and automatic ontology import.
+Deployment, a shared-host reset, production writes, store/distributable builds, and physical-device
+acceptance require authority beyond ordinary repository implementation work.

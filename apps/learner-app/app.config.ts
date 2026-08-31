@@ -36,6 +36,17 @@ const config: ExpoConfig = {
   plugins: [
     "expo-router",
     [
+      "expo-dev-client",
+      {
+        // The Debug client's first-run menu and floating Tools button obscure app controls and
+        // make a clean simulator run depend on client-owned onboarding state. The developer menu
+        // remains available through the standard simulator/device gesture when it is needed.
+        skipOnboarding: true,
+        showMenuAtLaunch: false,
+        toolsButton: false
+      }
+    ],
+    [
       "expo-build-properties",
       {
         // Only the e2e build permits cleartext, and only to reach the loopback fixture. `false`

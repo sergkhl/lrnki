@@ -1,0 +1,291 @@
+{
+  "schemaVersion": 1,
+  "key": "personal-finance",
+  "title": "Personal Finance",
+  "teaser": "Map obligations, preserve flexibility, and compare financial choices on the terms that actually matter.",
+  "declaredDomain": "Personal financial decision-making",
+  "audience": "Adult learners building resilient financial habits",
+  "sourceCredits": [
+    {
+      "title": "Personal Finance primer",
+      "author": "lrnki project",
+      "license": "Project-owned internal playtest source",
+      "note": "Accepted as a local authoring basis without independent external fact verification or individualized financial advice."
+    }
+  ],
+  "legs": [
+    {
+      "key": "financial-resilience",
+      "title": "See the whole position before choosing",
+      "stops": [
+        {
+          "key": "financial-map",
+          "label": "Separate flows from the balance sheet",
+          "requires": [],
+          "difficultyBand": 1,
+          "lesson": {
+            "sections": [
+              {
+                "key": "flow-and-snapshot",
+                "title": "Cash flow is a period; net worth is a moment",
+                "body": "Income and expenses describe movement over a chosen period, and their difference is cash flow. Assets and liabilities describe a position at a point in time, and their difference is net worth. Neither replaces the other: valuable but illiquid assets may coexist with a near-term cash shortfall, while positive monthly cash flow may coexist with large debt. Map timing, ownership, obligations, and uncertainty before treating one headline number as the whole story.",
+                "sourceAnchor": {
+                  "heading": "1. Build a Financial Map",
+                  "quote": "Net worth is a snapshot, while cash flow is a movie."
+                },
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "diagnose-cash-position",
+              "prompt": "A household owns a valuable property but cannot meet a bill due tomorrow without new debt. Which diagnosis is best?",
+              "options": [
+                {
+                  "key": "asset-rich-liquidity-shortfall",
+                  "text": "It may have positive net worth and still face a near-term liquidity shortfall"
+                },
+                {
+                  "key": "positive-net-worth-pays-all",
+                  "text": "Positive net worth automatically makes every current bill affordable"
+                },
+                {
+                  "key": "bill-proves-negative-income",
+                  "text": "The bill proves that the household received no income this period"
+                },
+                {
+                  "key": "property-is-expense",
+                  "text": "The property must be classified as a current expense"
+                }
+              ],
+              "answerKey": "asset-rich-liquidity-shortfall",
+              "explanation": {
+                "text": "Net worth counts value at a moment, but it does not show whether that value is accessible before an obligation falls due. The household can be asset-rich and cash-constrained at the same time.",
+                "sourceAnchor": {
+                  "heading": "1. Build a Financial Map",
+                  "quote": "A person can own valuable assets yet struggle to pay a near-term bill because those assets cannot quickly be converted into money."
+                }
+              }
+            },
+            {
+              "family": "matching",
+              "key": "match-financial-map",
+              "prompt": "Match each quantity to the role it plays in a financial map.",
+              "pairs": [
+                {
+                  "key": "cash-flow-role",
+                  "left": "Cash flow",
+                  "right": "Income minus expenses over a period"
+                },
+                {
+                  "key": "net-worth-role",
+                  "left": "Net worth",
+                  "right": "Assets minus liabilities at a point in time"
+                },
+                {
+                  "key": "liability-role",
+                  "left": "Liability",
+                  "right": "An amount owed or another financial obligation"
+                }
+              ],
+              "explanation": {
+                "text": "Cash flow measures movement, while net worth measures a snapshot assembled from assets and liabilities. Keeping their time frames distinct prevents one measure from hiding a different constraint.",
+                "sourceAnchor": {
+                  "heading": "1. Build a Financial Map",
+                  "quote": "The difference between total assets and total liabilities at a point in time is **net worth**."
+                }
+              }
+            }
+          ],
+          "supportPaths": []
+        },
+        {
+          "key": "liquidity-and-time",
+          "label": "Match resources to when they are needed",
+          "requires": ["financial-map"],
+          "difficultyBand": 2,
+          "lesson": {
+            "sections": [
+              {
+                "key": "reserve-and-compounding",
+                "title": "Flexibility has value before growth is counted",
+                "body": "An emergency reserve is liquid value held for necessary surprises or interrupted income. Its amount depends on the volatility of cash flow, obligations, support, and access—not a universal formula. Less liquid resources may offer growth, but they can be unavailable when the goal arrives. Compounding rewards time only under the scenario's assumed return; it does not guarantee a result, and inflation determines what the future balance can buy.",
+                "sourceAnchor": {
+                  "heading": "3. Liquidity, Saving, Inflation, and Compounding",
+                  "quote": "An **emergency reserve** is liquid value kept for unplanned, necessary expenses or interruptions in income."
+                },
+                "explorableTerms": [
+                  {
+                    "term": "cash flow",
+                    "supportPathKey": "review-cash-flow"
+                  }
+                ]
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "choose-reserve-design",
+              "prompt": "Which reserve design best serves a household with irregular income and a fixed payment due in two months?",
+              "options": [
+                {
+                  "key": "accessible-goal-matched-reserve",
+                  "text": "Keep a goal-matched amount accessible and review it against low-income scenarios"
+                },
+                {
+                  "key": "maximum-return-lockup",
+                  "text": "Lock every available unit into the highest projected return regardless of access"
+                },
+                {
+                  "key": "universal-one-month-rule",
+                  "text": "Use exactly one month of expenses because the same rule fits every household"
+                },
+                {
+                  "key": "ignore-fixed-payment",
+                  "text": "Exclude the fixed payment because it has not occurred yet"
+                }
+              ],
+              "answerKey": "accessible-goal-matched-reserve",
+              "explanation": {
+                "text": "The reserve's purpose is flexibility under disruption, so access, income variability, and the timing of obligations matter more than a universal target or the largest projected return.",
+                "sourceAnchor": {
+                  "heading": "3. Liquidity, Saving, Inflation, and Compounding",
+                  "quote": "The appropriate reserve is not a universal number."
+                }
+              }
+            },
+            {
+              "family": "impostor",
+              "key": "spot-time-value-impostor",
+              "prompt": "Two statements keep projections within their assumptions. One turns a scenario into a promise. Find the impostor.",
+              "statements": [
+                {
+                  "key": "inflation-changes-purchasing-power",
+                  "text": "Inflation can make a larger future balance buy less.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "liquidity-matches-timing",
+                  "text": "Resource access should be matched to when a goal or obligation arrives.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "time-guarantees-return",
+                  "text": "Given enough time, compounding guarantees the projected return.",
+                  "kind": "impostor"
+                }
+              ],
+              "explanation": {
+                "text": "Compounding describes what happens under stated rates and timing. Actual returns can vary, so more time does not turn a projection into a guarantee.",
+                "sourceAnchor": {
+                  "heading": "3. Liquidity, Saving, Inflation, and Compounding",
+                  "quote": "Early contributions have more time to grow, but time does not remove risk or guarantee a return."
+                }
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "review-cash-flow",
+              "term": "cash flow",
+              "sectionKey": "reserve-and-compounding",
+              "steps": [
+                {
+                  "stopKey": "financial-map",
+                  "activityKey": "diagnose-cash-position"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "compare-risk-and-products",
+          "label": "Compare the complete promise",
+          "requires": ["liquidity-and-time"],
+          "difficultyBand": 3,
+          "lesson": {
+            "sections": [
+              {
+                "key": "drivers-terms-and-tradeoffs",
+                "title": "Names and item counts do not reveal the risk",
+                "body": "Diversification reduces unnecessary dependence only when holdings respond to different underlying drivers; owning many versions of the same exposure is still concentration. It cannot remove broad loss or guarantee profit. Likewise, a financial product is its rights, obligations, cash flows, risks, and services—not its marketing label. Compare alternatives on a common horizon, including fees, access, currencies, adverse scenarios, and who can change the terms. Liquidity remains part of the comparison because a useful asset at the wrong time may not serve the goal.",
+                "sourceAnchor": {
+                  "heading": "6. Investing, Return, and Diversification",
+                  "quote": "**Diversification** spreads exposure among assets whose outcomes are not perfectly linked."
+                },
+                "explorableTerms": [
+                  {
+                    "term": "Liquidity",
+                    "supportPathKey": "review-liquidity-purpose"
+                  }
+                ]
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "compare-product-terms",
+              "prompt": "Two products share a label. Which comparison is most decision-relevant?",
+              "options": [
+                {
+                  "key": "common-basis-full-terms",
+                  "text": "Compare full cash flows, access, risks, currencies, change rights, and adverse cases on one horizon"
+                },
+                {
+                  "key": "headline-rate-only",
+                  "text": "Choose the larger headline rate without checking its period or fees"
+                },
+                {
+                  "key": "brand-category-only",
+                  "text": "Assume products in the same marketing category have equivalent obligations"
+                },
+                {
+                  "key": "past-return-guarantee",
+                  "text": "Treat the strongest recent return as a guarantee of the next period"
+                }
+              ],
+              "answerKey": "common-basis-full-terms",
+              "explanation": {
+                "text": "A product comparison must expose the actual rights, cash flows, access conditions, and risks on the same basis. A shared name or one advertised number cannot establish equivalence.",
+                "sourceAnchor": {
+                  "heading": "7. Comparing Products, Contracts, and Claims",
+                  "quote": "A financial product is a bundle of rights, obligations, cash flows, risks, and services."
+                }
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "review-liquidity-purpose",
+              "term": "Liquidity",
+              "sectionKey": "drivers-terms-and-tradeoffs",
+              "steps": [
+                {
+                  "stopKey": "liquidity-and-time",
+                  "activityKey": "choose-reserve-design"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "guardianActivityKeys": [
+        "match-financial-map",
+        "spot-time-value-impostor",
+        "choose-reserve-design",
+        "compare-product-terms"
+      ]
+    }
+  ],
+  "expeditionGuardianActivityKeys": [
+    "diagnose-cash-position",
+    "match-financial-map",
+    "spot-time-value-impostor",
+    "choose-reserve-design",
+    "compare-product-terms"
+  ]
+}

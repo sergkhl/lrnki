@@ -1,0 +1,291 @@
+{
+  "schemaVersion": 1,
+  "key": "probability-and-statistics",
+  "title": "Probability and Statistics",
+  "teaser": "Reason from samples and uncertain events without letting a calculation outrun its evidence.",
+  "declaredDomain": "Probability and statistical reasoning",
+  "audience": "Adult learners making evidence-based decisions",
+  "sourceCredits": [
+    {
+      "title": "Probability and Statistics primer",
+      "author": "lrnki project",
+      "license": "Project-owned internal playtest source",
+      "note": "Accepted as a local authoring basis without independent external fact verification."
+    }
+  ],
+  "legs": [
+    {
+      "key": "evidence-under-uncertainty",
+      "title": "From observations to warranted decisions",
+      "stops": [
+        {
+          "key": "sampling-claims",
+          "label": "Name what the data can represent",
+          "requires": [],
+          "difficultyBand": 1,
+          "lesson": {
+            "sections": [
+              {
+                "key": "population-sample-and-bias",
+                "title": "Start with the population, not the spreadsheet",
+                "body": "A population is the complete set of units named by the question; a sample is the subset actually observed. Before summarizing it, identify what one row represents, the time window, and how units entered the sample. More observations reduce random noise, but they do not repair a selection process that systematically misses part of the target population. A large volunteer poll can therefore measure its volunteers precisely while supporting little about everyone else.",
+                "sourceAnchor": {
+                  "heading": "1. Data, Variables, Populations, and Samples",
+                  "quote": "The **population** is the complete set of units about which a question is asked. A **sample** is the subset actually observed."
+                },
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "choose-representative-sample",
+              "prompt": "A city wants to estimate commute times for all registered commuters this month. Which design best supports that target?",
+              "options": [
+                {
+                  "key": "registry-random-sample",
+                  "text": "Randomly sample the commuter registry and report nonresponse"
+                },
+                {
+                  "key": "cycling-club-poll",
+                  "text": "Invite a very large cycling club to answer voluntarily"
+                },
+                {
+                  "key": "station-morning-only",
+                  "text": "Interview only people at one train station before 8 a.m."
+                },
+                {
+                  "key": "one-detailed-commuter",
+                  "text": "Study one commuter's route in exceptional detail"
+                }
+              ],
+              "answerKey": "registry-random-sample",
+              "explanation": {
+                "text": "The registry gives each target unit a defined route into selection, and reporting nonresponse exposes a remaining threat. Merely enlarging a biased convenience sample does not remove that bias.",
+                "sourceAnchor": {
+                  "heading": "1. Data, Variables, Populations, and Samples",
+                  "quote": "More data reduce random sampling noise; they do not automatically remove systematic bias."
+                }
+              }
+            },
+            {
+              "family": "matching",
+              "key": "match-data-roles",
+              "prompt": "Match each statistical role to its meaning.",
+              "pairs": [
+                {
+                  "key": "population-role",
+                  "left": "Population",
+                  "right": "The complete set named by the question"
+                },
+                {
+                  "key": "sample-role",
+                  "left": "Sample",
+                  "right": "The subset actually observed"
+                },
+                {
+                  "key": "statistic-role",
+                  "left": "Statistic",
+                  "right": "A number computed from a sample"
+                }
+              ],
+              "explanation": {
+                "text": "The sample supplies observations, a statistic summarizes those observations, and the population is the larger target the analysis may or may not represent.",
+                "sourceAnchor": {
+                  "heading": "1. Data, Variables, Populations, and Samples",
+                  "quote": "A number computed from a sample is a **statistic**."
+                }
+              }
+            }
+          ],
+          "supportPaths": []
+        },
+        {
+          "key": "conditional-probability",
+          "label": "Keep the condition in the denominator",
+          "requires": ["sampling-claims"],
+          "difficultyBand": 2,
+          "lesson": {
+            "sections": [
+              {
+                "key": "conditional-reference-group",
+                "title": "The condition changes who is being counted",
+                "body": "Conditional probability narrows the reference group to cases where the condition is known to hold. That makes P(attachment given urgent) a different question from P(urgent given attachment): their numerators may count the same overlap, but their denominators count different groups. Write the conditioning group in words before calculating, especially when interpreting screening or classification results.",
+                "sourceAnchor": {
+                  "heading": "3. Probability, Conditional Probability, and Independence",
+                  "quote": "A **conditional probability** updates the reference group."
+                },
+                "explorableTerms": [
+                  {
+                    "term": "reference group",
+                    "supportPathKey": "review-target-population"
+                  }
+                ]
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "reverse-the-condition",
+              "prompt": "Among 1,000 messages, 100 are urgent, 200 have attachments, and 30 are both urgent and attached. What is P(urgent | attachment)?",
+              "options": [
+                {
+                  "key": "fifteen-percent",
+                  "text": "30 / 200 = 15%"
+                },
+                {
+                  "key": "thirty-percent",
+                  "text": "30 / 100 = 30%"
+                },
+                {
+                  "key": "three-percent",
+                  "text": "30 / 1,000 = 3%"
+                },
+                {
+                  "key": "fifty-percent",
+                  "text": "100 / 200 = 50%"
+                }
+              ],
+              "answerKey": "fifteen-percent",
+              "explanation": {
+                "text": "The condition is attachment, so the denominator is the 200 attached messages. Thirty of those are urgent, giving 15%; 30% answers the reversed question.",
+                "sourceAnchor": {
+                  "heading": "3. Probability, Conditional Probability, and Independence",
+                  "quote": "Reversing the condition changes the denominator, so these two probabilities are generally different."
+                }
+              }
+            },
+            {
+              "family": "impostor",
+              "key": "spot-probability-impostor",
+              "prompt": "Two statements preserve the probability model. One confuses distinct relationships. Find the impostor.",
+              "statements": [
+                {
+                  "key": "condition-changes-group",
+                  "text": "Conditioning changes the reference group used in the denominator.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "independence-needs-justification",
+                  "text": "Independence is a modeling claim that needs justification.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "exclusive-means-independent",
+                  "text": "Two non-impossible events that cannot occur together must be independent.",
+                  "kind": "impostor"
+                }
+              ],
+              "explanation": {
+                "text": "If one non-impossible event occurs and excludes the other, observing it changes the other's probability to zero. Mutual exclusivity therefore creates dependence rather than independence.",
+                "sourceAnchor": {
+                  "heading": "3. Probability, Conditional Probability, and Independence",
+                  "quote": "Independence is not the same as mutual exclusivity."
+                }
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "review-target-population",
+              "term": "reference group",
+              "sectionKey": "conditional-reference-group",
+              "steps": [
+                {
+                  "stopKey": "sampling-claims",
+                  "activityKey": "choose-representative-sample"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "prediction-and-causation",
+          "label": "Separate association from intervention",
+          "requires": ["conditional-probability"],
+          "difficultyBand": 3,
+          "lesson": {
+            "sections": [
+              {
+                "key": "causal-alternatives",
+                "title": "Prediction does not identify what to change",
+                "body": "An association can help predict while leaving the causal story unresolved. The proposed cause may affect the outcome, the outcome may affect the proposed cause, a common cause may affect both, or selection may distort the observed relationship. A causal claim needs a design and assumptions that connect a comparison to an intervention. Its evidence must also match the target population where the intervention is meant to operate.",
+                "sourceAnchor": {
+                  "heading": "7. Association, Regression, Prediction, and Causation",
+                  "quote": "A high correlation does not imply that observations lie close to the line in practically useful units, and it does not establish causation."
+                },
+                "explorableTerms": [
+                  {
+                    "term": "target population",
+                    "supportPathKey": "review-population-scope"
+                  }
+                ]
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "diagnose-common-cause",
+              "prompt": "Workers who use a wellness room more often also report fewer injuries. Which fact most directly challenges the claim that room visits caused the reduction?",
+              "options": [
+                {
+                  "key": "safety-program-common-cause",
+                  "text": "Teams with stronger safety programs both encourage room use and prevent injuries"
+                },
+                {
+                  "key": "association-is-positive",
+                  "text": "The association points in a beneficial direction"
+                },
+                {
+                  "key": "visits-are-counted",
+                  "text": "Room visits are recorded as a count"
+                },
+                {
+                  "key": "injuries-are-unpleasant",
+                  "text": "Injuries are outcomes workers would prefer to avoid"
+                }
+              ],
+              "answerKey": "safety-program-common-cause",
+              "explanation": {
+                "text": "A stronger safety program is a plausible common cause of both room use and fewer injuries. The association alone cannot separate that explanation from an effect of the room.",
+                "sourceAnchor": {
+                  "heading": "7. Association, Regression, Prediction, and Causation",
+                  "quote": "A **confounder** is a common cause, or a suitable proxy for a common cause, of both the proposed exposure and the outcome."
+                }
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "review-population-scope",
+              "term": "target population",
+              "sectionKey": "causal-alternatives",
+              "steps": [
+                {
+                  "stopKey": "sampling-claims",
+                  "activityKey": "choose-representative-sample"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "guardianActivityKeys": [
+        "match-data-roles",
+        "spot-probability-impostor",
+        "reverse-the-condition",
+        "diagnose-common-cause"
+      ]
+    }
+  ],
+  "expeditionGuardianActivityKeys": [
+    "choose-representative-sample",
+    "match-data-roles",
+    "spot-probability-impostor",
+    "reverse-the-condition",
+    "diagnose-common-cause"
+  ]
+}

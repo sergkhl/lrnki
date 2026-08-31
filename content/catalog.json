@@ -1,4 +1,10 @@
 {
   "schemaVersion": 1,
-  "expeditionKeys": ["critical-thinking"]
+  "expeditionKeys": [
+    "critical-thinking",
+    "probability-and-statistics",
+    "personal-finance",
+    "machine-learning",
+    "neuroscience-of-memory-and-attention"
+  ]
 }

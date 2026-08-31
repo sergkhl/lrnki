@@ -1,58 +1,55 @@
 ---
 name: validate-lrnki
-description: Route and qualify lrnki validation across local automated checks, real-use quality, intercepted web, real-backend web, deployed systems, Android emulators, iOS simulators, and Android or iOS physical devices. Use whenever implementing, reviewing, testing, or reporting an lrnki behavior change; running Playwright, Maestro, database-backed, deployment, or real-model gates; investigating an invalid test run; or deciding what an observed result actually proves.
+description: Route and qualify lrnki validation across local automated checks, authored-content inspection, intercepted and real-backend web, Android emulators, iOS simulators, deployed systems, and physical devices. Use whenever implementing, reviewing, testing, or reporting an lrnki behavior change, running Playwright, Maestro, database-backed, deployment, or real-use gates, or deciding what an observed result proves.
 ---
 
 # Validate lrnki
 
-Select the evidence layer before selecting a command. Use one skill entry point and load only the
-reference files needed for the claim under test.
+Use the smallest environment that can prove the changed behavior, then name the evidence class
+exactly. One green class never upgrades another.
 
-## Route the work
+## Route
 
-1. Read the canonical [validation authority](../../../AGENTS.md#validation-authority).
-2. Name the product claim, environment, artifact or revision, and intended evidence class before
-   running anything.
-3. Load the smallest applicable reference set from the table. Do not preload every reference.
-4. If one requested conclusion spans multiple layers, validate and report each layer separately.
-5. After an important behavior-changing milestone, also load the real-use quality reference. A
-   green automated suite does not replace direct usefulness inspection.
+1. Classify the claim before running anything:
+   - deterministic structure/logic/build;
+   - authored-content semantic and teaching quality;
+   - intercepted Expo web presentation;
+   - real Better Auth/Hono/Postgres web behavior;
+   - Android emulator native behavior;
+   - iOS Debug simulator behavior;
+   - deployed route behavior;
+   - physical-device behavior.
+2. Read only the matching reference below plus any owning rig README it names.
+3. Run the smallest relevant gate first. Escalate only when the claim crosses a real boundary.
+4. On failure, preserve the first causal error, classify whether the harness or product failed, and
+   rerun only after naming the changed cause. A retry without a cause is not evidence.
+5. Record command, environment, identity/scope, result, and what it does not prove in the active
+   plan's Validation Log.
 
-| Intended evidence | Load |
-| --- | --- |
-| Source, unit, type, lint, build, or isolated DB behavior | [Local automated checks](references/local-automated.md) |
-| End-user or downstream usefulness, including real LLM output | [Real-use quality](references/real-use-quality.md) |
-| Production-format web export with deterministic API interception | [Intercepted web](references/web-intercepted.md) |
-| Web export over a real local API and Postgres | [Real-backend web](references/web-real-backend.md) |
-| A published web artifact, deployed API, or full deployed path | [Deployed](references/deployed.md) |
-| Android APK behavior on an emulator | [Native Android](references/native-android.md) |
-| iOS app behavior on a simulator, including future automated gates | [Native iOS](references/native-ios.md) |
-| Android or iOS behavior on hardware | [Physical device](references/physical-device.md) plus the platform reference |
+## References
 
-## Preserve claim boundaries
+- [Local automated](references/local-automated.md)
+- [Authored real-use quality](references/real-use-quality.md)
+- [Intercepted web](references/web-intercepted.md)
+- [Real-backend web](references/web-real-backend.md)
+- [Android emulator](references/native-android.md)
+- [iOS simulator](references/native-ios.md)
+- [Deployed](references/deployed.md)
+- [Physical device](references/physical-device.md)
 
-- Treat intercepted web, real-backend web, deployed, native emulator or simulator, and physical
-  device results as distinct evidence. State when production data, a deterministic fixture, or API
-  interception was involved.
-- Separate artifact reachability, navigation, integration, visual judgment, and automatic regression
-  authority. A single run may exercise several states, but it does not silently upgrade its claim.
-- Exclude runs where the intended interaction never became available because the host, OS UI,
-  device, build, fixture, network, or test tool failed. Record the invalid cause and rerun after
-  stabilizing it; do not count the attempt as a product result.
-- Inspect the evidence the claim requires. Read per-case reports, inspect screenshots directly for
-  visual claims, query produced artifacts for data claims, and include positive controls with every
-  zero-row inspection assertion.
-- Keep generated reports, screenshots, traces, and diagnostics in gitignored `tmp/`. Never link
-  retained documentation to those files.
+## Qualification rules
 
-## Consolidate the result
-
-- Put implementation-unit evidence in the owning plan's `## Validation Log`; otherwise replace the
-  single latest plan-less validation in `docs/plans/TODO.md`.
-- Put unresolved user-required physical actions in `docs/plans/BLOCKERS.md`. Do not create a blocker
-  for an agent-runnable emulator, local, or deployed check.
-- Record the command or procedure, exact environment, artifact freshness, valid result, excluded
-  attempts, inspected output, cleanup, and evidence boundary. Preserve current invariants instead of
-  run-count or timing history.
-- Change a scenario claim or rig mechanic only in its owning README or source. Keep this skill focused
-  on selecting, executing, triaging, and qualifying validation.
+- `pnpm content:check` proves schema/reference guarantees and exact source-anchor existence. It does
+  not prove semantic support, answer quality, teaching sufficiency, or playability.
+- Deterministic and database suites prove runtime/store contracts, not learner-visible quality.
+- Intercepted web proves the production-format Expo artifact against owned DTO fixtures and proves no
+  unmatched request escaped. It does not prove Hono, Postgres, or Better Auth.
+- Real-backend web proves the local real API/database path it actually exercises. It does not prove
+  deployment, native rendering, or physical-device behavior.
+- Emulator and simulator results remain platform-specific Debug evidence. They do not imply a store
+  artifact or physical pass.
+- Deployed reads do not authorize production writes, resets, or releases.
+- Physical-device runs are user-initiated. Do not handle credentials or claim a pass from emulator
+  evidence.
+- Keep reports, screenshots, traces, and diagnostics in gitignored `tmp/`; retained facts belong in
+  the active plan or owning README, never links to `tmp/`.

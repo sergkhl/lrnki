@@ -12,7 +12,7 @@
 # This does not reopen what ADR-0040 closed. What binds 8787 here is the deployed container itself,
 # not a second runtime standing beside it, so there is no shadowing upstream and nothing to arbitrate
 # between. 127.0.0.1 rather than 0.0.0.0 because Docker's iptables rules bypass ufw — the same reason
-# the postgres and litellm publishes in the base file are loopback-only.
+# the Postgres publish in the base file is loopback-only.
 services:
   learner-api:
     ports:

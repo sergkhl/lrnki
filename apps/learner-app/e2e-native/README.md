@@ -1,163 +1,138 @@
-# Native Android Maestro gate (opt-in)
+# Native Maestro gates
 
-This file owns the native gate's current scenario claims and mechanics; general evidence authority
-lives in [AGENTS.md](../../../AGENTS.md#validation-authority), and agent execution/failure triage
-lives in the
-[native Android route of the validation skill](../../../.agents/skills/validate-lrnki/SKILL.md).
-The gate drives the **real standalone e2e-profile APK** on an Android emulator with
-[Maestro](https://maestro.dev), against a **deterministic loopback fixture** — real React Native
-primitives, real Yoga layout, real gesture dispatch; only the upstream data service is mocked.
+The Android gate drives the real standalone e2e APK on an Android emulator. The app talks to a
+loopback server that loads the tracked authored catalog, runs the production content qualifier, and
+uses the production learner runtime with its in-memory state adapter. Only Better Auth persistence
+and Postgres are replaced by deterministic fixture identity and memory. The gate never touches a
+real database, deployment, or physical device.
 
-**Scope (measured by negative control):**
+The iOS gate drives a fresh Debug simulator build through its Expo development client and the same
+fixture/runtime seam. It is separately named Debug-simulator integration evidence; it is not an
+Android authority transfer, distributable build, or physical-device result.
 
-1. **Support Path dialog — ADOPTED automatic authority, requalified at 320 dp on 2026-08-10.** The
-   contextual term dialog must show its title, body, and close action, and closing must return to the
-   same Theory activity (the measured dialog-geometry regression, commit `0b1c9d3`). An isolated
-   mutant carrying only that regression's `Dialog` geometry failed the flow 3/3 at `Add support path`
-   — in every run *after* reaching, fully seeing, and activating the term action — while the current
-   build passed the same focused scenario three times at the same width. The **body and footer**
-   assertions carry the sensitivity: under the collapse the dialog *title* still resolves, so a
-   title-only oracle would pass the mutant. Keep all three.
-2. **Theory scroll — NAVIGATION only.** The real device swipe reaches the Support Paths panel to open
-   the dialog, but the touch-responder regression (commit `ddc0ec9`) is only intermittently
-   reproducible on the emulator, so that class stays **physically owned** and is not narrowed here.
-3. **Manual sign-in — NATIVE INTEGRATION COVERAGE, no automatic authority.** A dedicated flow proves
-   the real email/password form visibly rejects a wrong password and then establishes a session.
-   Other flows use the e2e-only one-tap action, which calls the same email route and exercises the
-   same Better Auth cookie persistence path without repeatedly typing the fixture identity.
-4. **Crystal Guardian obelisk — VISUAL EVIDENCE, no automatic authority.** A separate flow walks a
-   deterministic five-ward Leg Guardian through entry, partial, miss, Last Stand, and Final Ward, and
-   captures the final reveal and seven-ward Expedition Guardian beside them. Its assertions only
-   prove the flow reached the intended state; whether the ward states are still separable by fill,
-   facet, gloss, and contour on react-native-svg's native canvas is a judgement made from the PNGs,
-   and no negative control has been measured for it. At 320 dp every intended answer, outcome, and
-   Continue action is scrolled to full visibility before activation, so shuffled lower choices do
-   not restrict the flow to the AVD's physical density.
+General evidence authority lives in [AGENTS.md](../../../AGENTS.md#validation), and execution and
+triage live in the [Android validation route](../../../.agents/skills/validate-lrnki/references/native-android.md).
 
-Each flow file is one scenario with one claim: mixing an unproven visual capture into the
-adopted-authority flow would blur what a green run means. The runner runs the whole directory.
+## Scenario claims
 
-This is **not** in `pnpm check` and shares nothing with the intercepted web suite or the real-use
-web suite. It never touches production or the real-use database.
+- `android-runtime-reliability.yaml` retains automatic authority for the Support Path dialog at a
+  320 dp viewport. Its title, body, footer, and close/restore assertions are all required. The body
+  and footer are the sensitivity oracle for the historical isolated dialog-collapse mutant; a
+  title-only assertion did not distinguish that mutant.
+- The swipe needed to reach the Support action is navigation evidence only. It does not claim the
+  separately physical-device-owned touch-responder class.
+- `signin.yaml` is native integration coverage for a visible wrong-password refusal followed by a
+  successful session. Other scenarios use the fixture-only one-tap sign-in, which still exercises
+  the app's Better Auth cookie path.
+- `crystal-guardian-obelisk.yaml` is visual smoke for the authored Leg and Expedition Guardian
+  presentations. Its screenshots are judgment evidence only; no rendering mutant gives it automatic
+  authority.
 
-## Prerequisites
+Emulator evidence is not physical-device or distributable-build evidence.
 
-- **JDK 17** (Gradle/AGP for this Expo SDK): `brew install --cask temurin@17`.
-- **Android SDK + a booted emulator.** e.g. `$ANDROID_HOME/emulator/emulator -avd <name>`.
-- **Maestro CLI**: `curl -fsSL https://get.maestro.mobile.dev | bash`.
-- **The e2e APK**: `scripts/build-learner-android.sh e2e` → `apps/learner-app/lrnki-learner-e2e.apk`.
-  This profile sets `EXPO_PUBLIC_LRNKI_E2E_BUILD=1` (Android `usesCleartextTraffic: true`, via
-  `app.config.ts` + `expo-build-properties`) and bakes
-  `EXPO_PUBLIC_LEARNER_API_URL=http://10.0.2.2:8799`. Cleartext
-  exists **only** in this disposable artifact; preview/production keep the Android secure default.
-  The APK is gitignored and must never be uploaded or distributed.
+## Prerequisites and build
 
-  **Rebuild it whenever app code changes.** It is gitignored, so it is never refreshed by a pull, and
-  the runner installs whatever is on disk without comparing it to the tree — a stale APK runs the
-  *old* app against the current flows and fails on selectors that the working tree already has, or
-  worse, passes on behaviour that no longer exists. This is not hypothetical: the Better Auth cutover
-  left the checked-out APK carrying the deleted PIN gate, which is why those flows went a whole
-  implementation unit without ever running. Check `ls -la` against your last app change before
-  trusting a run.
+- JDK 17.
+- Android SDK plus a booted emulator.
+- Maestro CLI.
+- A fresh e2e APK built after the latest app change:
+
+```bash
+scripts/build-learner-android.sh e2e
+```
+
+The build writes `apps/learner-app/lrnki-learner-e2e.apk`. It is gitignored, must not be uploaded or
+distributed, enables cleartext only for the emulator fixture, and embeds
+`http://10.0.2.2:8799` as its learner API URL. A checked-out APK is not evidence that it matches the
+working tree; rebuild it whenever app code changes.
+
+For iOS, keep a fresh Debug build and Metro server running against the fixture origin:
+
+```bash
+EXPO_PUBLIC_LEARNER_API_URL=http://127.0.0.1:8799 pnpm dev:ios
+```
+
+The iOS runner fails closed unless exactly one simulator is booted (or `--device <udid>` selects
+one), the configured bundle is installed, and Metro answers at `http://127.0.0.1:8881/status`.
 
 ## Run
 
+From the repository root:
+
 ```bash
-caffeinate -dimsu pnpm e2e:native:maestro                         # from repo root
-caffeinate -dimsu pnpm e2e:native:maestro --device emulator-5554  # when several devices are attached
+caffeinate -dimsu pnpm e2e:native:maestro
+caffeinate -dimsu pnpm e2e:native:maestro --device emulator-5554
 ```
 
-The runner (`run.ts`) checks prerequisites and fails early with an exact setup command; resolves one
-device serial and gives it to **both** `adb` and Maestro (they disagree about ambient config — `adb`
-honours `ANDROID_SERIAL`, Maestro does not — so it fails closed rather than let the two drive
-different devices); passes the shared fixture-only identity to the dedicated manual sign-in flow
-and the fixture challenge ids to their owning flows; starts the loopback fixture (`server.ts`) on
-`:8799`; `adb install`s the APK; runs the flows; and
-tears the fixture down. Evidence (JUnit report, screenshots) lands under
-`tmp/2026-07-15-durable-learner-e2e-gates/native/`.
+The runner fails closed when tools, the APK, or an unambiguous ready device are missing. It starts
+the fixture on `:8799`, installs the APK, passes the fixture-only identity and production-created
+Guardian challenge ids to Maestro, runs each flow separately, then stops the fixture. JUnit and
+screenshot evidence lands in `tmp/2026-08-31-authored-learner-runtime/native/`.
+Set `NATIVE_MAESTRO` or `NATIVE_ADB` to exact compatible binaries when diagnosing a host-level
+tool regression; the selected binaries remain explicit evidence.
 
-**Narrow-viewport runs.** `adb shell wm density 540` on the 1080 px-wide AVD gives a 320 dp viewport
-(`1080 / 540 * 160`); `adb shell wm density reset` restores it. That width is where fixed chrome
-overlaps content, so it is the width the Support Path dialog authority was requalified at and the
-Guardian navigation was repaired against. The complete directory is supported there through the
-normal runner. To diagnose one scenario in isolation, run the fixture and `adb install` as `run.ts`
-does, then `maestro --device <serial> test .maestro/flows/<one>.yaml`. Set `NATIVE_APK` to point the
-runner at a different artifact, and restore density even after a failed run.
+For the required narrow run, set a 1080 px-wide emulator to 540 dpi, then restore it even after a
+failure:
 
-Keep the macOS display awake and the session unlocked for the whole run; wrap the runner with
-`caffeinate -dimsu` and use `pmset -g assertions` when host sleep is relevant to a failure. An
-awake-host pass after a screen-off or System UI failure supports a host/AVD lifecycle explanation,
-but it does not isolate display sleep as the cause unless APK, AVD state, density, CPU load, and flow
-are held constant in a controlled comparison.
+```bash
+adb -s emulator-5554 shell wm density 540
+pnpm e2e:native:maestro --device emulator-5554
+adb -s emulator-5554 shell wm density reset
+```
 
-Two other host gotchas, each already paid for once. Turn emulator autofill off
-(`adb shell settings put secure autofill_service null`) or a "Save password?" sheet covers the app
-right after the fixture login. And do not boot the AVD while a Gradle build is saturating the CPU: a
-starved cold boot raises a **"System UI isn't responding"** ANR that covers a perfectly rendered app
-and fails the first assertion of every flow. Exclude that run from product evidence, stabilize the
-host and AVD, and rerun.
+Maestro and `adb` do not interpret ambient device selection identically, so the runner resolves one
+serial and passes it to both. If installation reports an incompatible signature, the runner removes
+only the configured app id and retries once; that removal erases the resident app's local data.
 
-## Fixture data
+Keep the host awake and unlocked. Emulator System UI or autofill overlays invalidate a product
+claim; stabilize the host/AVD and rerun instead of treating coordinates, sleeps, or repeated taps as
+a fix.
 
-`scenario/*.json` are **real learner-api response shapes**, captured once from the supervisor-free
-API over a genuine production enrichment ("Vesicular transport", Cell Biology — a 12-lesson
-expedition with a long Theory activity and available Explorable Terms) and frozen. `server.ts`
-replays them and acks non-graded writes, so session reads hold no mutable state. The emulator reaches
-the host loopback fixture through Android's `10.0.2.2` alias.
+### iOS Debug simulator
 
-Identity is faked at the **wire** level, never stubbed in the app: the flows drive the real
-`authClient` and the real `@better-auth/expo` SecureStore mirror, and the dedicated sign-in flow also
-drives the real form. `server.ts`
-answers Better Auth's own shapes on `/auth/sign-in/email` and `/auth/get-session`. Three constraints
-that fail silently if broken, each already paid for once:
+With `pnpm dev:ios` still serving Metro, run:
 
-- **The `Set-Cookie` name must be `better-auth.session_token`.** The Expo plugin persists a cookie
-  only when its name carries the default `better-auth` prefix and a `session_token`/`session_data`
-  suffix. Any other name is dropped with no error and the app returns to the gate.
-- **No `Secure` flag.** The emulator reaches the fixture over cleartext http, so a `Secure` cookie is
-  never stored. The real API behaves the same way — it derives that flag from its base URL's scheme.
-- **`get-session` answers `null` when the request carries no cookie.** `launchApp: clearState: true`
-  wipes SecureStore, so a fixture that always returned a session would boot straight into the Journal
-  and the flow's first assertion — the sign-in gate — would fail for the wrong reason.
+```bash
+pnpm e2e:native:maestro:ios
+pnpm e2e:native:maestro:ios --device <simulator-udid>
+```
 
-The flows **sign in** rather than signing up: the fixture identity is a committed `.invalid` address
-and password shared by the e2e gate, runner, and server. It authenticates only against this loopback
-fixture; the real Better Auth store never holds it. The fixture models one pre-existing learner, and
-a freshly created account could not plausibly own the frozen 12-lesson journal it then reads.
+The runner owns three host/tooling corrections that are prerequisites to meaningful app evidence:
 
-`guardianFixture.ts` is the one stateful surface, because the ward states the Guardian flow exists to
-look at are only reachable by answering. It holds a five-ward lineup and an append-only event log,
-and folds them with the **production** `foldRecallChallenge` / `projectRecallChallengeView`, so queue
-rotation, the shield floor, the recovery edge, and the learner-safe view are not represented a second
-time. It is authored rather than captured, and that is deliberate: unlike the JSON beside it, it sits
-inside the app's tsconfig `include`, so `StudyItem` and `RecallChallengeView` shape-correctness is
-proven by typecheck instead of by provenance. The runner spawns it fresh per run, so every run starts
-at the entry state.
+- Maestro enumerates Android endpoints even for an explicit iOS UDID. Its bundled DADB client
+  probes IPv4 `localhost:5555` directly; Docker Desktop can accept that socket as a non-ADB
+  listener and leave device discovery blocked before XCUITest starts. The runner scopes
+  `-Djava.net.preferIPv6Addresses=true` to the Maestro JVM so that unrelated IPv4 listener is not
+  mistaken for an Android emulator. XCUITest continues to use its explicit `127.0.0.1` endpoint.
+- `clearState` reinstalls an Expo Debug client and erases its remembered Metro endpoint. The flow
+  therefore opens the exact `exp+lrnki://expo-development-client` URL supplied by the runner.
+  `app.config.ts` disables the client-only onboarding, launch menu, and floating Tools button so
+  they cannot obscure learner controls; the standard simulator/device gesture still opens the
+  developer menu when a human needs it.
+- iOS Keychain data survives an app reinstall. `clearKeychain: true` is required before the auth
+  refusal/recovery path; `clearState` alone is not a clean Better Auth start.
 
-> **Design note — captured shapes, not shared builders.** This adapter freezes captured real
-> responses rather than sharing one response-builder module with the intercepted Playwright suite.
-> That guarantees shape-correctness without refactoring the green intercepted suite's inline
-> fixtures. The two suites therefore do not share one scenario module; unifying them is optional and
-> only worthwhile if it does not obscure the intercepted suite (it currently would).
+The single iOS flow covers keyboard-backed wrong-password recovery, Journal and board celebration,
+one authored trail, the Support dialog body/footer, both Guardian scopes, leaderboard rendering,
+and a no-reset process restart. Evidence lands in
+`tmp/2026-08-31-authored-learner-runtime/native-ios/`.
 
-## Selectors
+Do not replace the JVM-scoped hostname correction with stopping Docker Desktop, editing `/etc/hosts`,
+or an unbounded retry. If Maestro changes its discovery behavior, remove the correction only after a
+plain hierarchy probe and this whole flow pass without it.
 
-Accessibility labels and app-owned `testID`s only — never generated prose or coordinates. The
-inline Explorable Term is a nested `<Text>` span with no queryable Android resource-id, so the flow
-targets the real `SupportPathsPanel` action (`support-path-add-<term>`, the component's designed
-large-target equivalent). Scroll readiness, full visibility, enabled state, and tap all use that same
-action ID; the device swipe still traverses the long Theory. The specific term value is fixed by the
-checked-in deterministic scenario.
+## Fixture and selectors
 
-The Guardian flow uses the answer tiles' accessibility labels from its checked-in deterministic
-fixture. Shuffled presentation means any intended answer can land below the viewport, so every
-answer is scrolled to 100% visibility, centered, asserted enabled, and tapped through that same
-label. Its outcome and Continue actions receive the same treatment before the next ward.
+`server.ts` qualifies `content/`, creates one deterministic learner in `MemoryLearnerStateStore`,
+adopts and completes Critical Thinking with production commands, and creates real Leg-rematch and
+Expedition Guardian challenges. Every subsequent GET and `POST /game/commands` is delegated to the
+same `LearnerRuntime` used by learner-api. Answer keys remain server-side.
 
-One selector rule is not style but a paid-for correctness constraint: **the wait condition and the
-action target must be the same node.** Scrolling until an ancestor container reports visible and then
-tapping a descendant lets the scroll stop while the descendant is still under the fixed footer — the
-tap lands on `Continue`, the activity advances, and the flow keeps asserting against the wrong
-screen. State `visibilityPercentage: 100`, `enabled: true`, and `centerElement: true` on the exact
-action, then assert and tap that same selector. Never recover from a missed target with coordinates,
-fixed sleeps, selector indexes, repeated taps, or a duplicated test-only control.
+Identity is faked only at the wire seam. The committed `.invalid` address authenticates only against
+this fixture. The cookie name is `better-auth.session_token`, it is deliberately non-`Secure` for
+loopback HTTP, and `/auth/get-session` returns `null` without that cookie so `clearState: true`
+actually returns to the gate.
+
+Flows use accessibility labels and app-owned test ids, never coordinates or generated prose. A
+wait and its action must target the same node; scroll it to full visibility, assert it is enabled,
+then tap it. That rule prevents fixed chrome from intercepting an apparently visible descendant.

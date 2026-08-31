@@ -1,9 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
-// Durable real-backend web gate config (plan 2026-07-15-001 U2/U3). Unlike the intercepted `e2e/`
-// suite, this drives the production Expo export against a REAL supervisor-free learner-api over
-// Postgres — NOT fixtures. The runner (`e2e-realuse/run.ts`) owns process lifecycle: it exports
-// the bundle, starts the API + static server, runs preflight, and cleans up. So this config has NO
+// Durable real-backend web gate config. Unlike the intercepted `e2e/` suite, this drives the
+// production Expo export against the real authored-content learner-api over Postgres, not fixtures.
+// The runner (`e2e-realuse/run.ts`) owns process lifecycle: it exports the bundle, starts the API +
+// static server, runs the full journey plus Playwright, and cleans up. So this config has no
 // `webServer` block and assumes the server is already up at REALUSE_WEB_PORT.
 //
 // Tracing is OFF on purpose (R13): a Playwright trace captures request headers, which now carry

@@ -25,12 +25,6 @@ services:
       # valid checkout; the only state this can refuse is a caller resolving the wrong path.
       # Guards `up`, not `watch` on already-running containers, and not `down`.
       - type: bind
-        source: ./scripts/docker/postgres/01-init-litellm-db.sql
-        target: /docker-entrypoint-initdb.d/01-init-litellm-db.sql
-        read_only: true
-        bind:
-          create_host_path: false
-      - type: bind
         source: ./scripts/docker/postgres/02-init-test-db.sql
         target: /docker-entrypoint-initdb.d/02-init-test-db.sql
         read_only: true
@@ -74,63 +68,8 @@ services:
       DATABASE_URL: postgresql://lrnki:lrnki@postgres:5432/lrnki
     restart: "no"
 
-  litellm:
-    image: ghcr.io/berriai/litellm:v1.88.1
-    container_name: lrnki-litellm
-    networks:
-      - lrnki
-    ports:
-      # Bound to loopback (U3): Docker's iptables rules bypass ufw, so a 0.0.0.0 publish would
-      # expose LiteLLM on the public VPS interface. Host-run admin-lab/kg-worker still reach it
-      # via localhost; containers use the `litellm` service name over the lrnki network.
-      - "127.0.0.1:4000:4000"
-    volumes:
-      # Fail-closed like the postgres binds above — reason documented there.
-      - type: bind
-        source: ./litellm/config.yaml
-        target: /app/config.yaml
-        read_only: true
-        bind:
-          create_host_path: false
-    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "1"]
-    env_file:
-      - .env
-    environment:
-      DATABASE_URL: postgresql://lrnki:lrnki@postgres:5432/litellm
-    healthcheck:
-      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/health/liveliness')"]
-      interval: 60s
-      timeout: 5s
-      retries: 5
-      start_period: 90s
-
-  # Mixed-format ingestion for Gate 2 (ADR-0013): PDF/DOCX/PPTX → structured
-  # document via the Docling HTTP API. Version-pinned so the parsed-layout
-  # contract stays reproducible across the frozen oracle suite.
-  docling:
-    build:
-      context: ./docling
-      dockerfile: Dockerfile
-    container_name: lrnki-docling
-    networks:
-      - lrnki
-    ports:
-      # Loopback-only (U3): same public-exposure hazard as litellm above.
-      - "127.0.0.1:5001:5001"
-    environment:
-      DOCLING_SERVE_ENABLE_UI: "1"
-      DOCLING_DEVICE: "cpu"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/health')"]
-      interval: 30s
-      timeout: 5s
-      retries: 5
-      start_period: 60s
-
-  # Learner HTTP API (U2 / ADR-0035). No published host port — only Caddy reaches it over the
-  # lrnki network. The relocated topic-generation supervisor runs inside this long-lived process,
-  # so these LiteLLM credentials are also its production generation credentials.
+  # Learner HTTP API (ADR-0035). No published host port — only Caddy reaches it over the lrnki
+  # network. Startup qualifies the tracked authored catalog before the server begins listening.
   #
   # This container is the ONLY process that serves the public API (ADR-0040). The dev loop starts
   # or reuses it detached, then attaches `docker compose watch --no-up learner-api` rather than
@@ -152,8 +91,6 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
-      litellm:
-        condition: service_healthy
     # Identity and sessions (ADR-0041). These carry NO compose default on purpose: an empty
     # `BETTER_AUTH_SECRET` makes the API refuse to start, which is the whole point — Better Auth
     # otherwise falls back to a secret published in its own source and only rejects that fallback
@@ -161,8 +98,6 @@ services:
     # beats a container that silently signs every learner's cookie with a public key.
     environment:
       DATABASE_URL: postgresql://lrnki:lrnki@postgres:5432/lrnki
-      LITELLM_BASE_URL: http://litellm:4000
-      LITELLM_API_KEY: ${LITELLM_API_KEY:-sk-local}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-https://api.lrnki.globesoul.com}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
@@ -191,6 +126,10 @@ services:
           initial_sync: true
           ignore:
             - "**/node_modules/"
+        - action: sync+restart
+          path: ./content
+          target: /app/content
+          initial_sync: true
         - action: rebuild
           path: ./pnpm-lock.yaml
 

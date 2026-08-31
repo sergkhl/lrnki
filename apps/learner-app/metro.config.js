@@ -1,6 +1,5 @@
 // Monorepo Metro config (plan 2026-07-09-001 U2): the repo root is a watch folder and a
-// module resolution root so the TS-source workspace packages (@lrnki/application/projection,
-// @lrnki/learner-api/client, @lrnki/domain-core, @lrnki/ports) compile in place under
+// module resolution root so the TS-source learner API client package compiles in place under
 // pnpm's isolated linker. Package-exports resolution is Metro's default on this SDK.
 const { getDefaultConfig } = require("expo/metro-config");
 const { withNativewind } = require("nativewind/metro");

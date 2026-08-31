@@ -15,7 +15,7 @@ const NODE = "node-specimen";
 
 test("a collected crystal renders the full-colour pass over its slot with every facet", async () => {
   await render(
-    <CrystalSpecimen species="band5" derivedNodeId={NODE} material="collected" growthFraction={1} />
+    <CrystalSpecimen species="band5" identityKey={NODE} material="collected" growthFraction={1} />
   );
   expect(screen.getByTestId("specimen-body")).toBeTruthy();
   expect(screen.getByTestId("specimen-fill")).toBeTruthy();
@@ -26,7 +26,7 @@ test("a collected crystal renders the full-colour pass over its slot with every 
 
 test("a partly grown crystal shows the slot material with the collected fill risen part-way", async () => {
   await render(
-    <CrystalSpecimen species="band1" derivedNodeId={NODE} material="open" growthFraction={0.5} />
+    <CrystalSpecimen species="band1" identityKey={NODE} material="open" growthFraction={0.5} />
   );
   const body = screen.getByTestId("specimen-body");
   const fill = screen.getByTestId("specimen-fill");
@@ -40,7 +40,7 @@ test("a partly grown crystal shows the slot material with the collected fill ris
 
 test("a fogged slot renders stone silhouette only — no collected fill and no gloss at all", async () => {
   await render(
-    <CrystalSpecimen species="band3" derivedNodeId={NODE} material="fogged" growthFraction={1} ariaLabel="Known ground" />
+    <CrystalSpecimen species="band3" identityKey={NODE} material="fogged" growthFraction={1} ariaLabel="Known ground" />
   );
   expect(screen.getByTestId("specimen-body")).toBeTruthy();
   expect(screen.queryAllByTestId("specimen-fill")).toHaveLength(0);
@@ -51,7 +51,7 @@ test("a fogged slot renders stone silhouette only — no collected fill and no g
 
 test("growth zero renders the slot alone — the risen region is degenerate", async () => {
   await render(
-    <CrystalSpecimen species="band4" derivedNodeId={NODE} material="next" growthFraction={0} />
+    <CrystalSpecimen species="band4" identityKey={NODE} material="next" growthFraction={0} />
   );
   expect(screen.getByTestId("specimen-body")).toBeTruthy();
   expect(screen.getAllByTestId("specimen-body-gloss").length).toBeGreaterThan(0);
@@ -60,7 +60,7 @@ test("growth zero renders the slot alone — the risen region is degenerate", as
 
 test("the rim light and occlusion contour frame every material exactly once", async () => {
   await render(
-    <CrystalSpecimen species="keystone" derivedNodeId={NODE} material="next" growthFraction={0.3} />
+    <CrystalSpecimen species="keystone" identityKey={NODE} material="next" growthFraction={0.3} />
   );
   expect(screen.getAllByTestId("specimen-contour")).toHaveLength(1);
   expect(screen.getAllByTestId("specimen-rim")).toHaveLength(1);

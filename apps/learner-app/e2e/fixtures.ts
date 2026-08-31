@@ -1,34 +1,21 @@
 import { test as base, expect, type Page, type Route } from "@playwright/test";
-
-// Deterministic fixtures and typed-API interception for the learner web gate (plan
-// 2026-07-14-001 U5, KTD8). The export is baked against the sentinel origin below; every call
-// to it is fulfilled here, so a scenario controls exactly which of the pending/error/data
-// branches each route sees. Response SHAPES mirror the learner-api projections (journal rows,
-// candidate cards, Better Auth session payloads) so the real bundle renders as it would in
-// production.
+import type {
+  LearnerReadDto,
+  LearnerTransitionDto
+} from "@lrnki/learner-api/client";
 
 export const API_ORIGIN = process.env.E2E_API_ORIGIN ?? "http://127.0.0.1:8788";
 
 export type Reply = { status: number; body: unknown };
 export const ok = (body: unknown): Reply => ({ status: 200, body });
 export const status = (code: number, body: unknown = { error: "error" }): Reply => ({ status: code, body });
-
-// A per-endpoint handler receives the intercepted request and returns a reply. Returning a
-// promise lets a scenario inject latency to exercise the visible loading states.
 export type Handler = (ctx: { method: string; pathname: string; postData: unknown }) => Reply | Promise<Reply>;
-
 export type MockState = {
   handlers: Partial<Record<string, Handler>>;
-  // Requests that reached the API origin with no matching handler — asserted empty so a
-  // forgotten mock surfaces as a test failure rather than a stray production call.
   unmatched: string[];
+  requests: Array<{ method: string; pathname: string; postData: unknown }>;
 };
 
-// ---- Fixture data -----------------------------------------------------------------------
-
-// The signed-in learner as Better Auth reports them (ADR-0041). `id` IS the learner ref every
-// learner-state row is keyed by, so it stays `gate-explorer` — scenarios build per-learner
-// localStorage keys (the Guardian arrival gate) out of it.
 export const sessionUser = {
   id: "gate-explorer",
   name: "Gate Explorer",
@@ -40,8 +27,6 @@ export const sessionUser = {
   updatedAt: "2026-01-01T00:00:00.000Z"
 };
 
-// `GET /auth/get-session` answers with this envelope, or with `null` for "no live session" —
-// the 200-with-null that lets the app separate signed-out from a read that did not complete.
 export const sessionPayload = {
   session: {
     id: "e2e-session",
@@ -54,125 +39,313 @@ export const sessionPayload = {
   user: sessionUser
 };
 
-// What the credential routes return on success. The app seeds `me` straight from `user` here,
-// which is why a successful sign-up needs no second session round-trip (KTD1).
 export const credentialSuccess = { token: sessionPayload.session.token, user: sessionUser };
-
-// Better Auth reports refusals as a stable `code` plus an HTTP status; `sessionError` in
-// `lib/session.ts` maps codes, never messages, so these are the codes it actually branches on.
 export const invalidCredentials = { code: "INVALID_EMAIL_OR_PASSWORD", message: "Invalid email or password" };
-
-// Handler sets for the two session states, spread into a scenario's `handlers` map. Signed-in is
-// a mock answer rather than a seeded credential: the browser cannot hold or read the HttpOnly
-// cookie, so what the session read returns IS the whole of "am I signed in".
 export const signedIn = (): MockState["handlers"] => ({ "GET /auth/get-session": () => ok(sessionPayload) });
 export const signedOut = (): MockState["handlers"] => ({ "GET /auth/get-session": () => ok(null) });
 
-export const journalPopulated = {
-  capabilities: {
-    syntheticTopicGeneration: {
-      status: "paused" as const,
-      message: "New topic scouting is paused while source-backed generation is checked. Choose a ready expedition in Explore."
-    }
-  },
-  started: [
-    {
-      status: "ready" as const,
-      learnerExpeditionId: "lex-started",
-      title: "Continental drift",
-      declaredDomain: "Geology",
-      enrichmentId: "enr-started",
-      active: true,
-      progress: { itemsPassed: 3, itemsAttempted: 5, lessonsRead: 2, itemsTotal: 10 },
-      layerPurpose: "Read plate boundaries from the rock record."
-    }
-  ],
-  yours: [
-    {
-      status: "ready" as const,
-      learnerExpeditionId: "lex-ready",
-      title: "Cell membranes",
-      declaredDomain: "Biology",
-      enrichmentId: "enr-ready",
-      active: false,
-      progress: { itemsPassed: 0, itemsAttempted: 0, lessonsRead: 0, itemsTotal: 8 },
-      layerPurpose: null
-    },
-    {
-      status: "generating" as const,
-      learnerExpeditionId: "lex-generating",
-      title: "Ocean currents",
-      declaredDomain: null,
-      failureMessage: null,
-      generation: {
-        queued: false,
-        stalled: false,
-        completed: 4,
-        total: 14,
-        fraction: 4 / 14,
-        indeterminate: false,
-        currentStage: "study-item-generation"
-      }
-    }
-  ],
-  shared: [
-    { enrichmentId: "enr-shared-1", catalogKey: "tectonic-plates", title: "Tectonic plates", teaser: "Follow moving plates through a changing crust.", declaredDomain: "Geology", sortOrder: 1, totalConceptCount: 7, searchTerms: ["plate", "tectonics"] },
-    { enrichmentId: "enr-shared-2", catalogKey: "photosynthesis", title: "Photosynthesis", teaser: "Trace light into stored chemical energy.", declaredDomain: "Biology", sortOrder: 2, totalConceptCount: 5, searchTerms: ["photosynthesis", "carbon fixation"] }
+const sourceCredits = [{
+  title: "Critical Thinking primer",
+  author: "lrnki project",
+  license: "Project-owned internal playtest source",
+  note: "Accepted as a local authoring basis without independent external fact verification."
+}];
+
+const optionActivity = {
+  family: "option_select" as const,
+  key: "identify-conclusion",
+  prompt: "Which claim is the conclusion?",
+  options: [
+    { key: "northern-road-closed", text: "The northern road is closed." },
+    { key: "take-southern-road", text: "We should take the southern road." }
   ]
 };
 
-export const catalogPopulated = {
-  candidates: [{
-    enrichmentId: "enr-critical-thinking",
-    catalogKey: "critical-thinking",
-    title: "Critical Thinking",
-    teaser: "Build stronger arguments, weigh evidence, test causal claims, and revise conclusions with confidence.",
-    declaredDomain: "critical thinking",
-    sortOrder: 1,
-    totalConceptCount: 5,
-    searchTerms: ["arguments", "evidence", "causal claims"]
-  }],
-  sources: [{
-    catalogKey: "critical-thinking",
-    title: "Critical Thinking",
-    sourceProvenance: {
-      authorship: "lrnki_model_authored_project_source",
-      knowledgeBasis: "general_model_knowledge_only",
-      externalClaimVerificationRequired: false,
-      acceptanceScope: "local_shared_learner_playtest"
-    },
-    sourceCredits: [{
-      sourceResourceId: "source-critical-thinking",
+const matchingActivity = {
+  family: "matching" as const,
+  key: "map-argument-parts",
+  prompt: "Match each reasoning role to what it does.",
+  left: [
+    { key: "left-claim", text: "Claim" },
+    { key: "left-conclusion", text: "Conclusion" }
+  ],
+  right: [
+    { key: "right-conclusion", text: "The claim the reasons support" },
+    { key: "right-claim", text: "A statement that can be accepted or rejected" }
+  ]
+};
+
+const impostorActivity = {
+  family: "impostor" as const,
+  key: "spot-evidence-impostor",
+  prompt: "One statement overclaims. Find the impostor.",
+  statements: [
+    { key: "random-selection-reduces-bias", text: "Random selection can reduce selection bias." },
+    { key: "anecdote-shows-possibility", text: "An anecdote can show that something can happen." },
+    { key: "size-cures-bias", text: "A large sample always removes selection bias." }
+  ]
+};
+
+export const journalRead = {
+  status: "ok",
+  stateVersion: "7",
+  view: {
+    kind: "journal",
+    activeExpeditionKey: "critical-thinking",
+    expeditions: [{
+      expeditionKey: "critical-thinking",
       title: "Critical Thinking",
-      sourceUri: "lrnki model-authored project source accepted for local playtest",
-      license: "lrnki project-owned playtest fixture"
+      contentRevision: "revision-critical-thinking",
+      contentChanged: false,
+      adoptedAt: "2026-08-31T00:00:00.000Z",
+      masteredStopCount: 1,
+      knownStopCount: 0,
+      totalStopCount: 3
     }]
-  }]
+  }
+} satisfies LearnerReadDto;
+
+export const emptyJournalRead = {
+  status: "ok",
+  stateVersion: "0",
+  view: { kind: "journal", activeExpeditionKey: null, expeditions: [] }
+} satisfies LearnerReadDto;
+
+export const catalogRead = {
+  status: "ok",
+  stateVersion: "7",
+  view: {
+    kind: "catalog",
+    catalogRevision: "catalog-revision",
+    expeditions: [{
+      expeditionKey: "critical-thinking",
+      title: "Critical Thinking",
+      teaser: "Make reasoning visible, test it against evidence, and revise confidence.",
+      declaredDomain: "Reasoning and decision-making",
+      audience: "Adult learners building practical reasoning habits",
+      sourceCredits,
+      contentRevision: "revision-critical-thinking",
+      adopted: true,
+      active: true
+    }]
+  }
+} satisfies LearnerReadDto;
+
+export const expeditionView = {
+  kind: "expedition" as const,
+  expedition: {
+    key: "critical-thinking",
+    contentRevision: "revision-critical-thinking",
+    title: "Critical Thinking",
+    teaser: "Make reasoning visible, test it against evidence, and revise confidence.",
+    declaredDomain: "Reasoning and decision-making",
+    audience: "Adult learners building practical reasoning habits",
+    sourceCredits,
+    legs: [{
+      key: "reasoning-foundations",
+      title: "From claims to warranted conclusions",
+      stops: [
+        {
+          key: "argument-structure",
+          label: "See the support structure",
+          requires: [],
+          difficultyBand: 1 as const,
+          lesson: { sections: [{
+            key: "claims-and-support",
+            title: "Separate claims from support",
+            body: "A support relationship links reasons to the conclusion they are intended to establish.",
+            explorableTerms: []
+          }] },
+          activities: [optionActivity, matchingActivity],
+          supportPaths: []
+        },
+        {
+          key: "evidence-quality",
+          label: "Judge how much the evidence earns",
+          requires: ["argument-structure"],
+          difficultyBand: 2 as const,
+          lesson: { sections: [{
+            key: "representative-evidence",
+            title: "A large sample can answer the wrong question",
+            body: "Recover the support relationship, then inspect how the sample was selected.",
+            explorableTerms: [{ term: "support relationship", supportPathKey: "review-support-relationship" }]
+          }] },
+          activities: [
+            { ...optionActivity, key: "evaluate-sample", prompt: "Which sample best matches the named population?" },
+            impostorActivity
+          ],
+          supportPaths: [{ key: "review-support-relationship", term: "support relationship" }]
+        },
+        {
+          key: "causal-claims",
+          label: "Test the causal story",
+          requires: ["evidence-quality"],
+          difficultyBand: 3 as const,
+          lesson: { sections: [{
+            key: "association-vs-cause",
+            title: "Association leaves several stories open",
+            body: "A common cause can move both observed variables without the proposed causal link.",
+            explorableTerms: []
+          }] },
+          activities: [{ ...optionActivity, key: "diagnose-fire-correlation", prompt: "Which common cause should be tested?" }],
+          supportPaths: []
+        }
+      ]
+    }]
+  },
+  active: true,
+  progress: [
+    {
+      stopKey: "argument-structure",
+      state: "mastered" as const,
+      lessonReadAt: "2026-08-31T00:01:00.000Z",
+      latestActivityOutcomes: [
+        { activityKey: "identify-conclusion", correct: true, answeredAt: "2026-08-31T00:02:00.000Z" },
+        { activityKey: "map-argument-parts", correct: true, answeredAt: "2026-08-31T00:03:00.000Z" }
+      ],
+      firstGradedCompletion: {
+        stopKey: "argument-structure",
+        completedAt: "2026-08-31T00:03:00.000Z",
+        difficultyBand: 1,
+        points: 1
+      },
+      restorationStopKeys: []
+    },
+    {
+      stopKey: "evidence-quality",
+      state: "available" as const,
+      lessonReadAt: "2026-08-31T00:04:00.000Z",
+      latestActivityOutcomes: [],
+      firstGradedCompletion: null,
+      restorationStopKeys: []
+    },
+    {
+      stopKey: "causal-claims",
+      state: "locked" as const,
+      lessonReadAt: null,
+      latestActivityOutcomes: [],
+      firstGradedCompletion: null,
+      restorationStopKeys: []
+    }
+  ],
+  supportPaths: [{
+    supportPathKey: "review-support-relationship",
+    parentStopKey: "evidence-quality",
+    term: "support relationship",
+    status: "closed" as const,
+    steps: [{
+      stopKey: "argument-structure",
+      activityKey: "identify-conclusion",
+      stopLabel: "See the support structure",
+      lesson: { sections: [{
+        key: "claims-and-support",
+        title: "Separate claims from support",
+        body: "A support relationship links reasons to a conclusion.",
+        explorableTerms: []
+      }] },
+      activity: optionActivity
+    }]
+  }],
+  guardians: [
+    {
+      scope: { kind: "leg" as const, legKey: "reasoning-foundations" },
+      state: "locked" as const,
+      eligibleActivityCount: 2,
+      activeChallengeId: null,
+      firstWinChallengeId: null
+    },
+    {
+      scope: { kind: "expedition" as const },
+      state: "locked" as const,
+      eligibleActivityCount: 3,
+      activeChallengeId: null,
+      firstWinChallengeId: null
+    }
+  ]
 };
 
-export const leaderboardFixture = {
-  // The board is optional in the journal UI (rendered only when present). Keep it minimal.
-  weekLabel: "This week",
-  cohort: [],
-  self: null
+export const expeditionRead = {
+  status: "ok",
+  stateVersion: "7",
+  view: expeditionView
+} satisfies LearnerReadDto;
+
+export const guardianActiveView = {
+  kind: "guardian" as const,
+  state: "active" as const,
+  expeditionKey: "critical-thinking",
+  challengeId: "guardian-e2e",
+  scope: { kind: "leg" as const, legKey: "reasoning-foundations" },
+  wardTotal: 3,
+  unresolvedWardCount: 3,
+  resolvedWardCount: 0,
+  remainingShield: 3,
+  shieldTotal: 3,
+  retreated: false,
+  currentActivity: impostorActivity,
+  matchingProgress: null
 };
 
-// ---- Interception -----------------------------------------------------------------------
+export const guardianRead = {
+  status: "ok",
+  stateVersion: "9",
+  view: guardianActiveView
+} satisfies LearnerReadDto;
 
-export const delay = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+export const leaderboardRead = {
+  status: "ok",
+  stateVersion: "7",
+  view: {
+    kind: "leaderboard",
+    weekKey: "2026-W36",
+    entries: [
+      { id: "rival-a", name: "Mina", points: 8, rank: 1, isViewer: false, isRival: true, badges: { podiums: 1 } },
+      { id: "gate-explorer", name: "Gate Explorer", points: 3, rank: 2, isViewer: true, isRival: false, badges: { podiums: 0 } }
+    ],
+    chase: { name: "Mina", gap: 5, direction: "ahead" },
+    viewerPoints: 3,
+    viewerRank: 2,
+    masteredCrystalCount: 1,
+    division: { name: "Quartz", threshold: 0, nextThreshold: 25 },
+    podiumEarnedForPreviousWeek: false
+  }
+} satisfies LearnerReadDto;
 
-// A handler that fails the first `n` calls with 500, then succeeds — the failed-then-recover
-// shape behind AE2/AE3.
-export function failThenSucceed(failures: number, success: Reply, failure: Reply = status(500)): Handler {
-  let seen = 0;
-  return () => (seen++ < failures ? failure : success);
+type AppliedTransition = Extract<LearnerTransitionDto, { status: "applied" }>;
+type AppliedEffect = AppliedTransition["effect"];
+
+const baseEffect: AppliedEffect = {
+  kind: "expedition_activated",
+  expeditionKey: "critical-thinking",
+  legKey: null,
+  stopKey: null,
+  activityKey: null,
+  supportPathKey: null,
+  challengeId: null,
+  correct: null,
+  revealKey: null,
+  feedback: null,
+  newlyCompletedStop: false,
+  pointsAwarded: 0,
+  firstGuardianWin: false
+};
+
+export function appliedTransition(
+  effect: Partial<AppliedEffect> = {},
+  view: AppliedTransition["view"] = expeditionView
+): LearnerTransitionDto {
+  return {
+    status: "applied",
+    replayed: false,
+    stateVersion: "8",
+    committedStateVersion: "8",
+    effect: { ...baseEffect, ...effect },
+    view
+  };
 }
 
-// Every learner request is credentialed now (`credentials: "include"`, ADR-0041), and the browser
-// rejects a credentialed response whose `Access-Control-Allow-Origin` is `*` — the mock must echo
-// the caller's exact origin and allow credentials, which is precisely the contract the real
-// learner-api CORS implements. Getting this wrong fails as an opaque network error rather than an
-// assertion, so it is derived per request instead of being a constant.
+export const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
 const corsHeaders = (origin: string | undefined): Record<string, string> => ({
   "access-control-allow-origin": origin ?? API_ORIGIN,
   "access-control-allow-credentials": "true",
@@ -188,25 +361,23 @@ async function installMock(page: Page, state: MockState): Promise<void> {
       const request = route.request();
       const method = request.method();
       const headers = corsHeaders(request.headers()["origin"]);
-      // Web and API live on different origins (Pages ↔ VPS in production), so a credentialed
-      // GET or a JSON POST is a non-simple CORS request and the browser preflights it. Answer
-      // the preflight here or the real request never fires.
       if (method === "OPTIONS") {
         await route.fulfill({ status: 204, headers, body: "" });
         return;
       }
       const pathname = new URL(request.url()).pathname;
       const key = matchKey(method, pathname, state.handlers);
-      if (!key) {
-        state.unmatched.push(`${method} ${pathname}`);
-        await route.fulfill({ status: 500, headers, contentType: "application/json", body: JSON.stringify({ error: "unmocked" }) });
-        return;
-      }
-      let postData: unknown = undefined;
+      let postData: unknown;
       try {
         postData = request.postDataJSON();
       } catch {
         postData = undefined;
+      }
+      state.requests.push({ method, pathname, postData });
+      if (!key) {
+        state.unmatched.push(`${method} ${pathname}`);
+        await route.fulfill({ status: 500, headers, contentType: "application/json", body: JSON.stringify({ error: "unmocked" }) });
+        return;
       }
       const reply = await state.handlers[key]!({ method, pathname, postData });
       await route.fulfill({
@@ -219,48 +390,36 @@ async function installMock(page: Page, state: MockState): Promise<void> {
   );
 }
 
-// Match "METHOD /path" against registered keys, supporting a trailing `/*` wildcard for the
-// dynamic `/expedition/:id` and `/challenge/:id` reads.
 function matchKey(method: string, pathname: string, handlers: MockState["handlers"]): string | undefined {
   const exact = `${method} ${pathname}`;
   if (handlers[exact]) return exact;
   for (const key of Object.keys(handlers)) {
-    const [m, pattern] = key.split(" ");
-    if (m !== method || !pattern.endsWith("/*")) continue;
-    const base = pattern.slice(0, -1); // keep trailing slash
-    if (pathname.startsWith(base)) return key;
+    const [candidateMethod, pattern] = key.split(" ");
+    if (candidateMethod !== method || !pattern?.endsWith("/*")) continue;
+    if (pathname.startsWith(pattern.slice(0, -1))) return key;
   }
   return undefined;
 }
 
-// Every key the page can read. The web session is an HttpOnly cookie the app never mirrors
-// (ADR-0041), so there is no credential to seed and nothing to read back: scenarios assert on the
-// ABSENCE of one here, and "signed in" is expressed entirely by what the session read returns.
 export async function readableStorageKeys(page: Page): Promise<string[]> {
-  return page.evaluate(() => Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i) ?? ""));
+  return page.evaluate(() => Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index) ?? ""));
 }
 
-// ---- Test fixture: mock + console-error guard -------------------------------------------
-
-type Fixtures = {
-  mock: MockState;
-  pageErrors: string[];
-};
+type Fixtures = { mock: MockState; pageErrors: string[] };
 
 export const test = base.extend<Fixtures>({
   pageErrors: async ({ page }, use) => {
     const errors: string[] = [];
-    page.on("pageerror", (err) => errors.push(`pageerror: ${err.message}`));
-    page.on("console", (msg) => {
-      if (msg.type() === "error") errors.push(`console.error: ${msg.text()}`);
+    page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
+    page.on("console", (message) => {
+      if (message.type() === "error") errors.push(`console.error: ${message.text()}`);
     });
     await use(errors);
   },
   mock: async ({ page }, use) => {
-    const state: MockState = { handlers: {}, unmatched: [] };
+    const state: MockState = { handlers: {}, unmatched: [], requests: [] };
     await installMock(page, state);
     await use(state);
-    // No unmocked API call slipped through to (a non-existent) production backend.
     expect(state.unmatched, `unmocked API calls: ${state.unmatched.join(", ")}`).toEqual([]);
   }
 });

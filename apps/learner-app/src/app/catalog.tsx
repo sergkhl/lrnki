@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
-import { Linking, ScrollView, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { ArrowLeft, BookOpen } from "lucide-react-native";
-import { CandidateCard } from "@/components/ExpeditionEntry";
-import { filterCatalogCandidates } from "@/learn/catalogSearch";
-import { catalogQuery } from "@/lib/queries";
+
+import { dispatchLearnerCommand } from "@/lib/actions";
+import { catalogQuery, type CatalogView } from "@/lib/queries";
 import {
+  Badge,
   Button,
   Card,
   Dialog,
@@ -20,38 +21,74 @@ import {
   buttonIconColor,
   colors
 } from "@/ui";
-import { learnerTerm } from "@/learn/vocabulary";
-import type { CatalogView } from "@/lib/queries";
 
 export default function CatalogPage() {
   const router = useRouter();
   const catalog = useQuery(catalogQuery);
   const [search, setSearch] = useState("");
-  const results = useMemo(() => filterCatalogCandidates(catalog.data?.candidates ?? [], search), [catalog.data, search]);
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const view = catalog.data?.view;
+  const expeditions = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase();
+    if (!view || !query) return view?.expeditions ?? [];
+    return view.expeditions.filter((candidate) =>
+      [candidate.title, candidate.teaser, candidate.declaredDomain, candidate.audience]
+        .some((value) => value.toLocaleLowerCase().includes(query))
+    );
+  }, [search, view]);
+
   const goBack = () => {
     if (router.canGoBack()) router.back();
     else router.replace("/");
   };
 
-  // Explicit pending/error states (R6): loading is no longer a blank list, and a failed read
-  // is distinct from a valid empty catalog (which the data branch below still renders as its
-  // own "no expeditions" card). Retry keeps the Browse route and its navigation context.
-  if (catalog.isPending) {
-    return <RouteStatus tone="loading" title={learnerTerm("catalogLoading")} />;
-  }
+  if (catalog.isPending) return <RouteStatus tone="loading" title="Opening the authored catalog…" />;
   if (catalog.isError || !catalog.data) {
     return (
       <RouteStatus
         tone="error"
-        title={learnerTerm("catalogErrorTitle")}
-        message={learnerTerm("catalogErrorBody")}
+        title="The catalog is out of reach"
         actions={[
-          { label: learnerTerm("retryAction"), onPress: () => void catalog.refetch() },
-          { label: learnerTerm("returnToTrail"), variant: "outline", onPress: goBack }
+          { label: "Try again", onPress: () => void catalog.refetch() },
+          { label: "Back to journal", variant: "outline", onPress: goBack }
         ]}
       />
     );
   }
+
+  const open = async (candidate: CatalogView["expeditions"][number]) => {
+    setError(null);
+    if (candidate.active) {
+      router.push(`/expedition/${candidate.expeditionKey}`);
+      return;
+    }
+    setPendingKey(candidate.expeditionKey);
+    try {
+      let version = catalog.data.stateVersion;
+      if (!candidate.adopted) {
+        const adopted = await dispatchLearnerCommand({
+          expectedStateVersion: version,
+          command: { kind: "adopt_expedition", expeditionKey: candidate.expeditionKey }
+        });
+        if (adopted.status !== "applied") {
+          setError(commandMessage(adopted.status));
+          return;
+        }
+        version = adopted.stateVersion;
+      }
+      const activated = await dispatchLearnerCommand({
+        expectedStateVersion: version,
+        command: { kind: "activate_expedition", expeditionKey: candidate.expeditionKey }
+      });
+      if (activated.status === "applied") router.push(`/expedition/${candidate.expeditionKey}`);
+      else setError(commandMessage(activated.status));
+    } catch {
+      setError("The expedition could not be opened. Try again.");
+    } finally {
+      setPendingKey(null);
+    }
+  };
 
   return (
     <Screen>
@@ -65,113 +102,96 @@ export default function CatalogPage() {
           className="self-start"
         />
       </View>
-      <ScrollView contentContainerClassName="mx-auto w-full max-w-lg gap-4 p-4">
+      <ScrollView contentContainerClassName="mx-auto w-full max-w-2xl gap-4 p-4">
         <View className="flex-row items-start justify-between gap-3">
           <View className="min-w-0 flex-1 gap-1">
             <Text variant="display">Browse expeditions</Text>
-            <Text variant="caption" color="muted">Find a shared trail ready to begin.</Text>
+            <Text color="muted">Directly authored trails, qualified together before the server starts.</Text>
           </View>
-          <SourcesAndLicensesDialog sources={catalog.data.sources} />
+          <SourcesDialog expeditions={catalog.data.view.expeditions} />
         </View>
         <Input
           label="Search expeditions"
-          placeholder="Try photosynthesis or oceanography"
+          placeholder="Try reasoning or statistics"
           value={search}
           onChangeText={setSearch}
-          accessibilityLabel="Search expeditions"
         />
-        {results.length > 0 ? results.map((candidate) => (
-          <CandidateCard key={candidate.enrichmentId} candidate={candidate} />
-        )) : (
-          <Card>
-            <Text variant="title" className="text-center">{search.trim() ? "No matching expeditions" : "No expeditions to browse"}</Text>
-            <Text variant="caption" color="muted" className="text-center">
-              {search.trim() ? "Try a different title or domain." : "Plan a new trail from your journal."}
-            </Text>
+        {error ? (
+          <Card className="border-destructive">
+            <Text color="destructive">{error}</Text>
           </Card>
-        )}
+        ) : null}
+        {expeditions.length === 0 ? (
+          <Card>
+            <Text variant="title" className="text-center">No matching expeditions</Text>
+            <Text color="muted" className="text-center">Try another title, domain, or audience.</Text>
+          </Card>
+        ) : expeditions.map((candidate) => (
+          <Card key={candidate.expeditionKey} className="gap-3">
+            <View className="flex-row flex-wrap items-start justify-between gap-2">
+              <View className="min-w-0 flex-1 gap-1">
+                <Text variant="heading">{candidate.title}</Text>
+                <Text variant="caption" color="muted">{candidate.declaredDomain}</Text>
+              </View>
+              {candidate.active ? <Badge>Active</Badge> : candidate.adopted ? <Badge>In journal</Badge> : null}
+            </View>
+            <Text>{candidate.teaser}</Text>
+            <Text variant="caption" color="muted">For {candidate.audience}</Text>
+            <Button
+              label={candidate.active ? "Resume trail" : candidate.adopted ? "Make active and open" : "Add to journal"}
+              busy={pendingKey === candidate.expeditionKey}
+              disabled={pendingKey !== null}
+              onPress={() => void open(candidate)}
+            />
+          </Card>
+        ))}
       </ScrollView>
     </Screen>
   );
 }
 
-export function SourcesAndLicensesDialog({
-  sources
-}: Readonly<{ sources: CatalogView["sources"] }>) {
+function SourcesDialog({ expeditions }: Readonly<{ expeditions: CatalogView["expeditions"] }>) {
   const [open, setOpen] = useState(false);
   return (
     <>
       <Button
         variant="outline"
         size="compact"
-        onPress={() => setOpen(true)}
+        label="Sources"
         icon={<BookOpen size={14} color={buttonIconColor("outline")} />}
-        label="Sources & licenses"
+        onPress={() => setOpen(true)}
       />
       <Dialog open={open} onOpenChange={setOpen}>
         <OverlayHeader
           icon={<BookOpen size={20} color={colors.ink} />}
-          title="Sources & licenses"
-          description="Provenance for the accepted expedition catalog."
+          title="Sources and disclosures"
+          description="Project-owned authoring bases for this catalog. No external factual-verification claim is implied."
           onClose={() => setOpen(false)}
         />
         <DialogBody>
-          {sources.length === 0 ? (
-            <Text color="muted">No accepted source credits are published.</Text>
-          ) : sources.map((entry) => (
-            <View key={entry.catalogKey} className="gap-2 border-b border-line pb-4 last:border-b-0">
-              <Text variant="title">{entry.title}</Text>
-              <Text variant="caption" color="muted">
-                {sourcePolicyDisclosure(entry.sourceProvenance)}
-              </Text>
-              {entry.sourceCredits.map((credit) => (
-                <View key={credit.sourceResourceId} className="gap-1">
-                  <Text variant="label">{credit.title}</Text>
-                  {credit.sourceUri ? <SourceUri value={credit.sourceUri} /> : null}
-                  {credit.license ? (
-                    <Text variant="caption" color="muted">License: {credit.license}</Text>
-                  ) : null}
+          {expeditions.map((expedition) => (
+            <View key={expedition.expeditionKey} className="gap-2 border-b border-line pb-4 last:border-b-0">
+              <Text variant="title">{expedition.title}</Text>
+              {expedition.sourceCredits.map((credit, index) => (
+                <View key={`${expedition.expeditionKey}-${index}`} className="gap-1">
+                  <Text variant="label">{credit.title}{credit.author ? ` — ${credit.author}` : ""}</Text>
+                  <Text variant="caption" color="muted">License: {credit.license}</Text>
+                  {credit.note ? <Text variant="caption" color="muted">{credit.note}</Text> : null}
                 </View>
               ))}
             </View>
           ))}
         </DialogBody>
         <DialogFooter>
-          <Button variant="outline" onPress={() => setOpen(false)} label="Done" />
+          <Button variant="outline" label="Done" onPress={() => setOpen(false)} />
         </DialogFooter>
       </Dialog>
     </>
   );
 }
 
-function SourceUri({ value }: Readonly<{ value: string }>) {
-  if (!/^https?:\/\//i.test(value)) {
-    return <Text variant="caption" color="muted">Source: {value}</Text>;
-  }
-  return (
-    <Text
-      variant="caption"
-      accessibilityRole="link"
-      className="underline"
-      onPress={() => void Linking.openURL(value)}
-    >
-      {value}
-    </Text>
-  );
-}
-
-function sourcePolicyDisclosure(source: CatalogView["sources"][number]["sourceProvenance"]): string {
-  const authorship = source.authorship === "lrnki_model_authored_project_source"
-    ? "lrnki project-authored playtest source"
-    : source.authorship;
-  const knowledge = source.knowledgeBasis === "general_model_knowledge_only"
-    ? "general model knowledge"
-    : source.knowledgeBasis;
-  const verification = source.externalClaimVerificationRequired
-    ? "external claims require verification"
-    : "external claims are not independently verified";
-  const scope = source.acceptanceScope === "local_shared_learner_playtest"
-    ? "accepted for local shared learner playtest"
-    : source.acceptanceScope;
-  return `${authorship} · ${knowledge} · ${verification} · ${scope}`;
+function commandMessage(status: string): string {
+  if (status === "stale") return "Your journal changed elsewhere. The catalog is refreshing; try again.";
+  if (status === "content_changed") return "This content revision needs the guarded development reset.";
+  return "The learner runtime refused this catalog action.";
 }

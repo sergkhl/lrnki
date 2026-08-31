@@ -25,10 +25,16 @@ export class ResetRequiredError extends Error {
 
 export type ExpectedMigration = Readonly<{ hash: string; createdAt: string }>;
 
+export const APPLICATION_RELATION_MANIFEST = [
+  "account",
+  "learner_journey_state",
+  "session",
+  "user",
+  "verification"
+] as const;
+
 export type InspectedApplicationSchemaState = Readonly<{
-  publicRelationCount: number;
-  sourceResourcesPresent: boolean;
-  operationRunsPresent: boolean;
+  publicRelations: readonly string[];
   migrationRows: readonly Readonly<{ hash: unknown; createdAt: unknown }>[];
 }>;
 
@@ -52,28 +58,27 @@ export function classifyApplicationSchemaState(
     return { kind: "reset-required", reason: "unexpected-history" };
   }
 
-  const sourcePresent = inspected.sourceResourcesPresent;
-  const operationsPresent = inspected.operationRunsPresent;
-  if (sourcePresent !== operationsPresent) {
-    return { kind: "reset-required", reason: "partial-schema" };
-  }
-
   const migrationRow = inspected.migrationRows[0];
-  if (inspected.publicRelationCount === 0) {
+  const actual = [...new Set(inspected.publicRelations)].sort();
+  const expectedRelations = [...APPLICATION_RELATION_MANIFEST];
+  if (actual.length === 0) {
     return migrationRow
       ? { kind: "reset-required", reason: "metadata-without-schema" }
       : { kind: "empty" };
   }
-
-  if (!sourcePresent && !operationsPresent) {
+  if (!migrationRow) {
+    const containsManifestRelation = actual.some((name) => expectedRelations.includes(
+      name as (typeof APPLICATION_RELATION_MANIFEST)[number]
+    ));
     return {
       kind: "reset-required",
-      reason: migrationRow ? "partial-schema" : "legacy-schema"
+      reason: containsManifestRelation && !sameStrings(actual, expectedRelations)
+        ? "partial-schema"
+        : "legacy-schema"
     };
   }
-
-  if (!migrationRow) {
-    return { kind: "reset-required", reason: "legacy-schema" };
+  if (!sameStrings(actual, expectedRelations)) {
+    return { kind: "reset-required", reason: "partial-schema" };
   }
 
   const createdAt = normalizeMigrationTimestamp(migrationRow.createdAt);
@@ -178,17 +183,16 @@ async function inspectApplicationSchemaState(
 ): Promise<InspectedApplicationSchemaState> {
   const [inventory] = await connection<
     {
-      public_relation_count: number;
-      source_resources_present: boolean;
-      operation_runs_present: boolean;
+      public_relations: string[];
       migration_table_present: boolean;
     }[]
   >`
     SELECT
-      count(*) FILTER (WHERE c.relkind IN ('r', 'p', 'v', 'm', 'f'))::integer
-        AS public_relation_count,
-      to_regclass('public.source_resources') IS NOT NULL AS source_resources_present,
-      to_regclass('public.operation_runs') IS NOT NULL AS operation_runs_present,
+      coalesce(
+        array_agg(c.relname ORDER BY c.relname)
+          FILTER (WHERE c.relkind IN ('r', 'p', 'v', 'm', 'f')),
+        ARRAY[]::text[]
+      ) AS public_relations,
       to_regclass('drizzle.__drizzle_migrations') IS NOT NULL AS migration_table_present
     FROM pg_class AS c
     JOIN pg_namespace AS n ON n.oid = c.relnamespace
@@ -209,11 +213,13 @@ async function inspectApplicationSchemaState(
   }
 
   return {
-    publicRelationCount: inventory.public_relation_count,
-    sourceResourcesPresent: inventory.source_resources_present,
-    operationRunsPresent: inventory.operation_runs_present,
+    publicRelations: inventory.public_relations,
     migrationRows
   };
+}
+
+function sameStrings(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
 function normalizeMigrationTimestamp(value: unknown): string | undefined {

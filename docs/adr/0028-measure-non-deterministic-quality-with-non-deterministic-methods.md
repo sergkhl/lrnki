@@ -1,22 +1,18 @@
-# Measure non-deterministic quality with non-deterministic methods
+# Measure judgment-based authored quality with direct judgment
 
 Status: Accepted
 
 ## Decision
 
-Judgment-based quality—Concept correctness, identity, prerequisites, difficulty, and evidence
-quality—is evaluated with representative real-use judgment, repeated sampling, and recorded agreement
-or uncertainty where the decision needs it.
+Judgment-based properties—teaching sufficiency, semantic source support, difficulty, route coherence,
+Support usefulness, and challenge appropriateness—are evaluated by direct inspection and real use.
+Reviewers record agreement, uncertainty, and `FIX_FIRST` findings rather than replacing those
+questions with a deterministic proxy that pretends one semantic answer is mechanically known.
 
-Do not replace an ambiguous semantic judgment with a deterministic proxy that pretends one answer is
-known, and do not chase bit-identical neural output. Variance is measurement signal; deterministic
-code may hard-veto only provable guarantees under AGENTS rule 16.
-
-[ADR-0013](0013-verify-quality-by-real-source-inspection.md) owns the test and inspection boundary.
-Published reproducibility comes from immutable persisted artifacts with provenance: a re-run is a new
-observation, while replaying the artifact reproduces the published state.
+Deterministic code may veto only provable structural guarantees. [ADR-0013](0013-verify-quality-by-real-source-inspection.md)
+owns the source-inspection boundary.
 
 ## Context
 
-Seeded greedy prerequisite judgments still varied on genuinely ambiguous pairs. Recording their
-distribution exposed uncertainty that deterministic parity checks concealed.
+Authored content is deterministic as data, but its quality is still a human judgment. Treating word
+counts, overlap, or other surface measures as truth would hide uncertainty instead of measuring it.

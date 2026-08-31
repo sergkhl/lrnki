@@ -1,0 +1,291 @@
+{
+  "schemaVersion": 1,
+  "key": "machine-learning",
+  "title": "Machine Learning",
+  "teaser": "Design and evaluate a supervised prediction system from decision contract to monitored policy.",
+  "declaredDomain": "Applied supervised machine learning",
+  "audience": "Adult learners evaluating or building prediction systems",
+  "sourceCredits": [
+    {
+      "title": "Machine Learning: Applied Supervised Learning primer",
+      "author": "lrnki project",
+      "license": "Project-owned internal playtest source",
+      "note": "Accepted as a local authoring basis without independent external fact verification."
+    }
+  ],
+  "legs": [
+    {
+      "key": "prediction-system-evidence",
+      "title": "Make the whole prediction system evaluable",
+      "stops": [
+        {
+          "key": "decision-contract",
+          "label": "Frame the prediction at decision time",
+          "requires": [],
+          "difficultyBand": 2,
+          "lesson": {
+            "sections": [
+              {
+                "key": "unit-time-target-decision",
+                "title": "An operational question comes before the model",
+                "body": "Define one prediction unit, the exact prediction time, the target and its horizon, the features available by that cutoff, and the decision the output will influence. A field that appears in the historical database is not automatically usable: if it arrives after the decision, it violates the availability contract. Choose evaluation measures around the consequences and capacity of the real decision, then compare with a credible non-ML baseline.",
+                "sourceAnchor": {
+                  "heading": "1. Frame the Prediction Problem Around a Decision",
+                  "quote": "A supervised-learning project begins with an operational question, not a model family."
+                },
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "enforce-availability-contract",
+              "prompt": "At order review time, a system predicts whether an order will be returned. Which candidate feature clearly violates the availability contract?",
+              "options": [
+                {
+                  "key": "final-return-resolution",
+                  "text": "The final return resolution recorded two weeks after the order"
+                },
+                {
+                  "key": "basket-value-at-review",
+                  "text": "The basket value visible when review begins"
+                },
+                {
+                  "key": "account-age-at-review",
+                  "text": "The account age calculated at the review cutoff"
+                },
+                {
+                  "key": "shipping-method-selected",
+                  "text": "The shipping method selected before review"
+                }
+              ],
+              "answerKey": "final-return-resolution",
+              "explanation": {
+                "text": "The final resolution is caused by events after the prediction cutoff and cannot exist at review time. Historical co-location does not make future information available to the deployed system.",
+                "sourceAnchor": {
+                  "heading": "1. Frame the Prediction Problem Around a Decision",
+                  "quote": "Features must be available at the exact moment a prediction would be made."
+                }
+              }
+            },
+            {
+              "family": "matching",
+              "key": "match-prediction-contract",
+              "prompt": "Match each contract element to the question it settles.",
+              "pairs": [
+                {
+                  "key": "unit-role",
+                  "left": "Prediction unit",
+                  "right": "What one row represents at inference"
+                },
+                {
+                  "key": "horizon-role",
+                  "left": "Prediction horizon",
+                  "right": "How far after the cutoff the target is observed"
+                },
+                {
+                  "key": "decision-role",
+                  "left": "Influenced decision",
+                  "right": "What action will use the output"
+                }
+              ],
+              "explanation": {
+                "text": "The unit names each prediction case, the horizon bounds its future outcome, and the decision determines which errors, output form, and capacity constraints matter.",
+                "sourceAnchor": {
+                  "heading": "1. Frame the Prediction Problem Around a Decision",
+                  "quote": "The prediction unit identifies one row at inference time: an account-month, a component-cycle, a patient-visit, or a document."
+                }
+              }
+            }
+          ],
+          "supportPaths": []
+        },
+        {
+          "key": "evaluation-without-leakage",
+          "label": "Keep evaluation information out of fitting",
+          "requires": ["decision-contract"],
+          "difficultyBand": 3,
+          "lesson": {
+            "sections": [
+              {
+                "key": "split-by-arrival-process",
+                "title": "A split must imitate how new predictions arrive",
+                "body": "Estimate generalization on observations that did not choose the fitted system. Split by entity, time, site, or another grouping when rows share information; random rows are appropriate only for the matching deployment claim. Fit preprocessing inside each training partition, and keep held-out data from influencing feature choices, thresholds, or transformations. Target leakage includes any predictor containing the target or later consequences unavailable at prediction time. Reusing test results for another design iteration quietly turns the test set into validation data.",
+                "sourceAnchor": {
+                  "heading": "2. Splits, Evaluation Protocols, and Leakage",
+                  "quote": "Generalization performance must be estimated on observations not used to choose the fitted system."
+                },
+                "explorableTerms": [
+                  {
+                    "term": "prediction time",
+                    "supportPathKey": "review-prediction-cutoff"
+                  }
+                ]
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "choose-temporal-evaluation",
+              "prompt": "A service predicts next-month cancellation from monthly account histories. Which evaluation most closely tests future deployment?",
+              "options": [
+                {
+                  "key": "earlier-train-later-test",
+                  "text": "Train on earlier months and test on later mature outcomes, keeping each cutoff's future fields unavailable"
+                },
+                {
+                  "key": "random-all-months",
+                  "text": "Randomly mix all account-months, including later history from the same accounts"
+                },
+                {
+                  "key": "preprocess-full-dataset",
+                  "text": "Fit preprocessing on all months before making the split"
+                },
+                {
+                  "key": "iterate-on-test",
+                  "text": "Tune repeatedly until the final test month gives the preferred score"
+                }
+              ],
+              "answerKey": "earlier-train-later-test",
+              "explanation": {
+                "text": "A time-ordered evaluation preserves the direction of information and tests later cases. Mixing histories, fitting transformations globally, or adapting to test results lets evaluation information influence development.",
+                "sourceAnchor": {
+                  "heading": "2. Splits, Evaluation Protocols, and Leakage",
+                  "quote": "Time-ordered prediction normally requires a temporal evaluation: train on earlier data and evaluate on later data."
+                }
+              }
+            },
+            {
+              "family": "impostor",
+              "key": "spot-evaluation-impostor",
+              "prompt": "Two practices preserve an evaluation boundary. One contaminates it. Find the impostor.",
+              "statements": [
+                {
+                  "key": "group-shared-entities",
+                  "text": "Keep rows from the same entity together when identity-specific history could leak across the split.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "fit-transform-per-fold",
+                  "text": "Fit learned preprocessing separately inside each training fold.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "retune-after-test",
+                  "text": "After reading the test score, retune the threshold and still call that score a final untouched estimate.",
+                  "kind": "impostor"
+                }
+              ],
+              "explanation": {
+                "text": "Once a test result drives another design choice, that test has participated in selection. It is now validation evidence, not an untouched final estimate.",
+                "sourceAnchor": {
+                  "heading": "2. Splits, Evaluation Protocols, and Leakage",
+                  "quote": "If test results influence another design iteration, the test set has become validation data;"
+                }
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "review-prediction-cutoff",
+              "term": "prediction time",
+              "sectionKey": "split-by-arrival-process",
+              "steps": [
+                {
+                  "stopKey": "decision-contract",
+                  "activityKey": "enforce-availability-contract"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "calibrated-decision-policy",
+          "label": "Turn scores into a monitored policy",
+          "requires": ["evaluation-without-leakage"],
+          "difficultyBand": 4,
+          "lesson": {
+            "sections": [
+              {
+                "key": "calibration-threshold-and-shift",
+                "title": "A useful score still needs a decision rule",
+                "body": "Ranking, probability quality, and decision value are different properties. Calibration asks whether cases assigned probability near p experience the event about fraction p in the relevant population. Choose thresholds or top-k policies from benefits, costs, capacity, and subgroup behavior, using held-out data. After deployment, monitor service health, inputs, scores, actions, delayed outcomes, and calibration. A shifted input distribution is a warning to investigate, while a stable-looking input distribution cannot prove the concept remains unchanged.",
+                "sourceAnchor": {
+                  "heading": "9. Metrics, Calibration, Thresholds, and Subgroup Behavior",
+                  "quote": "**Calibration** asks whether events assigned probability near `p` occur about fraction `p` in the relevant population."
+                },
+                "explorableTerms": [
+                  {
+                    "term": "held-out data",
+                    "supportPathKey": "review-evaluation-boundary"
+                  }
+                ]
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "choose-review-policy",
+              "prompt": "A calibrated risk score feeds a team that can review only 500 cases per day. Which next step respects the complete decision system?",
+              "options": [
+                {
+                  "key": "evaluate-top-k-policy",
+                  "text": "Evaluate a top-500 policy with real error costs, subgroup behavior, and an operational fallback"
+                },
+                {
+                  "key": "default-half-threshold",
+                  "text": "Use 0.5 because every calibrated score requires that threshold"
+                },
+                {
+                  "key": "ranking-proves-calibration",
+                  "text": "Treat strong ranking as proof that the probabilities are calibrated"
+                },
+                {
+                  "key": "ignore-outcomes-after-launch",
+                  "text": "Stop measuring outcomes because offline evaluation already fixed the system"
+                }
+              ],
+              "answerKey": "evaluate-top-k-policy",
+              "explanation": {
+                "text": "Review capacity makes top-k selection part of the policy. It must be evaluated with consequences and monitoring; the score alone neither chooses the threshold nor guarantees continued usefulness.",
+                "sourceAnchor": {
+                  "heading": "9. Metrics, Calibration, Thresholds, and Subgroup Behavior",
+                  "quote": "The model score is an input to policy, not the policy itself."
+                }
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "review-evaluation-boundary",
+              "term": "held-out data",
+              "sectionKey": "calibration-threshold-and-shift",
+              "steps": [
+                {
+                  "stopKey": "evaluation-without-leakage",
+                  "activityKey": "choose-temporal-evaluation"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "guardianActivityKeys": [
+        "match-prediction-contract",
+        "spot-evaluation-impostor",
+        "choose-temporal-evaluation",
+        "choose-review-policy"
+      ]
+    }
+  ],
+  "expeditionGuardianActivityKeys": [
+    "enforce-availability-contract",
+    "match-prediction-contract",
+    "spot-evaluation-impostor",
+    "choose-temporal-evaluation",
+    "choose-review-policy"
+  ]
+}

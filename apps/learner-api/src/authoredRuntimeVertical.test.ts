@@ -172,7 +172,13 @@ test("test-only Hono composition completes Critical Thinking through one authent
     catalogRead.view.kind === "catalog"
       ? catalogRead.view.expeditions.map((entry) => entry.expeditionKey)
       : [],
-    ["critical-thinking"]
+    [
+      "critical-thinking",
+      "probability-and-statistics",
+      "personal-finance",
+      "machine-learning",
+      "neuroscience-of-memory-and-attention"
+    ]
   );
 
   assert.equal(

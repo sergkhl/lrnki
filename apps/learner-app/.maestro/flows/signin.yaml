@@ -27,4 +27,4 @@ appId: com.globesoul.lrnki
 - hideKeyboard
 - tapOn:
     id: "gate-enter"
-- assertVisible: "Choose an expedition"
+- assertVisible: "Expedition journal"

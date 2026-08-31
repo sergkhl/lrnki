@@ -1,45 +1,22 @@
-# Define the typed Study Item Bank and learner-response identity
+# Use authored activity families and one learner-response identity
 
 Status: Accepted
 
 ## Decision
 
-The learner loop uses the derived node within one Derived Graph Layer as its subject identity. A
-learner-neutral Study Item Bank is a typed union of option-select, matching, and impostor activities
-keyed to that subject; source types own exact payloads and
-[ADR-0039](0039-own-persisted-shape-in-code-first-drizzle-schema.md) owns their persistence.
+Each Stop owns authored option-select, matching, and optional impostor Activities. Answer material is
+server-private; the learner API sends only playable pre-answer projections and returns explanation
+after grading.
 
-A per-node blueprint may select a sparse set of suitable item types. Deterministic guards enforce only
-provable structure and provenance, while semantic suitability remains neural and measurable. A
-missing type is a valid, inspectable absence rather than permission to fabricate an activity.
+An acquisition response is identified by learner, Expedition revision, Stop, Activity, and source
+context. A Support Path that references an Activity reuses that ordinary acquisition identity rather
+than cloning evidence. Guardian responses remain a separate challenge identity and never change
+acquisition mastery or weekly acquisition points.
 
-Learner-facing projections never expose answer keys. The server resolves the persisted key, grades
-every type through one grading-neutral path, and appends observations to the Response Log. Calibration
-is a separate mutable self-report over a derived node, never a Study Item or graded observation.
-
-Study Items retain whether their grounding is source CEP evidence, rescued source evidence, or
-generated grounding. Source citations require verified source text; generated citations are labeled
-generated and cannot masquerade as quotes.
-
-Two semantic verification questions remain distinct:
-
-- Answer-Key Verification classifies every candidate's truth for an owner-neutral learning subject
-  and checks answer-key uniqueness. Candidate presentation is deterministic and independent of the
-  server key, generated position, stable IDs, and neutral-node identity. Source policy and source
-  types own each consumer's current attempt budget and unavailable outcome.
-- Matching Assignment Verification checks whether a whole matching board has exactly one defensible
-  assignment; individually true pairs do not answer that question.
-
-Both use a cross-family judge and may veto only their named harm class. Unclear or unavailable
-judgment is not converted into a lexical hard veto; deterministic rules continue to own only
-provable guarantees under AGENTS rule 16.
-
-The Response Log is append-only and graded-only for neutral activities. Learner-scoped Support Steps
-share grading mechanics but use the discriminated scoped identity and evidence-isolation rules in
-[ADR-0037](0037-persist-learner-scoped-scaffold-detours.md).
+Calibration is an explicit self-report, not a graded response. Exact unions and payloads remain
+source-owned.
 
 ## Context
 
-Concept-only identity excluded rescued and generated nodes, while one untyped card could not support
-several mechanics. Typed activities, server-owned keys, explicit grounding, and scoped observations
-keep learner evidence trustworthy without moving learner state into the neutral graph.
+Typed play supports distinct mechanics, while one response identity prevents replay, Support reuse,
+and challenge play from awarding the same learning progress through competing paths.

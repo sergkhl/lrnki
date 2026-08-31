@@ -1,4 +1,4 @@
-# learner-api production image (U1 of the deployment plan). Build context is the repo
+# Learner API production image. Build context is the repository root
 # ROOT so the pnpm workspace closure is visible; build with:
 #   docker build -f apps/learner-api/Dockerfile -t lrnki-learner-api .
 # The container runs the TS source through tsx exactly like `pnpm start`, but reads env
@@ -12,7 +12,7 @@ WORKDIR /app
 
 # Copy the whole workspace (`.dockerignore` strips node_modules/build outputs) and install
 # only the learner-api dependency closure. The trailing `...` on the filter pulls in every
-# workspace package learner-api depends on (application, ports, infrastructure-*, domain-core).
+# workspace package learner-api depends on (learner-runtime and infrastructure-postgres).
 COPY . .
 RUN pnpm install --frozen-lockfile --filter @lrnki/learner-api...
 

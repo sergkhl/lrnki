@@ -27,9 +27,7 @@ import {
 
 const repositoryRoot = new URL("../../../", import.meta.url);
 const contentRoot = new URL("content/", repositoryRoot);
-const baseCatalog = JSON.parse(
-  await readFile(new URL("catalog.json", contentRoot), "utf8")
-) as unknown;
+const baseCatalog = { schemaVersion: 1, expeditionKeys: ["critical-thinking"] } as const;
 const baseDocument = JSON.parse(
   await readFile(
     new URL("expeditions/critical-thinking/expedition.json", contentRoot),
@@ -126,7 +124,7 @@ function reverseObjectKeys(value: unknown): unknown {
   return value;
 }
 
-test("the checked-in Critical Thinking document qualifies as one opaque ordered catalog", () => {
+test("the Critical Thinking fixture qualifies as one opaque ordered catalog", () => {
   const catalog = mustQualify(qualify());
   assert.deepEqual(catalog.orderedKeys, ["critical-thinking"]);
   assert.match(catalog.catalogRevision, /^[a-f0-9]{64}$/);
@@ -412,6 +410,14 @@ test("pre-answer projections contain playable identifiers but no keyed correctne
 test("the filesystem seam accepts the checked-in tree and refuses startup before returning a partial catalog", async () => {
   const checkedIn = await loadAndQualifyCatalog(new URL("content/", repositoryRoot).pathname);
   assert.equal(checkedIn.ok, true);
+  if (!checkedIn.ok) return;
+  assert.deepEqual(checkedIn.catalog.orderedKeys, [
+    "critical-thinking",
+    "probability-and-statistics",
+    "personal-finance",
+    "machine-learning",
+    "neuroscience-of-memory-and-attention"
+  ]);
 
   const root = await mkdtemp(join(tmpdir(), "lrnki-authored-content-"));
   try {

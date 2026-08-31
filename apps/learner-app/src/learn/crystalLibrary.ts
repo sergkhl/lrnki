@@ -213,8 +213,8 @@ export function crystalForBand(band: number): CrystalSpecies {
 // mirror: the light source is fixed upper-left and mirroring inverts every rim light.
 export type CrystalVariation = { scale: number };
 
-export function crystalVariationFor(derivedNodeId: string): CrystalVariation {
-  const random = mulberry32(hashSeed(`variation:${derivedNodeId}`));
+export function crystalVariationFor(identityKey: string): CrystalVariation {
+  const random = mulberry32(hashSeed(`variation:${identityKey}`));
   return { scale: Math.round((0.9 + random() * 0.1) * 100) / 100 };
 }
 

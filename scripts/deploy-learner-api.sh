@@ -102,7 +102,7 @@ fi
 # URL's scheme) out of it, so the `.env.example` dev default left on a deployment host yields an API
 # that health-checks green, serves the whole credential path, and quietly mints session cookies with
 # no `Secure` flag over HTTPS while Google rejects the callback (ADR-0041). Nothing errors, because a
-# wrong base URL still resolves — the same failure shape as a stale LiteLLM alias. Asserted against
+# wrong base URL still resolves without an infrastructure error. Asserted against
 # the RUNNING container so this reads what shipped, not what a file said, and so compose's default
 # stays the single source of that value.
 EXPECTED_AUTH_URL="${HEALTH_URL%/health}"

@@ -7,14 +7,13 @@ execution: code
 
 # Simplify the Learner Runtime Around Directly Authored Expeditions
 
-**Status:** In progress — U0–U2 complete. The abandoned U6 generation work is recoverable in commit
-`4ae809e`; its plan was committed as Abandoned with this replacement in `212cf90`, then removed in a
-standalone reference-repair commit. The private direct-content authority now qualifies Critical
-Thinking, and the private two-method learner runtime is complete against in-memory and test-Postgres
-adapters; the legacy runtime remains the sole live authority. U3 is next.
+**Status:** Complete — U0–U5 and the exit test passed on 2026-08-31. The abandoned U6 generation
+work remains recoverable in `4ae809e`; the atomic authored-runtime cutover, guarded local reset,
+legacy deletion, five-Expedition qualification, real-backend journey, and native evidence are
+consolidated below. This record is ready for its standalone lifecycle closure commit.
 
-**NEXT:** U3 atomically cuts learner-api and Expo over to the direct content/runtime seam, performs
-the guarded local reset, and deletes the generation-era system only after the replacement is live.
+**NEXT:** Commit this consolidated evidence, then delete this completed plan in a separate closure
+commit while repairing the plan index and TODO at their own altitudes.
 
 **Decision state:** Accepted by the owner on 2026-08-31. This plan replaces the earlier retirement
 design rather than amending it. The earlier direction was correct about deleting model-generated
@@ -630,6 +629,92 @@ This plan closes only when all are true:
   intercepted-web evidence only. The 70 browser scenarios still exercise the legacy live contract;
   they do not prove cutover. No local-development reset, real-backend, native, deployed,
   distributable, physical-device, production, or new external-quality claim.
+
+### U3 — atomic cutover, guarded reset, and legacy deletion (2026-08-31)
+
+- **Cutover:** Learner API now loads the tracked catalog all-or-nothing before listening and exposes
+  authenticated authored-key reads plus one command endpoint. Expo imports transport DTOs only and
+  retains auth, trail, activity, Support, Guardian, reward/formation, leaderboard, accessibility,
+  haptics, and reduced-motion presentation. ADR-0042 became true in the same unit.
+- **Deletion:** Removed Admin Lab, the knowledge-graph worker, graph/extraction/enrichment/generation
+  modules, model ports and prompts, LiteLLM, Docling, ingestion/local-storage packages, content
+  packages/installers/requalification, generation routes/states, and every superseded application
+  table and adapter. The workspace now contains learner-api, learner-app, learner-runtime, and the
+  Postgres adapter only; tracked package/config searches found no removed workspace dependency.
+- **Guarded reset:** Immediately before reset, the owned local endpoint/database and positive counts
+  were re-resolved: one user, one session, five catalog rows, two learner Expeditions, one lesson
+  read, and one response. The reset intentionally discarded those accounts, sessions, content rows,
+  adoptions, progress, responses, and all other application state. It was not run against a shared
+  host or production database.
+- **Persisted result:** The regenerated code-first baseline has exactly `account`,
+  `learner_journey_state`, `session`, `user`, and `verification`; `drizzle.__drizzle_migrations` has
+  one row. A same-query positive control found `learner_journey_state=1` and the sampled removed
+  relations `=0`. Final validation teardown left zero users and zero journey rows.
+- **Topology/docs:** Both production and development Compose configurations parse with Postgres,
+  migration, learner-api, and optional Caddy only; tracked `content/` is a learner-api build/watch
+  input. AGENTS, CONTEXT, README, ADRs, validation routes, and rig ownership now describe the
+  authored runtime rather than the deleted pipeline.
+- **Qualification:** Local source, code-first schema, owned local-development Postgres, Compose
+  parsing, automated tests, and intercepted browser evidence. No deployment, shared-host reset,
+  production write, distributable build, or physical-device claim.
+
+### U4 — Critical Thinking real use and native evidence (2026-08-31)
+
+- **Direct inspection:** Critical Thinking is `PASS` for all six lesson sections, four option-select
+  activities, one three-pair matching activity, one impostor set, two exact-reference Support Paths,
+  and both Guardian pools. An initial U1 `FIX_FIRST` Support destination had already been repaired;
+  this terminal inspection found no remaining unsupported claim, wrong key, or broken route.
+- **Real backend:** One clean Better Auth/Hono/Postgres journey exercised adoption/activation,
+  idempotent replay and stale refusal, every lesson and activity with wrong-to-correct paths,
+  calibration/clear/restoration, Support open/hide/restore and evidence reuse, locked final Guardian,
+  retreat/resume/abandon, shield loss/recovery, Leg first win/rematch, Expedition first win, rewards,
+  leaderboard, sign-out/sign-in persistence, and learner isolation. Server/API payload assertions
+  found no pre-answer key, truth/impostor marker, or private authored document.
+- **Real-backend web:** Fresh production-format Expo export passed at phone and desktop viewports;
+  stale-cookie recovery, profile creation, private grading, Support, refresh/resume, Journal/board,
+  and three validation learners' exact teardown passed. A first rerun safely refused because Docker
+  Desktop owned port 8091; the unchanged gate passed on free port 8092 and removed all three rows.
+- **Android:** A fresh SDK-57 standalone e2e APK (`ef9a0cbd8b7d65badfe3abd0b9315520db661d3d6f70e42f9daf70f0231cb0aa`)
+  passed sign-in, the retained 320-dp Support scenario, and Guardian presentation on API-35. The
+  historical Support dialog-collapse mutant failed the exact body/footer assertion 3/3, while the
+  restored production source and fresh APK passed; that narrow automatic authority is retained.
+- **iOS:** A fresh SDK-57 Debug build on an iPhone 17 Pro iOS 26.5 simulator passed the canonical
+  authored-runtime Maestro flow in 1m04s. It covered wrong-password recovery, Journal celebration,
+  Support body/footer, both Guardian scopes, retreat/navigation, leaderboard, and authenticated
+  restart. Screenshots were visually inspected; this remains Debug-simulator integration evidence.
+- **Qualification:** Real local backend and browser, Android emulator authority only for the owned
+  Support regression class, separate Android presentation smoke, and iOS Debug-simulator smoke. No
+  deployed, distributable, physical-device, production, or external-factual-verification claim.
+
+### U5 — five-Expedition catalog, Maestro unblock, and final matrix (2026-08-31)
+
+- **Catalog:** The accepted order is Critical Thinking, Probability and Statistics, Personal
+  Finance, Machine Learning, and Neuroscience of Memory and Attention. `pnpm content:check` accepted
+  all five at catalog revision `80a6483fefded4030b69f6c699e44a5f19071aef0b0e559f70de3f72b009a87b`.
+- **Semantic/source inspection:** `PASS` for all 18 lesson sections, 26 answer-bearing activities,
+  10 exact-substring Support terms/destinations, five matching sets (16 pairs), five impostor sets,
+  20 Leg-pool references, 25 Expedition-pool references, and all 44 section/explanation anchors
+  against the five project-owned primers. Structural qualification was not treated as semantic
+  approval. No `FIX_FIRST` remained.
+- **Additional real use:** For each of the other four Expeditions, authenticated public HTTP set and
+  cleared calibration, opened/hid/restored an authored Support Path, completed every Stop and every
+  activity with wrong-to-correct grading, and won its Leg Guardian. The same run exercised all five
+  Expeditions and persisted across sign-out/sign-in.
+- **Maestro blocker fixed:** Diagnosis showed Maestro 2.6.1 enumerating its bundled Android DADB
+  client for an explicit iOS run; Docker Desktop's non-ADB IPv4 listener on `localhost:5555` accepted
+  the probe and blocked before XCUITest. The owned runner scopes IPv6 hostname preference to Maestro
+  while XCUITest keeps explicit IPv4. It also owns one-process-per-flow execution, Debug-client deep
+  linking after state clear, Keychain clear, keyboard submit, password-prompt dismissal, semantic
+  Support scrolling, and dev-client overlay suppression. The flow then exposed and fixed the real
+  trail-to-Journal back-stack defect, now covered at phone and desktop sizes.
+- **Final automated matrix:** `pnpm check` passed direct qualification, five-table schema parity,
+  all workspace typechecks/tests, lint, API and Expo builds, 25 learner-app suites/149 tests, and
+  20/20 intercepted Playwright scenarios. `pnpm test:db` passed the fresh/current/legacy/partial/
+  stale migration classifier and every live test-Postgres suite. Both Compose configurations,
+  `git diff --check`, positive-controlled legacy searches, and the exact public-relation query
+  passed. The iOS simulator was shut down and temporary root screenshots were removed.
+- **Qualification:** The exit test is satisfied with evidence classes kept separate. `BLOCKERS.md`
+  remains `_None._`; no owner-only action is required for this greenfield, non-release plan.
 
 ## Open findings
 

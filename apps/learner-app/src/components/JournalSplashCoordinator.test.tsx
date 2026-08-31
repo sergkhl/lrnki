@@ -5,15 +5,11 @@ import { JournalSplashCoordinator } from "./JournalSplashCoordinator";
 import { boardFixture } from "./LeaderboardDialog.test";
 import { readBoardSeen, writeBoardSeen } from "@/lib/navMemory";
 import { learnerTerm } from "@/learn/vocabulary";
-import type { LeaderboardView } from "@/lib/api";
+import type { LeaderboardView } from "@/lib/queries";
 
 jest.mock("@/lib/navMemory", () => ({
   readBoardSeen: jest.fn(() => Promise.resolve(null)),
-  writeBoardSeen: jest.fn(() => Promise.resolve()),
-  readGuardianArrivalSeen: jest.fn(() => Promise.resolve(false)),
-  markGuardianArrivalSeen: jest.fn(() => Promise.resolve()),
-  readVistaSeenBindings: jest.fn(() => Promise.resolve(null)),
-  writeVistaSeenBindings: jest.fn(() => Promise.resolve())
+  writeBoardSeen: jest.fn(() => Promise.resolve())
 }));
 
 const readBoardSeenMock = readBoardSeen as jest.MockedFunction<typeof readBoardSeen>;
