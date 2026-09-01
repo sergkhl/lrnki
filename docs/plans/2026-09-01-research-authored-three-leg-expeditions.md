@@ -6,7 +6,7 @@ closure, keep exactly one Open findings section, and never link tracked document
 
 # Re-author three-Leg Expeditions from online research
 
-- **Status:** In progress; Units 1–2 are complete and Unit 3 is next.
+- **Status:** In progress; Units 1–3 are complete and Unit 4 is next.
 - **Priority:** 1; this is the only active implementation plan.
 - **Execution:** One sequential, exclusive implementation lane in catalog order.
 - **Review:** Every Expedition requires a fresh-context reviewer who did not author it.
@@ -14,10 +14,11 @@ closure, keep exactly one Open findings section, and never link tracked document
 - **Owner gates:** None active; physical-device, deployed, production, migration, and release work
   remain out.
 - **Completed:** Unit 1 established the final schema-v2 contract. Unit 2 Critical Thinking revision
-  `dc27a6435197ed6923243fcec3c02bbcb99e195a6adbb529b24f224c56e55b43` passed the complete
-  fresh-context learner/private-source review after every finding was repaired.
-- **NEXT:** Research, author, structurally qualify, and independently review Probability and
-  Statistics under the consolidated Unit 2 rules before Personal Finance begins.
+  `dc27a6435197ed6923243fcec3c02bbcb99e195a6adbb529b24f224c56e55b43` and Unit 3 Probability and
+  Statistics revision `9be3bb797b672f3f577daf63b4eab5a8d54aacfa9a1bd84d465cacca977978d1`
+  passed complete fresh-context learner/private-source review after every finding was repaired.
+- **NEXT:** Research, author, structurally qualify, and independently review Personal Finance under
+  the consolidated Unit 2–3 rules before Machine Learning begins.
 - **Exit:** All five reviewed documents, the atomic cutover, and the evidence in this plan pass with
   `Open findings: _None._` and every durable rule in its canonical home.
 
@@ -550,6 +551,32 @@ Acceptance criteria:
   real-backend, native, deployed, production, release, or physical-device evidence. Unit 3 applies
   these rules to Probability and Statistics; Unit 7 still owns the atomic catalog and remaining
   current-policy documentation cutover.
+
+### 2026-09-01 — Unit 3: Probability and Statistics independently passed
+
+- **Commit:** This Unit 3 batch. The exact Probability and Statistics revision
+  `9be3bb797b672f3f577daf63b4eab5a8d54aacfa9a1bd84d465cacca977978d1` owns three four-Stop Legs,
+  36 Lesson sections, 24 Activities across all three families, six targeted Support Paths, 23
+  Leg-Guardian memberships, 12 Expedition-Guardian memberships, and 17 inspectable online source
+  credits.
+- **Independent proof:** A fresh-context reviewer recorded and explained all 24 answers from the
+  learner-safe projection before private access, then reconciled 24/24 keys, pair maps, and impostor
+  kinds. The reviewer inspected every Lesson, alternative, explanation, pair, statement, Support,
+  prerequisite, difficulty step, Guardian membership, and all 17 exact official endpoints. The final
+  exact revision received `PASS` with no `FIX_FIRST`; private positive controls were present and all
+  corresponding learner-projection grading, pool, and Support-route fields were absent.
+- **Repairs and rule audit:** Six Guardian-held worked-example copies became fresh transfer settings;
+  arithmetic distractors, skew-summary tone, and the causal prerequisite were repaired. Unsupported
+  survey, risk, test-design, and regression prose was narrowed, while four claim-specific citation
+  assignments were completed. Existing fresh-transfer, cue-resistance, prerequisite, and semantic
+  source-assignment rules caught these defects, so this unit introduced no new durable rule and did
+  not require a Critical Thinking re-audit.
+- **Boundary and handoff:** The production scratch qualifier and all 15 focused qualifier/runtime
+  tests passed. The tracked schema-v1 root catalog and package-wide root-catalog test remain
+  intentionally refused until Unit 7; this is authored-quality and local deterministic evidence for
+  one isolated candidate, not final tracked-catalog, rendered game-flow, real-backend, native,
+  deployed, production, release, or physical-device evidence. Unit 4 begins Personal Finance; Unit 7
+  still owns the atomic five-document and current-policy documentation cutover.
 
 ## Open findings
 
