@@ -2,8 +2,8 @@
 
 This directory indexes live coordination and ready or in-progress implementation plans. Plan
 lifecycle is adopted and overridden in [AGENTS.md](../../AGENTS.md#documentation-workflow), which
-routes shared mechanics through the vendored
-[`plan-lifecycle` skill](../../.agents/plugins/agent-workflow-core/skills/plan-lifecycle/SKILL.md).
+routes shared mechanics through the `plan-lifecycle` skill from the globally installed
+`agent-workflow-core` plugin.
 
 ## Live coordination
 

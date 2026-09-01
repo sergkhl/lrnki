@@ -23,9 +23,9 @@ repair their references in the same change.
 
 ## Documentation workflow
 
-- Apply the vendored
-  [`plan-lifecycle`](.agents/plugins/agent-workflow-core/skills/plan-lifecycle/SKILL.md) skill when
-  reading or writing `docs/plans/`. lrnki does not adopt `docs/plans/RELEASE.md`; never create it.
+- Apply the `plan-lifecycle` skill when reading or writing `docs/plans/`. It comes from the
+  `agent-workflow-core` plugin, installed globally rather than vendored here. lrnki does not adopt
+  `docs/plans/RELEASE.md`; never create it.
 - Keep `CONTEXT.md` a glossary: one or two sentences per project term, with behavior and exact shapes
   elsewhere.
 - Retain an ADR only for a hard-to-reverse, surprising decision with a real trade-off. Keep one

@@ -1,3 +1,0 @@
-interface:
-  display_name: "Plan Lifecycle"
-  short_description: "How the plan index, TODO, RELEASE and BLOCKERS fit together"
