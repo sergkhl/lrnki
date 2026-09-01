@@ -2,59 +2,53 @@
 
 ## TODO
 
-- **Re-author all five Expeditions from online research — in progress in Unit 9.** Unit 1 established
-  the final schema-v2 contract. Critical Thinking revision `dc27a643…e55b43`, Probability and
+- **Re-author all five Expeditions from online research — complete; final record ready for lifecycle
+  closure.** Unit 1 established the final schema-v2 contract. Critical Thinking revision
+  `dc27a643…e55b43`, Probability and
   Statistics revision `9be3bb79…7978d1`, Personal Finance revision `767d26bc…7452f9a`, Machine
   Learning revision `60366ccf…0e4e82`, and Neuroscience revision `07bd08f8…40feca3` now hold complete
   learner/private-source `PASS` and are the exact tracked catalog at revision
   `1c29d8c2…d78e9ff`. The no-primer content/runtime/UI/ADR/documentation cutover and focused local
   proof are complete under the
-  [priority-1 plan](./2026-09-01-research-authored-three-leg-expeditions.md). The final deterministic,
-  database, real-backend, intercepted, Android-emulator, and iOS-simulator gates pass; reconcile the
-  retained status and close by the plan exit test.
+  [priority-1 plan](./2026-09-01-research-authored-three-leg-expeditions.md). Every required final
+  evidence class and the exit test pass. Commit this final record, then archive it in the required
+  separate lifecycle-closure commit.
 
 ## COMPLETED
 
-- **The learner product now runs only on directly authored Expeditions (2026-08-31).** Codex CLI
-  authors the exact tracked documents consumed by the server; one all-or-nothing qualifier owns
-  schema, references, source anchors, learner-safe projections, and canonical revisions without a
-  model, compiler, package, installer, content database, or runtime requalification. One deep
-  learner-runtime module owns private grading and the retained full game over a single validated
-  Postgres aggregate. The graph, extraction, enrichment, generation, Admin Lab, worker, LiteLLM,
-  Docling, ingestion, content-store, and inspection systems are deleted. Durable policy lives in
-  [ADR-0042](../adr/0042-author-expeditions-directly-without-runtime-models.md), authoring mechanics
-  in [content/AUTHORING.md](../../content/AUTHORING.md), runtime/setup mechanics in the root
-  [README](../../README.md), and native claims in the
-  [rig README](../../apps/learner-app/e2e-native/README.md). Detailed implementation and evidence
-  are retained in commits `1e2567a`, `3bf2c04`, and `d4e81f0`.
+- **Five researched three-Leg Expeditions replaced the primer-constrained catalog (2026-09-01).**
+  The same five human-readable keys and order now resolve to twelve-Stop authored documents with
+  explicit online source credits, learner-visible Lesson references, and post-answer explanation
+  references. Every exact revision passed an independent learner-first/private-source review; the
+  old primers, exact-anchor contract, duplicate candidate trees, and Matching identity leak are
+  gone. Durable policy remains in [ADR-0042](../adr/0042-author-expeditions-directly-without-runtime-models.md),
+  authoring mechanics in [content/AUTHORING.md](../../content/AUTHORING.md), validation boundaries in
+  [validate-lrnki](../../.agents/skills/validate-lrnki/SKILL.md), and native authority in the
+  [rig README](../../apps/learner-app/e2e-native/README.md). The atomic cutover and final evidence
+  are retained in commits `28f325f`, `e10515d`, and `eba37f5`.
 
 ## VALIDATION
 
-### Directly authored learner runtime — 2026-08-31
+### Reviewed three-Leg authored catalog — 2026-09-01
 
-- `pnpm check` passed the five-Expedition content qualifier, exact five-table schema parity, every
-  workspace typecheck/test, lint, API and Expo builds, 25 learner-app suites/149 tests, and 20/20
-  intercepted Playwright scenarios at phone and desktop sizes. `pnpm test:db` passed all migration
-  classifier and live test-Postgres suites; both Compose configurations and `git diff --check`
-  passed.
-- The guarded local reset produced exactly Better Auth's `account`, `session`, `user`, and
-  `verification` tables plus `learner_journey_state`, with one migration-history row. Positive
-  controls found the aggregate table and no sampled removed relation. Final real-use teardown left
-  zero users and zero journey rows.
-- Direct semantic/source inspection passed all 18 lesson sections, 26 activities, 10 Support Paths,
-  five matching sets, five impostor sets, both Guardian pool classes, and 44 section/explanation
-  anchors across the accepted five-primer catalog. The project-owned primers remain a local
-  playtest basis, not independently verified factual or arbitrary-source evidence.
-- A real Better Auth/Hono/Postgres journey completed Critical Thinking's full acquisition,
-  calibration, restoration, Support, Guardian, reward, leaderboard, persistence, and isolation
-  lifecycle, then completed every Stop/activity, a Support Path, calibration behavior, and one Leg
-  Guardian in each other Expedition. Fresh production-format phone and desktop web journeys passed,
-  and their three reserved learners were deleted exactly.
-- A fresh Android SDK-57 e2e APK passed sign-in, Guardian presentation, and the retained 320-dp
-  Support Path authority check; its isolated dialog-collapse mutant failed the intended body/footer
-  assertion 3/3. A fresh iOS SDK-57 Debug simulator build passed the canonical authored-runtime
-  Maestro flow after the runner fixed the Docker/DADB discovery hang and related clean-state issues.
-  The flow also exposed and drove a regression-covered trail-to-Journal navigation fix.
+- `pnpm content:check` accepted only the five independently passed revisions at catalog revision
+  `1c29d8c2…d78e9ff`. Direct inspection covered all 180 Lesson sections, 118 Activities, 30 Support
+  Paths, both Guardian scopes, every answer/explanation, and all 93 exact online credits after every
+  `FIX_FIRST` was repaired.
+- `pnpm check` passed exact schema/content qualification, all workspace typechecks/tests/lint/builds,
+  26 Expo suites/151 tests, and 20/20 intercepted phone/desktop scenarios. `pnpm test:db` passed the
+  nine-case migration matrix, 18 live `lrnki_test` infrastructure cases, and downstream suites.
+- Direct HTTP completed all five authenticated journeys. Production-format phone UI completed all
+  twelve Critical Thinking Stops and four Guardians; desktop UI completed frozen full Legs and Leg
+  Guardians for Probability Leg 1, Finance Leg 2, and Machine Learning Leg 3. Three reserved
+  learners were deleted exactly; Neuroscience has no real-backend UI Leg claim.
+- A fresh Android API-36 emulator passed sign-in, source/Support/three-Leg presentation, and both
+  Guardian scopes against APK SHA-256 `6051a79d…9e9d83`. A separately identified iOS 26.5 Debug
+  simulator passed the keyed authored-runtime flow against binary SHA-256 `319c7ceb…997ae`.
+- The guarded `lrnki` reset removed one pre-existing local-development user, account, session, and
+  journey (zero verifications); final cleanup left every identity/journey table empty except the one
+  migration row. Those removed records are recoverable only by recreation.
 - Evidence is local automated, owned development/test Postgres, intercepted and real-backend web,
   Android emulator, and separately identified iOS Debug-simulator evidence. It is not deployed,
-  distributable, physical-device, production, release, external-fact, or arbitrary-source evidence.
+  distributable, physical-device, production, release, external-fact-generality, or arbitrary-source
+  evidence.

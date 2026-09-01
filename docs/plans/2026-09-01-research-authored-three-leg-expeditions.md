@@ -6,7 +6,7 @@ closure, keep exactly one Open findings section, and never link tracked document
 
 # Re-author three-Leg Expeditions from online research
 
-- **Status:** In progress; Units 1–8 are complete and Unit 9 is next.
+- **Status:** Complete; Units 1–9 and the exit test pass.
 - **Priority:** 1; this is the only active implementation plan.
 - **Execution:** One sequential, exclusive implementation lane in catalog order.
 - **Review:** Every Expedition requires a fresh-context reviewer who did not author it.
@@ -19,11 +19,13 @@ closure, keep exactly one Open findings section, and never link tracked document
   Unit 4 Personal Finance revision `767d26bc0794a061f447147af5614fbba945aad06d7253693f493893c7452f9a`,
   Unit 5 Machine Learning revision `60366ccf1de0448021bce06437bb642cdf3e2f81abd779834d561b4d140e4e82`,
   and Unit 6 Neuroscience revision `07bd08f859242913a8f1d01bfc2f022482755c240e5e01af223df285340feca3`
-  passed complete learner/private-source review after every finding was repaired.
-- **NEXT:** Reconcile the retained evidence and rolling status, commit the final plan record, then
-  close it under the Unit 9 exit test.
-- **Exit:** All five reviewed documents, the atomic cutover, and the evidence in this plan pass with
-  `Open findings: _None._` and every durable rule in its canonical home.
+  passed complete learner/private-source review after every finding was repaired. Unit 7 cut over
+  the five exact documents atomically; Unit 8 passed every required final evidence class; Unit 9
+  reconciled their retained status and evidence.
+- **NEXT:** Archive this committed final record by deleting it and its ordered-index entry in a
+  separate lifecycle-closure commit.
+- **Exit:** Passed. All five reviewed documents, the atomic cutover, and the required evidence pass
+  with `Open findings: _None._`; every durable rule is in its canonical home.
 
 ## Problem
 
@@ -510,214 +512,95 @@ Acceptance criteria:
 
 ### 2026-09-01 — Unit 1: final authored-document contract
 
-- **Commit:** This Unit 1 batch. The learner-runtime content module now accepts only schema-v2
-  documents with exactly three Legs of four-to-seven Stops, keyed learner-visible HTTPS source
-  credits, non-empty Lesson/explanation references, document-only revisions, and no primer loader.
-  Graded command effects expose only referenced credit keys alongside the revealed explanation;
-  pre-answer Activity projections retain no correctness, pair-map, truth-kind, explanation, or
-  explanation-citation field.
-- **Proof:** The isolated production-shape candidate passed all 14 focused qualifier/runtime tests,
-  including 4/7-Stop positive controls; 2/4-Leg and 3/8-Stop negative controls; malformed, duplicate,
-  dangling, empty, and unreferenced credit cases; semantic revision mutations; filesystem loading
-  without `source.md`; learner-safe projection; graded reveal and receipt replay. `pnpm typecheck`,
-  focused ESLint, and `git diff --check` passed. Positive controls found the JSON loader, qualifier,
-  and revision seam; the same runtime files contained no source-file reader, fetch/model client,
-  compatibility flag, or database content path.
-- **Boundary and rerun invariant:** `pnpm content:check` currently refuses all five schema-v1 root
-  documents at the intended version/credit/reference/route constraints. Units 2–6 author exact
-  candidates without weakening that refusal; Unit 7 must make the five-document cutover atomically.
-  This is local deterministic contract evidence only, not authored-quality, final-catalog,
-  real-backend, web-presentation, native, deployed, production, or physical-device evidence.
+- **Result:** Schema v2 requires exactly three Legs of four-to-seven Stops, keyed learner-visible
+  HTTPS credits, non-empty Lesson/explanation references, document-only revisions, and no primer
+  loader. Fourteen focused qualifier/runtime tests covered valid 4/7-Stop bounds, invalid route and
+  credit shapes, semantic revision mutations, filesystem loading, learner-safe projection, graded
+  citation reveal, and receipt replay; typecheck, focused lint, positive/absence controls, and
+  `git diff --check` passed. This was local deterministic contract evidence only.
 
 ### 2026-09-01 — Unit 2: Critical Thinking independently passed
 
-- **Commit:** This Unit 2 batch. The exact Critical Thinking revision
-  `dc27a6435197ed6923243fcec3c02bbcb99e195a6adbb529b24f224c56e55b43` owns three four-Stop
-  mastery Legs, 36 Lesson sections, 22 Activities across all three families, six targeted Support
-  Paths, 19 Leg-Guardian memberships, ten Expedition-Guardian memberships, and nine inspectable
-  online source credits.
-- **Independent proof:** The same fresh-context reviewer first recorded all 22 answers and rationales
-  from the learner-safe projection, then reconciled 22/22 private keys/maps/kinds and inspected every
-  Lesson section, alternative, explanation, pair, impostor truth/reveal, Support destination,
-  prerequisite, difficulty step, Guardian pool, and exact cited source. All nine official endpoints
-  were inspected; the repaired exact revision received `PASS` with no `FIX_FIRST`.
-- **Repairs and durable rules:** Board-specific domain-separated projection order removed authored
-  option, statement, and matching-position correctness channels and gained an authored-order
-  negative control. The content removed an unsupported assumption rule and decorative prerequisite,
-  repaired the linchpin/Support distinction, added direct lateral/upstream instruction, replaced four
-  higher-band near-copy cases with transfer cases, and balanced alternatives. The reusable learner-
-  first review, semantic source-fit, cueing, transfer, and presentation-privacy rules live in the
-  authoring guide and authored-quality validation reference.
-- **Boundary and handoff:** Focused qualifier tests, learner-runtime typecheck/lint, the production
-  scratch qualifier, and `git diff --check` passed. This is authored-quality and local deterministic
-  evidence for one exact candidate; it is not final tracked-catalog, rendered game-flow,
-  real-backend, native, deployed, production, release, or physical-device evidence. Unit 3 applies
-  these rules to Probability and Statistics; Unit 7 still owns the atomic catalog and remaining
-  current-policy documentation cutover.
+- **Result:** Revision `dc27a643…e55b43` owns three four-Stop Legs, 36 Lesson sections, 22
+  Activities across all families, six Support Paths, and nine credits. A fresh-context reviewer
+  solved all 22 Activities from the learner-safe projection before reconciling every private key,
+  route, Guardian membership, explanation, and exact source; unsupported rules, cueing,
+  prerequisites, transfer cases, and source fit were repaired before exact-candidate `PASS`.
+  Focused qualification/runtime checks passed; no rendered, backend, native, or external claim was
+  made by this unit.
 
 ### 2026-09-01 — Unit 3: Probability and Statistics independently passed
 
-- **Commit:** This Unit 3 batch. The exact Probability and Statistics revision
-  `9be3bb797b672f3f577daf63b4eab5a8d54aacfa9a1bd84d465cacca977978d1` owns three four-Stop Legs,
-  36 Lesson sections, 24 Activities across all three families, six targeted Support Paths, 23
-  Leg-Guardian memberships, 12 Expedition-Guardian memberships, and 17 inspectable online source
-  credits.
-- **Independent proof:** A fresh-context reviewer recorded and explained all 24 answers from the
-  learner-safe projection before private access, then reconciled 24/24 keys, pair maps, and impostor
-  kinds. The reviewer inspected every Lesson, alternative, explanation, pair, statement, Support,
-  prerequisite, difficulty step, Guardian membership, and all 17 exact official endpoints. The final
-  exact revision received `PASS` with no `FIX_FIRST`; private positive controls were present and all
-  corresponding learner-projection grading, pool, and Support-route fields were absent.
-- **Repairs and rule audit:** Six Guardian-held worked-example copies became fresh transfer settings;
-  arithmetic distractors, skew-summary tone, and the causal prerequisite were repaired. Unsupported
-  survey, risk, test-design, and regression prose was narrowed, while four claim-specific citation
-  assignments were completed. Existing fresh-transfer, cue-resistance, prerequisite, and semantic
-  source-assignment rules caught these defects, so this unit introduced no new durable rule and did
-  not require a Critical Thinking re-audit.
-- **Boundary and handoff:** The production scratch qualifier and all 15 focused qualifier/runtime
-  tests passed. The tracked schema-v1 root catalog and package-wide root-catalog test remain
-  intentionally refused until Unit 7; this is authored-quality and local deterministic evidence for
-  one isolated candidate, not final tracked-catalog, rendered game-flow, real-backend, native,
-  deployed, production, release, or physical-device evidence. Unit 4 begins Personal Finance; Unit 7
-  still owns the atomic five-document and current-policy documentation cutover.
+- **Result:** Revision `9be3bb79…7978d1` owns three four-Stop Legs, 36 Lesson sections, 24
+  Activities, six Support Paths, and 17 credits. A fresh-context reviewer solved and explained all
+  24 Activities before private access, then inspected every grading shape, route, Guardian pool, and
+  exact official endpoint. Worked-example copies, arithmetic and wording cues, one decorative
+  prerequisite, and narrow survey/risk/test/regression support were repaired before exact-candidate
+  `PASS`; all 15 focused qualifier/runtime tests passed.
 
 ### 2026-09-01 — Unit 4: Personal Finance independently passed
 
-- **Commit:** This Unit 4 batch. The exact Personal Finance revision
-  `767d26bc0794a061f447147af5614fbba945aad06d7253693f493893c7452f9a` owns three four-Stop Legs,
-  36 Lesson sections, 24 Activities across all three families, six targeted Support Paths, 24
-  Leg-Guardian memberships, 12 Expedition-Guardian memberships, and 19 inspectable online source
-  credits.
-- **Independent proof:** A fresh-context reviewer recorded and explained all 24 answers from the
-  learner-safe projection before private access, then reconciled 24/24 keys, pair maps, and impostor
-  kinds. The reviewer inspected every Lesson, alternative, explanation, pair, statement, Support,
-  prerequisite, difficulty step, Guardian membership, and all 19 exact official endpoints. The final
-  exact revision received `PASS` with no `FIX_FIRST`; private positive controls were present and all
-  corresponding learner-projection grading, pool, and Support-route fields were absent.
-- **Repairs and rule audit:** Categorical text and key cues were removed from all impostor boards;
-  goal pacing now uses the stated remaining amount; FINRA evidence distinguishes financial ability
-  from willingness; the insurance Support repairs liquid-resource purpose; credit claims stay within
-  exact CFPB scope; source metadata was corrected; and SEC transaction versus transfer fee taxonomy
-  is exact. Existing transfer, cue-resistance, Support-specificity, and claim-specific semantic-source
-  rules caught every defect, so this unit introduced no new durable rule or retroactive re-audit.
-- **Boundary and handoff:** The production scratch qualifier and all 15 focused qualifier/runtime
-  tests passed after review. The tracked schema-v1 root catalog remains intentionally refused until
-  Unit 7; this is authored-quality and local deterministic evidence for one isolated candidate, not
-  final tracked-catalog, rendered game-flow, real-backend, native, deployed, production, release, or
-  physical-device evidence. Unit 5 begins Machine Learning; Unit 7 still owns the atomic five-
-  document and current-policy documentation cutover.
+- **Result:** Revision `767d26bc…7452f9a` owns three four-Stop Legs, 36 Lesson sections, 24
+  Activities, six Support Paths, and 19 credits. A fresh-context reviewer completed the learner-first
+  and full private/source inspections, then re-passed the exact candidate after repairs to impostor
+  cues, goal pacing, financial-ability language, insurance Support, CFPB claim scope, metadata, and
+  SEC fee taxonomy. All 15 focused qualifier/runtime tests passed; the evidence remained isolated
+  authored-quality and local deterministic proof.
 
 ### 2026-09-01 — Unit 5: Machine Learning independently passed
 
-- **Commit:** This Unit 5 batch. The exact Machine Learning revision
-  `60366ccf1de0448021bce06437bb642cdf3e2f81abd779834d561b4d140e4e82` owns three four-Stop Legs,
-  36 Lesson sections, 24 Activities across all three families, six targeted Support Paths, 24
-  Leg-Guardian memberships, 12 Expedition-Guardian memberships, and 24 inspectable online source
-  credits.
-- **Independent proof:** The same fresh-context reviewer recorded and explained all 24 answers from
-  the learner-safe projection before private access, then reconciled 24/24 keys, pair maps, and
-  impostor kinds. The reviewer inspected every Lesson, alternative, explanation, pair, statement,
-  Support, prerequisite, difficulty step, Guardian membership, source-credit record, and all 24
-  exact endpoints. The final repaired revision received `PASS` with no `FIX_FIRST`; private positive
-  controls were present and all corresponding learner-projection grading, pool, and Support-route
-  fields were absent.
-- **Repairs and rule audit:** Higher-band alternatives became operational transfer cases; categorical
-  impostor cues and decorative prerequisites were removed; claim-specific source assignments were
-  completed; the first contract Stop now aligns prediction entity and horizon teaching with the
-  exact NVIDIA target/entity/horizon source; and the NIST credit describes the living served
-  artifact rather than an unverified snapshot. Existing transfer, cue-resistance, prerequisite,
-  claim-specific source-fit, and source-metadata rules caught every defect, so this unit introduced
-  no new durable rule or retroactive re-audit.
-- **Boundary and handoff:** The production scratch qualifier and all 15 focused qualifier/runtime
-  tests passed after review, and all 24 declared endpoints returned HTTP 200 during the final author
-  sweep. The tracked schema-v1 root catalog remains intentionally refused until Unit 7; this is
-  authored-quality and local deterministic evidence for one isolated candidate, not final tracked-
-  catalog, rendered game-flow, real-backend, native, deployed, production, release, or physical-
-  device evidence. Unit 6 begins Neuroscience; Unit 7 still owns the atomic five-document and
-  current-policy documentation cutover.
+- **Result:** Revision `60366ccf…0e4e82` owns three four-Stop Legs, 36 Lesson sections, 24
+  Activities, six Support Paths, and 24 credits. Its fresh-context reviewer completed all public
+  answers before reconciling every private/source seam and exact endpoint. Operational transfer
+  cases replaced near copies; categorical cues, decorative prerequisites, citation assignments,
+  prediction target/entity/horizon teaching, and NIST metadata were repaired before exact-candidate
+  `PASS`; all 15 focused tests and all 24 final endpoint checks passed.
 
 ### 2026-09-01 — Unit 6: Neuroscience independently passed
 
-- **Commit:** This Unit 6 batch. The exact Neuroscience revision
-  `07bd08f859242913a8f1d01bfc2f022482755c240e5e01af223df285340feca3` owns three four-Stop Legs,
-  36 Lesson sections, 24 Activities across all three families, six targeted Support Paths, 24
-  Leg-Guardian memberships, 12 Expedition-Guardian memberships, and 24 inspectable online source
-  credits.
-- **Independent proof:** A fresh-context reviewer first solved and explained all 24 Activities from
-  the learner-safe projection before private/source access, then reconciled every key, pair map,
-  impostor kind, explanation, Support, prerequisite, difficulty step, Guardian membership, source
-  assignment, and exact endpoint. After the Phase-2-only source-scope repair, the same reviewer ran a
-  complete public regression, explicitly not claimed as newly blind, and a final private/source
-  rerun on the exact revision above; both passed with no remaining `FIX_FIRST`. Populated private
-  positive controls were present and every corresponding public grading, pool, and Support-route
-  field was absent.
-- **Repairs and rule audit:** Neutral response identifiers, balanced length ranks and projected
-  positions, six non-identity matching transforms, and varied substantive impostors removed public
-  shortcuts. Two near-copy cases became dependency-reconstruction and measured input/output
-  transfer tasks; the reconsolidation board regained one uniquely false claim; and unsupported
-  memory-age/reminder-duration specificity was narrowed to the cited review's supported boundary
-  conditions. Existing cue-resistance, transfer, unique-key, claim-specific source-fit, and source-
-  metadata rules caught every defect, so this unit introduced no new durable rule or retroactive
-  re-audit. All five exact candidate revisions now hold `PASS` together.
-- **Boundary and handoff:** The production scratch catalog qualified all five candidates at revision
-  `1c29d8c2a9c5f94fa8d671a15dad0a4bbe9fb7e8c51321da6863337c2d78e9ff`; all 15 focused qualifier/
-  runtime tests passed; and all 24 declared URLs returned successful 2xx transport responses (16
-  HTTP 200 and eight HTTP 203). The tracked schema-v1 root catalog remains intentionally refused
-  until Unit 7. This is authored-quality and local deterministic evidence, not final tracked-catalog,
-  rendered game-flow, real-backend, native, deployed, production, release, or physical-device
-  evidence. Unit 7 now owns the atomic five-document and current-policy documentation cutover.
+- **Result:** Revision `07bd08f8…40feca3` owns three four-Stop Legs, 36 Lesson sections, 24
+  Activities, six Support Paths, and 24 credits. A fresh-context reviewer completed the learner-first
+  pass and full private/source audit; after a source-scope repair, the exact candidate passed its
+  public regression and private/source rerun with no `FIX_FIRST`. Neutral identifiers, balanced
+  cueing, matching transforms, transfer cases, one unique impostor, and claim boundaries were
+  repaired. The production scratch catalog then qualified all five exact candidates together at
+  `1c29d8c2…d78e9ff`.
 
 ### 2026-09-01 — Unit 7: exact reviewed catalog cut over atomically
 
-- **Cutover:** This Unit 7 batch moved the five exact independently passed documents to their
-  canonical paths. `pnpm content:check` qualified revisions `dc27a643…e55b43`,
-  `9be3bb79…7978d1`, `767d26bc…7452f9a`, `60366ccf…0e4e82`, and `07bd08f8…40feca3` together at
-  catalog revision `1c29d8c2…d78e9ff`. The five `source.md` files and scratch candidate documents
-  are deleted; one JSON document per Expedition now owns runtime content and keyed online credits.
-- **Runtime/API proof and repair:** Final-content execution exposed an opaque Matching identity
-  drift: independently shuffled public lanes were decoded by array index. Projection and grading
-  now share one public-key derivation with an explicit round-trip regression. All 29 learner-runtime
-  tests and all five learner-api suites passed the final twelve-Stop Critical Thinking route,
-  Support, all three Leg Guardians, final Guardian, citations, revision, private grading, rewards,
-  persistence, and isolation.
-- **Presentation proof:** A reusable accessible disclosure renders full credit metadata in Catalog,
-  each Lesson/Support section, acquisition feedback, and Guardian feedback. Lesson references remain
-  public while explanation references appear only in graded effects. All 26 Expo unit suites/151
-  tests passed; the production-format intercepted Expo export then passed all 14 focused phone and
-  desktop scenarios after one selector-only repair for a duplicated fixture label.
-- **Authority and boundary:** AGENTS, CONTEXT, README, ADRs 0013/0028/0031/0032/0042, the authoring
-  and validation guidance, typed DTO path, fixtures, and UI copy now point to source-credit
-  resolution plus direct online-evidence judgment. Focused typechecks, ESLint, `git diff --check`,
-  positive/absence controls, and candidate cleanup passed. This is final tracked-catalog, local
-  deterministic, and intercepted-web evidence only; Unit 8 still owns full checks, database,
-  real-backend, Android emulator, and iOS simulator evidence. Deployment, production, release,
-  distributable, arbitrary-source, and physical-device claims remain unproved and out of scope.
+- **Result:** The five passed documents moved atomically to their canonical paths at catalog revision
+  `1c29d8c2…d78e9ff`; every `source.md` and candidate copy was deleted. Final-content execution
+  exposed and repaired Matching identity drift through one shared public-key derivation. All 29
+  learner-runtime tests, five learner-api suites, 26 Expo suites/151 tests, and 14 focused
+  production-format intercepted scenarios passed. Current ADRs, authoring/validation guidance,
+  typed DTOs, fixtures, and UI now point to one credit-resolution and direct online-evidence
+  authority.
 
 ### 2026-09-01 — Unit 8: final evidence-class gates passed
 
-- **Automated and database proof:** The final tracked catalog requalified at revision
-  `1c29d8c2…d78e9ff`; `pnpm check` passed all workspace typechecks, tests, lint, builds, and 20/20
-  intercepted phone/desktop scenarios, while `pnpm test:db` passed the nine-case migration matrix,
-  18 live `lrnki_test` infrastructure cases, and downstream suites. The plan-authorized guarded
-  development reset targeted only `lrnki`; final real-use teardown left zero users, accounts,
-  sessions, verifications, and journeys with one migration row.
-- **Real-backend proof:** Direct HTTP completed all five authenticated journeys. Production-format
-  Playwright then passed the full twelve-Stop Critical Thinking route through three Leg Guardians
-  and its Expedition Guardian on phone, plus frozen complete Legs and Guardians for Probability
-  `produce-and-describe-data`, Finance `borrow-and-protect`, and Machine Learning
-  `deploy-and-respond` on desktop. The three reserved learners were deleted exactly; Neuroscience
-  retains reviewer, direct, deterministic, and intercepted evidence without a real-backend UI Leg.
-- **Native proof:** A fresh Android API-36 `Medium_Phone_API_36.1` run passed sign-in, the complete
-  runtime-reliability flow, and distinct Leg/Expedition Guardian obelisks against APK SHA-256
-  `6051a79d…9e9d83`. A separately built iOS 26.5 iPhone 17 Pro Debug run passed the keyed authored-
-  runtime flow against app-binary SHA-256 `319c7ceb…997ae`; all owned emulators, simulators, and
-  Metro processes were shut down without touching the unrelated listener on port 8881.
-- **Causal repairs and boundary:** Final routes required state-driven Guardian solving, exact keyed
-  source selectors, viewport-aware native disclosure checks, and dismissal of the board celebration
-  before Guardian screenshots. The Android system-UI ANR was invalidated and rerun after a cold,
-  snapshot-free boot. Evidence is local automated, owned development/test Postgres, intercepted and
-  real-backend web, Android emulator, and iOS Debug simulator only—not deployed, distributable,
-  physical-device, production, release, external-fact-generality, or arbitrary-source evidence.
+- **Result:** `pnpm check` passed the exact catalog, workspace typechecks/tests/lint/builds, and
+  20/20 intercepted scenarios; `pnpm test:db` passed nine migration cases, 18 live `lrnki_test`
+  cases, and downstream suites. Direct HTTP completed all five journeys. Production-format UI
+  completed all twelve Critical Thinking Stops and four Guardians on phone plus the frozen
+  Probability Leg 1, Finance Leg 2, and Machine Learning Leg 3 scopes and Guardians on desktop;
+  three reserved learners were deleted exactly, while Neuroscience received no UI-Leg claim. The
+  guarded `lrnki` reset removed one pre-existing local-development user, account, session, and
+  journey (zero verifications); those records are recoverable only by recreation.
+  Android API 36 passed the owned flows against APK SHA-256 `6051a79d…9e9d83`; iOS 26.5 passed
+  against Debug binary SHA-256 `319c7ceb…997ae`. This proves only local automated, owned
+  development/test Postgres, intercepted/real-backend web, emulator, and simulator layers—not
+  deployed, distributable, physical-device, production, release, arbitrary-source, or general
+  external-fact accuracy.
+
+### 2026-09-01 — Unit 9: status reconciled and exit test passed
+
+- **Result:** The header, ordered index, and `TODO.md` agree that every unit and required evidence
+  class passes; `BLOCKERS.md` remains `_None._`, no `RELEASE.md` exists, and Open findings is
+  `_None._`. Positive controls over the five tracked JSON documents total 15 Legs, 60 Stops, 180
+  Lesson sections, 118 Activities, 30 Support Paths, and 93 credits. This log retains exactly one
+  entry per unit; the plan and rolling status remain below their size limits, documentation links
+  point only to retained authorities, and `git diff --check` passes. The completed plan is ready for
+  its required separate archival closure commit.
 
 ## Open findings
 
