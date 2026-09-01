@@ -667,6 +667,22 @@ function validateExpedition(
   }
 }
 
+function projectionOrder<T extends Readonly<{ key: string }>>(
+  activityKey: string,
+  lane: "option" | "matching-left" | "matching-right" | "impostor",
+  items: ReadonlyArray<T>
+): T[] {
+  return [...items].sort((left, right) => {
+    const leftRank = createHash("sha256")
+      .update(`learner-projection-order-v1\0${activityKey}\0${lane}\0${left.key}`, "utf8")
+      .digest("hex");
+    const rightRank = createHash("sha256")
+      .update(`learner-projection-order-v1\0${activityKey}\0${lane}\0${right.key}`, "utf8")
+      .digest("hex");
+    return leftRank.localeCompare(rightRank) || left.key.localeCompare(right.key);
+  });
+}
+
 function matchingProjection(activity: AuthoredMatching): Extract<LearnerActivityProjection, {
   family: "matching";
 }> {
@@ -679,11 +695,11 @@ function matchingProjection(activity: AuthoredMatching): Extract<LearnerActivity
     family: "matching",
     key: activity.key,
     prompt: activity.prompt,
-    left: activity.pairs.map((pair) => ({
+    left: projectionOrder(activity.key, "matching-left", activity.pairs).map((pair) => ({
       key: publicKey("left", pair.key),
       text: pair.left
     })),
-    right: [...activity.pairs].reverse().map((pair) => ({
+    right: projectionOrder(activity.key, "matching-right", activity.pairs).map((pair) => ({
       key: publicKey("right", pair.key),
       text: pair.right
     }))
@@ -696,7 +712,10 @@ function activityProjection(activity: AuthoredActivity): LearnerActivityProjecti
       family: activity.family,
       key: activity.key,
       prompt: activity.prompt,
-      options: activity.options.map((option) => ({ key: option.key, text: option.text }))
+      options: projectionOrder(activity.key, "option", activity.options).map((option) => ({
+        key: option.key,
+        text: option.text
+      }))
     };
   }
   if (activity.family === "matching") {
@@ -706,7 +725,7 @@ function activityProjection(activity: AuthoredActivity): LearnerActivityProjecti
     family: activity.family,
     key: activity.key,
     prompt: activity.prompt,
-    statements: activity.statements.map((statement) => ({
+    statements: projectionOrder(activity.key, "impostor", activity.statements).map((statement) => ({
       key: statement.key,
       text: statement.text
     }))

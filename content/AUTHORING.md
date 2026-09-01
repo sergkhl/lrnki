@@ -1,27 +1,33 @@
 # Authored Expedition guide
 
 This directory is learner content, not generated build output. Codex CLI is an offline author: it
-reads one project-owned `source.md`, writes the exact `expedition.json` consumed by the learner
+researches inspectable online sources, writes the exact `expedition.json` consumed by the learner
 server, runs the repository qualifier, and repairs every diagnostic. The repository has no Codex
-client, prompt, model port, compiler, package, installer, or database representation for content.
+client, prompt, model port, compiler, package, installer, source fetcher, or database representation
+for content.
 
 ## Authoring loop
 
-1. Read the complete local primer. Do not rely on remembered facts that the primer does not support.
+1. Research the domain through current, inspectable online sources. Prefer open original or official
+   material and authoritative syntheses that support the exact claim; do not rely on remembered facts.
 2. Choose a coherent learner-visible route and author its Legs, Stops, prerequisites, lessons,
    activities, Support Paths, and Guardian pools directly in `expedition.json`.
 3. Use lowercase kebab-case human-readable keys. Never add UUIDs, hashes, indexes, generated
    identities, database keys, or derived route metadata.
 4. Run `pnpm content:check` from the repository root. Read every structured diagnostic and repair the
    document; never suppress or weaken a refusal to admit one Expedition.
-5. Inspect the learner-safe projection tests and then inspect every visible claim, answer,
-   explanation, pair, impostor reveal, Support target, and source anchor against `source.md`.
-6. Record `PASS` or `FIX_FIRST` in the active plan's Validation Log. Repair every `FIX_FIRST` before
-   treating the Expedition as ready.
+5. Give a fresh-context reviewer only the learner-safe projection. The reviewer records every answer
+   and rationale before seeing private grading or opening sources, and notes teaching sufficiency,
+   cueing, pacing, Support use, and Guardian repetition.
+6. Then give the same reviewer the exact private document and every cited source. It inspects every
+   visible claim, answer, alternative, explanation, pair, impostor reveal, prerequisite, Support
+   target, difficulty step, and Guardian pool against the cited evidence.
+7. Record `PASS` or concrete `FIX_FIRST` findings in the active plan's Validation Log. Repair every
+   `FIX_FIRST` and re-run the same boundary on the exact repaired revision before acceptance.
 
-`pnpm content:check` proves structure and exact anchor existence. It does not prove that prose
-teaches, that a quote supports a claim semantically, or that a route feels coherent. Those remain
-direct-inspection and real-use judgments.
+`pnpm content:check` proves structure and exact source-credit resolution. It does not prove that
+prose teaches, that a source supports a claim semantically, or that a route feels coherent. Those
+remain direct-inspection and real-use judgments.
 
 ## Teaching depth
 
@@ -43,20 +49,31 @@ For each Stop:
 - ensure every activity is answerable from the lesson and its cited source, while avoiding copy that
   simply gives away the answer by position or formatting.
 
+A worked example may scaffold first acquisition, but difficulty and Guardian authority require
+transfer. Higher-band and Guardian-eligible Activities use a fresh setting whose underlying
+reasoning structure is the same; they do not repeat the worked example's objects and answer-bearing
+contrast closely enough to reward recall of the example.
+
 Section kinds are not a proxy for quality. Exact source resolution establishes provenance; direct
 inspection establishes whether the source supports the authored teaching. Authored prose is never
 misrepresented as a source quotation.
 
 ## Route and game contract
 
-- Array order is instructional order. Author three to five Stops per Leg and only reference
-  prerequisite Stops that occur earlier in the Expedition.
+- Array order is instructional order. Author exactly three Legs with four to seven Stops each and
+  only reference prerequisite Stops that occur earlier in the Expedition.
 - Every Stop has one lesson and at least one option-select activity. Every Expedition contains
   option-select, matching, and impostor play; each Leg contains matching or impostor play that is
   available in its Guardian pool.
 - Options must be mutually distinguishable in the context of the prompt. Matching must be a genuine
   bijection with unique left and right labels. An impostor activity has exactly one false statement,
   at least two source-supported truths, and a reveal that explains the distinction.
+- All alternatives remain plausible under a named local misconception and comparable in length,
+  tone, qualification, and grammatical fit. The correct response is not identifiable as the longest,
+  most polished, least absolute, or only carefully bounded choice.
+- Learner-safe correctness is a presentation property, not merely a field-removal property. Public
+  option, statement, and matching-column order is stable for one Activity but derived independently
+  from authored order; no universal position or transform may reveal an answer or pair map.
 - Guardian pools reference existing activity keys. A Leg pool references only activities in that
   Leg. The Expedition pool exercises all three families.
 - `requires` expresses necessary learning order, not a desire to make a trail look linear. Do not
@@ -72,27 +89,28 @@ Choose a Support target that actually helps the learner repair the local confusi
 label search, generated fallback, retry, polling, or generating/failed Support state. A missing or
 poor destination is an authoring defect to repair in the document.
 
-## Source anchors and disclosures
+## Source credits and disclosures
 
-Every lesson section and every answer-bearing explanation carries:
+Each Expedition owns one keyed `sourceCredits` collection. Every Lesson section and every
+answer-bearing explanation carries a non-empty ordered `sourceCreditKeys` array whose keys resolve
+inside that Expedition. Credits identify the source with a canonical public HTTPS URL, learner-useful
+title and authority metadata, an access date, and version/date information when the source exposes it.
 
-```json
-{
-  "heading": "Exact Markdown heading text without # markers",
-  "quote": "Exact byte-for-byte excerpt under that heading"
-}
-```
+Source credit assignment is claim-specific: a page that names a technique does not support an
+authored procedure unless it substantively explains that procedure. Add a directly inspectable
+source that teaches the operation or narrow the teaching and grading to what the cited material
+actually establishes. Shared vocabulary and link reachability are never semantic evidence.
 
-The quote is inspection evidence, not learner copy. Keep it narrowly sufficient and verify that it
-supports the full nearby claim rather than sharing only vocabulary. Each Expedition also owns its
-learner-visible source disclosures in `sourceCredits`; there is no database join that can repair a
-missing disclosure later.
+Authored teaching remains original prose; do not copy source passages or keep a second tracked source
+packet. Source credits and Lesson references are public. Activity explanation references remain
+private until grading reveals the explanation. No source fetch occurs in build or runtime, and link
+availability is never a learner-api startup dependency.
 
 ## Semantic quality rubric
 
 Record `FIX_FIRST` for any of these:
 
-- a learner-visible material claim is unsupported by the local primer;
+- a learner-visible material claim is unsupported by its cited online evidence;
 - an answer is incorrect, non-unique, or distinguishable only through a trick unrelated to mastery;
 - a lesson or activity assumes knowledge across an unsatisfied prerequisite;
 - a Support destination does not repair the term's likely confusion;
@@ -104,5 +122,6 @@ Sparse coverage, explicit asset absence, uncertain optional edges, and non-mater
 difficulty, or ordering imperfections are safe incompleteness only when they cannot change source
 support, grading, prerequisite closure, or completion. Record them without weakening qualification.
 
-The primers are project-owned playtest sources accepted for this product slice. A `PASS` does not
-claim independent factual verification or support for arbitrary external sources.
+A `PASS` is bounded to the exact sources and authored claims inspected on the recorded revision. It
+does not establish independent factual truth, support arbitrary external sources, or promise that a
+source URL will never move.

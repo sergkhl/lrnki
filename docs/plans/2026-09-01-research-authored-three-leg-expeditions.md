@@ -6,19 +6,18 @@ closure, keep exactly one Open findings section, and never link tracked document
 
 # Re-author three-Leg Expeditions from online research
 
-- **Status:** Blocked in Unit 2; Critical Thinking is authored and privately self-checked, but its
-  required independent review has not begun.
+- **Status:** In progress; Units 1–2 are complete and Unit 3 is next.
 - **Priority:** 1; this is the only active implementation plan.
 - **Execution:** One sequential, exclusive implementation lane in catalog order.
 - **Review:** Every Expedition requires a fresh-context reviewer who did not author it.
 - **Scope:** Replace all five current routes and the primer/anchor contract atomically.
-- **Owner gates:** [Authorize the fresh-context Critical Thinking reviewer](./BLOCKERS.md#critical-thinking-independent-review);
-  physical-device, deployed, production, migration, and release work remain out.
-- **Completed:** Unit 1 established the final schema-v2 contract. Unit 2 research, exact authoring,
-  private source/teaching review, and structural qualification are complete for Critical Thinking
-  content revision `32fd930216fade46f8713401d3b2b342f924b624d25e187c8aa57c9b6f176978`.
-- **NEXT:** Resolve the owner gate, run the Unit 2 fresh-context learner/private-source review on
-  that exact revision, repair every `FIX_FIRST`, and obtain `PASS` before Unit 3 begins.
+- **Owner gates:** None active; physical-device, deployed, production, migration, and release work
+  remain out.
+- **Completed:** Unit 1 established the final schema-v2 contract. Unit 2 Critical Thinking revision
+  `dc27a6435197ed6923243fcec3c02bbcb99e195a6adbb529b24f224c56e55b43` passed the complete
+  fresh-context learner/private-source review after every finding was repaired.
+- **NEXT:** Research, author, structurally qualify, and independently review Probability and
+  Statistics under the consolidated Unit 2 rules before Personal Finance begins.
 - **Exit:** All five reviewed documents, the atomic cutover, and the evidence in this plan pass with
   `Open findings: _None._` and every durable rule in its canonical home.
 
@@ -526,30 +525,32 @@ Acceptance criteria:
   This is local deterministic contract evidence only, not authored-quality, final-catalog,
   real-backend, web-presentation, native, deployed, production, or physical-device evidence.
 
-### 2026-09-01 — Unit 2 authoring and private self-check; independent review pending
+### 2026-09-01 — Unit 2: Critical Thinking independently passed
 
-- **Candidate:** The exact Critical Thinking document at content revision
-  `32fd930216fade46f8713401d3b2b342f924b624d25e187c8aa57c9b6f176978` owns three four-Stop
-  mastery Legs, 36 Lesson sections, 12 option-selects, six matching boards, four impostor boards,
-  six targeted Support Paths, and seven inspectable online source credits. Its per-Leg difficulty
-  curves are `1/2/2/3`, `2/3/4/4`, and `3/4/4/5`; each Leg pool includes non-option play and the
-  Expedition pool covers all three families.
-- **Private review repairs:** An Ohio State page that returned `403` on the reviewer path was removed
-  in favor of directly inspectable Cornell information-literacy guidance. NIST sampling guidance was
-  added where the logic text alone under-supported sample-to-population claims. Cue-heavy wording,
-  two redundant prerequisites, and incomplete Guardian representation were also repaired before the
-  final self-check.
-- **Proof:** The production loader/qualifier accepted the isolated candidate with zero diagnostics.
-  All seven credits are referenced, option text-length spread remained below the auxiliary `1.5`
-  review flag, every answer key resolved, and the learner-safe projection contained no answer key,
-  explanation, pair map, truth kind, or pre-answer Activity citation field. These are structural and
-  author self-check results; they do not establish semantic `PASS`.
-- **Boundary:** Unit 2 remains incomplete at the required author-independent learner simulation and
-  private source audit. The exact resume action is owned by the linked blocker; Unit 3 must not begin
-  until the reviewer passes the repaired exact revision.
+- **Commit:** This Unit 2 batch. The exact Critical Thinking revision
+  `dc27a6435197ed6923243fcec3c02bbcb99e195a6adbb529b24f224c56e55b43` owns three four-Stop
+  mastery Legs, 36 Lesson sections, 22 Activities across all three families, six targeted Support
+  Paths, 19 Leg-Guardian memberships, ten Expedition-Guardian memberships, and nine inspectable
+  online source credits.
+- **Independent proof:** The same fresh-context reviewer first recorded all 22 answers and rationales
+  from the learner-safe projection, then reconciled 22/22 private keys/maps/kinds and inspected every
+  Lesson section, alternative, explanation, pair, impostor truth/reveal, Support destination,
+  prerequisite, difficulty step, Guardian pool, and exact cited source. All nine official endpoints
+  were inspected; the repaired exact revision received `PASS` with no `FIX_FIRST`.
+- **Repairs and durable rules:** Board-specific domain-separated projection order removed authored
+  option, statement, and matching-position correctness channels and gained an authored-order
+  negative control. The content removed an unsupported assumption rule and decorative prerequisite,
+  repaired the linchpin/Support distinction, added direct lateral/upstream instruction, replaced four
+  higher-band near-copy cases with transfer cases, and balanced alternatives. The reusable learner-
+  first review, semantic source-fit, cueing, transfer, and presentation-privacy rules live in the
+  authoring guide and authored-quality validation reference.
+- **Boundary and handoff:** Focused qualifier tests, learner-runtime typecheck/lint, the production
+  scratch qualifier, and `git diff --check` passed. This is authored-quality and local deterministic
+  evidence for one exact candidate; it is not final tracked-catalog, rendered game-flow,
+  real-backend, native, deployed, production, release, or physical-device evidence. Unit 3 applies
+  these rules to Probability and Statistics; Unit 7 still owns the atomic catalog and remaining
+  current-policy documentation cutover.
 
 ## Open findings
 
-- **BLOCKED:** Resolve the
-  [Critical Thinking independent-review owner gate](./BLOCKERS.md#critical-thinking-independent-review)
-  before continuing Unit 2 or opening Unit 3.
+_None._

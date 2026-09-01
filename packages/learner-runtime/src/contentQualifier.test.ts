@@ -489,6 +489,78 @@ test("learner projection exposes Lesson citations but keeps grading and explanat
   assert.ok(projectedMatching.right.every((item) => !leftKeys.has(item.key)));
 });
 
+test("learner projection removes authored position as a correctness channel", () => {
+  const document = cloneDocument();
+  document.legs[0]!.stops[2]!.activities.push(
+    impostor("leg-1-stop-3", sourceCreditKey(1, 3))
+  );
+  const projection = projectQualifiedCatalog(mustQualify(qualify(document)))[0]!;
+  const projectedActivities = projection.legs.flatMap((leg) =>
+    leg.stops.flatMap((item) => item.activities)
+  );
+
+  const optionPositions = document.legs
+    .flatMap((leg) => leg.stops)
+    .flatMap((item) => item.activities)
+    .filter((item): item is AuthoredOptionSelect => item.family === "option_select")
+    .map((privateActivity) => {
+      const publicActivity = projectedActivities.find((item) => item.key === privateActivity.key);
+      assert.equal(publicActivity?.family, "option_select");
+      return publicActivity.options.findIndex((option) => option.key === privateActivity.answerKey);
+    });
+  assert.ok(new Set(optionPositions).size > 1, "option keys retained one universal position");
+
+  const impostorPositions = document.legs
+    .flatMap((leg) => leg.stops)
+    .flatMap((item) => item.activities)
+    .filter((item): item is AuthoredImpostor => item.family === "impostor")
+    .map((privateActivity) => {
+      const privateKey = privateActivity.statements.find((item) => item.kind === "impostor")?.key;
+      const publicActivity = projectedActivities.find((item) => item.key === privateActivity.key);
+      assert.ok(privateKey);
+      assert.equal(publicActivity?.family, "impostor");
+      return publicActivity.statements.findIndex((statement) => statement.key === privateKey);
+    });
+  assert.ok(new Set(impostorPositions).size > 1, "impostors retained one universal position");
+
+  const matchingPositionMaps = document.legs
+    .flatMap((leg) => leg.stops)
+    .flatMap((item) => item.activities)
+    .filter((item): item is AuthoredMatching => item.family === "matching")
+    .map((privateActivity) => {
+      const publicActivity = projectedActivities.find((item) => item.key === privateActivity.key);
+      assert.equal(publicActivity?.family, "matching");
+      return publicActivity.left.map((left) => {
+        const pair = privateActivity.pairs.find((candidate) => candidate.left === left.text);
+        assert.ok(pair);
+        return publicActivity.right.findIndex((right) => right.text === pair.right);
+      });
+    });
+  assert.ok(
+    new Set(matchingPositionMaps.map((positions) => JSON.stringify(positions))).size > 1,
+    "matching boards retained one universal positional map"
+  );
+
+  const reordered = structuredClone(document);
+  for (const privateActivity of reordered.legs
+    .flatMap((leg) => leg.stops)
+    .flatMap((item) => item.activities)) {
+    if (privateActivity.family === "option_select") privateActivity.options.reverse();
+    if (privateActivity.family === "matching") privateActivity.pairs.reverse();
+    if (privateActivity.family === "impostor") privateActivity.statements.reverse();
+  }
+  const reorderedProjection = projectQualifiedCatalog(mustQualify(qualify(reordered)))[0]!;
+  assert.deepEqual(
+    reorderedProjection.legs.map((leg) =>
+      leg.stops.map((item) => item.activities)
+    ),
+    projection.legs.map((leg) =>
+      leg.stops.map((item) => item.activities)
+    ),
+    "authored array order changed public answer positions"
+  );
+});
+
 test("the learner-runtime interface reveals explanation citations only in the graded effect", async () => {
   const catalog = mustQualify(qualify());
   const store = new MemoryLearnerStateStore([{ learnerRef: "learner-a", displayName: "Explorer A" }]);
