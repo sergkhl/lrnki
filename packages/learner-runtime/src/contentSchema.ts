@@ -6,21 +6,38 @@ const contentKeySchema = z
 
 const nonEmptyTextSchema = z.string().trim().min(1);
 
-export const sourceAnchorSchema = z
-  .object({
-    heading: nonEmptyTextSchema,
-    quote: nonEmptyTextSchema
-  })
-  .strict();
+const sourceCreditKeysSchema = z.array(contentKeySchema).min(1);
+
+const httpsUrlSchema = z
+  .url()
+  .refine((value) => new URL(value).protocol === "https:", "use a canonical HTTPS URL");
+
+const calendarDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "use an ISO calendar date (YYYY-MM-DD)")
+  .refine((value) => {
+    const date = new Date(`${value}T00:00:00.000Z`);
+    return !Number.isNaN(date.valueOf()) && date.toISOString().slice(0, 10) === value;
+  }, "use a real calendar date");
 
 export const sourceCreditSchema = z
   .object({
+    key: contentKeySchema,
     title: nonEmptyTextSchema,
+    url: httpsUrlSchema,
     author: nonEmptyTextSchema.optional(),
-    license: nonEmptyTextSchema,
+    publisher: nonEmptyTextSchema.optional(),
+    publishedAt: nonEmptyTextSchema.optional(),
+    version: nonEmptyTextSchema.optional(),
+    accessedAt: calendarDateSchema,
+    license: nonEmptyTextSchema.optional(),
     note: nonEmptyTextSchema.optional()
   })
-  .strict();
+  .strict()
+  .refine((credit) => credit.author !== undefined || credit.publisher !== undefined, {
+    message: "identify the source with author and/or publisher",
+    path: ["author"]
+  });
 
 export const explorableTermSchema = z
   .object({
@@ -34,7 +51,7 @@ export const lessonSectionSchema = z
     key: contentKeySchema,
     title: nonEmptyTextSchema,
     body: nonEmptyTextSchema,
-    sourceAnchor: sourceAnchorSchema,
+    sourceCreditKeys: sourceCreditKeysSchema,
     explorableTerms: z.array(explorableTermSchema)
   })
   .strict();
@@ -42,7 +59,7 @@ export const lessonSectionSchema = z
 export const activityExplanationSchema = z
   .object({
     text: nonEmptyTextSchema,
-    sourceAnchor: sourceAnchorSchema
+    sourceCreditKeys: sourceCreditKeysSchema
   })
   .strict();
 
@@ -150,21 +167,21 @@ export const authoredLegSchema = z
   .object({
     key: contentKeySchema,
     title: nonEmptyTextSchema,
-    stops: z.array(authoredStopSchema).min(3).max(5),
+    stops: z.array(authoredStopSchema).min(4).max(7),
     guardianActivityKeys: z.array(contentKeySchema).min(1)
   })
   .strict();
 
 export const authoredExpeditionSchema = z
   .object({
-    schemaVersion: z.literal(1),
+    schemaVersion: z.literal(2),
     key: contentKeySchema,
     title: nonEmptyTextSchema,
     teaser: nonEmptyTextSchema,
     declaredDomain: nonEmptyTextSchema,
     audience: nonEmptyTextSchema,
     sourceCredits: z.array(sourceCreditSchema).min(1),
-    legs: z.array(authoredLegSchema).min(1),
+    legs: z.array(authoredLegSchema).length(3),
     expeditionGuardianActivityKeys: z.array(contentKeySchema).min(1)
   })
   .strict();

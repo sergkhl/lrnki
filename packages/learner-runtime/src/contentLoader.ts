@@ -46,29 +46,10 @@ async function readJson(
   }
 }
 
-async function readSource(
-  filePath: string,
-  diagnosticPath: string,
-  diagnostics: CatalogDiagnostic[]
-): Promise<string | undefined> {
-  try {
-    return await readFile(filePath, "utf8");
-  } catch (error) {
-    diagnostics.push(
-      loadDiagnostic(
-        diagnosticPath,
-        error instanceof Error ? error.message : "failed to read source file"
-      )
-    );
-    return undefined;
-  }
-}
-
 export async function loadAndQualifyCatalog(contentRoot: string): Promise<CatalogQualification> {
   const diagnostics: CatalogDiagnostic[] = [];
   const catalog = await readJson(join(contentRoot, "catalog.json"), "catalog", diagnostics);
   const expeditions = new Map<string, unknown>();
-  const sources = new Map<string, string>();
   const expeditionRoot = join(contentRoot, "expeditions");
 
   let entries: Dirent<string>[] = [];
@@ -93,20 +74,12 @@ export async function loadAndQualifyCatalog(contentRoot: string): Promise<Catalo
       `expeditions.${key}`,
       diagnostics
     );
-    const source = await readSource(
-      join(expeditionRoot, key, "source.md"),
-      `sources.${key}`,
-      diagnostics
-    );
     if (expedition !== undefined) {
       expeditions.set(key, expedition);
     }
-    if (source !== undefined) {
-      sources.set(key, source);
-    }
   }
 
-  const qualification = qualifyCatalog({ catalog, expeditions, sources });
+  const qualification = qualifyCatalog({ catalog, expeditions });
   if (diagnostics.length === 0) {
     return qualification;
   }

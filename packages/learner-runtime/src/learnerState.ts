@@ -179,6 +179,7 @@ export const commandEffectSchema = z
     correct: z.boolean().nullable(),
     revealKey: nonEmptySchema.nullable(),
     feedback: nonEmptySchema.nullable(),
+    feedbackSourceCreditKeys: z.array(keySchema),
     newlyCompletedStop: z.boolean(),
     pointsAwarded: z.number().int().min(0).max(5),
     firstGuardianWin: z.boolean()

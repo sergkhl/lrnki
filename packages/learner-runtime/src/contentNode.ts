@@ -3,7 +3,6 @@ export {
   projectQualifiedCatalog,
   qualifiedExpeditionDocument,
   qualifiedExpeditionRevision,
-  qualifiedExpeditionSource,
   qualifyCatalog,
   type CatalogDiagnostic,
   type CatalogQualification,

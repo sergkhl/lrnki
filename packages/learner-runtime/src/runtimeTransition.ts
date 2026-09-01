@@ -69,6 +69,7 @@ function baseEffect(
     correct: null,
     revealKey: null,
     feedback: null,
+    feedbackSourceCreditKeys: [],
     newlyCompletedStop: false,
     pointsAwarded: 0,
     firstGuardianWin: false
@@ -436,6 +437,7 @@ function acquisitionCommand(
       correct: graded.correct,
       revealKey: graded.revealKey,
       feedback: location.activity.explanation.text,
+      feedbackSourceCreditKeys: location.activity.explanation.sourceCreditKeys,
       newlyCompletedStop: completion.newlyCompleted,
       pointsAwarded: completion.points
     }
@@ -751,6 +753,7 @@ export function applyLearnerCommand(input: ApplyCommandInput): ApplyCommandResul
         correct,
         revealKey,
         feedback: location.activity.explanation.text,
+        feedbackSourceCreditKeys: location.activity.explanation.sourceCreditKeys,
         firstGuardianWin: firstWin
       }
     };

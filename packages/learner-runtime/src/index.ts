@@ -11,7 +11,6 @@ export {
   authoredSupportPathSchema,
   explorableTermSchema,
   lessonSectionSchema,
-  sourceAnchorSchema,
   sourceCreditSchema,
   type AuthoredActivity,
   type AuthoredCatalog,

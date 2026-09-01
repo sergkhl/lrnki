@@ -63,6 +63,7 @@ export type LearnerExpeditionProjection = Readonly<{
                 key: string;
                 title: string;
                 body: string;
+                sourceCreditKeys: ReadonlyArray<string>;
                 explorableTerms: ReadonlyArray<
                   Readonly<{ term: string; supportPathKey: string }>
                 >;
@@ -81,7 +82,6 @@ const qualifiedCatalogBrand: unique symbol = Symbol("QualifiedCatalog");
 
 type QualifiedExpedition = Readonly<{
   document: AuthoredExpedition;
-  source: string;
   contentRevision: string;
   learnerProjection: LearnerExpeditionProjection;
 }>;
@@ -104,7 +104,6 @@ export type CatalogQualification =
 type QualificationInput = Readonly<{
   catalog: unknown;
   expeditions: ReadonlyMap<string, unknown>;
-  sources: ReadonlyMap<string, string>;
 }>;
 
 function issuePath(prefix: string, issue: ZodIssue): string {
@@ -155,82 +154,12 @@ function stableValue(value: unknown): unknown {
   return value;
 }
 
-export function canonicalContentRevision(
-  expedition: AuthoredExpedition,
-  source: string
-): string {
+export function canonicalContentRevision(expedition: AuthoredExpedition): string {
   const canonicalDocument = JSON.stringify(stableValue(expedition));
   return createHash("sha256")
-    .update("lrnki-authored-expedition-v1\0", "utf8")
+    .update("lrnki-authored-expedition-v2\0", "utf8")
     .update(canonicalDocument, "utf8")
-    .update("\0", "utf8")
-    .update(source, "utf8")
     .digest("hex");
-}
-
-type MarkdownHeading = Readonly<{
-  title: string;
-  level: number;
-  contentStart: number;
-  sectionEnd: number;
-}>;
-
-function markdownHeadings(source: string): MarkdownHeading[] {
-  const matches = [...source.matchAll(/^(#{1,6})[ \t]+(.+?)[ \t]*#*[ \t]*$/gm)];
-  return matches.map((match, index) => {
-    const level = match[1]?.length ?? 0;
-    const title = match[2]?.trim() ?? "";
-    const lineEnd = source.indexOf("\n", (match.index ?? 0) + match[0].length);
-    const contentStart = lineEnd === -1 ? source.length : lineEnd + 1;
-    const next = matches.slice(index + 1).find((candidate) => {
-      const candidateLevel = candidate[1]?.length ?? 0;
-      return candidateLevel <= level;
-    });
-    return {
-      title,
-      level,
-      contentStart,
-      sectionEnd: next?.index ?? source.length
-    };
-  });
-}
-
-function validateAnchor(
-  source: string,
-  headings: ReadonlyArray<MarkdownHeading>,
-  heading: string,
-  quote: string,
-  path: string,
-  diagnostics: CatalogDiagnostic[]
-): void {
-  const matches = headings.filter((candidate) => candidate.title === heading);
-  if (matches.length === 0) {
-    addDiagnostic(
-      diagnostics,
-      "source_heading_missing",
-      `${path}.heading`,
-      `source heading ${JSON.stringify(heading)} does not exist`
-    );
-    return;
-  }
-  if (matches.length > 1) {
-    addDiagnostic(
-      diagnostics,
-      "source_heading_ambiguous",
-      `${path}.heading`,
-      `source heading ${JSON.stringify(heading)} occurs more than once`
-    );
-    return;
-  }
-  const match = matches[0];
-  if (!match || !source.slice(match.contentStart, match.sectionEnd).includes(quote)) {
-    addDiagnostic(
-      diagnostics,
-      "source_quote_missing",
-      `${path}.quote`,
-      "quote does not occur byte-for-byte under the named source heading"
-    );
-  }
 }
 
 function validateUnique(
@@ -294,19 +223,45 @@ function detectPrerequisiteCycles(
   }
 }
 
+function validateSourceCreditReferences(
+  sourceCreditKeys: ReadonlyArray<string>,
+  availableSourceCreditKeys: ReadonlySet<string>,
+  referencedSourceCreditKeys: Set<string>,
+  path: string,
+  diagnostics: CatalogDiagnostic[]
+): void {
+  validateUnique(
+    sourceCreditKeys,
+    path,
+    "source_credit_reference_duplicate",
+    diagnostics
+  );
+  for (const sourceCreditKey of sourceCreditKeys) {
+    if (!availableSourceCreditKeys.has(sourceCreditKey)) {
+      addDiagnostic(
+        diagnostics,
+        "source_credit_reference_missing",
+        path,
+        `source credit ${JSON.stringify(sourceCreditKey)} does not exist in this Expedition`
+      );
+      continue;
+    }
+    referencedSourceCreditKeys.add(sourceCreditKey);
+  }
+}
+
 function validateActivity(
   activity: AuthoredActivity,
   path: string,
-  source: string,
-  headings: ReadonlyArray<MarkdownHeading>,
+  availableSourceCreditKeys: ReadonlySet<string>,
+  referencedSourceCreditKeys: Set<string>,
   diagnostics: CatalogDiagnostic[]
 ): void {
-  validateAnchor(
-    source,
-    headings,
-    activity.explanation.sourceAnchor.heading,
-    activity.explanation.sourceAnchor.quote,
-    `${path}.explanation.sourceAnchor`,
+  validateSourceCreditReferences(
+    activity.explanation.sourceCreditKeys,
+    availableSourceCreditKeys,
+    referencedSourceCreditKeys,
+    `${path}.explanation.sourceCreditKeys`,
     diagnostics
   );
 
@@ -386,14 +341,9 @@ function validateActivity(
 
 function validateExpedition(
   expedition: AuthoredExpedition,
-  source: string,
   diagnostics: CatalogDiagnostic[]
 ): void {
   const base = `expeditions.${expedition.key}`;
-  if (source.length === 0) {
-    addDiagnostic(diagnostics, "source_empty", `sources.${expedition.key}`, "source is empty");
-  }
-  const headings = markdownHeadings(source);
   const legs = expedition.legs;
   const stops = legs.flatMap((leg) => leg.stops);
   const activities = stops.flatMap((stop) => stop.activities);
@@ -401,6 +351,17 @@ function validateExpedition(
   const stopByKey = new Map(stops.map((stop) => [stop.key, stop] as const));
   const activityByKey = new Map(activities.map((activity) => [activity.key, activity] as const));
   const stopOrdinal = new Map(stops.map((stop, index) => [stop.key, index] as const));
+  const availableSourceCreditKeys = new Set(
+    expedition.sourceCredits.map((sourceCredit) => sourceCredit.key)
+  );
+  const referencedSourceCreditKeys = new Set<string>();
+
+  validateUnique(
+    expedition.sourceCredits.map((sourceCredit) => sourceCredit.key),
+    `${base}.sourceCredits`,
+    "source_credit_key_duplicate",
+    diagnostics
+  );
 
   validateUnique(
     legs.map((leg) => leg.key),
@@ -528,12 +489,11 @@ function validateExpedition(
 
       for (const [sectionIndex, section] of stop.lesson.sections.entries()) {
         const sectionPath = `${stopPath}.lesson.sections.${sectionIndex}`;
-        validateAnchor(
-          source,
-          headings,
-          section.sourceAnchor.heading,
-          section.sourceAnchor.quote,
-          `${sectionPath}.sourceAnchor`,
+        validateSourceCreditReferences(
+          section.sourceCreditKeys,
+          availableSourceCreditKeys,
+          referencedSourceCreditKeys,
+          `${sectionPath}.sourceCreditKeys`,
           diagnostics
         );
         for (const [termIndex, term] of section.explorableTerms.entries()) {
@@ -579,8 +539,8 @@ function validateExpedition(
         validateActivity(
           activity,
           `${stopPath}.activities.${activityIndex}`,
-          source,
-          headings,
+          availableSourceCreditKeys,
+          referencedSourceCreditKeys,
           diagnostics
         );
       }
@@ -660,6 +620,17 @@ function validateExpedition(
           }
         }
       }
+    }
+  }
+
+  for (const sourceCredit of expedition.sourceCredits) {
+    if (!referencedSourceCreditKeys.has(sourceCredit.key)) {
+      addDiagnostic(
+        diagnostics,
+        "source_credit_unreferenced",
+        `${base}.sourceCredits`,
+        `source credit ${JSON.stringify(sourceCredit.key)} is not referenced by teaching or an explanation`
+      );
     }
   }
 
@@ -767,6 +738,7 @@ function learnerProjection(
             key: section.key,
             title: section.title,
             body: section.body,
+            sourceCreditKeys: section.sourceCreditKeys,
             explorableTerms: section.explorableTerms
           }))
         },
@@ -826,14 +798,6 @@ export function qualifyCatalog(input: QualificationInput): CatalogQualification 
         "catalog member has no Expedition document"
       );
     }
-    if (!input.sources.has(key)) {
-      addDiagnostic(
-        diagnostics,
-        "catalog_source_missing",
-        `sources.${key}`,
-        "catalog member has no source document"
-      );
-    }
   }
   for (const key of input.expeditions.keys()) {
     if (!membership.has(key)) {
@@ -845,17 +809,6 @@ export function qualifyCatalog(input: QualificationInput): CatalogQualification 
       );
     }
   }
-  for (const key of input.sources.keys()) {
-    if (!membership.has(key)) {
-      addDiagnostic(
-        diagnostics,
-        "catalog_source_extra",
-        `sources.${key}`,
-        "source document is absent from catalog membership"
-      );
-    }
-  }
-
   const parsedExpeditions = new Map<string, AuthoredExpedition>();
   for (const key of catalog.expeditionKeys) {
     const raw = input.expeditions.get(key);
@@ -878,11 +831,8 @@ export function qualifyCatalog(input: QualificationInput): CatalogQualification 
     parsedExpeditions.set(key, parsed.data);
   }
 
-  for (const [key, expedition] of parsedExpeditions) {
-    const source = input.sources.get(key);
-    if (source !== undefined) {
-      validateExpedition(expedition, source, diagnostics);
-    }
+  for (const expedition of parsedExpeditions.values()) {
+    validateExpedition(expedition, diagnostics);
   }
 
   if (diagnostics.length > 0) {
@@ -892,16 +842,14 @@ export function qualifyCatalog(input: QualificationInput): CatalogQualification 
   const qualifiedExpeditions = new Map<string, QualifiedExpedition>();
   for (const key of catalog.expeditionKeys) {
     const document = parsedExpeditions.get(key);
-    const source = input.sources.get(key);
-    if (!document || source === undefined) {
+    if (!document) {
       throw new Error("qualified catalog construction reached an impossible missing member");
     }
-    const contentRevision = canonicalContentRevision(document, source);
+    const contentRevision = canonicalContentRevision(document);
     qualifiedExpeditions.set(
       key,
       freezeDeep({
         document,
-        source,
         contentRevision,
         learnerProjection: learnerProjection(document, contentRevision)
       })
@@ -945,13 +893,6 @@ export function qualifiedExpeditionDocument(
   expeditionKey: string
 ): AuthoredExpedition | undefined {
   return qualifiedExpeditions(catalog).get(expeditionKey)?.document;
-}
-
-export function qualifiedExpeditionSource(
-  catalog: QualifiedCatalog,
-  expeditionKey: string
-): string | undefined {
-  return qualifiedExpeditions(catalog).get(expeditionKey)?.source;
 }
 
 export function qualifiedExpeditionRevision(

@@ -6,12 +6,15 @@ closure, keep exactly one Open findings section, and never link tracked document
 
 # Re-author three-Leg Expeditions from online research
 
-- **Status:** Ready.
+- **Status:** In progress; Unit 1 is complete and Unit 2 is next.
 - **Priority:** 1; this is the only active implementation plan.
 - **Execution:** One sequential, exclusive implementation lane in catalog order.
 - **Review:** Every Expedition requires a fresh-context reviewer who did not author it.
 - **Scope:** Replace all five current routes and the primer/anchor contract atomically.
 - **Owner gates:** None; physical-device, deployed, production, migration, and release work are out.
+- **Completed:** Unit 1 established the final schema-v2 qualification, revision, loader, learner-safe
+  citation, and graded-explanation citation contract against an isolated exact-shape candidate.
+- **NEXT:** Unit 2 — research, author, and independently review Critical Thinking.
 - **Exit:** All five reviewed documents, the atomic cutover, and the evidence in this plan pass with
   `Open findings: _None._` and every durable rule in its canonical home.
 
@@ -498,7 +501,26 @@ Acceptance criteria:
 
 ## Validation Log
 
-_None._
+### 2026-09-01 — Unit 1: final authored-document contract
+
+- **Commit:** This Unit 1 batch. The learner-runtime content module now accepts only schema-v2
+  documents with exactly three Legs of four-to-seven Stops, keyed learner-visible HTTPS source
+  credits, non-empty Lesson/explanation references, document-only revisions, and no primer loader.
+  Graded command effects expose only referenced credit keys alongside the revealed explanation;
+  pre-answer Activity projections retain no correctness, pair-map, truth-kind, explanation, or
+  explanation-citation field.
+- **Proof:** The isolated production-shape candidate passed all 14 focused qualifier/runtime tests,
+  including 4/7-Stop positive controls; 2/4-Leg and 3/8-Stop negative controls; malformed, duplicate,
+  dangling, empty, and unreferenced credit cases; semantic revision mutations; filesystem loading
+  without `source.md`; learner-safe projection; graded reveal and receipt replay. `pnpm typecheck`,
+  focused ESLint, and `git diff --check` passed. Positive controls found the JSON loader, qualifier,
+  and revision seam; the same runtime files contained no source-file reader, fetch/model client,
+  compatibility flag, or database content path.
+- **Boundary and rerun invariant:** `pnpm content:check` currently refuses all five schema-v1 root
+  documents at the intended version/credit/reference/route constraints. Units 2–6 author exact
+  candidates without weakening that refusal; Unit 7 must make the five-document cutover atomically.
+  This is local deterministic contract evidence only, not authored-quality, final-catalog,
+  real-backend, web-presentation, native, deployed, production, or physical-device evidence.
 
 ## Open findings
 

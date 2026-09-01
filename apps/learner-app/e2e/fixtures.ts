@@ -45,10 +45,12 @@ export const signedIn = (): MockState["handlers"] => ({ "GET /auth/get-session":
 export const signedOut = (): MockState["handlers"] => ({ "GET /auth/get-session": () => ok(null) });
 
 const sourceCredits = [{
-  title: "Critical Thinking primer",
-  author: "lrnki project",
-  license: "Project-owned internal playtest source",
-  note: "Accepted as a local authoring basis without independent external fact verification."
+  key: "reasoning-guide",
+  title: "Critical Thinking source guide",
+  url: "https://example.org/reasoning-guide",
+  publisher: "Example Institute",
+  accessedAt: "2026-09-01",
+  note: "Production-shape intercepted-web fixture."
 }];
 
 const optionActivity = {
@@ -154,6 +156,7 @@ export const expeditionView = {
             key: "claims-and-support",
             title: "Separate claims from support",
             body: "A support relationship links reasons to the conclusion they are intended to establish.",
+            sourceCreditKeys: ["reasoning-guide"],
             explorableTerms: []
           }] },
           activities: [optionActivity, matchingActivity],
@@ -168,6 +171,7 @@ export const expeditionView = {
             key: "representative-evidence",
             title: "A large sample can answer the wrong question",
             body: "Recover the support relationship, then inspect how the sample was selected.",
+            sourceCreditKeys: ["reasoning-guide"],
             explorableTerms: [{ term: "support relationship", supportPathKey: "review-support-relationship" }]
           }] },
           activities: [
@@ -185,6 +189,7 @@ export const expeditionView = {
             key: "association-vs-cause",
             title: "Association leaves several stories open",
             body: "A common cause can move both observed variables without the proposed causal link.",
+            sourceCreditKeys: ["reasoning-guide"],
             explorableTerms: []
           }] },
           activities: [{ ...optionActivity, key: "diagnose-fire-correlation", prompt: "Which common cause should be tested?" }],
@@ -241,6 +246,7 @@ export const expeditionView = {
         key: "claims-and-support",
         title: "Separate claims from support",
         body: "A support relationship links reasons to a conclusion.",
+        sourceCreditKeys: ["reasoning-guide"],
         explorableTerms: []
       }] },
       activity: optionActivity
@@ -325,6 +331,7 @@ const baseEffect: AppliedEffect = {
   correct: null,
   revealKey: null,
   feedback: null,
+  feedbackSourceCreditKeys: [],
   newlyCompletedStop: false,
   pointsAwarded: 0,
   firstGuardianWin: false
