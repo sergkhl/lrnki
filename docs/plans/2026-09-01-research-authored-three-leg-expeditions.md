@@ -6,15 +6,19 @@ closure, keep exactly one Open findings section, and never link tracked document
 
 # Re-author three-Leg Expeditions from online research
 
-- **Status:** In progress; Unit 1 is complete and Unit 2 is next.
+- **Status:** Blocked in Unit 2; Critical Thinking is authored and privately self-checked, but its
+  required independent review has not begun.
 - **Priority:** 1; this is the only active implementation plan.
 - **Execution:** One sequential, exclusive implementation lane in catalog order.
 - **Review:** Every Expedition requires a fresh-context reviewer who did not author it.
 - **Scope:** Replace all five current routes and the primer/anchor contract atomically.
-- **Owner gates:** None; physical-device, deployed, production, migration, and release work are out.
-- **Completed:** Unit 1 established the final schema-v2 qualification, revision, loader, learner-safe
-  citation, and graded-explanation citation contract against an isolated exact-shape candidate.
-- **NEXT:** Unit 2 — research, author, and independently review Critical Thinking.
+- **Owner gates:** [Authorize the fresh-context Critical Thinking reviewer](./BLOCKERS.md#critical-thinking-independent-review);
+  physical-device, deployed, production, migration, and release work remain out.
+- **Completed:** Unit 1 established the final schema-v2 contract. Unit 2 research, exact authoring,
+  private source/teaching review, and structural qualification are complete for Critical Thinking
+  content revision `32fd930216fade46f8713401d3b2b342f924b624d25e187c8aa57c9b6f176978`.
+- **NEXT:** Resolve the owner gate, run the Unit 2 fresh-context learner/private-source review on
+  that exact revision, repair every `FIX_FIRST`, and obtain `PASS` before Unit 3 begins.
 - **Exit:** All five reviewed documents, the atomic cutover, and the evidence in this plan pass with
   `Open findings: _None._` and every durable rule in its canonical home.
 
@@ -522,6 +526,30 @@ Acceptance criteria:
   This is local deterministic contract evidence only, not authored-quality, final-catalog,
   real-backend, web-presentation, native, deployed, production, or physical-device evidence.
 
+### 2026-09-01 — Unit 2 authoring and private self-check; independent review pending
+
+- **Candidate:** The exact Critical Thinking document at content revision
+  `32fd930216fade46f8713401d3b2b342f924b624d25e187c8aa57c9b6f176978` owns three four-Stop
+  mastery Legs, 36 Lesson sections, 12 option-selects, six matching boards, four impostor boards,
+  six targeted Support Paths, and seven inspectable online source credits. Its per-Leg difficulty
+  curves are `1/2/2/3`, `2/3/4/4`, and `3/4/4/5`; each Leg pool includes non-option play and the
+  Expedition pool covers all three families.
+- **Private review repairs:** An Ohio State page that returned `403` on the reviewer path was removed
+  in favor of directly inspectable Cornell information-literacy guidance. NIST sampling guidance was
+  added where the logic text alone under-supported sample-to-population claims. Cue-heavy wording,
+  two redundant prerequisites, and incomplete Guardian representation were also repaired before the
+  final self-check.
+- **Proof:** The production loader/qualifier accepted the isolated candidate with zero diagnostics.
+  All seven credits are referenced, option text-length spread remained below the auxiliary `1.5`
+  review flag, every answer key resolved, and the learner-safe projection contained no answer key,
+  explanation, pair map, truth kind, or pre-answer Activity citation field. These are structural and
+  author self-check results; they do not establish semantic `PASS`.
+- **Boundary:** Unit 2 remains incomplete at the required author-independent learner simulation and
+  private source audit. The exact resume action is owned by the linked blocker; Unit 3 must not begin
+  until the reviewer passes the repaired exact revision.
+
 ## Open findings
 
-_None._
+- **BLOCKED:** Resolve the
+  [Critical Thinking independent-review owner gate](./BLOCKERS.md#critical-thinking-independent-review)
+  before continuing Unit 2 or opening Unit 3.

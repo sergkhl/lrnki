@@ -13,8 +13,9 @@ routes shared mechanics through the `plan-lifecycle` skill from the globally ins
 ## Active implementation plans (execution order)
 
 - [Re-author three-Leg Expeditions from online research](./2026-09-01-research-authored-three-leg-expeditions.md)
-  — **In progress; priority 1.** The final schema-v2 qualifier, revision, loader, and citation seam is
-  complete against an isolated candidate. Next: research, author, and independently review Critical
-  Thinking before the other four candidates and atomic no-model cutover.
+  — **Blocked in Unit 2; priority 1.** Critical Thinking is researched, exactly authored, privately
+  self-checked, and structurally qualified. Resolve its
+  [fresh-context independent-review gate](./BLOCKERS.md#critical-thinking-independent-review)
+  before the other four candidates or atomic no-model cutover.
 
 <!-- Lifecycle adoption and overrides: AGENTS.md → Documentation workflow. -->

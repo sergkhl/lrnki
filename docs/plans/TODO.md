@@ -2,12 +2,13 @@
 
 ## TODO
 
-- **Re-author all five Expeditions from online research — in progress.** Unit 1 established the final
-  schema-v2 qualifier, document-only revision, primer-free loader, public Lesson citations, and
-  post-grade explanation-citation keys against an isolated exact-shape candidate. Next, follow the
-  [priority-1 plan](./2026-09-01-research-authored-three-leg-expeditions.md) to research, author, and
-  independently review Critical Thinking, then continue in catalog order before the one atomic
-  cutover and bounded web/emulator/simulator validation.
+- **Re-author all five Expeditions from online research — blocked in Unit 2.** Unit 1 established the
+  final schema-v2 contract. Critical Thinking revision
+  `32fd930216fade46f8713401d3b2b342f924b624d25e187c8aa57c9b6f176978` now has three four-Stop Legs,
+  seven inspectable source credits, and a passing structural/private author self-check. Resolve the
+  [independent-review owner gate](./BLOCKERS.md#critical-thinking-independent-review), then finish
+  Unit 2 under the [priority-1 plan](./2026-09-01-research-authored-three-leg-expeditions.md) before
+  opening Probability and Statistics or the later atomic cutover and validation units.
 
 ## COMPLETED
 
