@@ -2,17 +2,7 @@
 
 ## TODO
 
-- **Re-author all five Expeditions from online research — complete; final record ready for lifecycle
-  closure.** Unit 1 established the final schema-v2 contract. Critical Thinking revision
-  `dc27a643…e55b43`, Probability and
-  Statistics revision `9be3bb79…7978d1`, Personal Finance revision `767d26bc…7452f9a`, Machine
-  Learning revision `60366ccf…0e4e82`, and Neuroscience revision `07bd08f8…40feca3` now hold complete
-  learner/private-source `PASS` and are the exact tracked catalog at revision
-  `1c29d8c2…d78e9ff`. The no-primer content/runtime/UI/ADR/documentation cutover and focused local
-  proof are complete under the
-  [priority-1 plan](./2026-09-01-research-authored-three-leg-expeditions.md). Every required final
-  evidence class and the exit test pass. Commit this final record, then archive it in the required
-  separate lifecycle-closure commit.
+_None._
 
 ## COMPLETED
 
