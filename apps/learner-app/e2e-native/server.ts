@@ -60,6 +60,13 @@ type Fixture = Readonly<{
   runtime: LearnerRuntime;
   legChallengeId: string;
   expeditionChallengeId: string;
+  firstStopKey: string;
+  firstStopLabel: string;
+  firstSectionKey: string;
+  firstSectionTitle: string;
+  firstSourceTitle: string;
+  supportPathKey: string;
+  legTitles: readonly [string, string, string];
 }>;
 
 function transport(value: unknown): unknown {
@@ -168,20 +175,28 @@ async function bootstrapFixture(): Promise<Fixture> {
     }
   }
 
-  const legKey = document.legs[0]?.key;
-  if (!legKey) throw new Error("native fixture Expedition has no Leg");
-  const firstLeg = await dispatch({
-    kind: "create_guardian",
-    expeditionKey: EXPEDITION_KEY,
-    scope: { kind: "leg", legKey }
-  });
-  if (!firstLeg.effect.challengeId) throw new Error("native bootstrap Leg Guardian has no id");
-  await winGuardian(runtime, store, document, firstLeg.effect.challengeId, dispatch);
+  const firstLeg = document.legs[0];
+  const secondLeg = document.legs[1];
+  const thirdLeg = document.legs[2];
+  if (!firstLeg || !secondLeg || !thirdLeg) {
+    throw new Error("native fixture Expedition must have exactly three Legs");
+  }
+  for (const leg of document.legs) {
+    const challenge = await dispatch({
+      kind: "create_guardian",
+      expeditionKey: EXPEDITION_KEY,
+      scope: { kind: "leg", legKey: leg.key }
+    });
+    if (!challenge.effect.challengeId) {
+      throw new Error(`native bootstrap Leg Guardian ${leg.key} has no id`);
+    }
+    await winGuardian(runtime, store, document, challenge.effect.challengeId, dispatch);
+  }
 
   const rematch = await dispatch({
     kind: "create_guardian",
     expeditionKey: EXPEDITION_KEY,
-    scope: { kind: "leg", legKey }
+    scope: { kind: "leg", legKey: firstLeg.key }
   });
   const summit = await dispatch({
     kind: "create_guardian",
@@ -191,10 +206,28 @@ async function bootstrapFixture(): Promise<Fixture> {
   if (!rematch.effect.challengeId || !summit.effect.challengeId) {
     throw new Error("native bootstrap Guardian identity missing");
   }
+  const firstStop = firstLeg.stops[0];
+  const firstSection = firstStop?.lesson.sections[0];
+  const firstCreditKey = firstSection?.sourceCreditKeys[0];
+  const firstSource = document.sourceCredits.find((credit) => credit.key === firstCreditKey);
+  const firstSupport = document.legs
+    .flatMap((leg) => leg.stops)
+    .flatMap((stop) => stop.supportPaths)
+    .at(0);
+  if (!firstStop || !firstSection || !firstSource || !firstSupport) {
+    throw new Error("native fixture lacks its representative Stop, source credit, or Support Path");
+  }
   return {
     runtime,
     legChallengeId: rematch.effect.challengeId,
-    expeditionChallengeId: summit.effect.challengeId
+    expeditionChallengeId: summit.effect.challengeId,
+    firstStopKey: firstStop.key,
+    firstStopLabel: firstStop.label,
+    firstSectionKey: firstSection.key,
+    firstSectionTitle: firstSection.title,
+    firstSourceTitle: firstSource.title,
+    supportPathKey: firstSupport.key,
+    legTitles: [firstLeg.title, secondLeg.title, thirdLeg.title]
   };
 }
 
@@ -300,7 +333,14 @@ const server = createServer(async (req, res) => {
     return send(res, 200, {
       expeditionKey: EXPEDITION_KEY,
       legChallengeId: fixture.legChallengeId,
-      expeditionChallengeId: fixture.expeditionChallengeId
+      expeditionChallengeId: fixture.expeditionChallengeId,
+      firstStopKey: fixture.firstStopKey,
+      firstStopLabel: fixture.firstStopLabel,
+      firstSectionKey: fixture.firstSectionKey,
+      firstSectionTitle: fixture.firstSectionTitle,
+      firstSourceTitle: fixture.firstSourceTitle,
+      supportPathKey: fixture.supportPathKey,
+      legTitles: fixture.legTitles
     });
   }
   if (method === "GET" && pathname === "/journal") {

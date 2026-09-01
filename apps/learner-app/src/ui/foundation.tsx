@@ -102,10 +102,20 @@ export function Screen({
 export function Card({
   children,
   className,
-  style
-}: Readonly<{ children: ReactNode; className?: string; style?: StyleProp<ViewStyle> }>) {
+  style,
+  testID
+}: Readonly<{
+  children: ReactNode;
+  className?: string;
+  style?: StyleProp<ViewStyle>;
+  testID?: string;
+}>) {
   return (
-    <View className={`rounded-card border border-line bg-card p-4 ${className ?? ""}`} style={style}>
+    <View
+      className={`rounded-card border border-line bg-card p-4 ${className ?? ""}`}
+      style={style}
+      testID={testID}
+    >
       {children}
     </View>
   );

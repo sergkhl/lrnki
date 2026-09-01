@@ -94,7 +94,18 @@ async function preflight(): Promise<{ maestro: string; device: Simulator }> {
 }
 
 let server: ChildProcess | null = null;
-type FixtureMeta = Readonly<{ expeditionKey: string; legChallengeId: string; expeditionChallengeId: string }>;
+type FixtureMeta = Readonly<{
+  expeditionKey: string;
+  legChallengeId: string;
+  expeditionChallengeId: string;
+  firstStopKey: string;
+  firstStopLabel: string;
+  firstSectionKey: string;
+  firstSectionTitle: string;
+  firstSourceTitle: string;
+  supportPathKey: string;
+  legTitles: readonly [string, string, string];
+}>;
 
 async function startFixture(): Promise<FixtureMeta> {
   try {
@@ -156,6 +167,15 @@ async function main(): Promise<void> {
       "-e", `EXPEDITION_KEY=${fixture.expeditionKey}`,
       "-e", `GUARDIAN_CHALLENGE_ID=${fixture.legChallengeId}`,
       "-e", `SUMMIT_CHALLENGE_ID=${fixture.expeditionChallengeId}`,
+      "-e", `FIRST_STOP_KEY=${fixture.firstStopKey}`,
+      "-e", `FIRST_STOP_LABEL=${fixture.firstStopLabel}`,
+      "-e", `FIRST_SECTION_KEY=${fixture.firstSectionKey}`,
+      "-e", `FIRST_SECTION_TITLE=${fixture.firstSectionTitle}`,
+      "-e", `FIRST_SOURCE_TITLE=${fixture.firstSourceTitle}`,
+      "-e", `SUPPORT_PATH_KEY=${fixture.supportPathKey}`,
+      "-e", `LEG_ONE_TITLE=${fixture.legTitles[0]}`,
+      "-e", `LEG_TWO_TITLE=${fixture.legTitles[1]}`,
+      "-e", `LEG_THREE_TITLE=${fixture.legTitles[2]}`,
       "--debug-output", join(EVIDENCE, "debug"),
       "--flatten-debug-output",
       "--test-output-dir", EVIDENCE,

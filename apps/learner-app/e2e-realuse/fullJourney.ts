@@ -108,35 +108,58 @@ async function exerciseCriticalThinking(
   await client.applied({
     kind: "set_calibration_known",
     expeditionKey,
-    stopKey: "evidence-quality"
+    stopKey: "distinguish-causal-support"
   });
   let view = await client.readExpedition(expeditionKey);
-  assert.equal(progress(view, "argument-structure").state, "known");
-  assert.equal(progress(view, "evidence-quality").state, "known");
-  assert.equal(progress(view, "causal-claims").state, "available");
+  assert.equal(progress(view, "weigh-inductive-support").state, "known");
+  assert.equal(progress(view, "investigate-source-fit").state, "known");
+  assert.equal(progress(view, "distinguish-causal-support").state, "known");
+  assert.equal(progress(view, "compare-plausible-explanations").state, "available");
 
-  await client.applied({ kind: "record_lesson_read", expeditionKey, stopKey: "causal-claims" });
-  const causalActivity = authoredActivity(expedition, "diagnose-fire-correlation");
+  await client.applied({
+    kind: "record_lesson_read",
+    expeditionKey,
+    stopKey: "compare-plausible-explanations"
+  });
+  const causalActivity = authoredActivity(expedition, "choose-discriminating-test");
   view = await client.readExpedition(expeditionKey);
-  await answerAcquisition(client, view, "causal-claims", causalActivity, false, { kind: "trail" });
+  await answerAcquisition(
+    client,
+    view,
+    "compare-plausible-explanations",
+    causalActivity,
+    false,
+    { kind: "trail" }
+  );
   view = await client.readExpedition(expeditionKey);
-  assert.deepEqual(progress(view, "causal-claims").restorationStopKeys, ["evidence-quality"]);
+  assert.deepEqual(
+    progress(view, "compare-plausible-explanations").restorationStopKeys,
+    ["distinguish-causal-support"]
+  );
 
   await client.applied({
     kind: "clear_calibration_known",
     expeditionKey,
-    stopKey: "evidence-quality"
+    stopKey: "distinguish-causal-support"
   });
   view = await client.readExpedition(expeditionKey);
-  assert.equal(progress(view, "causal-claims").state, "locked");
+  assert.equal(progress(view, "compare-plausible-explanations").state, "locked");
 
-  await exerciseSupport(client, expedition, "review-support-relationship");
+  const representativeSupport = expedition.legs
+    .flatMap((leg) => leg.stops)
+    .flatMap((stop) => stop.supportPaths)
+    .at(0);
+  assert.ok(representativeSupport, "Critical Thinking needs a representative Support Path");
+  await exerciseSupport(client, expedition, representativeSupport.key);
   await completeEveryStop(client, expedition, true);
   view = await client.readExpedition(expeditionKey);
   assert.ok(view.progress.every((item) => item.state === "mastered"));
 
   const privateProjection = JSON.stringify(await client.read(`/expedition/${expeditionKey}`));
-  assert.doesNotMatch(privateProjection, /answerKey|sourceAnchor|"kind":"truth"|"kind":"impostor"/);
+  assert.doesNotMatch(
+    privateProjection,
+    /answerKey|feedbackSourceCreditKeys|sourceAnchor|"kind":"truth"|"kind":"impostor"/
+  );
 
   const legKey = expedition.legs[0]?.key;
   assert.ok(legKey);
@@ -186,13 +209,30 @@ async function exerciseCriticalThinking(
   const rematchWin = await winGuardian(client, expedition, rematch);
   assert.equal(rematchWin.firstWin, false);
 
+  for (const remainingLeg of expedition.legs.slice(1)) {
+    const challenge = await createGuardian(client, expeditionKey, {
+      kind: "leg",
+      legKey: remainingLeg.key
+    });
+    const win = await winGuardian(client, expedition, challenge);
+    assert.equal(win.firstWin, true);
+  }
+
   const summit = await createGuardian(client, expeditionKey, { kind: "expedition" });
   const summitWin = await winGuardian(client, expedition, summit);
   assert.equal(summitWin.firstWin, true);
 
   const board = await client.readLeaderboard();
-  assert.equal(board.viewerPoints, 6, "Critical Thinking should award only first Stop completions");
-  assert.ok(board.masteredCrystalCount >= 3);
+  const expectedPoints = expedition.legs
+    .flatMap((leg) => leg.stops)
+    .reduce((total, stop) => total + stop.difficultyBand, 0);
+  const expectedMasteredStops = expedition.legs.flatMap((leg) => leg.stops).length;
+  assert.equal(
+    board.viewerPoints,
+    expectedPoints,
+    "Critical Thinking should award each Stop's difficulty exactly once"
+  );
+  assert.equal(board.masteredCrystalCount, expectedMasteredStops);
 }
 
 async function exerciseOneCompleteLeg(
@@ -358,6 +398,10 @@ async function answerAcquisition(
   }
   const result = await client.applied(command);
   assert.equal(result.effect.correct, correct);
+  assert.ok(
+    result.effect.feedbackSourceCreditKeys.length > 0,
+    `${activity.key} graded explanation lost its source credits`
+  );
   return result;
 }
 
@@ -397,6 +441,7 @@ async function answerGuardianWrong(
       rightKey: wrong.key
     });
     assert.equal(result.effect.correct, false);
+    assert.ok(result.effect.feedbackSourceCreditKeys.length > 0);
     return;
   }
   const correctKey = activity.family === "option_select"
@@ -419,6 +464,7 @@ async function answerGuardianWrong(
     chosenKey: wrong.key
   });
   assert.equal(result.effect.correct, false);
+  assert.ok(result.effect.feedbackSourceCreditKeys.length > 0);
 }
 
 async function answerGuardianCorrect(
@@ -437,6 +483,7 @@ async function answerGuardianCorrect(
         ...pair
       });
       assert.equal(result.effect.correct, true);
+      assert.ok(result.effect.feedbackSourceCreditKeys.length > 0);
     }
     return;
   }
@@ -452,6 +499,7 @@ async function answerGuardianCorrect(
     chosenKey
   });
   assert.equal(result.effect.correct, true);
+  assert.ok(result.effect.feedbackSourceCreditKeys.length > 0);
 }
 
 async function winGuardian(
@@ -462,6 +510,7 @@ async function winGuardian(
   for (let turn = 0; turn < 100; turn += 1) {
     const view = await client.readGuardian(expedition.key, challengeId);
     if (view.state === "won") return view;
+    assert.ok(view.sourceCredits.length > 0, `${expedition.key} Guardian lost public source credits`);
     await answerGuardianCorrect(client, expedition, view);
   }
   throw new Error(`${expedition.key} Guardian ${challengeId} did not finish within 100 turns`);

@@ -14,11 +14,13 @@ export type SourceCredit = CatalogView["expeditions"][number]["sourceCredits"][n
 export function SourceCreditsExpander({
   sourceCredits,
   sourceCreditKeys,
-  contextLabel
+  contextLabel,
+  testID
 }: Readonly<{
   sourceCredits: readonly SourceCredit[];
   sourceCreditKeys: readonly string[];
   contextLabel: string;
+  testID?: string;
 }>) {
   const [expanded, setExpanded] = useState(false);
   const resolved = useMemo(() => {
@@ -41,7 +43,7 @@ export function SourceCreditsExpander({
         label={expanded ? "Hide sources" : `Sources (${resolved.length})`}
         icon={<BookOpen size={14} color={buttonIconColor("outline")} />}
         onPress={() => setExpanded((current) => !current)}
-        testID="sources-expander"
+        testID={testID ?? "sources-expander"}
       />
       {expanded ? (
         <View

@@ -106,7 +106,7 @@ export function AuthoredActivityCard({
   const revealKey = effect?.revealKey ?? null;
 
   return (
-    <Card className="gap-4">
+    <Card className="gap-4" testID={`activity-${activity.key}`}>
       <View className="flex-row flex-wrap items-start justify-between gap-2">
         <Text variant="heading" className="min-w-0 flex-1">{activity.prompt}</Text>
         <Badge>{familyLabel(activity.family)}</Badge>

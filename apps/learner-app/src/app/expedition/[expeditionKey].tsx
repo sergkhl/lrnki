@@ -176,6 +176,7 @@ export default function ExpeditionPage() {
               })}
               {guardian ? (
                 <GuardianGate
+                  testID={`guardian-leg-${leg.key}`}
                   guardian={guardian}
                   busy={pending === `guardian:${scopeKey(guardian.scope)}`}
                   onEnter={() => void enterGuardian(guardian)}
@@ -188,6 +189,7 @@ export default function ExpeditionPage() {
         {view.guardians.find((guardian) => guardian.scope.kind === "expedition") ? (
           <GuardianGate
             summit
+            testID="guardian-expedition"
             guardian={view.guardians.find((guardian) => guardian.scope.kind === "expedition") as ExpeditionView["guardians"][number]}
             busy={pending === "guardian:expedition"}
             onEnter={() => {
@@ -246,7 +248,7 @@ function StopCard({
   const termPaths = new Map(supportPaths.map((path) => [path.term, path] as const));
 
   return (
-    <Card className={`gap-4 ${locked ? "opacity-60" : ""}`}>
+    <Card className={`gap-4 ${locked ? "opacity-60" : ""}`} testID={`stop-${stop.key}`}>
       <View className="flex-row items-start gap-3">
         <CrystalSpecimen
           species={crystalForBand(stop.difficultyBand)}
@@ -288,6 +290,7 @@ function StopCard({
                   sourceCredits={sourceCredits}
                   sourceCreditKeys={section.sourceCreditKeys}
                   contextLabel={`the Lesson section “${section.title}”`}
+                  testID={`sources-expander-${stop.key}-${section.key}`}
                 />
                 {section.explorableTerms.map((term) => {
                   const path = supportPaths.find((candidate) => candidate.supportPathKey === term.supportPathKey);
@@ -376,11 +379,13 @@ function StopCard({
 function GuardianGate({
   guardian,
   summit = false,
+  testID,
   busy,
   onEnter
 }: Readonly<{
   guardian: ExpeditionView["guardians"][number];
   summit?: boolean;
+  testID: string;
   busy: boolean;
   onEnter: () => void;
 }>) {
@@ -391,7 +396,7 @@ function GuardianGate({
           : "Guardian locked";
   const canEnter = guardian.state === "active" || guardian.state === "won" || guardian.state === "available";
   return (
-    <Card className={`gap-3 ${summit ? "border-trail bg-gem-soft" : ""}`}>
+    <Card className={`gap-3 ${summit ? "border-trail bg-gem-soft" : ""}`} testID={testID}>
       <View className="flex-row items-center gap-3">
         <Shield size={28} color={colors.trail} />
         <View className="min-w-0 flex-1 gap-1">

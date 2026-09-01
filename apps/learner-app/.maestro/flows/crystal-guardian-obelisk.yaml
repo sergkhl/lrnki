@@ -9,6 +9,8 @@ appId: com.globesoul.lrnki
 - tapOn:
     id: "gate-e2e-signin"
 - assertVisible: "Expedition journal"
+- assertVisible: "You climbed the board!"
+- tapOn: "Close"
 
 - openLink: lrnki://guardian/${EXPEDITION_KEY}/${GUARDIAN_CHALLENGE_ID}
 - assertVisible: "Leg Guardian"

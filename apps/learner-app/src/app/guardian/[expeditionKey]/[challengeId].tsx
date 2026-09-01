@@ -138,7 +138,7 @@ export default function GuardianPage() {
             </View>
           </Card>
         ) : (
-          <Card className="gap-4">
+          <Card className="gap-4" testID={`guardian-activity-${activity.key}`}>
             <Text variant="heading">{activity.prompt}</Text>
             {activity.family === "matching" ? (
               <GuardianMatching

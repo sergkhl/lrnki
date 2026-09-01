@@ -6,7 +6,7 @@ closure, keep exactly one Open findings section, and never link tracked document
 
 # Re-author three-Leg Expeditions from online research
 
-- **Status:** In progress; Units 1–7 are complete and Unit 8 is next.
+- **Status:** In progress; Units 1–8 are complete and Unit 9 is next.
 - **Priority:** 1; this is the only active implementation plan.
 - **Execution:** One sequential, exclusive implementation lane in catalog order.
 - **Review:** Every Expedition requires a fresh-context reviewer who did not author it.
@@ -20,8 +20,8 @@ closure, keep exactly one Open findings section, and never link tracked document
   Unit 5 Machine Learning revision `60366ccf1de0448021bce06437bb642cdf3e2f81abd779834d561b4d140e4e82`,
   and Unit 6 Neuroscience revision `07bd08f859242913a8f1d01bfc2f022482755c240e5e01af223df285340feca3`
   passed complete learner/private-source review after every finding was repaired.
-- **NEXT:** Run the final deterministic, database, intercepted-web, real-backend-web, Android
-  emulator, and iOS simulator gates in Unit 8, then reconcile and close in Unit 9.
+- **NEXT:** Reconcile the retained evidence and rolling status, commit the final plan record, then
+  close it under the Unit 9 exit test.
 - **Exit:** All five reviewed documents, the atomic cutover, and the evidence in this plan pass with
   `Open findings: _None._` and every durable rule in its canonical home.
 
@@ -692,6 +692,32 @@ Acceptance criteria:
   deterministic, and intercepted-web evidence only; Unit 8 still owns full checks, database,
   real-backend, Android emulator, and iOS simulator evidence. Deployment, production, release,
   distributable, arbitrary-source, and physical-device claims remain unproved and out of scope.
+
+### 2026-09-01 — Unit 8: final evidence-class gates passed
+
+- **Automated and database proof:** The final tracked catalog requalified at revision
+  `1c29d8c2…d78e9ff`; `pnpm check` passed all workspace typechecks, tests, lint, builds, and 20/20
+  intercepted phone/desktop scenarios, while `pnpm test:db` passed the nine-case migration matrix,
+  18 live `lrnki_test` infrastructure cases, and downstream suites. The plan-authorized guarded
+  development reset targeted only `lrnki`; final real-use teardown left zero users, accounts,
+  sessions, verifications, and journeys with one migration row.
+- **Real-backend proof:** Direct HTTP completed all five authenticated journeys. Production-format
+  Playwright then passed the full twelve-Stop Critical Thinking route through three Leg Guardians
+  and its Expedition Guardian on phone, plus frozen complete Legs and Guardians for Probability
+  `produce-and-describe-data`, Finance `borrow-and-protect`, and Machine Learning
+  `deploy-and-respond` on desktop. The three reserved learners were deleted exactly; Neuroscience
+  retains reviewer, direct, deterministic, and intercepted evidence without a real-backend UI Leg.
+- **Native proof:** A fresh Android API-36 `Medium_Phone_API_36.1` run passed sign-in, the complete
+  runtime-reliability flow, and distinct Leg/Expedition Guardian obelisks against APK SHA-256
+  `6051a79d…9e9d83`. A separately built iOS 26.5 iPhone 17 Pro Debug run passed the keyed authored-
+  runtime flow against app-binary SHA-256 `319c7ceb…997ae`; all owned emulators, simulators, and
+  Metro processes were shut down without touching the unrelated listener on port 8881.
+- **Causal repairs and boundary:** Final routes required state-driven Guardian solving, exact keyed
+  source selectors, viewport-aware native disclosure checks, and dismissal of the board celebration
+  before Guardian screenshots. The Android system-UI ANR was invalidated and rerun after a cold,
+  snapshot-free boot. Evidence is local automated, owned development/test Postgres, intercepted and
+  real-backend web, Android emulator, and iOS Debug simulator only—not deployed, distributable,
+  physical-device, production, release, external-fact-generality, or arbitrary-source evidence.
 
 ## Open findings
 

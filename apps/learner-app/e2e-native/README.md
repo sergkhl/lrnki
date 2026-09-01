@@ -18,15 +18,17 @@ triage live in the [Android validation route](../../../.agents/skills/validate-l
 - `android-runtime-reliability.yaml` retains automatic authority for the Support Path dialog at a
   320 dp viewport. Its title, body, footer, and close/restore assertions are all required. The body
   and footer are the sensitivity oracle for the historical isolated dialog-collapse mutant; a
-  title-only assertion did not distinguish that mutant.
+  title-only assertion did not distinguish that mutant. The same flow now also proves the exact
+  first Lesson's compact source disclosure and all three authored Leg titles using fixture-supplied
+  Stop, section, Support, and Leg keys.
 - The swipe needed to reach the Support action is navigation evidence only. It does not claim the
   separately physical-device-owned touch-responder class.
 - `signin.yaml` is native integration coverage for a visible wrong-password refusal followed by a
   successful session. Other scenarios use the fixture-only one-tap sign-in, which still exercises
   the app's Better Auth cookie path.
-- `crystal-guardian-obelisk.yaml` is visual smoke for the authored Leg and Expedition Guardian
-  presentations. Its screenshots are judgment evidence only; no rendering mutant gives it automatic
-  authority.
+- `crystal-guardian-obelisk.yaml` closes the expected first-visit board celebration before capturing
+  the authored Leg and Expedition Guardian presentations. Its screenshots are judgment evidence
+  only; no rendering mutant gives it automatic authority.
 
 Emulator evidence is not physical-device or distributable-build evidence.
 
@@ -113,8 +115,9 @@ The runner owns three host/tooling corrections that are prerequisites to meaning
   refusal/recovery path; `clearState` alone is not a clean Better Auth start.
 
 The single iOS flow covers keyboard-backed wrong-password recovery, Journal and board celebration,
-one authored trail, the Support dialog body/footer, both Guardian scopes, leaderboard rendering,
-and a no-reset process restart. Evidence lands in
+the exact first Lesson source disclosure, all three authored Leg titles, the Support dialog
+body/footer, both Guardian scopes, leaderboard rendering, and a no-reset process restart. Evidence
+lands in
 `tmp/2026-08-31-authored-learner-runtime/native-ios/`.
 
 Do not replace the JVM-scoped hostname correction with stopping Docker Desktop, editing `/etc/hosts`,
@@ -124,9 +127,11 @@ plain hierarchy probe and this whole flow pass without it.
 ## Fixture and selectors
 
 `server.ts` qualifies `content/`, creates one deterministic learner in `MemoryLearnerStateStore`,
-adopts and completes Critical Thinking with production commands, and creates real Leg-rematch and
-Expedition Guardian challenges. Every subsequent GET and `POST /game/commands` is delegated to the
-same `LearnerRuntime` used by learner-api. Answer keys remain server-side.
+adopts and completes all 12 Critical Thinking Stops with production commands, wins each Leg
+Guardian, and creates real Leg-rematch and Expedition Guardian challenges. It exports the qualified
+first Stop/section/source, representative Support, and all three Leg titles to the flows rather than
+duplicating content prose. Every subsequent GET and `POST /game/commands` is delegated to the same
+`LearnerRuntime` used by learner-api. Answer keys remain server-side.
 
 Identity is faked only at the wire seam. The committed `.invalid` address authenticates only against
 this fixture. The cookie name is `better-auth.session_token`, it is deliberately non-`Secure` for

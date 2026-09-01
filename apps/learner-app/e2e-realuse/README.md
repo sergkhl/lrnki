@@ -21,17 +21,30 @@ The runner:
 4. starts the normal authored-content learner-api and a loopback static server;
 5. signs up a disposable probe, reads the direct catalog, and selects its first Expedition;
 6. drives the probe through the full public HTTP journey in all five authored Expeditions;
-7. runs Playwright phone and desktop journeys for stale-session recovery, private grading, Support,
-   persistence, rewards, and leaderboard presentation; and
+7. runs a phone Playwright journey through all of Critical Thinking and a desktop journey through
+   three frozen secondary Leg scopes for stale-session recovery, private grading, Support,
+   persistence, rewards, isolation, and leaderboard presentation; and
 8. on success or failure, removes exactly the probe, phone, and desktop learners for that run and
    stops its children.
 
-The full HTTP journey covers adoption replay, stale versions, every activity family, wrong-to-right
-grading, lesson reads, calibration and restoration, Support open/hide/restore/referenced grading,
-Guardian lock/retreat/resume/abandon/shield/recovery/first win/rematch/final win, rewards, board
-points, content privacy, and sign-out/sign-in persistence. It completes Critical Thinking and one
-full Leg plus Guardian in each remaining Expedition. Phone and desktop separately prove the real
-Expo seam and two-learner isolation.
+The direct HTTP journey covers adoption replay, stale versions, every activity family,
+wrong-to-right grading, lesson reads, calibration and restoration, Support
+open/hide/restore/referenced grading, Guardian lock/retreat/resume/abandon/shield/recovery/first
+win/rematch/final win, rewards, board points, content privacy, and sign-out/sign-in persistence in
+all five Expeditions.
+
+The phone UI journey completes all 12 Critical Thinking Stops and all four Guardians, including
+citations, recovery, rematch, summit, Journal/board navigation, logout/login persistence, and exact
+points. The desktop UI journey completes these frozen secondary scopes and their Leg Guardians:
+
+- Probability and Statistics: `produce-and-describe-data` (Leg 1);
+- Personal Finance: `borrow-and-protect` (Leg 2); and
+- Machine Learning: `deploy-and-respond` (Leg 3).
+
+Neuroscience of Memory and Attention receives the full direct HTTP journey plus reviewer,
+structural/runtime, and intercepted presentation evidence; this gate intentionally makes no
+real-backend UI Leg claim for it. Phone and desktop separately prove the real Expo seam and
+two-learner isolation.
 
 Install Chromium once if needed:
 

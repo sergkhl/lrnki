@@ -102,7 +102,7 @@ export const journalRead = {
       adoptedAt: "2026-08-31T00:00:00.000Z",
       masteredStopCount: 1,
       knownStopCount: 0,
-      totalStopCount: 3
+      totalStopCount: 12
     }]
   }
 } satisfies LearnerReadDto;
@@ -145,7 +145,7 @@ export const expeditionView = {
     sourceCredits,
     legs: [{
       key: "reasoning-foundations",
-      title: "From claims to warranted conclusions",
+      title: "Make the Reasoning Visible",
       stops: [
         {
           key: "argument-structure",
@@ -196,6 +196,14 @@ export const expeditionView = {
           supportPaths: []
         }
       ]
+    }, {
+      key: "interrogate-the-evidence",
+      title: "Interrogate the Evidence",
+      stops: []
+    }, {
+      key: "decide-and-revise",
+      title: "Decide and Revise",
+      stops: []
     }]
   },
   active: true,
@@ -257,6 +265,20 @@ export const expeditionView = {
       scope: { kind: "leg" as const, legKey: "reasoning-foundations" },
       state: "locked" as const,
       eligibleActivityCount: 2,
+      activeChallengeId: null,
+      firstWinChallengeId: null
+    },
+    {
+      scope: { kind: "leg" as const, legKey: "interrogate-the-evidence" },
+      state: "locked" as const,
+      eligibleActivityCount: 0,
+      activeChallengeId: null,
+      firstWinChallengeId: null
+    },
+    {
+      scope: { kind: "leg" as const, legKey: "decide-and-revise" },
+      state: "locked" as const,
+      eligibleActivityCount: 0,
       activeChallengeId: null,
       firstWinChallengeId: null
     },

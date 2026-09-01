@@ -48,16 +48,32 @@ appId: com.globesoul.lrnki
 - assertVisible: "Expedition journal"
 
 - tapOn: "Resume trail"
-- assertVisible: "See the support structure"
+- assertVisible: ${FIRST_STOP_LABEL}
+- assertVisible: ${LEG_ONE_TITLE}
 - scrollUntilVisible:
     element:
-      id: "support-path-review-support-relationship"
+      id: "sources-expander-${FIRST_STOP_KEY}-${FIRST_SECTION_KEY}"
     direction: DOWN
     timeout: 30000
     speed: 60
     visibilityPercentage: 100
 - tapOn:
-    id: "support-path-review-support-relationship"
+    id: "sources-expander-${FIRST_STOP_KEY}-${FIRST_SECTION_KEY}"
+    enabled: true
+- assertVisible: ${FIRST_SOURCE_TITLE}
+- takeScreenshot: ios-authored-lesson-source-credit
+- tapOn:
+    id: "sources-expander-${FIRST_STOP_KEY}-${FIRST_SECTION_KEY}"
+    enabled: true
+- scrollUntilVisible:
+    element:
+      id: "support-path-${SUPPORT_PATH_KEY}"
+    direction: DOWN
+    timeout: 30000
+    speed: 60
+    visibilityPercentage: 100
+- tapOn:
+    id: "support-path-${SUPPORT_PATH_KEY}"
     enabled: true
 - assertVisible: "Support Path"
 - assertVisible: "This branch reuses ordinary acquisition evidence.*"
@@ -65,7 +81,25 @@ appId: com.globesoul.lrnki
 - takeScreenshot: ios-authored-support-path
 - tapOn: "Keep exploring"
 - assertVisible:
-    id: "support-path-review-support-relationship"
+    id: "support-path-${SUPPORT_PATH_KEY}"
+
+- scrollUntilVisible:
+    element:
+      text: ${LEG_TWO_TITLE}
+    direction: DOWN
+    timeout: 60000
+    speed: 80
+    visibilityPercentage: 100
+- assertVisible: ${LEG_TWO_TITLE}
+- scrollUntilVisible:
+    element:
+      text: ${LEG_THREE_TITLE}
+    direction: DOWN
+    timeout: 60000
+    speed: 80
+    visibilityPercentage: 100
+- assertVisible: ${LEG_THREE_TITLE}
+- takeScreenshot: ios-authored-three-leg-trail
 
 - openLink: lrnki://guardian/${EXPEDITION_KEY}/${GUARDIAN_CHALLENGE_ID}
 - assertVisible: "Leg Guardian"

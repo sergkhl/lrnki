@@ -98,7 +98,9 @@ test("Catalog adopts and activates through the single command endpoint, then ope
 
   await page.getByRole("button", { name: "Add to journal" }).click();
   await expect(page).toHaveURL(/\/expedition\/critical-thinking$/);
-  await expect(page.getByText("From claims to warranted conclusions")).toBeVisible();
+  await expect(page.getByText("Make the Reasoning Visible")).toBeVisible();
+  await expect(page.getByText("Interrogate the Evidence")).toBeVisible();
+  await expect(page.getByText("Decide and Revise")).toBeVisible();
 
   const commands = mock.requests
     .filter((request) => request.pathname === "/game/commands")
