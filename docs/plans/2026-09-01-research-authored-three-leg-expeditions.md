@@ -6,7 +6,7 @@ closure, keep exactly one Open findings section, and never link tracked document
 
 # Re-author three-Leg Expeditions from online research
 
-- **Status:** In progress; Units 1–5 are complete and Unit 6 is next.
+- **Status:** In progress; Units 1–6 are complete and Unit 7 is next.
 - **Priority:** 1; this is the only active implementation plan.
 - **Execution:** One sequential, exclusive implementation lane in catalog order.
 - **Review:** Every Expedition requires a fresh-context reviewer who did not author it.
@@ -16,12 +16,12 @@ closure, keep exactly one Open findings section, and never link tracked document
 - **Completed:** Unit 1 established the final schema-v2 contract. Unit 2 Critical Thinking revision
   `dc27a6435197ed6923243fcec3c02bbcb99e195a6adbb529b24f224c56e55b43`, Unit 3 Probability and
   Statistics revision `9be3bb797b672f3f577daf63b4eab5a8d54aacfa9a1bd84d465cacca977978d1`,
-  and Unit 4 Personal Finance revision
-  `767d26bc0794a061f447147af5614fbba945aad06d7253693f493893c7452f9a`, and Unit 5 Machine Learning
-  revision `60366ccf1de0448021bce06437bb642cdf3e2f81abd779834d561b4d140e4e82` passed complete
-  fresh-context learner/private-source review after every finding was repaired.
-- **NEXT:** Research, author, structurally qualify, and independently review Neuroscience of Memory
-  and Attention under the consolidated Unit 2–5 rules before the atomic cutover begins.
+  Unit 4 Personal Finance revision `767d26bc0794a061f447147af5614fbba945aad06d7253693f493893c7452f9a`,
+  Unit 5 Machine Learning revision `60366ccf1de0448021bce06437bb642cdf3e2f81abd779834d561b4d140e4e82`,
+  and Unit 6 Neuroscience revision `07bd08f859242913a8f1d01bfc2f022482755c240e5e01af223df285340feca3`
+  passed complete learner/private-source review after every finding was repaired.
+- **NEXT:** Land the five reviewed exact documents and complete the atomic content, runtime, UI,
+  ADR, and documentation cutover in Unit 7.
 - **Exit:** All five reviewed documents, the atomic cutover, and the evidence in this plan pass with
   `Open findings: _None._` and every durable rule in its canonical home.
 
@@ -635,6 +635,37 @@ Acceptance criteria:
   catalog, rendered game-flow, real-backend, native, deployed, production, release, or physical-
   device evidence. Unit 6 begins Neuroscience; Unit 7 still owns the atomic five-document and
   current-policy documentation cutover.
+
+### 2026-09-01 — Unit 6: Neuroscience independently passed
+
+- **Commit:** This Unit 6 batch. The exact Neuroscience revision
+  `07bd08f859242913a8f1d01bfc2f022482755c240e5e01af223df285340feca3` owns three four-Stop Legs,
+  36 Lesson sections, 24 Activities across all three families, six targeted Support Paths, 24
+  Leg-Guardian memberships, 12 Expedition-Guardian memberships, and 24 inspectable online source
+  credits.
+- **Independent proof:** A fresh-context reviewer first solved and explained all 24 Activities from
+  the learner-safe projection before private/source access, then reconciled every key, pair map,
+  impostor kind, explanation, Support, prerequisite, difficulty step, Guardian membership, source
+  assignment, and exact endpoint. After the Phase-2-only source-scope repair, the same reviewer ran a
+  complete public regression, explicitly not claimed as newly blind, and a final private/source
+  rerun on the exact revision above; both passed with no remaining `FIX_FIRST`. Populated private
+  positive controls were present and every corresponding public grading, pool, and Support-route
+  field was absent.
+- **Repairs and rule audit:** Neutral response identifiers, balanced length ranks and projected
+  positions, six non-identity matching transforms, and varied substantive impostors removed public
+  shortcuts. Two near-copy cases became dependency-reconstruction and measured input/output
+  transfer tasks; the reconsolidation board regained one uniquely false claim; and unsupported
+  memory-age/reminder-duration specificity was narrowed to the cited review's supported boundary
+  conditions. Existing cue-resistance, transfer, unique-key, claim-specific source-fit, and source-
+  metadata rules caught every defect, so this unit introduced no new durable rule or retroactive
+  re-audit. All five exact candidate revisions now hold `PASS` together.
+- **Boundary and handoff:** The production scratch catalog qualified all five candidates at revision
+  `1c29d8c2a9c5f94fa8d671a15dad0a4bbe9fb7e8c51321da6863337c2d78e9ff`; all 15 focused qualifier/
+  runtime tests passed; and all 24 declared URLs returned successful 2xx transport responses (16
+  HTTP 200 and eight HTTP 203). The tracked schema-v1 root catalog remains intentionally refused
+  until Unit 7. This is authored-quality and local deterministic evidence, not final tracked-catalog,
+  rendered game-flow, real-backend, native, deployed, production, release, or physical-device
+  evidence. Unit 7 now owns the atomic five-document and current-policy documentation cutover.
 
 ## Open findings
 
