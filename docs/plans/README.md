@@ -13,9 +13,10 @@ routes shared mechanics through the `plan-lifecycle` skill from the globally ins
 ## Active implementation plans (execution order)
 
 - [Re-author three-Leg Expeditions from online research](./2026-09-01-research-authored-three-leg-expeditions.md)
-  — **In progress in Unit 4; priority 1.** Critical Thinking revision `dc27a643…e55b43` and
-  Probability and Statistics revision `9be3bb79…7978d1` passed complete independent
-  learner/private-source review. Apply the consolidated rules while authoring and reviewing Personal
-  Finance before the later candidates or atomic no-model cutover.
+  — **In progress in Unit 5; priority 1.** Critical Thinking revision `dc27a643…e55b43`,
+  Probability and Statistics revision `9be3bb79…7978d1`, and Personal Finance revision
+  `767d26bc…7452f9a` passed complete independent learner/private-source review. Apply the
+  consolidated rules while authoring and reviewing Machine Learning before Neuroscience or the
+  atomic no-model cutover.
 
 <!-- Lifecycle adoption and overrides: AGENTS.md → Documentation workflow. -->

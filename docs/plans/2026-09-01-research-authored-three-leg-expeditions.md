@@ -6,7 +6,7 @@ closure, keep exactly one Open findings section, and never link tracked document
 
 # Re-author three-Leg Expeditions from online research
 
-- **Status:** In progress; Units 1–3 are complete and Unit 4 is next.
+- **Status:** In progress; Units 1–4 are complete and Unit 5 is next.
 - **Priority:** 1; this is the only active implementation plan.
 - **Execution:** One sequential, exclusive implementation lane in catalog order.
 - **Review:** Every Expedition requires a fresh-context reviewer who did not author it.
@@ -14,11 +14,13 @@ closure, keep exactly one Open findings section, and never link tracked document
 - **Owner gates:** None active; physical-device, deployed, production, migration, and release work
   remain out.
 - **Completed:** Unit 1 established the final schema-v2 contract. Unit 2 Critical Thinking revision
-  `dc27a6435197ed6923243fcec3c02bbcb99e195a6adbb529b24f224c56e55b43` and Unit 3 Probability and
-  Statistics revision `9be3bb797b672f3f577daf63b4eab5a8d54aacfa9a1bd84d465cacca977978d1`
-  passed complete fresh-context learner/private-source review after every finding was repaired.
-- **NEXT:** Research, author, structurally qualify, and independently review Personal Finance under
-  the consolidated Unit 2–3 rules before Machine Learning begins.
+  `dc27a6435197ed6923243fcec3c02bbcb99e195a6adbb529b24f224c56e55b43`, Unit 3 Probability and
+  Statistics revision `9be3bb797b672f3f577daf63b4eab5a8d54aacfa9a1bd84d465cacca977978d1`,
+  and Unit 4 Personal Finance revision
+  `767d26bc0794a061f447147af5614fbba945aad06d7253693f493893c7452f9a` passed complete fresh-context
+  learner/private-source review after every finding was repaired.
+- **NEXT:** Research, author, structurally qualify, and independently review Machine Learning under
+  the consolidated Unit 2–4 rules before Neuroscience begins.
 - **Exit:** All five reviewed documents, the atomic cutover, and the evidence in this plan pass with
   `Open findings: _None._` and every durable rule in its canonical home.
 
@@ -577,6 +579,32 @@ Acceptance criteria:
   one isolated candidate, not final tracked-catalog, rendered game-flow, real-backend, native,
   deployed, production, release, or physical-device evidence. Unit 4 begins Personal Finance; Unit 7
   still owns the atomic five-document and current-policy documentation cutover.
+
+### 2026-09-01 — Unit 4: Personal Finance independently passed
+
+- **Commit:** This Unit 4 batch. The exact Personal Finance revision
+  `767d26bc0794a061f447147af5614fbba945aad06d7253693f493893c7452f9a` owns three four-Stop Legs,
+  36 Lesson sections, 24 Activities across all three families, six targeted Support Paths, 24
+  Leg-Guardian memberships, 12 Expedition-Guardian memberships, and 19 inspectable online source
+  credits.
+- **Independent proof:** A fresh-context reviewer recorded and explained all 24 answers from the
+  learner-safe projection before private access, then reconciled 24/24 keys, pair maps, and impostor
+  kinds. The reviewer inspected every Lesson, alternative, explanation, pair, statement, Support,
+  prerequisite, difficulty step, Guardian membership, and all 19 exact official endpoints. The final
+  exact revision received `PASS` with no `FIX_FIRST`; private positive controls were present and all
+  corresponding learner-projection grading, pool, and Support-route fields were absent.
+- **Repairs and rule audit:** Categorical text and key cues were removed from all impostor boards;
+  goal pacing now uses the stated remaining amount; FINRA evidence distinguishes financial ability
+  from willingness; the insurance Support repairs liquid-resource purpose; credit claims stay within
+  exact CFPB scope; source metadata was corrected; and SEC transaction versus transfer fee taxonomy
+  is exact. Existing transfer, cue-resistance, Support-specificity, and claim-specific semantic-source
+  rules caught every defect, so this unit introduced no new durable rule or retroactive re-audit.
+- **Boundary and handoff:** The production scratch qualifier and all 15 focused qualifier/runtime
+  tests passed after review. The tracked schema-v1 root catalog remains intentionally refused until
+  Unit 7; this is authored-quality and local deterministic evidence for one isolated candidate, not
+  final tracked-catalog, rendered game-flow, real-backend, native, deployed, production, release, or
+  physical-device evidence. Unit 5 begins Machine Learning; Unit 7 still owns the atomic five-
+  document and current-policy documentation cutover.
 
 ## Open findings
 

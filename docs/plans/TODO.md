@@ -2,14 +2,14 @@
 
 ## TODO
 
-- **Re-author all five Expeditions from online research — in progress in Unit 4.** Unit 1 established
-  the final schema-v2 contract. Critical Thinking revision `dc27a643…e55b43` and Probability and
-  Statistics revision `9be3bb79…7978d1` passed complete learner-first private/source review after
-  every structural, cueing, transfer, route, and claim-specific source finding was repaired. Apply
-  the consolidated rules while researching, authoring, qualifying, and independently reviewing
-  Personal Finance under the
-  [priority-1 plan](./2026-09-01-research-authored-three-leg-expeditions.md) before the later
-  candidates or atomic cutover and validation units.
+- **Re-author all five Expeditions from online research — in progress in Unit 5.** Unit 1 established
+  the final schema-v2 contract. Critical Thinking revision `dc27a643…e55b43`, Probability and
+  Statistics revision `9be3bb79…7978d1`, and Personal Finance revision `767d26bc…7452f9a` passed
+  complete learner-first private/source review after every structural, cueing, transfer, route, and
+  claim-specific source finding was repaired. Apply the consolidated rules while researching,
+  authoring, qualifying, and independently reviewing Machine Learning under the
+  [priority-1 plan](./2026-09-01-research-authored-three-leg-expeditions.md) before Neuroscience or
+  the atomic cutover and validation units.
 
 ## COMPLETED
 
