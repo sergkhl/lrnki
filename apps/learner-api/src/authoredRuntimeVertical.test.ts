@@ -150,6 +150,18 @@ test("test-only Hono composition completes Critical Thinking through one authent
   const catalog = await loadQualifiedCatalogOrThrow(contentRoot);
   const document = qualifiedExpeditionDocument(catalog, "critical-thinking");
   if (!document) throw new Error("Critical Thinking content is missing");
+  const documentStops = document.legs.flatMap((leg) => leg.stops);
+  const supportOwner = documentStops.find((stop) => stop.supportPaths.length > 0);
+  const supportPath = supportOwner?.supportPaths[0];
+  const supportStep = supportPath?.steps[0];
+  const supportActivity = supportStep
+    ? documentStops
+        .find((stop) => stop.key === supportStep.stopKey)
+        ?.activities.find((activity) => activity.key === supportStep.activityKey)
+    : undefined;
+  if (!supportOwner || !supportPath || !supportStep || supportActivity?.family !== "option_select") {
+    throw new Error("Critical Thinking must retain one option-select Support fixture");
+  }
   const store = new MemoryLearnerStateStore([
     { learnerRef: "alice", displayName: "Alice" },
     { learnerRef: "bob", displayName: "Bob" }
@@ -200,32 +212,32 @@ test("test-only Hono composition completes Critical Thinking through one authent
   await alice.command({
     kind: "open_support_path",
     expeditionKey: "critical-thinking",
-    stopKey: "evidence-quality",
-    supportPathKey: "review-support-relationship"
+    stopKey: supportOwner.key,
+    supportPathKey: supportPath.key
   });
   const supportAnswer = await alice.command({
     kind: "answer_option_select",
     expeditionKey: "critical-thinking",
-    stopKey: "argument-structure",
-    activityKey: "identify-conclusion",
-    chosenOptionKey: "take-southern-road",
+    stopKey: supportStep.stopKey,
+    activityKey: supportStep.activityKey,
+    chosenOptionKey: supportActivity.answerKey,
     source: {
       kind: "support",
-      supportPathKey: "review-support-relationship"
+      supportPathKey: supportPath.key
     }
   });
   assert.equal(supportAnswer.status, "applied");
-  assert.equal(supportAnswer.effect?.stopKey, "argument-structure");
+  assert.equal(supportAnswer.effect?.stopKey, supportStep.stopKey);
   await alice.command({
     kind: "hide_support_path",
     expeditionKey: "critical-thinking",
-    supportPathKey: "review-support-relationship"
+    supportPathKey: supportPath.key
   });
   await alice.command({
     kind: "open_support_path",
     expeditionKey: "critical-thinking",
-    stopKey: "evidence-quality",
-    supportPathKey: "review-support-relationship"
+    stopKey: supportOwner.key,
+    supportPathKey: supportPath.key
   });
 
   const correctCommand = (
@@ -297,7 +309,7 @@ test("test-only Hono composition completes Critical Thinking through one authent
         correctCommand(read.view as ExpeditionView, stop.key, activity.key)
       );
       assert.equal(answered.status, "applied");
-      assert.equal(answered.effect?.correct, true);
+      assert.equal(answered.effect?.correct, true, `expected ${activity.key} to grade correct`);
     }
   }
 
@@ -311,6 +323,10 @@ test("test-only Hono composition completes Critical Thinking through one authent
       assert.equal(read.view?.kind, "guardian");
       const guardian = read.view as GuardianView;
       if (guardian.state === "won") return guardian;
+      assert.deepEqual(
+        guardian.sourceCredits.map((credit) => credit.key),
+        document.sourceCredits.map((credit) => credit.key)
+      );
       const server: AuthoredActivity | undefined = document.legs
         .flatMap((leg) => leg.stops)
         .flatMap((stop) => stop.activities)
@@ -328,45 +344,51 @@ test("test-only Hono composition completes Critical Thinking through one authent
             (candidate): boolean => candidate.text === pair?.right
           );
           if (!pair || !right) throw new Error("Guardian Matching pair failed to hydrate");
-          assert.equal(
-            (await alice.command({
-              kind: "answer_guardian_matching_pair",
-              expeditionKey: "critical-thinking",
-              challengeId,
-              activityKey: server.key,
-              leftKey: left.key,
-              rightKey: right.key
-            })).status,
-            "applied"
+          const answered = await alice.command({
+            kind: "answer_guardian_matching_pair",
+            expeditionKey: "critical-thinking",
+            challengeId,
+            activityKey: server.key,
+            leftKey: left.key,
+            rightKey: right.key
+          });
+          assert.equal(answered.status, "applied");
+          assert.deepEqual(
+            answered.effect?.feedbackSourceCreditKeys,
+            server.explanation.sourceCreditKeys
           );
         }
       } else if (server.family !== "matching") {
         const keyed: string = server.family === "option_select"
           ? server.answerKey
           : server.statements.find((statement) => statement.kind === "impostor")?.key ?? "";
-        assert.equal(
-          (await alice.command({
-            kind: "answer_guardian_selection",
-            expeditionKey: "critical-thinking",
-            challengeId,
-            activityKey: server.key,
-            chosenKey: keyed
-          })).status,
-          "applied"
+        const answered = await alice.command({
+          kind: "answer_guardian_selection",
+          expeditionKey: "critical-thinking",
+          challengeId,
+          activityKey: server.key,
+          chosenKey: keyed
+        });
+        assert.equal(answered.status, "applied");
+        assert.deepEqual(
+          answered.effect?.feedbackSourceCreditKeys,
+          server.explanation.sourceCreditKeys
         );
       }
     }
     throw new Error("Guardian did not finish");
   };
 
-  const legCreated = await alice.command({
-    kind: "create_guardian",
-    expeditionKey: "critical-thinking",
-    scope: { kind: "leg", legKey: "reasoning-foundations" }
-  });
-  assert.equal(legCreated.status, "applied");
-  assert.ok(legCreated.effect?.challengeId);
-  assert.equal((await answerGuardian(legCreated.effect.challengeId)).state, "won");
+  for (const leg of document.legs) {
+    const legCreated = await alice.command({
+      kind: "create_guardian",
+      expeditionKey: "critical-thinking",
+      scope: { kind: "leg", legKey: leg.key }
+    });
+    assert.equal(legCreated.status, "applied");
+    assert.ok(legCreated.effect?.challengeId);
+    assert.equal((await answerGuardian(legCreated.effect.challengeId)).state, "won");
+  }
 
   const finalCreated = await alice.command({
     kind: "create_guardian",
@@ -381,8 +403,11 @@ test("test-only Hono composition completes Critical Thinking through one authent
   assert.equal(board.status, "ok");
   assert.equal(board.view?.kind, "leaderboard");
   if (board.view?.kind === "leaderboard") {
-    assert.equal(board.view.viewerPoints, 6);
-    assert.equal(board.view.masteredCrystalCount, 3);
+    assert.equal(
+      board.view.viewerPoints,
+      documentStops.reduce((total, stop) => total + stop.difficultyBand, 0)
+    );
+    assert.equal(board.view.masteredCrystalCount, documentStops.length);
   }
   const aliceJournal = await alice.read("journal");
   assert.equal(aliceJournal.view?.kind, "journal");
@@ -390,7 +415,7 @@ test("test-only Hono composition completes Critical Thinking through one authent
     aliceJournal.view?.kind === "journal"
       ? aliceJournal.view.expeditions[0]?.masteredStopCount
       : 0,
-    3
+    documentStops.length
   );
   const bobJournal = await bob.read("journal");
   assert.equal(bobJournal.view?.kind, "journal");

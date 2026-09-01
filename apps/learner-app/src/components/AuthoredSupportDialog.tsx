@@ -13,12 +13,17 @@ import {
   colors
 } from "@/ui";
 import { AuthoredActivityCard } from "./AuthoredActivityCard";
+import {
+  SourceCreditsExpander,
+  type SourceCredit
+} from "./SourceCredits";
 
 export type AuthoredSupportPath = ExpeditionView["supportPaths"][number];
 
 export function AuthoredSupportDialog({
   open,
   path,
+  sourceCredits,
   expeditionKey,
   expectedStateVersion,
   onOpenChange,
@@ -27,6 +32,7 @@ export function AuthoredSupportDialog({
 }: Readonly<{
   open: boolean;
   path: AuthoredSupportPath | null;
+  sourceCredits: readonly SourceCredit[];
   expeditionKey: string;
   expectedStateVersion: string;
   onOpenChange: (open: boolean) => void;
@@ -67,12 +73,18 @@ export function AuthoredSupportDialog({
               <View key={section.key} className="gap-1">
                 <Text variant="title">{section.title}</Text>
                 <Text>{section.body}</Text>
+                <SourceCreditsExpander
+                  sourceCredits={sourceCredits}
+                  sourceCreditKeys={section.sourceCreditKeys}
+                  contextLabel={`the Support Lesson section “${section.title}”`}
+                />
               </View>
             ))}
             <AuthoredActivityCard
               expeditionKey={expeditionKey}
               stopKey={step.stopKey}
               activity={step.activity}
+              sourceCredits={sourceCredits}
               source={{ kind: "support", supportPathKey: path.supportPathKey }}
               expectedStateVersion={expectedStateVersion}
               onSettled={onSettled}

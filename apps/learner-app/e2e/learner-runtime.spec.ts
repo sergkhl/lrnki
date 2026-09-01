@@ -91,8 +91,9 @@ test("Catalog adopts and activates through the single command endpoint, then ope
   await page.goto("/catalog");
   await expect(page.getByText("Browse expeditions")).toBeVisible();
   await page.getByRole("button", { name: "Sources" }).click();
-  await expect(page.getByText("Critical Thinking primer")).toBeVisible();
-  await expect(page.getByText(/No external factual-verification claim/i)).toBeVisible();
+  await expect(page.getByText("Critical Thinking source guide")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open source: Critical Thinking source guide" })).toBeVisible();
+  await expect(page.getByText(/no independent factual-verification claim/i)).toBeVisible();
   await page.getByRole("button", { name: "Done" }).click();
 
   await page.getByRole("button", { name: "Add to journal" }).click();
@@ -117,7 +118,8 @@ test("authored trail renders all activity families and opens an exact-reference 
         kind: command.kind === "open_support_path" ? "support_opened" : "activity_answered",
         supportPathKey: command.supportPathKey ?? null,
         correct: command.kind.startsWith("answer_") ? true : null,
-        feedback: command.kind.startsWith("answer_") ? "The authored explanation is returned only after grading." : null
+        feedback: command.kind.startsWith("answer_") ? "The authored explanation is returned only after grading." : null,
+        feedbackSourceCreditKeys: command.kind.startsWith("answer_") ? ["reasoning-guide"] : []
       }));
     }
   };
@@ -127,6 +129,13 @@ test("authored trail renders all activity families and opens an exact-reference 
   await expect(page.getByText("Match", { exact: true })).toBeVisible();
   await expect(page.getByText("Find the impostor", { exact: true })).toBeVisible();
   await expect(page.getByText("support relationship", { exact: true }).first()).toBeVisible();
+  await expect(page.getByLabel("Show sources for the Lesson section “Separate claims from support”")).toBeVisible();
+  await expect(page.getByLabel("Show sources for this graded explanation")).toHaveCount(0);
+
+  await page.getByLabel("The northern road is closed.").first().click();
+  await expect(page.getByText("The authored explanation is returned only after grading.")).toBeVisible();
+  await page.getByLabel("Show sources for this graded explanation").click();
+  await expect(page.getByRole("button", { name: "Open source: Critical Thinking source guide" })).toBeVisible();
 
   await page.getByRole("button", { name: /Explore “support relationship” Support Path/ }).click();
   await expect(page.getByText("Support Path", { exact: true })).toBeVisible();
@@ -159,7 +168,8 @@ test("Guardian uses authored activities and the command union without exposing a
         activityKey: "spot-evidence-impostor",
         correct: true,
         revealKey: command.chosenKey ?? null,
-        feedback: "Large samples do not repair biased selection."
+        feedback: "Large samples do not repair biased selection.",
+        feedbackSourceCreditKeys: ["reasoning-guide"]
       }, guardianActiveView));
     }
   };
@@ -175,6 +185,8 @@ test("Guardian uses authored activities and the command union without exposing a
   await page.getByLabel("A large sample always removes selection bias.").click();
   await expect(page.getByText("Ward resolved.")).toBeVisible();
   await expect(page.getByText("Large samples do not repair biased selection.")).toBeVisible();
+  await page.getByLabel("Show sources for this graded Guardian explanation").click();
+  await expect(page.getByRole("button", { name: "Open source: Critical Thinking source guide" })).toBeVisible();
   const command = mock.requests.find((request) => request.pathname === "/game/commands");
   expect((command?.postData as { command: unknown }).command).toEqual({
     kind: "answer_guardian_selection",

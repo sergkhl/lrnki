@@ -178,6 +178,7 @@ export type GuardianView =
       remainingShield: number;
       shieldTotal: number;
       retreated: boolean;
+      sourceCredits: LearnerExpeditionProjection["sourceCredits"];
       currentActivity: LearnerActivityProjection;
       matchingProgress: GuardianMatchingProgressView | null;
     }>

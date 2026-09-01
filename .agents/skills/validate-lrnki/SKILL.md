@@ -39,7 +39,7 @@ exactly. One green class never upgrades another.
 
 ## Qualification rules
 
-- `pnpm content:check` proves schema/reference guarantees and exact source-anchor existence. It does
+- `pnpm content:check` proves schema/reference guarantees and exact source-credit resolution. It does
   not prove semantic support, answer quality, teaching sufficiency, or playability.
 - Deterministic and database suites prove runtime/store contracts, not learner-visible quality.
 - Intercepted web proves the production-format Expo artifact against owned DTO fixtures and proves no

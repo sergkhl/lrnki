@@ -683,24 +683,43 @@ function projectionOrder<T extends Readonly<{ key: string }>>(
   });
 }
 
+function matchingPublicKey(
+  activityKey: string,
+  side: "left" | "right",
+  pairKey: string
+): string {
+  return createHash("sha256")
+    .update(`${activityKey}\0${side}\0${pairKey}`, "utf8")
+    .digest("hex")
+    .slice(0, 16);
+}
+
+export function matchingPairKeyFromPublic(
+  authored: AuthoredMatching,
+  projected: Extract<LearnerActivityProjection, { family: "matching" }>,
+  side: "left" | "right",
+  publicKey: string
+): string | null {
+  const publicEntries = side === "left" ? projected.left : projected.right;
+  if (!publicEntries.some((entry) => entry.key === publicKey)) return null;
+  return authored.pairs.find(
+    (pair) => matchingPublicKey(authored.key, side, pair.key) === publicKey
+  )?.key ?? null;
+}
+
 function matchingProjection(activity: AuthoredMatching): Extract<LearnerActivityProjection, {
   family: "matching";
 }> {
-  const publicKey = (side: "left" | "right", pairKey: string): string =>
-    createHash("sha256")
-      .update(`${activity.key}\0${side}\0${pairKey}`, "utf8")
-      .digest("hex")
-      .slice(0, 16);
   return {
     family: "matching",
     key: activity.key,
     prompt: activity.prompt,
     left: projectionOrder(activity.key, "matching-left", activity.pairs).map((pair) => ({
-      key: publicKey("left", pair.key),
+      key: matchingPublicKey(activity.key, "left", pair.key),
       text: pair.left
     })),
     right: projectionOrder(activity.key, "matching-right", activity.pairs).map((pair) => ({
-      key: publicKey("right", pair.key),
+      key: matchingPublicKey(activity.key, "right", pair.key),
       text: pair.right
     }))
   };

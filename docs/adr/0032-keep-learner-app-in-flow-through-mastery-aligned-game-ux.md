@@ -5,8 +5,9 @@ Status: Accepted
 ## Decision
 
 Every visible goal, challenge, reward, and recovery path stays aligned with mastery of the active
-Authored Expedition. Authored prerequisite closure determines playable Stops; a completed Leg may
-enable its Guardian without blocking the next prerequisite-valid Stop.
+Authored Expedition. Each Expedition presents exactly three Legs of four to seven ordered Stops.
+Authored prerequisite closure determines playable Stops; a completed Leg may enable its Guardian
+without blocking the next prerequisite-valid Stop.
 
 Acquisition mastery requires Lesson read plus every required current Activity correct, or explicit
 known calibration. Known calibration creates no graded response, crystal, or weekly point and can be
@@ -19,7 +20,8 @@ win.
 
 Interaction remains mobile-first and accessible: state does not rely on color, reduced motion keeps
 equivalent information, haptics are semantic, and leaderboard/reward presentation cannot become a
-parallel objective.
+parallel objective. Before private grading or source reconciliation, an independent content reviewer
+uses the same learner-safe projection and records each answer and rationale as a Learner would.
 
 ## Context
 

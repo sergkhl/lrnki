@@ -6,7 +6,7 @@ closure, keep exactly one Open findings section, and never link tracked document
 
 # Re-author three-Leg Expeditions from online research
 
-- **Status:** In progress; Units 1–6 are complete and Unit 7 is next.
+- **Status:** In progress; Units 1–7 are complete and Unit 8 is next.
 - **Priority:** 1; this is the only active implementation plan.
 - **Execution:** One sequential, exclusive implementation lane in catalog order.
 - **Review:** Every Expedition requires a fresh-context reviewer who did not author it.
@@ -666,6 +666,32 @@ Acceptance criteria:
   until Unit 7. This is authored-quality and local deterministic evidence, not final tracked-catalog,
   rendered game-flow, real-backend, native, deployed, production, release, or physical-device
   evidence. Unit 7 now owns the atomic five-document and current-policy documentation cutover.
+
+### 2026-09-01 — Unit 7: exact reviewed catalog cut over atomically
+
+- **Cutover:** This Unit 7 batch moved the five exact independently passed documents to their
+  canonical paths. `pnpm content:check` qualified revisions `dc27a643…e55b43`,
+  `9be3bb79…7978d1`, `767d26bc…7452f9a`, `60366ccf…0e4e82`, and `07bd08f8…40feca3` together at
+  catalog revision `1c29d8c2…d78e9ff`. The five `source.md` files and scratch candidate documents
+  are deleted; one JSON document per Expedition now owns runtime content and keyed online credits.
+- **Runtime/API proof and repair:** Final-content execution exposed an opaque Matching identity
+  drift: independently shuffled public lanes were decoded by array index. Projection and grading
+  now share one public-key derivation with an explicit round-trip regression. All 29 learner-runtime
+  tests and all five learner-api suites passed the final twelve-Stop Critical Thinking route,
+  Support, all three Leg Guardians, final Guardian, citations, revision, private grading, rewards,
+  persistence, and isolation.
+- **Presentation proof:** A reusable accessible disclosure renders full credit metadata in Catalog,
+  each Lesson/Support section, acquisition feedback, and Guardian feedback. Lesson references remain
+  public while explanation references appear only in graded effects. All 26 Expo unit suites/151
+  tests passed; the production-format intercepted Expo export then passed all 14 focused phone and
+  desktop scenarios after one selector-only repair for a duplicated fixture label.
+- **Authority and boundary:** AGENTS, CONTEXT, README, ADRs 0013/0028/0031/0032/0042, the authoring
+  and validation guidance, typed DTO path, fixtures, and UI copy now point to source-credit
+  resolution plus direct online-evidence judgment. Focused typechecks, ESLint, `git diff --check`,
+  positive/absence controls, and candidate cleanup passed. This is final tracked-catalog, local
+  deterministic, and intercepted-web evidence only; Unit 8 still owns full checks, database,
+  real-backend, Android emulator, and iOS simulator evidence. Deployment, production, release,
+  distributable, arbitrary-source, and physical-device claims remain unproved and out of scope.
 
 ## Open findings
 

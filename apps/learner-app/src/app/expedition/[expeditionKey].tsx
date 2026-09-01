@@ -11,6 +11,10 @@ import {
 } from "@/components/AuthoredSupportDialog";
 import { CrystalSpecimen } from "@/components/CrystalSpecimen";
 import { ExplorableTheoryText } from "@/components/ExplorableTheoryText";
+import {
+  SourceCreditsExpander,
+  type SourceCredit
+} from "@/components/SourceCredits";
 import { dispatchLearnerCommand, type LearnerCommandDto, type LearnerTransitionDto } from "@/lib/actions";
 import { expeditionQuery, type ExpeditionView } from "@/lib/queries";
 import { crystalForBand } from "@/learn/crystalLibrary";
@@ -161,6 +165,7 @@ export default function ExpeditionPage() {
                     stop={stop}
                     progress={progress}
                     supportPaths={view.supportPaths.filter((path) => path.parentStopKey === stop.key)}
+                    sourceCredits={view.expedition.sourceCredits}
                     stateVersion={data.stateVersion}
                     pending={pending}
                     onRun={run}
@@ -196,6 +201,7 @@ export default function ExpeditionPage() {
       <AuthoredSupportDialog
         open={supportOpen}
         path={selectedSupport}
+        sourceCredits={view.expedition.sourceCredits}
         expeditionKey={expeditionKey}
         expectedStateVersion={data.stateVersion}
         onOpenChange={setSupportOpen}
@@ -214,6 +220,7 @@ function StopCard({
   stop,
   progress,
   supportPaths,
+  sourceCredits,
   stateVersion,
   pending,
   onRun,
@@ -224,6 +231,7 @@ function StopCard({
   stop: AuthoredStop;
   progress: StopProgress;
   supportPaths: ExpeditionView["supportPaths"];
+  sourceCredits: readonly SourceCredit[];
   stateVersion: string;
   pending: string | null;
   onRun: (identity: string, command: LearnerCommandDto) => Promise<LearnerTransitionDto | null>;
@@ -275,6 +283,11 @@ function StopCard({
                     const path = termPaths.get(term);
                     if (path) void onOpenSupport(stop.key, path);
                   }}
+                />
+                <SourceCreditsExpander
+                  sourceCredits={sourceCredits}
+                  sourceCreditKeys={section.sourceCreditKeys}
+                  contextLabel={`the Lesson section “${section.title}”`}
                 />
                 {section.explorableTerms.map((term) => {
                   const path = supportPaths.find((candidate) => candidate.supportPathKey === term.supportPathKey);
@@ -343,6 +356,7 @@ function StopCard({
                   expeditionKey={expeditionKey}
                   stopKey={stop.key}
                   activity={activity}
+                  sourceCredits={sourceCredits}
                   source={{ kind: "trail" }}
                   expectedStateVersion={stateVersion}
                   disabled={pending !== null}

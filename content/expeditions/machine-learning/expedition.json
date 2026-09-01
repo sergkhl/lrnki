@@ -1,38 +1,259 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "key": "machine-learning",
   "title": "Machine Learning",
-  "teaser": "Design and evaluate a supervised prediction system from decision contract to monitored policy.",
-  "declaredDomain": "Applied supervised machine learning",
-  "audience": "Adult learners evaluating or building prediction systems",
+  "teaser": "Frame a supervised-learning decision, build honest evidence, and operate the resulting policy as a monitored system rather than a frozen score.",
+  "audience": "Adult learners building or evaluating applied supervised-learning systems across regression and classification",
+  "declaredDomain": "Applied supervised learning from decision and data contracts through fitting, evaluation, deployment policy, monitoring, and lifecycle response",
   "sourceCredits": [
     {
-      "title": "Machine Learning: Applied Supervised Learning primer",
-      "author": "lrnki project",
-      "license": "Project-owned internal playtest source",
-      "note": "Accepted as a local authoring basis without independent external fact verification."
+      "key": "google-ml-framing",
+      "title": "Framing an ML problem",
+      "url": "https://developers.google.com/machine-learning/problem-framing/ml-framing",
+      "publisher": "Google for Developers",
+      "version": "Machine Learning Problem Framing course as accessed 2026-09-01",
+      "accessedAt": "2026-09-01",
+      "note": "Official course guidance separating desired outcome, model goal and output, system action, model metrics, and product success metrics."
+    },
+    {
+      "key": "nvidia-prediction-types",
+      "title": "Prediction Types",
+      "url": "https://docs.nvidia.com/sdgm/rfm/prediction-types",
+      "publisher": "NVIDIA",
+      "version": "Nemotron Relational prediction-types documentation as accessed 2026-09-01",
+      "accessedAt": "2026-09-01",
+      "note": "Official product documentation explicitly defines a temporal prediction by its target, entity (who the prediction is for), and horizon (the future window); used here for that contract structure, not as a runtime product dependency."
+    },
+    {
+      "key": "google-labels",
+      "title": "Datasets: Labels",
+      "url": "https://developers.google.com/machine-learning/crash-course/overfitting/labels",
+      "publisher": "Google for Developers",
+      "version": "Machine Learning Crash Course as accessed 2026-09-01",
+      "accessedAt": "2026-09-01",
+      "note": "Official course guidance distinguishing direct labels from imperfect proxy labels and requiring label-quality inspection."
+    },
+    {
+      "key": "sklearn-common-pitfalls",
+      "title": "Common pitfalls and recommended practices",
+      "url": "https://scikit-learn.org/1.9/common_pitfalls.html",
+      "publisher": "scikit-learn developers",
+      "version": "scikit-learn 1.9.0 documentation",
+      "accessedAt": "2026-09-01",
+      "note": "Versioned official guidance on inconsistent preprocessing, leakage, training-only fitting, pipelines, and evaluation on novel data."
+    },
+    {
+      "key": "sklearn-cross-validation",
+      "title": "Cross-validation: evaluating estimator performance",
+      "url": "https://scikit-learn.org/1.9/modules/cross_validation.html",
+      "publisher": "scikit-learn developers",
+      "version": "scikit-learn 1.9.0 documentation",
+      "accessedAt": "2026-09-01",
+      "note": "Versioned official guidance on held-out testing, validation and model selection, cross-validation, grouping, and pipeline evaluation."
+    },
+    {
+      "key": "google-linear-loss",
+      "title": "Linear regression: Loss",
+      "url": "https://developers.google.com/machine-learning/crash-course/linear-regression/loss",
+      "publisher": "Google for Developers",
+      "version": "Machine Learning Crash Course as accessed 2026-09-01",
+      "accessedAt": "2026-09-01",
+      "note": "Official course definitions and worked distinctions for loss, MAE, MSE, and RMSE."
+    },
+    {
+      "key": "google-gradient-descent",
+      "title": "Linear regression: Gradient descent",
+      "url": "https://developers.google.com/machine-learning/crash-course/linear-regression/gradient-descent",
+      "publisher": "Google for Developers",
+      "version": "Machine Learning Crash Course as accessed 2026-09-01",
+      "accessedAt": "2026-09-01",
+      "note": "Official course explanation of iterative parameter updates, gradients, convergence, and loss minimization."
+    },
+    {
+      "key": "google-logistic-loss",
+      "title": "Logistic regression: Loss and regularization",
+      "url": "https://developers.google.com/machine-learning/crash-course/logistic-regression/loss-regularization",
+      "publisher": "Google for Developers",
+      "version": "Machine Learning Crash Course as accessed 2026-09-01",
+      "accessedAt": "2026-09-01",
+      "note": "Official course guidance on log loss, probability modeling, regularization, and early stopping for logistic regression."
+    },
+    {
+      "key": "sklearn-linear-models",
+      "title": "Linear Models",
+      "url": "https://scikit-learn.org/1.9/modules/linear_model.html",
+      "publisher": "scikit-learn developers",
+      "version": "scikit-learn 1.9.0 documentation",
+      "accessedAt": "2026-09-01",
+      "note": "Versioned official reference for supervised linear regression and linear classification families and their regularized variants."
+    },
+    {
+      "key": "sklearn-decision-trees",
+      "title": "Decision Trees",
+      "url": "https://scikit-learn.org/1.9/modules/tree.html",
+      "publisher": "scikit-learn developers",
+      "version": "scikit-learn 1.9.0 documentation",
+      "accessedAt": "2026-09-01",
+      "note": "Versioned official reference for tree-based regression and classification, piecewise rules, complexity, instability, and extrapolation limits."
+    },
+    {
+      "key": "sklearn-ensembles",
+      "title": "Ensembles: Gradient boosting, random forests, bagging, voting, stacking",
+      "url": "https://scikit-learn.org/1.9/modules/ensemble.html",
+      "publisher": "scikit-learn developers",
+      "version": "scikit-learn 1.9.0 documentation",
+      "accessedAt": "2026-09-01",
+      "note": "Versioned official reference for randomized forests, boosting, and the bias-variance and computation trade-offs of tree ensembles."
+    },
+    {
+      "key": "google-overfitting",
+      "title": "Overfitting",
+      "url": "https://developers.google.com/machine-learning/crash-course/overfitting/overfitting",
+      "publisher": "Google for Developers",
+      "version": "Machine Learning Crash Course as accessed 2026-09-01",
+      "accessedAt": "2026-09-01",
+      "note": "Official course guidance on train-versus-validation behavior, underfitting, overfitting, generalization, complexity, and distribution assumptions."
+    },
+    {
+      "key": "sklearn-learning-curves",
+      "title": "Validation curves: plotting scores to evaluate models",
+      "url": "https://scikit-learn.org/1.9/modules/learning_curve.html",
+      "publisher": "scikit-learn developers",
+      "version": "scikit-learn 1.9.0 documentation",
+      "accessedAt": "2026-09-01",
+      "note": "Versioned official guidance on training and validation curves, bias and variance patterns, varying training-set size, and the limits of adding more data."
+    },
+    {
+      "key": "sklearn-model-evaluation",
+      "title": "Metrics and scoring: quantifying the quality of predictions",
+      "url": "https://scikit-learn.org/1.9/modules/model_evaluation.html",
+      "publisher": "scikit-learn developers",
+      "version": "scikit-learn 1.9.0 documentation",
+      "accessedAt": "2026-09-01",
+      "note": "Versioned official metric reference covering regression, classification, baselines, multiple outputs, and score selection."
+    },
+    {
+      "key": "google-classification-metrics",
+      "title": "Classification: Accuracy, recall, precision, and related metrics",
+      "url": "https://developers.google.com/machine-learning/crash-course/classification/accuracy-precision-recall",
+      "publisher": "Google for Developers",
+      "version": "Machine Learning Crash Course as accessed 2026-09-01",
+      "accessedAt": "2026-09-01",
+      "note": "Official course definitions of confusion-matrix counts, metric denominators, threshold dependence, imbalance, and consequence-based metric choice."
+    },
+    {
+      "key": "sklearn-calibration",
+      "title": "Probability calibration",
+      "url": "https://scikit-learn.org/1.9/modules/calibration.html",
+      "publisher": "scikit-learn developers",
+      "version": "scikit-learn 1.9.0 documentation",
+      "accessedAt": "2026-09-01",
+      "note": "Versioned official guidance on reliability diagrams, predicted-probability interpretation, and independent calibration data."
+    },
+    {
+      "key": "sklearn-threshold-tuning",
+      "title": "Tuning the decision threshold for class prediction",
+      "url": "https://scikit-learn.org/1.9/modules/classification_threshold.html",
+      "publisher": "scikit-learn developers",
+      "version": "scikit-learn 1.9.0 documentation",
+      "accessedAt": "2026-09-01",
+      "note": "Versioned official guidance separating statistical probability or score estimation from action thresholds and warning against same-data threshold tuning."
+    },
+    {
+      "key": "google-fairness-evaluation",
+      "title": "Fairness: Evaluating for bias",
+      "url": "https://developers.google.com/machine-learning/crash-course/fairness/evaluating-for-bias",
+      "publisher": "Google for Developers",
+      "version": "Machine Learning Crash Course as accessed 2026-09-01",
+      "accessedAt": "2026-09-01",
+      "note": "Official course guidance that aggregate metrics can hide minority-group behavior and that fairness definitions depend on the context."
+    },
+    {
+      "key": "nist-ai-rmf-playbook",
+      "title": "AI Risk Management Framework Playbook",
+      "url": "https://airc.nist.gov/docs/AI_RMF_Playbook.pdf",
+      "publisher": "National Institute of Standards and Technology",
+      "version": "Living 147-page NIST AIRC PDF with 2024-08-03 PDF creation/modification metadata, as accessed 2026-09-01",
+      "accessedAt": "2026-09-01",
+      "note": "Official lifecycle guidance on context-specific disaggregated metrics, tolerance thresholds, documentation, monitoring, corrective action, and decommissioning. This credit describes the artifact served by the living endpoint rather than asserting an immutable publication snapshot."
+    },
+    {
+      "key": "google-monitoring",
+      "title": "Production ML systems: Monitoring pipelines",
+      "url": "https://developers.google.com/machine-learning/crash-course/production-ml-systems/monitoring",
+      "publisher": "Google for Developers",
+      "version": "Machine Learning Crash Course as accessed 2026-09-01",
+      "accessedAt": "2026-09-01",
+      "note": "Official course guidance on training-serving skew, feature availability, slice metrics, service and model health, delayed labels, and real-world outcomes."
+    },
+    {
+      "key": "google-productionization",
+      "title": "Productionization",
+      "url": "https://developers.google.com/machine-learning/managing-ml-projects/production",
+      "publisher": "Google for Developers",
+      "version": "Managing ML Projects course as accessed 2026-09-01",
+      "accessedAt": "2026-09-01",
+      "note": "Official project guidance on monitoring and alerting, deployment subsets, approvals, diagnosis, and rollback."
+    },
+    {
+      "key": "pmlr-covariate-shift",
+      "title": "Sequential Covariate Shift Detection Using Classifier Two-Sample Tests",
+      "url": "https://proceedings.mlr.press/v162/jang22a.html",
+      "publisher": "Proceedings of Machine Learning Research",
+      "version": "ICML 2022, PMLR 162",
+      "accessedAt": "2026-09-01",
+      "note": "Primary research defining covariate shift as changed input distributions with an unchanged conditional label relationship and evaluating a detector with controlled false positives."
+    },
+    {
+      "key": "pmlr-concept-drift",
+      "title": "DriftSurf: Stable-State / Reactive-State Learning under Concept Drift",
+      "url": "https://proceedings.mlr.press/v139/tahmasbi21a.html",
+      "publisher": "Proceedings of Machine Learning Research",
+      "version": "ICML 2021, PMLR 139",
+      "accessedAt": "2026-09-01",
+      "note": "Primary research showing that a streaming-data distribution change can make a learned model inaccurate while standalone drift detection can produce false positives."
+    },
+    {
+      "key": "google-model-cards",
+      "title": "Model Cards for Model Reporting",
+      "url": "https://research.google/pubs/model-cards-for-model-reporting/",
+      "publisher": "Google Research",
+      "version": "FAT* 2019 paper",
+      "accessedAt": "2026-09-01",
+      "note": "Primary paper proposing documentation of intended use, evaluation procedure, limitations, and relevant subgroup and intersectional performance."
     }
   ],
   "legs": [
     {
-      "key": "prediction-system-evidence",
-      "title": "Make the whole prediction system evaluable",
+      "key": "frame-and-fit",
+      "title": "Frame and fit the prediction",
       "stops": [
         {
-          "key": "decision-contract",
-          "label": "Frame the prediction at decision time",
+          "key": "write-decision-contract",
+          "label": "Define the decision before the model",
           "requires": [],
-          "difficultyBand": 2,
+          "difficultyBand": 1,
           "lesson": {
             "sections": [
               {
-                "key": "unit-time-target-decision",
-                "title": "An operational question comes before the model",
-                "body": "Define one prediction unit, the exact prediction time, the target and its horizon, the features available by that cutoff, and the decision the output will influence. A field that appears in the historical database is not automatically usable: if it arrives after the decision, it violates the availability contract. Choose evaluation measures around the consequences and capacity of the real decision, then compare with a credible non-ML baseline.",
-                "sourceAnchor": {
-                  "heading": "1. Frame the Prediction Problem Around a Decision",
-                  "quote": "A supervised-learning project begins with an operational question, not a model family."
-                },
+                "key": "outcome-model-and-action",
+                "title": "Outcome, model output, and action are different",
+                "body": "Start with the outcome the system is meant to improve, then state the model output and the action that will consume it. A classification score, a numerical forecast, and the operational decision made from either are separate objects. Record a non-ML or simple-rule baseline and a product success measure as well as a model metric, because a better offline score need not improve the intended outcome.",
+                "sourceCreditKeys": ["google-ml-framing", "sklearn-model-evaluation"],
+                "explorableTerms": []
+              },
+              {
+                "key": "case-cutoff-target-horizon",
+                "title": "Name one prediction case and its future",
+                "body": "For a temporal prediction, name the target, the prediction entity or case, and the future horizon. The case says who or what one inference concerns, such as one active account at one Monday cutoff. The cutoff says when its features freeze. The target says what will later count as the outcome, and the horizon says how far after the cutoff that outcome is observed. If a proxy label replaces the desired outcome, record the mismatch rather than silently treating the proxy as identical.",
+                "sourceCreditKeys": ["nvidia-prediction-types", "google-labels", "google-monitoring"],
+                "explorableTerms": []
+              },
+              {
+                "key": "availability-follows-cutoff",
+                "title": "Historical presence is not prediction-time availability",
+                "body": "For each feature, ask whether its value exists through the same production path by the prediction cutoff. A field recorded later may be strongly associated with the label and still be unusable. Also define when labels mature, who or what supplies them, and which deployment population the contract covers. These details turn a table of historical columns into an availability contract that evaluation can imitate.",
+                "sourceCreditKeys": ["google-labels", "google-monitoring", "google-productionization"],
                 "explorableTerms": []
               }
             ]
@@ -40,186 +261,613 @@
           "activities": [
             {
               "family": "option_select",
-              "key": "enforce-availability-contract",
-              "prompt": "At order review time, a system predicts whether an order will be returned. Which candidate feature clearly violates the availability contract?",
+              "key": "choose-operational-contract",
+              "prompt": "Each Monday at 09:00, a retention team can call 100 active accounts about cancellation risk during the next 30 days. Which proposed contract is operationally complete?",
               "options": [
                 {
-                  "key": "final-return-resolution",
-                  "text": "The final return resolution recorded two weeks after the order"
+                  "key": "weekly-account-cutoff-action",
+                  "text": "One active account at Monday 09:00; use fields available by then; label cancellation within 30 days; rank accounts for the 100-call queue"
                 },
                 {
-                  "key": "basket-value-at-review",
-                  "text": "The basket value visible when review begins"
+                  "key": "customer-risk-without-horizon",
+                  "text": "Predict which customers are risky from the full warehouse, then let the team decide later how many to call"
                 },
                 {
-                  "key": "account-age-at-review",
-                  "text": "The account age calculated at the review cutoff"
+                  "key": "cancellation-record-as-feature",
+                  "text": "Use the final cancellation record as an input for each account and predict whether the same cancellation occurred"
                 },
                 {
-                  "key": "shipping-method-selected",
-                  "text": "The shipping method selected before review"
+                  "key": "monthly-score-without-case",
+                  "text": "Produce a monthly risk score before naming whether one row represents an account, a contact, or a billing event"
                 }
               ],
-              "answerKey": "final-return-resolution",
+              "answerKey": "weekly-account-cutoff-action",
               "explanation": {
-                "text": "The final resolution is caused by events after the prediction cutoff and cannot exist at review time. Historical co-location does not make future information available to the deployed system.",
-                "sourceAnchor": {
-                  "heading": "1. Frame the Prediction Problem Around a Decision",
-                  "quote": "Features must be available at the exact moment a prediction would be made."
-                }
+                "text": "The complete contract aligns one account as the prediction case, Monday's cutoff, a 30-day future target, cutoff-available inputs, and the capacity-limited action. The other proposals omit a horizon or prediction case, defer the action, or use the outcome itself as an input.",
+                "sourceCreditKeys": ["nvidia-prediction-types", "google-ml-framing", "google-labels", "google-monitoring"]
               }
             },
             {
               "family": "matching",
-              "key": "match-prediction-contract",
-              "prompt": "Match each contract element to the question it settles.",
+              "key": "match-contract-elements",
+              "prompt": "Match each decision-contract element to the question it settles.",
               "pairs": [
                 {
-                  "key": "unit-role",
-                  "left": "Prediction unit",
-                  "right": "What one row represents at inference"
+                  "key": "case-question",
+                  "left": "Prediction entity or case",
+                  "right": "Who or what one inference concerns"
                 },
                 {
-                  "key": "horizon-role",
-                  "left": "Prediction horizon",
-                  "right": "How far after the cutoff the target is observed"
+                  "key": "cutoff-question",
+                  "left": "Prediction cutoff",
+                  "right": "When feature information must stop"
                 },
                 {
-                  "key": "decision-role",
-                  "left": "Influenced decision",
-                  "right": "What action will use the output"
+                  "key": "horizon-question",
+                  "left": "Target horizon",
+                  "right": "How far into the future the outcome is observed"
+                },
+                {
+                  "key": "action-question",
+                  "left": "Influenced action",
+                  "right": "What the system does with the output"
                 }
               ],
               "explanation": {
-                "text": "The unit names each prediction case, the horizon bounds its future outcome, and the decision determines which errors, output form, and capacity constraints matter.",
-                "sourceAnchor": {
-                  "heading": "1. Frame the Prediction Problem Around a Decision",
-                  "quote": "The prediction unit identifies one row at inference time: an account-month, a component-cycle, a patient-visit, or a document."
-                }
+                "text": "The prediction entity or case identifies who or what receives one prediction, the cutoff bounds usable information, the horizon bounds the later target, and the action connects the prediction to an operational decision. None of these roles can substitute for another.",
+                "sourceCreditKeys": ["nvidia-prediction-types", "google-ml-framing", "google-monitoring"]
               }
             }
           ],
           "supportPaths": []
         },
         {
-          "key": "evaluation-without-leakage",
-          "label": "Keep evaluation information out of fitting",
-          "requires": ["decision-contract"],
-          "difficultyBand": 3,
+          "key": "design-deployment-evaluation",
+          "label": "Make evaluation imitate deployment",
+          "requires": ["write-decision-contract"],
+          "difficultyBand": 2,
           "lesson": {
             "sections": [
               {
-                "key": "split-by-arrival-process",
-                "title": "A split must imitate how new predictions arrive",
-                "body": "Estimate generalization on observations that did not choose the fitted system. Split by entity, time, site, or another grouping when rows share information; random rows are appropriate only for the matching deployment claim. Fit preprocessing inside each training partition, and keep held-out data from influencing feature choices, thresholds, or transformations. Target leakage includes any predictor containing the target or later consequences unavailable at prediction time. Reusing test results for another design iteration quietly turns the test set into validation data.",
-                "sourceAnchor": {
-                  "heading": "2. Splits, Evaluation Protocols, and Leakage",
-                  "quote": "Generalization performance must be estimated on observations not used to choose the fitted system."
-                },
+                "key": "deployment-shaped-split",
+                "title": "A split states a generalization claim",
+                "body": "Choose a split that matches how cases arrive after deployment. If the claim concerns later time, preserve time order. If multiple rows share an entity, site, household, or device-specific signal, keep that group from crossing the boundary when deployment will face new groups. A random row split is appropriate only when exchangeable new rows from the same process are the real claim. Keep the prediction cutoff intact in every partition.",
+                "sourceCreditKeys": ["sklearn-cross-validation", "google-monitoring"],
                 "explorableTerms": [
                   {
-                    "term": "prediction time",
-                    "supportPathKey": "review-prediction-cutoff"
+                    "term": "prediction cutoff",
+                    "supportPathKey": "revisit-decision-cutoff"
                   }
                 ]
+              },
+              {
+                "key": "train-validation-test-roles",
+                "title": "Development and final estimation have separate data roles",
+                "body": "Fit parameters on training data. Use validation folds or a validation set to compare features, model families, hyperparameters, and thresholds. Freeze that choice before using the final test set for the stated deployment claim. If a test result changes the design, that set has participated in selection and no longer supplies an untouched final estimate.",
+                "sourceCreditKeys": ["sklearn-cross-validation"],
+                "explorableTerms": []
+              },
+              {
+                "key": "leakage-is-information-flow",
+                "title": "Leakage includes every learned choice",
+                "body": "Leakage occurs when information outside the training partition influences fitting or selection. It includes target consequences unavailable at prediction time, duplicated or related cases across a split, and preprocessing or feature selection fitted before the split. Compare against a simple baseline through the same clean protocol; a sophisticated model beating a contaminated estimate proves nothing about new cases.",
+                "sourceCreditKeys": ["sklearn-common-pitfalls", "sklearn-cross-validation", "google-monitoring"],
+                "explorableTerms": []
               }
             ]
           },
           "activities": [
             {
               "family": "option_select",
-              "key": "choose-temporal-evaluation",
-              "prompt": "A service predicts next-month cancellation from monthly account histories. Which evaluation most closely tests future deployment?",
+              "key": "choose-grouped-future-split",
+              "prompt": "A model uses weekly sensor rows to predict next-week failure. Deployment next quarter covers machines absent from development data. Which evaluation best matches that claim?",
               "options": [
                 {
-                  "key": "earlier-train-later-test",
-                  "text": "Train on earlier months and test on later mature outcomes, keeping each cutoff's future fields unavailable"
+                  "key": "row-random-all-weeks",
+                  "text": "Randomly mix weekly rows so the same machine can appear in both training and test partitions"
                 },
                 {
-                  "key": "random-all-months",
-                  "text": "Randomly mix all account-months, including later history from the same accounts"
+                  "key": "future-new-machines",
+                  "text": "Train on earlier weeks from development machines, then test on later mature outcomes from held-out machines"
                 },
                 {
-                  "key": "preprocess-full-dataset",
-                  "text": "Fit preprocessing on all months before making the split"
+                  "key": "latest-features-everywhere",
+                  "text": "Attach each machine's latest known outcome to all earlier rows before making a random split"
                 },
                 {
-                  "key": "iterate-on-test",
-                  "text": "Tune repeatedly until the final test month gives the preferred score"
+                  "key": "training-score-only",
+                  "text": "Fit on every machine-week and report the score on those same rows because all available data was used"
                 }
               ],
-              "answerKey": "earlier-train-later-test",
+              "answerKey": "future-new-machines",
               "explanation": {
-                "text": "A time-ordered evaluation preserves the direction of information and tests later cases. Mixing histories, fitting transformations globally, or adapting to test results lets evaluation information influence development.",
-                "sourceAnchor": {
-                  "heading": "2. Splits, Evaluation Protocols, and Leakage",
-                  "quote": "Time-ordered prediction normally requires a temporal evaluation: train on earlier data and evaluate on later data."
-                }
+                "text": "Holding out machines tests generalization beyond identity-specific history, and later mature outcomes preserve the future direction. Random rows, backfilled outcomes, or training scores let information from the claimed deployment cases influence fitting.",
+                "sourceCreditKeys": ["sklearn-cross-validation", "sklearn-common-pitfalls", "google-monitoring"]
               }
             },
             {
               "family": "impostor",
-              "key": "spot-evaluation-impostor",
-              "prompt": "Two practices preserve an evaluation boundary. One contaminates it. Find the impostor.",
+              "key": "audit-evaluation-boundary",
+              "prompt": "Two practices preserve a final evaluation boundary. One changes its role. Find the impostor.",
               "statements": [
                 {
-                  "key": "group-shared-entities",
-                  "text": "Keep rows from the same entity together when identity-specific history could leak across the split.",
+                  "key": "grouped-entity-boundary",
+                  "text": "Keep related entity rows in one partition when shared history would otherwise cross the claimed evaluation boundary.",
                   "kind": "truth"
                 },
                 {
-                  "key": "fit-transform-per-fold",
-                  "text": "Fit learned preprocessing separately inside each training fold.",
+                  "key": "validation-selected-pipeline",
+                  "text": "Use validation evidence to choose the complete pipeline, then freeze that selected design before final testing.",
                   "kind": "truth"
                 },
                 {
-                  "key": "retune-after-test",
-                  "text": "After reading the test score, retune the threshold and still call that score a final untouched estimate.",
+                  "key": "post-test-threshold-revision",
+                  "text": "Revise the threshold from the final test, then report that test as the revised policy's final estimate.",
                   "kind": "impostor"
                 }
               ],
               "explanation": {
-                "text": "Once a test result drives another design choice, that test has participated in selection. It is now validation evidence, not an untouched final estimate.",
-                "sourceAnchor": {
-                  "heading": "2. Splits, Evaluation Protocols, and Leakage",
-                  "quote": "If test results influence another design iteration, the test set has become validation data;"
-                }
+                "text": "Once the final test result drives a threshold change, the test has joined model selection. The estimate may still inform development, but it is no longer evidence from a design frozen before that data was examined.",
+                "sourceCreditKeys": ["sklearn-cross-validation", "sklearn-common-pitfalls"]
               }
             }
           ],
           "supportPaths": [
             {
-              "key": "review-prediction-cutoff",
-              "term": "prediction time",
-              "sectionKey": "split-by-arrival-process",
+              "key": "revisit-decision-cutoff",
+              "term": "prediction cutoff",
+              "sectionKey": "deployment-shaped-split",
               "steps": [
                 {
-                  "stopKey": "decision-contract",
-                  "activityKey": "enforce-availability-contract"
+                  "stopKey": "write-decision-contract",
+                  "activityKey": "choose-operational-contract"
                 }
               ]
             }
           ]
         },
         {
-          "key": "calibrated-decision-policy",
-          "label": "Turn scores into a monitored policy",
-          "requires": ["evaluation-without-leakage"],
+          "key": "fit-transformations-and-loss",
+          "label": "Fit the whole pipeline on training data",
+          "requires": ["design-deployment-evaluation"],
+          "difficultyBand": 3,
+          "lesson": {
+            "sections": [
+              {
+                "key": "learned-preprocessing-is-fitting",
+                "title": "Transformers learn parameters too",
+                "body": "Imputation values, scaling statistics, category vocabularies, feature-selection rules, and dimensionality reductions are learned from data. Within each validation split, fit those transformations only on that training fold, then apply the fitted transformation to its held-out fold. A pipeline keeps preprocessing and the predictor inside the same fitting boundary; computing a mean or choosing features on the full dataset leaks held-out information.",
+                "sourceCreditKeys": ["sklearn-common-pitfalls", "sklearn-cross-validation"],
+                "explorableTerms": [
+                  {
+                    "term": "held-out fold",
+                    "supportPathKey": "revisit-evaluation-boundary"
+                  }
+                ]
+              },
+              {
+                "key": "loss-metric-and-success",
+                "title": "Training loss is not the whole acceptance rule",
+                "body": "A loss function scores prediction error during fitting; the optimizer changes model parameters to reduce that objective. An evaluation metric compares frozen candidates on held-out cases, while a product or decision measure asks whether the deployed action helps. They may be related without being identical. For numerical targets, absolute and squared losses weight large residuals differently; for binary probability models, log loss evaluates probability assignments.",
+                "sourceCreditKeys": ["google-linear-loss", "google-logistic-loss", "google-ml-framing"],
+                "explorableTerms": []
+              },
+              {
+                "key": "optimization-updates-parameters",
+                "title": "Optimization follows a chosen objective",
+                "body": "Gradient descent repeatedly evaluates loss, computes a direction that reduces it, and updates weights and bias by a learning-rate-scaled step. Parameters are learned values such as weights; hyperparameters such as learning rate, regularization strength, or tree depth are chosen outside that fitted parameter update. Convergence of training loss means the optimizer has settled for that objective and data—it does not by itself prove generalization or decision value.",
+                "sourceCreditKeys": ["google-gradient-descent", "google-logistic-loss", "google-overfitting"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "choose-fold-local-pipeline",
+              "prompt": "A validation fold contains unseen stores and some missing temperatures. Which procedure estimates the full fitted pipeline without preprocessing leakage?",
+              "options": [
+                {
+                  "key": "global-impute-then-split",
+                  "text": "Compute the median temperature on all stores, fill every row, and then divide rows into folds"
+                },
+                {
+                  "key": "fold-fit-transform",
+                  "text": "Within each split, fit the imputer and model on training stores, then transform and score the held-out stores"
+                },
+                {
+                  "key": "validation-fit-both",
+                  "text": "Fit a separate imputer and model on the validation stores before comparing their validation loss"
+                },
+                {
+                  "key": "drop-missing-after-score",
+                  "text": "Score all validation rows first, then remove whichever missing-value cases make the metric worse"
+                }
+              ],
+              "answerKey": "fold-fit-transform",
+              "explanation": {
+                "text": "The imputer and predictor are both fitted only on each training fold and then applied to held-out stores. Global or validation fitting leaks held-out information, while post-score deletion changes the evaluated population after seeing results.",
+                "sourceCreditKeys": ["sklearn-common-pitfalls", "sklearn-cross-validation"]
+              }
+            },
+            {
+              "family": "matching",
+              "key": "match-training-roles",
+              "prompt": "Match each training-system element to its role.",
+              "pairs": [
+                {
+                  "key": "parameter-role",
+                  "left": "Model parameter",
+                  "right": "Value learned during fitting, such as a weight"
+                },
+                {
+                  "key": "hyperparameter-role",
+                  "left": "Hyperparameter",
+                  "right": "Configuration selected outside parameter fitting"
+                },
+                {
+                  "key": "loss-role",
+                  "left": "Training loss",
+                  "right": "Objective whose error the optimizer reduces"
+                },
+                {
+                  "key": "metric-role",
+                  "left": "Held-out evaluation metric",
+                  "right": "Rule used to compare frozen predictions on new cases"
+                }
+              ],
+              "explanation": {
+                "text": "Parameters are learned inside fitting; hyperparameters configure that process; loss guides parameter updates; and a held-out metric evaluates predictions outside the fitted examples. Keeping the roles separate prevents training convergence from masquerading as final acceptance.",
+                "sourceCreditKeys": ["google-gradient-descent", "google-linear-loss", "sklearn-cross-validation"]
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "revisit-evaluation-boundary",
+              "term": "held-out fold",
+              "sectionKey": "learned-preprocessing-is-fitting",
+              "steps": [
+                {
+                  "stopKey": "design-deployment-evaluation",
+                  "activityKey": "choose-grouped-future-split"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "compare-model-families",
+          "label": "Compare model families under one protocol",
+          "requires": ["fit-transformations-and-loss"],
+          "difficultyBand": 3,
+          "lesson": {
+            "sections": [
+              {
+                "key": "output-shape-comes-first",
+                "title": "Regression and classification answer different questions",
+                "body": "Supervised regression predicts a numerical target such as delay minutes; classification predicts a category or a probability for a class. Choose the output shape from the decision contract rather than from a fashionable algorithm name. A dynamic downstream cutoff can use a numeric or probability score with policy code, while a fixed action category may be modeled directly when that better matches the loss and decision.",
+                "sourceCreditKeys": ["google-ml-framing", "sklearn-linear-models"],
+                "explorableTerms": []
+              },
+              {
+                "key": "linear-and-logistic-baselines",
+                "title": "Linear models supply a transparent reference class",
+                "body": "Linear regression represents a numerical prediction as an intercept plus weighted features. Logistic regression applies a sigmoid to a linear score to model a binary-event probability and is commonly trained with log loss and regularization. These families supply a regularized reference when their additive structure is adequate; their held-out evidence, rather than the family name, determines whether that reference is useful for the declared prediction task.",
+                "sourceCreditKeys": ["sklearn-linear-models", "google-logistic-loss"],
+                "explorableTerms": []
+              },
+              {
+                "key": "trees-and-ensembles-tradeoffs",
+                "title": "Trees express nonlinear rules; ensembles trade simplicity for stability",
+                "body": "A decision tree learns piecewise rules for regression or classification and can capture interactions without a linear boundary. Deep trees can overfit and can change sharply with small data changes. Random forests average diverse randomized trees to reduce variance; boosting builds an additive sequence that corrects earlier errors. Compare families through the same split, preprocessing, metric, latency, resource, and interpretability requirements rather than declaring one family universally best.",
+                "sourceCreditKeys": ["sklearn-decision-trees", "sklearn-ensembles"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "choose-output-family",
+              "prompt": "A dispatch system must estimate how many minutes late each shipment will arrive; operations applies changing delay cutoffs later. Which initial supervised output best preserves that contract?",
+              "options": [
+                {
+                  "key": "regress-delay-minutes",
+                  "text": "Regression that predicts delay minutes, with changing action cutoffs kept in the dispatch policy"
+                },
+                {
+                  "key": "classify-carrier-name",
+                  "text": "Classification that predicts the carrier name because carrier is already present in the feature table"
+                },
+                {
+                  "key": "cluster-shipment-rows",
+                  "text": "Unsupervised clustering that groups shipments without fitting the stated delay target"
+                },
+                {
+                  "key": "fixed-late-category",
+                  "text": "One permanent late-or-not label even though operations changes the action cutoff by capacity"
+                }
+              ],
+              "answerKey": "regress-delay-minutes",
+              "explanation": {
+                "text": "The contract asks for a numerical delay estimate while downstream cutoffs change. Regression preserves that quantity for policy code; the other choices predict a different object, omit the target, or freeze a threshold the scenario says is dynamic.",
+                "sourceCreditKeys": ["google-ml-framing", "sklearn-linear-models"]
+              }
+            },
+            {
+              "family": "impostor",
+              "key": "audit-family-claims",
+              "prompt": "Two statements support a model-family comparison. One bypasses the comparison. Find the impostor.",
+              "statements": [
+                {
+                  "key": "linear-reference-candidate",
+                  "text": "Evaluate a regularized linear or logistic reference through the same deployment-shaped comparison used for other candidates.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "tree-interaction-candidate",
+                  "text": "Include tree-based candidates when piecewise effects and feature interactions are plausible in the observed feature space.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "ensemble-first-selection",
+                  "text": "Choose the ensemble first, then use held-out data only to estimate that chosen family.",
+                  "kind": "impostor"
+                }
+              ],
+              "explanation": {
+                "text": "A family name does not establish deployment fit. Linear, tree, and ensemble candidates express different structures and costs, so the decision requires the same clean evidence protocol plus the operational constraints.",
+                "sourceCreditKeys": ["sklearn-linear-models", "sklearn-decision-trees", "sklearn-ensembles", "sklearn-cross-validation"]
+              }
+            }
+          ],
+          "supportPaths": []
+        }
+      ],
+      "guardianActivityKeys": [
+        "choose-operational-contract",
+        "match-contract-elements",
+        "choose-grouped-future-split",
+        "audit-evaluation-boundary",
+        "choose-fold-local-pipeline",
+        "match-training-roles",
+        "choose-output-family",
+        "audit-family-claims"
+      ]
+    },
+    {
+      "key": "select-for-generalization",
+      "title": "Select for useful generalization",
+      "stops": [
+        {
+          "key": "diagnose-fit-and-generalization",
+          "label": "Read training and validation behavior together",
+          "requires": ["compare-model-families"],
+          "difficultyBand": 3,
+          "lesson": {
+            "sections": [
+              {
+                "key": "train-validation-patterns",
+                "title": "Training and validation errors diagnose different failures",
+                "body": "Training error describes fit to examples that influenced the parameters; validation error describes performance on held-out development cases. High error on both can indicate underfitting, a weak representation, or a hard target. Low training error with much worse validation error indicates a generalization gap consistent with overfitting. Interpret the pattern under the declared split and baseline rather than attaching a diagnosis to one number alone.",
+                "sourceCreditKeys": ["google-overfitting", "sklearn-learning-curves", "sklearn-cross-validation"],
+                "explorableTerms": [
+                  {
+                    "term": "validation error",
+                    "supportPathKey": "revisit-held-out-evidence"
+                  }
+                ]
+              },
+              {
+                "key": "complexity-and-regularization",
+                "title": "Complexity is controlled, not celebrated",
+                "body": "More depth, features, interactions, or training steps can lower training loss while increasing variance on new cases. Regularization penalizes or constrains complexity; early stopping limits training when validation behavior begins to degrade. The useful strength is data- and protocol-dependent, so tune it on validation evidence rather than assuming that either the largest or smallest model will generalize best.",
+                "sourceCreditKeys": ["google-overfitting", "google-logistic-loss", "sklearn-decision-trees"],
+                "explorableTerms": []
+              },
+              {
+                "key": "curves-and-data-coverage",
+                "title": "Learning curves separate some model and data questions",
+                "body": "Plot comparable training and validation metrics as the training set grows or complexity changes. A persistent large gap suggests variance or a mismatch that may respond to regularization, more representative data, or a simpler family. Poor performance on both sides suggests revisiting features, target quality, capacity, or the attainable baseline. Curves remain evidence about the sampled process, not proof against future shift.",
+                "sourceCreditKeys": ["google-overfitting", "sklearn-learning-curves", "sklearn-cross-validation"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "diagnose-error-pattern",
+              "prompt": "A depth increase changes delivery-time RMSE from train/validation 4.8/5.2 minutes to 1.0/8.0 minutes on the same clean split. What is the best next diagnosis and test?",
+              "options": [
+                {
+                  "key": "expanded-depth-comparison",
+                  "text": "Treat the training improvement as unfinished fitting; add depth again and compare only the new training RMSE"
+                },
+                {
+                  "key": "constrained-depth-comparison",
+                  "text": "Treat the widened gap as consistent with overfitting; compare shallower or regularized candidates on the unchanged validation protocol"
+                },
+                {
+                  "key": "pooled-split-comparison",
+                  "text": "Treat the split as the cause of disagreement; reshuffle training and validation cases together and repeat the comparison"
+                },
+                {
+                  "key": "mae-reframed-comparison",
+                  "text": "Treat the held-out misses as an RMSE sensitivity issue; switch to MAE and select from that post-hoc result"
+                }
+              ],
+              "answerKey": "constrained-depth-comparison",
+              "explanation": {
+                "text": "The deeper model fits training examples much more closely while its held-out error worsens, a generalization gap consistent with overfitting. Compare a constrained candidate on the unchanged split. Training-only selection, destroying the split, or changing the declared metric after seeing the result does not resolve that evidence.",
+                "sourceCreditKeys": ["google-overfitting", "sklearn-learning-curves", "sklearn-decision-trees", "sklearn-cross-validation", "sklearn-model-evaluation"]
+              }
+            },
+            {
+              "family": "impostor",
+              "key": "audit-generalization-claims",
+              "prompt": "Two statements use train and validation evidence coherently. One misreads it. Find the impostor.",
+              "statements": [
+                {
+                  "key": "shared-split-curves",
+                  "text": "Compare training and validation curves under the same split and metric before attributing their gap to model complexity.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "validation-selected-regularization",
+                  "text": "Treat regularization strength as a selected setting and compare its candidates with the same held-out development evidence.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "training-loss-convergence",
+                  "text": "After convergence and a narrow train-validation gap, treat measured validation error as the error retained on new cases.",
+                  "kind": "impostor"
+                }
+              ],
+              "explanation": {
+                "text": "Convergence says the optimizer has settled for the training objective; it does not erase the difference between fitted and new cases. Generalization still requires a clean validation protocol and a relevant future population.",
+                "sourceCreditKeys": ["google-gradient-descent", "google-overfitting", "sklearn-cross-validation"]
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "revisit-held-out-evidence",
+              "term": "validation error",
+              "sectionKey": "train-validation-patterns",
+              "steps": [
+                {
+                  "stopKey": "fit-transformations-and-loss",
+                  "activityKey": "choose-fold-local-pipeline"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "select-without-test-tuning",
+          "label": "Select candidates without consuming the test",
+          "requires": ["diagnose-fit-and-generalization"],
           "difficultyBand": 4,
           "lesson": {
             "sections": [
               {
-                "key": "calibration-threshold-and-shift",
-                "title": "A useful score still needs a decision rule",
-                "body": "Ranking, probability quality, and decision value are different properties. Calibration asks whether cases assigned probability near p experience the event about fraction p in the relevant population. Choose thresholds or top-k policies from benefits, costs, capacity, and subgroup behavior, using held-out data. After deployment, monitor service health, inputs, scores, actions, delayed outcomes, and calibration. A shifted input distribution is a warning to investigate, while a stable-looking input distribution cannot prove the concept remains unchanged.",
-                "sourceAnchor": {
-                  "heading": "9. Metrics, Calibration, Thresholds, and Subgroup Behavior",
-                  "quote": "**Calibration** asks whether events assigned probability near `p` occur about fraction `p` in the relevant population."
+                "key": "cross-validation-is-development-evidence",
+                "title": "Cross-validation repeats held-out development comparisons",
+                "body": "Cross-validation rotates training and validation roles within the development data so each candidate can be assessed on several held-out folds. The splitter must preserve the deployment grouping or time structure, and every learned transformation belongs inside each fold. The fold scores describe variation across those partitions; their average is not a guarantee for a different deployment process.",
+                "sourceCreditKeys": ["sklearn-cross-validation", "sklearn-common-pitfalls"],
+                "explorableTerms": []
+              },
+              {
+                "key": "same-protocol-fair-comparison",
+                "title": "Candidate comparisons need the same evidence basis",
+                "body": "Compare model families, features, and hyperparameters on the same folds, target definition, preprocessing boundary, and declared metric. Keep a simple baseline in the table and inspect fold spread and important slices instead of selecting from a rounded mean alone. Compute and latency limits can be acceptance constraints even when one candidate's model metric is slightly better.",
+                "sourceCreditKeys": ["sklearn-cross-validation", "sklearn-model-evaluation", "google-ml-framing", "google-monitoring", "google-productionization"],
+                "explorableTerms": []
+              },
+              {
+                "key": "freeze-before-final-test",
+                "title": "The final test follows a frozen selection record",
+                "body": "Record the selected pipeline, hyperparameters, metric, threshold policy when applicable, and evaluation code before final testing. It can be appropriate to refit that frozen pipeline on the full development set, then evaluate once on the untouched test set. If the result triggers another model choice, obtain new final evidence rather than reusing the consumed test estimate as if no iteration occurred.",
+                "sourceCreditKeys": ["sklearn-cross-validation", "sklearn-threshold-tuning"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "choose-selection-protocol",
+              "prompt": "Three pipeline families and their hyperparameters must be compared for new clinics, with one untouched clinic set reserved for final evidence. Which protocol preserves that role?",
+              "options": [
+                {
+                  "key": "reserved-clinic-tiebreak",
+                  "text": "Use grouped development folds, let reserved clinics break a near-tie, and report a bootstrap interval from those same clinics"
                 },
+                {
+                  "key": "grouped-development-selection",
+                  "text": "Use clinic-grouped development folds to select the whole pipeline, freeze it, refit as declared, and test once on reserved clinics"
+                },
+                {
+                  "key": "development-wide-preprocessing",
+                  "text": "Fit preprocessing once on all development clinics, cross-validate only the predictors, and test the winner once on reserved clinics"
+                },
+                {
+                  "key": "family-specific-comparisons",
+                  "text": "Let each family use its strongest split and metric, select the best reported development score, and run one reserved test"
+                }
+              ],
+              "answerKey": "grouped-development-selection",
+              "explanation": {
+                "text": "Clinic-grouped folds keep selection inside development data and refit the entire preprocessing-model pipeline per fold. Freezing before the reserved test preserves a final estimate for new clinics. Preprocessing outside the folds leaks validation information, incomparable protocols cannot rank families fairly, and a reserved-set tie-break consumes the final role.",
+                "sourceCreditKeys": ["sklearn-cross-validation", "sklearn-common-pitfalls"]
+              }
+            },
+            {
+              "family": "matching",
+              "key": "match-selection-evidence",
+              "prompt": "Match each evidence object to its selection role.",
+              "pairs": [
+                {
+                  "key": "training-fold-role",
+                  "left": "Training fold",
+                  "right": "Fits transformations and model parameters"
+                },
+                {
+                  "key": "validation-fold-role",
+                  "left": "Validation fold",
+                  "right": "Compares candidate settings during development"
+                },
+                {
+                  "key": "final-test-role",
+                  "left": "Untouched final test",
+                  "right": "Estimates the frozen selection on its declared claim"
+                },
+                {
+                  "key": "baseline-role",
+                  "left": "Simple baseline",
+                  "right": "Shows whether added complexity improves the same metric"
+                }
+              ],
+              "explanation": {
+                "text": "Training folds fit parameters, validation folds guide development choices, the untouched test estimates the already frozen choice, and the baseline makes added complexity earn its place under the same metric and split.",
+                "sourceCreditKeys": ["sklearn-cross-validation", "sklearn-model-evaluation"]
+              }
+            }
+          ],
+          "supportPaths": []
+        },
+        {
+          "key": "evaluate-regression-errors",
+          "label": "Read numerical errors in decision units",
+          "requires": ["select-without-test-tuning"],
+          "difficultyBand": 4,
+          "lesson": {
+            "sections": [
+              {
+                "key": "residuals-keep-direction",
+                "title": "A residual keeps the miss and its direction",
+                "body": "For a numerical target, define a residual with one stated sign convention, such as actual minus prediction. Positive and negative residuals then show underprediction and overprediction under that convention. Inspect their distribution and their relationship to time, sites, target size, and important slices; an average can hide a biased direction or a small set of damaging misses.",
+                "sourceCreditKeys": ["google-linear-loss", "sklearn-model-evaluation", "google-monitoring"],
+                "explorableTerms": []
+              },
+              {
+                "key": "mae-and-rmse-weight-errors",
+                "title": "MAE and RMSE answer different error questions",
+                "body": "MAE averages absolute error and stays in target units. RMSE takes the square root of mean squared error, also returning to target units while giving larger residuals more weight. Neither metric is universally best: choose and record the weighting that matches the decision consequences, then keep it fixed during candidate comparison.",
+                "sourceCreditKeys": ["google-linear-loss", "sklearn-model-evaluation"],
+                "explorableTerms": []
+              },
+              {
+                "key": "distribution-slices-and-baseline",
+                "title": "One regression score needs a distribution around it",
+                "body": "Report the chosen aggregate from frozen predictions alongside a simple baseline, residual quantiles or tail errors, and relevant slices. State the target units and evaluation population. A lower average error can coexist with worse error on a constrained region or with a rare large miss that matters operationally, so acceptance should use the predeclared bundle rather than a post-hoc favorable metric.",
+                "sourceCreditKeys": ["sklearn-model-evaluation", "google-ml-framing", "google-monitoring"],
                 "explorableTerms": [
                   {
-                    "term": "held-out data",
-                    "supportPathKey": "review-evaluation-boundary"
+                    "term": "frozen predictions",
+                    "supportPathKey": "revisit-frozen-selection"
                   }
                 ]
               }
@@ -228,45 +876,573 @@
           "activities": [
             {
               "family": "option_select",
-              "key": "choose-review-policy",
-              "prompt": "A calibrated risk score feeds a team that can review only 500 cases per day. Which next step respects the complete decision system?",
+              "key": "compare-error-profiles",
+              "prompt": "On four frozen cases, Model A has absolute errors [0, 0, 0, 8] minutes and Model B has [3, 3, 3, 3] minutes. Which comparison is correct?",
               "options": [
                 {
-                  "key": "evaluate-top-k-policy",
-                  "text": "Evaluate a top-500 policy with real error costs, subgroup behavior, and an operational fallback"
+                  "key": "a-both-metrics",
+                  "text": "A has lower MAE and lower RMSE because three of its four errors are zero"
                 },
                 {
-                  "key": "default-half-threshold",
-                  "text": "Use 0.5 because every calibrated score requires that threshold"
+                  "key": "b-both-metrics",
+                  "text": "B has lower MAE and lower RMSE because all four of its errors are equal"
                 },
                 {
-                  "key": "ranking-proves-calibration",
-                  "text": "Treat strong ranking as proof that the probabilities are calibrated"
+                  "key": "a-mae-b-rmse",
+                  "text": "A has lower MAE (2 versus 3), while B has lower RMSE (3 versus 4)"
                 },
                 {
-                  "key": "ignore-outcomes-after-launch",
-                  "text": "Stop measuring outcomes because offline evaluation already fixed the system"
+                  "key": "metrics-tie",
+                  "text": "The models tie on both metrics because each error list sums to an even number"
                 }
               ],
-              "answerKey": "evaluate-top-k-policy",
+              "answerKey": "a-mae-b-rmse",
               "explanation": {
-                "text": "Review capacity makes top-k selection part of the policy. It must be evaluated with consequences and monitoring; the score alone neither chooses the threshold nor guarantees continued usefulness.",
-                "sourceAnchor": {
-                  "heading": "9. Metrics, Calibration, Thresholds, and Subgroup Behavior",
-                  "quote": "The model score is an input to policy, not the policy itself."
+                "text": "A's MAE is (0 + 0 + 0 + 8) / 4 = 2 and its RMSE is sqrt(64 / 4) = 4. B's MAE and RMSE are both 3. The choice between them therefore depends on the declared consequence of a rare large miss versus typical error.",
+                "sourceCreditKeys": ["google-linear-loss", "sklearn-model-evaluation"]
+              }
+            },
+            {
+              "family": "matching",
+              "key": "match-regression-diagnostics",
+              "prompt": "Match each regression diagnostic to the question it answers.",
+              "pairs": [
+                {
+                  "key": "mae-question",
+                  "left": "MAE",
+                  "right": "What is the average absolute miss in target units?"
+                },
+                {
+                  "key": "rmse-question",
+                  "left": "RMSE",
+                  "right": "What target-unit score gives larger misses extra weight?"
+                },
+                {
+                  "key": "residual-sign-question",
+                  "left": "Residual sign",
+                  "right": "Which direction did the prediction miss under the declared convention?"
+                },
+                {
+                  "key": "baseline-question",
+                  "left": "Baseline comparison",
+                  "right": "Did the fitted pipeline improve on a simpler rule under the same protocol?"
                 }
+              ],
+              "explanation": {
+                "text": "MAE describes typical absolute magnitude, RMSE emphasizes larger residuals, the residual sign preserves direction, and a baseline tests whether modeling complexity adds value under the same evidence basis.",
+                "sourceCreditKeys": ["google-linear-loss", "sklearn-model-evaluation"]
               }
             }
           ],
           "supportPaths": [
             {
-              "key": "review-evaluation-boundary",
-              "term": "held-out data",
-              "sectionKey": "calibration-threshold-and-shift",
+              "key": "revisit-frozen-selection",
+              "term": "frozen predictions",
+              "sectionKey": "distribution-slices-and-baseline",
               "steps": [
                 {
-                  "stopKey": "evaluation-without-leakage",
-                  "activityKey": "choose-temporal-evaluation"
+                  "stopKey": "select-without-test-tuning",
+                  "activityKey": "choose-selection-protocol"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "evaluate-classification-scores",
+          "label": "Separate classification metrics and calibration",
+          "requires": ["select-without-test-tuning"],
+          "difficultyBand": 4,
+          "lesson": {
+            "sections": [
+              {
+                "key": "confusion-counts-and-denominators",
+                "title": "Start from the positive class and four counts",
+                "body": "Name the positive class, then count true positives, false positives, true negatives, and false negatives at one threshold. Recall is true positives divided by all actual positives; precision is true positives divided by all predicted positives. Their denominators answer different questions. A metric name without its positive class, population, and threshold is incomplete evidence.",
+                "sourceCreditKeys": ["google-classification-metrics", "sklearn-model-evaluation"],
+                "explorableTerms": []
+              },
+              {
+                "key": "thresholds-change-errors",
+                "title": "Thresholds trade false positives against false negatives",
+                "body": "Changing a binary threshold changes the confusion counts and therefore precision, recall, and related metrics. Accuracy can look high when the negative class dominates, so compare the metrics tied to the actual error costs and capacity. Ranking measures summarize score order across thresholds; they do not choose the operating threshold or prove that score values are probabilities.",
+                "sourceCreditKeys": ["google-classification-metrics", "sklearn-threshold-tuning", "sklearn-model-evaluation"],
+                "explorableTerms": []
+              },
+              {
+                "key": "calibration-is-probability-quality",
+                "title": "Calibration and ranking are separate properties",
+                "body": "For a calibrated binary score, cases assigned probabilities near 0.7 should have an observed positive fraction near 0.7 in the relevant population. Reliability diagrams compare predicted probability bins with observed frequencies. Calibration must be evaluated on data independent of the cases used to fit the classifier or calibrator, and it can vary across populations or time even when ranking remains useful.",
+                "sourceCreditKeys": ["sklearn-calibration", "sklearn-cross-validation", "google-monitoring"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "calculate-classification-recall",
+              "prompt": "At one frozen threshold, a detector has 18 true positives, 6 false negatives, 9 false positives, and 67 true negatives. What is recall for the stated positive class?",
+              "options": [
+                {
+                  "key": "recall-two-thirds",
+                  "text": "0.67, because 18 / (18 + 9) uses all predicted positives"
+                },
+                {
+                  "key": "recall-three-quarters",
+                  "text": "0.75, because 18 / (18 + 6) uses all actual positives"
+                },
+                {
+                  "key": "recall-eighty-five",
+                  "text": "0.85, because (18 + 67) / 100 uses every correct classification"
+                },
+                {
+                  "key": "recall-ninety",
+                  "text": "0.90, because (18 + 9) / (18 + 6 + 9) excludes true negatives"
+                }
+              ],
+              "answerKey": "recall-three-quarters",
+              "explanation": {
+                "text": "Recall uses all actual positives: TP / (TP + FN) = 18 / 24 = 0.75. The 0.67 calculation is precision, and 0.85 is accuracy. The threshold and positive class remain part of the claim.",
+                "sourceCreditKeys": ["google-classification-metrics"]
+              }
+            },
+            {
+              "family": "impostor",
+              "key": "audit-classification-claims",
+              "prompt": "Two statements preserve distinct classification evidence. One collapses it. Find the impostor.",
+              "statements": [
+                {
+                  "key": "threshold-specific-confusion-counts",
+                  "text": "Recompute confusion-matrix metrics for the declared positive class on held-out predictions whenever the operating threshold changes.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "ranking-calibration-inspection",
+                  "text": "Inspect ranking and probability calibration separately on held-out cases when the deployed policy depends on both properties.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "aggregate-accuracy-acceptance",
+                  "text": "For a one-percent positive rate, accept primarily on accuracy when the evaluation set is large and untouched.",
+                  "kind": "impostor"
+                }
+              ],
+              "explanation": {
+                "text": "When negatives dominate, high accuracy can coexist with missing most positives. Acceptance must preserve the positive class, threshold, error consequences, and any separate ranking or calibration requirements.",
+                "sourceCreditKeys": ["google-classification-metrics", "sklearn-calibration", "sklearn-threshold-tuning"]
+              }
+            }
+          ],
+          "supportPaths": []
+        }
+      ],
+      "guardianActivityKeys": [
+        "diagnose-error-pattern",
+        "audit-generalization-claims",
+        "choose-selection-protocol",
+        "match-selection-evidence",
+        "compare-error-profiles",
+        "match-regression-diagnostics",
+        "calculate-classification-recall",
+        "audit-classification-claims"
+      ]
+    },
+    {
+      "key": "deploy-and-respond",
+      "title": "Deploy and respond as a system",
+      "stops": [
+        {
+          "key": "turn-scores-into-policy",
+          "label": "Turn model output into an explicit policy",
+          "requires": ["evaluate-regression-errors", "evaluate-classification-scores"],
+          "difficultyBand": 4,
+          "lesson": {
+            "sections": [
+              {
+                "key": "score-is-not-action",
+                "title": "A score becomes useful through a decision rule",
+                "body": "A regression estimate, class score, or predicted probability is not yet an action. The policy maps it to a threshold, ranked top-k queue, resource allocation, abstention, or other response. A library's default class threshold is a software convention, not a universal decision optimum. Keep policy code and policy version explicit so the same model can be evaluated under different operational rules.",
+                "sourceCreditKeys": ["google-ml-framing", "sklearn-threshold-tuning"],
+                "explorableTerms": []
+              },
+              {
+                "key": "ranking-calibration-and-capacity",
+                "title": "Ranking, probability quality, and capacity constrain different parts",
+                "body": "Ranking quality matters when limited capacity selects the highest-scored cases. Calibration matters when a score is interpreted as a probability or combined with expected costs. Capacity limits how many actions can occur, regardless of score quality. Name which property the policy needs and evaluate it on held-out data; a useful rank order does not prove calibrated probabilities, and calibration does not choose the available capacity.",
+                "sourceCreditKeys": ["sklearn-calibration", "sklearn-threshold-tuning", "sklearn-model-evaluation"],
+                "explorableTerms": []
+              },
+              {
+                "key": "evaluate-complete-policy",
+                "title": "Evaluate the model-policy pair and its fallback",
+                "body": "Choose thresholds or top-k rules from stated false-positive and false-negative consequences, capacity, subgroup behavior, and a fallback for missing or invalid output. Tune the rule within development data, then freeze it for final evaluation. After launch, measure both model evidence and the real outcome the action was meant to improve; offline model gains and product success are related but not interchangeable.",
+                "sourceCreditKeys": ["google-classification-metrics", "sklearn-threshold-tuning", "google-ml-framing", "google-monitoring", "nist-ai-rmf-playbook"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "choose-capacity-policy",
+              "prompt": "A calibrated inspection-risk model scores 8,000 parcels daily, but trained staff can inspect 200. Which next step evaluates the complete decision system?",
+              "options": [
+                {
+                  "key": "calibrated-half-threshold",
+                  "text": "Inspect scores above 0.5, then cap the queue at 200 because calibrated probabilities make 0.5 the natural decision boundary"
+                },
+                {
+                  "key": "heldout-top-k-policy",
+                  "text": "On held-out data, evaluate a top-200 queue with error consequences, relevant slices, capacity use, and invalid-score fallback"
+                },
+                {
+                  "key": "ranked-queue-monitoring",
+                  "text": "Select the top 200 from held-out scores, accept ranking as the offline gate, and measure error consequences only after launch"
+                },
+                {
+                  "key": "final-set-policy-fit",
+                  "text": "Use final-test outcomes to recalibrate probabilities and size the 200-case queue, then report performance on those same cases"
+                }
+              ],
+              "answerKey": "heldout-top-k-policy",
+              "explanation": {
+                "text": "Capacity makes top-200 selection part of the policy. The complete evaluation includes consequences, relevant slices, operational use, and fallback; neither 0.5 nor ranking alone chooses the decision, and final-test fitting consumes the boundary.",
+                "sourceCreditKeys": ["sklearn-threshold-tuning", "sklearn-calibration", "google-monitoring"]
+              }
+            },
+            {
+              "family": "matching",
+              "key": "match-policy-parts",
+              "prompt": "Match each deployed decision-system part to its role.",
+              "pairs": [
+                {
+                  "key": "score-policy-role",
+                  "left": "Model score",
+                  "right": "Orders or estimates cases before an action rule"
+                },
+                {
+                  "key": "threshold-policy-role",
+                  "left": "Operating threshold",
+                  "right": "Maps score values to one action boundary"
+                },
+                {
+                  "key": "capacity-policy-role",
+                  "left": "Action capacity",
+                  "right": "Limits how many selected cases can be handled"
+                },
+                {
+                  "key": "fallback-policy-role",
+                  "left": "Fallback path",
+                  "right": "Handles missing, invalid, or unavailable model output"
+                }
+              ],
+              "explanation": {
+                "text": "The score supplies an estimate or ordering, the threshold supplies an action boundary, capacity constrains volume, and the fallback preserves behavior when model output cannot be used. Together they define more than the fitted model alone.",
+                "sourceCreditKeys": ["sklearn-threshold-tuning", "google-productionization", "nist-ai-rmf-playbook"]
+              }
+            }
+          ],
+          "supportPaths": []
+        },
+        {
+          "key": "audit-subgroup-behavior",
+          "label": "Inspect relevant groups without hiding context",
+          "requires": ["turn-scores-into-policy"],
+          "difficultyBand": 4,
+          "lesson": {
+            "sections": [
+              {
+                "key": "aggregate-can-hide-slices",
+                "title": "Strong aggregate performance can conceal a weak group",
+                "body": "Compute the same decision-relevant metrics for groups and conditions where errors or access may differ. These may include geography, device type, time window, workflow channel, or demographic and intersectional groups when appropriate and lawful for the context. Aggregate performance weighted toward a large group can remain strong while a smaller group receives poor recall, calibration, or error magnitude.",
+                "sourceCreditKeys": ["google-fairness-evaluation", "google-monitoring", "google-model-cards"],
+                "explorableTerms": [
+                  {
+                    "term": "recall",
+                    "supportPathKey": "revisit-positive-denominator"
+                  }
+                ]
+              },
+              {
+                "key": "denominators-and-uncertainty",
+                "title": "A subgroup metric needs its cases and denominator",
+                "body": "For each slice, report the positive class, threshold or policy, numerator, denominator, sample size, and uncertainty or instability where feasible. Small intersectional groups can produce noisy estimates, while missing or selectively observed labels can bias the comparison. A disparity is a signal to investigate data production, labels, model behavior, policy, and impact—not a license to invent precision the evidence does not contain.",
+                "sourceCreditKeys": ["google-classification-metrics", "google-fairness-evaluation", "nist-ai-rmf-playbook"],
+                "explorableTerms": []
+              },
+              {
+                "key": "fairness-criterion-is-contextual",
+                "title": "Fairness criteria encode a context-specific choice",
+                "body": "Different criteria focus on selection rates, opportunity, error rates, calibration, individual comparisons, or downstream outcomes, and they need not agree. Choose metrics and tolerance levels from the decision context, harms, law, governance, and input from affected stakeholders. Document trade-offs and response thresholds instead of claiming that one technical equality proves the whole system fair.",
+                "sourceCreditKeys": ["google-fairness-evaluation", "nist-ai-rmf-playbook", "google-model-cards"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "diagnose-hidden-subgroup",
+              "prompt": "A support-routing classifier has 89% recall overall but 46% recall for the smaller night-channel slice at the same threshold. What is the strongest supported next step?",
+              "options": [
+                {
+                  "key": "aggregate-then-observe",
+                  "text": "Accept from the untouched overall result, add night-channel monitoring, and defer a separate decision until more slice labels mature"
+                },
+                {
+                  "key": "night-data-retraining",
+                  "text": "Attribute the gap to scarce night examples, oversample them for retraining, and check whether night recall rises"
+                },
+                {
+                  "key": "slice-chain-investigation",
+                  "text": "Report the slice denominator and uncertainty, then inspect data, labels, scores, policy, and outcomes before choosing a response"
+                },
+                {
+                  "key": "matched-selection-policy",
+                  "text": "Move the night threshold until its selection rate matches the full population, then compare recall under that policy"
+                }
+              ],
+              "answerKey": "slice-chain-investigation",
+              "explanation": {
+                "text": "The large recall gap is material evidence to investigate, but it does not identify its own cause or prescribe one fairness intervention. The denominator, uncertainty, data and label process, model scores, deployed policy, and outcomes all belong in the diagnosis.",
+                "sourceCreditKeys": ["google-fairness-evaluation", "nist-ai-rmf-playbook", "google-monitoring"]
+              }
+            },
+            {
+              "family": "impostor",
+              "key": "audit-subgroup-conclusions",
+              "prompt": "Two statements preserve subgroup evidence. One overstates it. Find the impostor.",
+              "statements": [
+                {
+                  "key": "slice-metric-record",
+                  "text": "Report each relevant slice's metric with its policy threshold, denominator, sample size, and feasible uncertainty limits.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "system-chain-trace",
+                  "text": "Trace a disparity through data, labels, model scores, policy actions, and downstream outcomes before selecting a mitigation response.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "aggregate-score-inference",
+                  "text": "When every subgroup appears in evaluation, treat stable aggregate recall as evidence that subgroup recall is comparable.",
+                  "kind": "impostor"
+                }
+              ],
+              "explanation": {
+                "text": "An aggregate score can be dominated by the largest group and therefore cannot establish behavior in smaller or intersectional slices. Subgroup evidence also needs denominators, context, and the surrounding decision process.",
+                "sourceCreditKeys": ["google-fairness-evaluation", "google-model-cards", "nist-ai-rmf-playbook"]
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "revisit-positive-denominator",
+              "term": "recall",
+              "sectionKey": "aggregate-can-hide-slices",
+              "steps": [
+                {
+                  "stopKey": "evaluate-classification-scores",
+                  "activityKey": "calculate-classification-recall"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "detect-shift-and-monitor",
+          "label": "Monitor the system and interpret shift cautiously",
+          "requires": ["audit-subgroup-behavior"],
+          "difficultyBand": 5,
+          "lesson": {
+            "sections": [
+              {
+                "key": "several-processes-can-change",
+                "title": "Inputs, labels, and their relationship can change",
+                "body": "After deployment, input or feature distributions can move, label prevalence can move, and the relationship between features and outcomes can change. Training-serving skew can also arise when schemas or feature code differ between pipelines. Compare current windows with versioned reference windows, but keep the categories separate because the diagnosis and response may differ.",
+                "sourceCreditKeys": ["google-monitoring", "google-productionization", "pmlr-covariate-shift", "pmlr-concept-drift"],
+                "explorableTerms": []
+              },
+              {
+                "key": "shift-alert-is-not-performance-proof",
+                "title": "An unlabeled shift alert is a warning, not a verdict",
+                "body": "A feature-distribution or score-distribution alert shows that a monitored signal crossed its reference threshold. It does not alone prove that prediction error rose, explain the cause, or show that retraining will help. When outcomes arrive later, preserve the alert, investigate pipeline and population changes, use bounded proxy or sampled review where justified, and update the performance assessment when mature labels become available.",
+                "sourceCreditKeys": ["google-monitoring", "nist-ai-rmf-playbook", "pmlr-covariate-shift", "pmlr-concept-drift"],
+                "explorableTerms": []
+              },
+              {
+                "key": "monitor-the-whole-chain",
+                "title": "Monitoring spans service, data, scores, actions, and outcomes",
+                "body": "Monitor availability, latency, errors, schema and missingness; feature and score distributions; policy thresholds, action rates, and capacity; delayed model metrics, calibration, and real outcomes; and relevant slices throughout. Give each alert a reference window, tolerance, owner, and review action. A stable input dashboard cannot prove the label relationship or downstream impact stayed stable.",
+                "sourceCreditKeys": ["google-monitoring", "google-productionization", "nist-ai-rmf-playbook"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "interpret-shift-alert",
+              "prompt": "A delivery model's distance-feature distribution crosses its alert threshold after a routing change; mature delay labels arrive in three weeks. What conclusion and response fit the current evidence?",
+              "options": [
+                {
+                  "key": "alert-scaled-performance",
+                  "text": "Use the feature-statistic change as a provisional estimate of RMSE increase and trigger the corresponding performance response"
+                },
+                {
+                  "key": "current-window-retraining",
+                  "text": "Retrain on the latest mature labeled window because the input alert establishes that the currently served model is stale"
+                },
+                {
+                  "key": "warning-investigation-followup",
+                  "text": "Treat it as a warning, check pipeline and population changes, keep safeguards, and assess error when mature labels arrive"
+                },
+                {
+                  "key": "mature-label-only-review",
+                  "text": "Keep serving unchanged and wait for mature labels before checking the routing pipeline, because the alert does not prove error"
+                }
+              ],
+              "answerKey": "warning-investigation-followup",
+              "explanation": {
+                "text": "The crossed threshold establishes a monitored distribution change, not its effect on RMSE or its cause. Pipeline and population diagnosis can begin now, safeguards remain active, and mature outcomes are needed for the direct performance claim.",
+                "sourceCreditKeys": ["google-monitoring", "google-productionization", "nist-ai-rmf-playbook", "pmlr-covariate-shift"]
+              }
+            },
+            {
+              "family": "matching",
+              "key": "match-monitoring-signals",
+              "prompt": "Match each monitored signal to the layer it directly measures.",
+              "pairs": [
+                {
+                  "key": "latency-signal",
+                  "left": "Prediction latency percentile",
+                  "right": "Serving health and response time"
+                },
+                {
+                  "key": "null-rate-signal",
+                  "left": "Feature missing-value rate",
+                  "right": "Input data quality and schema behavior"
+                },
+                {
+                  "key": "score-rate-signal",
+                  "left": "Risk-score distribution",
+                  "right": "Model-output behavior before policy action"
+                },
+                {
+                  "key": "outcome-signal",
+                  "left": "Mature labeled error by slice",
+                  "right": "Realized predictive performance for observed outcomes"
+                }
+              ],
+              "explanation": {
+                "text": "Latency measures service behavior, missingness measures incoming data quality, score distributions measure model output, and mature labeled errors measure realized prediction quality. A change at one layer does not automatically identify another layer's result.",
+                "sourceCreditKeys": ["google-monitoring", "google-productionization"]
+              }
+            }
+          ],
+          "supportPaths": []
+        },
+        {
+          "key": "run-lifecycle-response",
+          "label": "Respond, revalidate, and preserve the record",
+          "requires": ["detect-shift-and-monitor"],
+          "difficultyBand": 5,
+          "lesson": {
+            "sections": [
+              {
+                "key": "alerts-need-owned-response",
+                "title": "Predeclare tolerances, owners, and containment",
+                "body": "For each material service, data, performance, subgroup, or outcome signal, record the threshold, observation window, responsible owner, and first response. The response may pause an action, route cases to a fallback, reduce rollout, roll back a model or policy, or open investigation. A dashboard without a decision owner and response condition records change without controlling its impact.",
+                "sourceCreditKeys": ["nist-ai-rmf-playbook", "google-productionization"],
+                "explorableTerms": []
+              },
+              {
+                "key": "diagnose-before-retraining",
+                "title": "Contain, diagnose, correct, then revalidate",
+                "body": "Preserve the shift alert and affected versions, check serving and feature pipelines, examine data and labels, and compare model, policy, and outcome evidence. Retraining is one possible correction, not an automatic response: a schema bug may need a pipeline repair, a policy overload may need a capacity change, and an invalid use may require decommissioning. Any changed model, data, transformation, threshold, or workflow re-enters the relevant held-out, subgroup, calibration, integration, and staged-rollout gates.",
+                "sourceCreditKeys": ["google-productionization", "nist-ai-rmf-playbook", "google-monitoring"],
+                "explorableTerms": [
+                  {
+                    "term": "shift alert",
+                    "supportPathKey": "revisit-shift-evidence"
+                  }
+                ]
+              },
+              {
+                "key": "version-and-document-the-system",
+                "title": "The release record includes more than model weights",
+                "body": "Link the decision contract, data and label versions, split logic, preprocessing and code, fitted model and hyperparameters, metrics and slices, calibration, policy threshold, fallback, approvals, monitoring, and incident history. A model card records intended uses, evaluation conditions, subgroup results, and known limitations. That record enables reproduction, rollback, review of off-label use, and a reasoned decision to update or retire the system.",
+                "sourceCreditKeys": ["google-model-cards", "nist-ai-rmf-playbook", "google-productionization"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "choose-incident-response",
+              "prompt": "After a schema release, missingness and false negatives rise in one route while the previous model-policy version remains available. Which response preserves evidence and controls impact?",
+              "options": [
+                {
+                  "key": "partial-window-retraining",
+                  "text": "Retrain a candidate on the partially labeled incident window while the affected route remains live, then replace it after offline metrics recover"
+                },
+                {
+                  "key": "rollback-and-close",
+                  "text": "Roll back the affected route to the prior version and close the incident once missingness returns to baseline"
+                },
+                {
+                  "key": "contain-diagnose-revalidate",
+                  "text": "Route affected cases to fallback or rollback, preserve versions and logs, repair the cause, rerun relevant gates, and stage the return"
+                },
+                {
+                  "key": "schema-patch-resume",
+                  "text": "Patch the schema mapping, restore the current version, and reuse its pre-release acceptance because model weights did not change"
+                }
+              ],
+              "answerKey": "contain-diagnose-revalidate",
+              "explanation": {
+                "text": "Containment limits current impact while versioned evidence supports diagnosis. The repair then re-enters affected validation and staged rollout. Retraining on incomplete labels prolongs exposure, a schema patch changes the fitted pipeline even when weights do not change, and rollback alone does not establish that false-negative behavior recovered or the cause is understood.",
+                "sourceCreditKeys": ["google-productionization", "nist-ai-rmf-playbook", "google-model-cards"]
+              }
+            },
+            {
+              "family": "impostor",
+              "key": "audit-lifecycle-claims",
+              "prompt": "Two statements preserve lifecycle evidence. One skips it. Find the impostor.",
+              "statements": [
+                {
+                  "key": "versioned-system-record",
+                  "text": "Link data, code, transformations, model, policy, metrics, monitoring, and approvals for each released system version.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "cause-specific-response",
+                  "text": "Choose among pipeline repair, policy change, retraining, rollback, fallback, or retirement from the diagnosed problem.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "changed-window-acceptance",
+                  "text": "Reuse prior acceptance when only the training window changes, then monitor after release.",
+                  "kind": "impostor"
+                }
+              ],
+              "explanation": {
+                "text": "Changed data or policy can change model and decision behavior, so the new system must pass the relevant gates on its own versioned evidence. Prior acceptance supplies history, not automatic approval for changed inputs or actions.",
+                "sourceCreditKeys": ["google-productionization", "nist-ai-rmf-playbook", "google-model-cards"]
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "revisit-shift-evidence",
+              "term": "shift alert",
+              "sectionKey": "diagnose-before-retraining",
+              "steps": [
+                {
+                  "stopKey": "detect-shift-and-monitor",
+                  "activityKey": "interpret-shift-alert"
                 }
               ]
             }
@@ -274,18 +1450,29 @@
         }
       ],
       "guardianActivityKeys": [
-        "match-prediction-contract",
-        "spot-evaluation-impostor",
-        "choose-temporal-evaluation",
-        "choose-review-policy"
+        "choose-capacity-policy",
+        "match-policy-parts",
+        "diagnose-hidden-subgroup",
+        "audit-subgroup-conclusions",
+        "interpret-shift-alert",
+        "match-monitoring-signals",
+        "choose-incident-response",
+        "audit-lifecycle-claims"
       ]
     }
   ],
   "expeditionGuardianActivityKeys": [
-    "enforce-availability-contract",
-    "match-prediction-contract",
-    "spot-evaluation-impostor",
-    "choose-temporal-evaluation",
-    "choose-review-policy"
+    "match-contract-elements",
+    "audit-evaluation-boundary",
+    "choose-fold-local-pipeline",
+    "audit-family-claims",
+    "diagnose-error-pattern",
+    "match-selection-evidence",
+    "compare-error-profiles",
+    "audit-classification-claims",
+    "match-policy-parts",
+    "diagnose-hidden-subgroup",
+    "interpret-shift-alert",
+    "audit-lifecycle-claims"
   ]
 }

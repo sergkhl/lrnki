@@ -5,8 +5,9 @@ Status: Accepted
 ## Decision
 
 Every Stop owns one Lesson that teaches the learner-visible objective before its Activities grade it.
-Lesson sections carry exact source anchors and enough explanation, contrast, or example for the
-Activities to be answerable without exposing their keys.
+Lesson sections carry keyed Source Credit references and enough explanation, contrast, or example
+for the Activities to be answerable without exposing their keys. Direct source inspection, not
+reference resolution alone, establishes whether the cited evidence supports the teaching and answer.
 
 Reading is ungraded. A Lesson cannot itself create a response, reward, or mastery; acquisition
 mastery combines its read evidence with the Stop's required current Activities, except for explicit

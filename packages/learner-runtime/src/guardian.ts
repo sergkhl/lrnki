@@ -1,8 +1,4 @@
-import type { LearnerActivityProjection } from "./contentQualifier";
-import type {
-  AuthoredActivity,
-  AuthoredMatching
-} from "./contentSchema";
+import type { AuthoredActivity } from "./contentSchema";
 import type {
   ExpeditionJourneyState,
   GuardianChallenge,
@@ -231,21 +227,6 @@ export function selectionCorrectKey(activity: AuthoredActivity): string | null {
   return null;
 }
 
-export function matchingPairKeyFromPublic(
-  authored: AuthoredMatching,
-  projected: Extract<LearnerActivityProjection, { family: "matching" }>,
-  side: "left" | "right",
-  publicKey: string
-): string | null {
-  const publicEntries = side === "left" ? projected.left : projected.right;
-  const publicIndex = publicEntries.findIndex((entry) => entry.key === publicKey);
-  if (publicIndex < 0) return null;
-  const authoredIndex = side === "left"
-    ? publicIndex
-    : authored.pairs.length - 1 - publicIndex;
-  return authored.pairs[authoredIndex]?.key ?? null;
-}
-
 export function projectGuardianView(input: {
   expedition: RuntimeExpedition;
   journey: ExpeditionJourneyState;
@@ -287,6 +268,7 @@ export function projectGuardianView(input: {
     remainingShield: combat.remainingShield,
     shieldTotal: GUARDIAN_SHIELD_TOTAL,
     retreated: combat.retreated,
+    sourceCredits: input.expedition.projection.sourceCredits,
     currentActivity,
     matchingProgress:
       combat.matching?.activityKey === currentActivityKey

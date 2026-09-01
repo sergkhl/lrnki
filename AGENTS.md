@@ -11,8 +11,8 @@ Keep one canonical definition for every fact:
   snapshot, and journal files are mechanical artifacts and are never edited or applied by hand
   ([ADR-0039](docs/adr/0039-own-persisted-shape-in-code-first-drizzle-schema.md)).
 - `content/catalog.json` owns catalog membership and order. Each tracked
-  `content/expeditions/<key>/expedition.json` and `source.md` pair owns one complete authored
-  Expedition and its project-owned source basis.
+  `content/expeditions/<key>/expedition.json` owns one complete authored Expedition, including its
+  keyed online source credits and exact teaching references.
 - A linked brainstorm owns accepted framing only until its decisions are implemented, abandoned, or
   re-homed. A linked ready/in-progress plan owns active implementation design and its Validation Log.
 - `docs/plans/TODO.md` owns current work and rolling completed outcomes;
@@ -52,11 +52,11 @@ repair their references in the same change.
   user-initiated and belong in `docs/plans/BLOCKERS.md` only when a plan actually requires them.
 - Before running or qualifying evidence, apply `.agents/skills/validate-lrnki/SKILL.md` and its
   smallest relevant environment reference.
-- Structural qualification proves structure and exact anchor existence, not teaching quality or
-  semantic support. Inspect every learner-visible lesson, answer, explanation, pair, impostor reveal,
-  Support target, Guardian pool, and source anchor against its local primer. Record `FIX_FIRST` for
-  unsupported material claims, incorrect or non-unique keys, prerequisite leakage, unhelpful Support,
-  or an incoherent route; repair every `FIX_FIRST` before acceptance.
+- Structural qualification proves structure and exact source-credit resolution, not teaching
+  quality or semantic support. Inspect every learner-visible lesson, answer, explanation, pair,
+  impostor reveal, Support target, and Guardian pool against its cited online evidence. Record
+  `FIX_FIRST` for unsupported material claims, incorrect or non-unique keys, prerequisite leakage,
+  unhelpful Support, or an incoherent route; repair every `FIX_FIRST` before acceptance.
 - Every zero-row or absence assertion needs a positive control over the same inspection seam.
 
 ## Rules

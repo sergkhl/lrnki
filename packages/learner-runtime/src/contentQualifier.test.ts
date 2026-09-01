@@ -6,6 +6,7 @@ import test from "node:test";
 
 import {
   canonicalContentRevision,
+  matchingPairKeyFromPublic,
   projectQualifiedCatalog,
   qualifiedExpeditionRevision,
   qualifyCatalog,
@@ -487,6 +488,26 @@ test("learner projection exposes Lesson citations but keeps grading and explanat
   assert.equal(projectedMatching?.family, "matching");
   const leftKeys = new Set(projectedMatching.left.map((item) => item.key));
   assert.ok(projectedMatching.right.every((item) => !leftKeys.has(item.key)));
+  const privateMatching = cloneDocument().legs
+    .flatMap((leg) => leg.stops)
+    .flatMap((item) => item.activities)
+    .find((item): item is AuthoredMatching => item.key === projectedMatching.key);
+  assert.ok(privateMatching);
+  for (const side of ["left", "right"] as const) {
+    const entries: ReadonlyArray<Readonly<{ key: string; text: string }>> =
+      side === "left" ? projectedMatching.left : projectedMatching.right;
+    for (const entry of entries) {
+      const pair: AuthoredMatching["pairs"][number] | undefined =
+        privateMatching.pairs.find((candidate) =>
+          (side === "left" ? candidate.left : candidate.right) === entry.text
+        );
+      assert.ok(pair);
+      assert.equal(
+        matchingPairKeyFromPublic(privateMatching, projectedMatching, side, entry.key),
+        pair.key
+      );
+    }
+  }
 });
 
 test("learner projection removes authored position as a correctness channel", () => {

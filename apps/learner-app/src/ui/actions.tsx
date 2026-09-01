@@ -142,6 +142,7 @@ export function Button({
   size = "default",
   disabled = false,
   busy = false,
+  expanded,
   onPress,
   label,
   icon,
@@ -154,6 +155,8 @@ export function Button({
   size?: "default" | "compact";
   disabled?: boolean;
   busy?: boolean;
+  /** For disclosure controls: exposes the expanded state without changing the visual label. */
+  expanded?: boolean;
   onPress: () => void;
   label: string;
   icon?: ReactNode;
@@ -170,6 +173,7 @@ export function Button({
       accessibilityLabel={accessibilityLabel ?? label}
       disabled={disabled}
       busy={busy}
+      expanded={expanded}
       haptic={haptic}
       onPress={onPress}
       className={`${height} flex-row items-center justify-center gap-2 rounded-control px-4 ${BUTTON_BOX[variant]} ${disabled ? "opacity-50" : ""} ${className ?? ""}`}

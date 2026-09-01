@@ -10,11 +10,12 @@ The tracked ordered membership of learner-visible Expeditions. _Avoid_: installe
 catalog, generated package.
 
 **Authored Expedition**:
-One complete declarative learning journey written offline from its project-owned primer and consumed
-directly by the server. _Avoid_: generated course, content package, graph projection.
+One complete declarative learning journey researched and written offline, then consumed directly by
+the server. _Avoid_: generated course, content package, graph projection.
 
 **Leg**:
-An authored milestone containing an ordered group of three to five Stops and one Guardian scope.
+An authored milestone containing an ordered group of four to seven Stops and one Guardian scope;
+every Expedition has exactly three Legs.
 _Avoid_: generated section, database chapter.
 
 **Stop**:
@@ -22,12 +23,16 @@ One authored learning objective with a Lesson, Activities, prerequisite referenc
 optional Support Paths. _Avoid_: Concept, node, checkpoint identity.
 
 **Lesson**:
-The ungraded teaching material for one Stop, divided into source-anchored sections. _Avoid_: prompt,
-quiz explanation, generated grounding.
+The ungraded teaching material for one Stop, divided into sections with keyed Source Credit
+references. _Avoid_: prompt, quiz explanation, generated grounding.
+
+**Source Credit**:
+Learner-visible authority and link metadata for one inspectable online source, referenced by authored
+teaching and graded explanations. _Avoid_: source packet, copied page, runtime fetch.
 
 **Activity**:
 A server-graded option-select, matching, or impostor exercise with a private answer and a
-source-anchored explanation. _Avoid_: Study Item, card bank, self-report.
+source-referenced explanation. _Avoid_: Study Item, card bank, self-report.
 
 **Explorable Term**:
 An exact rendered lesson substring that opens one explicitly authored Support Path. _Avoid_: keyword,
@@ -42,7 +47,7 @@ A server-owned Leg or Expedition challenge assembled from an explicit authored a
 durable combat, recovery, rematch, and reward state. _Avoid_: mastery-affecting quiz, client battle.
 
 **Content Revision**:
-The canonical identity of one qualified Expedition's semantic document and referenced primer bytes.
+The canonical identity of one qualified Expedition's semantic document.
 _Avoid_: file hash, formatting hash, database version.
 
 ## Learner experience

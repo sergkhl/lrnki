@@ -3,10 +3,10 @@ import type {
   AuthoredMatching,
   AuthoredStop
 } from "./contentSchema";
+import { matchingPairKeyFromPublic } from "./contentQualifier";
 import {
   foldGuardianChallenge,
   guardianScopeKey,
-  matchingPairKeyFromPublic,
   nextGuardianEventSeq,
   selectGuardianLineup,
   selectionCorrectKey,

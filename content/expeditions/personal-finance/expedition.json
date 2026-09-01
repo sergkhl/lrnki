@@ -1,38 +1,207 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "key": "personal-finance",
   "title": "Personal Finance",
-  "teaser": "Map obligations, preserve flexibility, and compare financial choices on the terms that actually matter.",
-  "declaredDomain": "Personal financial decision-making",
-  "audience": "Adult learners building resilient financial habits",
+  "teaser": "Map the whole financial position, compare costs and risks on equal terms, and make decisions that stay tied to goals, time, and written evidence.",
+  "declaredDomain": "Household financial position, cash flow, saving, borrowing, insurance, investing, and product-claim evaluation",
+  "audience": "Adult learners making general-education financial decisions across different providers and jurisdictions",
   "sourceCredits": [
     {
-      "title": "Personal Finance primer",
-      "author": "lrnki project",
-      "license": "Project-owned internal playtest source",
-      "note": "Accepted as a local authoring basis without independent external fact verification or individualized financial advice."
+      "key": "fdic-net-worth",
+      "title": "Money Smart for Adults Module 10 Participant Guide: Building Your Financial Future",
+      "url": "https://catalog.fdic.gov/catalog/sfc/servlet.shepherd/document/download/069t000000BcgzVAAR",
+      "publisher": "Federal Deposit Insurance Corporation",
+      "version": "Money Smart for Adults, Module 10",
+      "accessedAt": "2026-09-01",
+      "note": "Official financial-education guide defining assets, liabilities, equity, and net worth and demonstrating a current-value net-worth calculation."
+    },
+    {
+      "key": "cfpb-goal-worksheet",
+      "title": "My New Money Goal Worksheet",
+      "url": "https://www.consumerfinance.gov/documents/7276/cfpb_my-new-money-goal_worksheet.pdf",
+      "publisher": "Consumer Financial Protection Bureau",
+      "accessedAt": "2026-09-01",
+      "note": "Official worksheet connecting a goal amount and date to the monthly amount needed and the cash available after income, expenses, and existing savings."
+    },
+    {
+      "key": "cfpb-cash-flow",
+      "title": "Creating a Cash Flow Budget",
+      "url": "https://files.consumerfinance.gov/f/documents/cfpb_your-money-your-goals_cash_flow_budget_tool_2018-11_ADA.pdf",
+      "publisher": "Consumer Financial Protection Bureau",
+      "version": "Your Money, Your Goals tool, November 2018",
+      "accessedAt": "2026-09-01",
+      "note": "Official tool for tracking the timing of income, bills, daily expenses, and savings through weekly beginning and ending balances."
+    },
+    {
+      "key": "cfpb-budget-guideline",
+      "title": "Analyzing Budgets",
+      "url": "https://files.consumerfinance.gov/f/documents/cfpb_building_block_activities_analyzing-budgets_guide.pdf",
+      "publisher": "Consumer Financial Protection Bureau",
+      "version": "Summer 2022",
+      "accessedAt": "2026-09-01",
+      "note": "Official educator guide presenting percentage budgeting as one possible rule and explicitly warning that not everyone can follow the same split."
+    },
+    {
+      "key": "cfpb-emergency-fund",
+      "title": "An Essential Guide to Building an Emergency Fund",
+      "url": "https://www.consumerfinance.gov/an-essential-guide-to-building-an-emergency-fund/",
+      "publisher": "Consumer Financial Protection Bureau",
+      "version": "Last modified October 29, 2025",
+      "accessedAt": "2026-09-01",
+      "note": "Official consumer guide defining an emergency fund as a cash reserve for unplanned expenses or income loss and relating it to cash-flow timing."
+    },
+    {
+      "key": "investor-compound-interest",
+      "title": "Compound Interest Calculator",
+      "url": "https://www.investor.gov/financial-tools-calculators/calculators/compound-interest-calculator",
+      "publisher": "U.S. Securities and Exchange Commission, Investor.gov",
+      "accessedAt": "2026-09-01",
+      "note": "Official calculator exposing principal, contributions, time, estimated rate, rate range, and compounding frequency as separate growth assumptions."
+    },
+    {
+      "key": "investor-risk-inflation",
+      "title": "What Is Risk?",
+      "url": "https://www.investor.gov/introduction-investing/investing-basics/what-risk",
+      "publisher": "U.S. Securities and Exchange Commission, Investor.gov",
+      "accessedAt": "2026-09-01",
+      "note": "Official overview of investment risk, including inflation reducing purchasing power and liquidity limits preventing timely access or causing penalties."
+    },
+    {
+      "key": "cfpb-auto-loan-comparison",
+      "title": "How Do I Compare Auto Loan Offers?",
+      "url": "https://www.consumerfinance.gov/ask-cfpb/how-do-i-compare-auto-loan-offers-what-should-i-look-at-besides-the-monthly-payment-en-753/",
+      "publisher": "Consumer Financial Protection Bureau",
+      "version": "Last reviewed January 30, 2024",
+      "accessedAt": "2026-09-01",
+      "note": "Official comparison guidance covering amount financed, APR, interest rate, term, monthly payment, and how a longer term can lower payment while raising total interest."
+    },
+    {
+      "key": "cfpb-card-repayment",
+      "title": "Understanding the Three-Year Repayment Box on a Credit Card Bill",
+      "url": "https://www.consumerfinance.gov/ask-cfpb/a-box-on-my-credit-card-bill-says-that-i-will-pay-off-the-balance-in-three-years-if-i-pay-a-certain-amount-what-does-that-mean-do-i-have-to-pay-that-much-if-i-pay-that-much-and-make-new-purchases-will-i-still-owe-nothing-after-three-years-en-36/",
+      "publisher": "Consumer Financial Protection Bureau",
+      "version": "Last reviewed January 22, 2024; last modified February 2, 2024",
+      "accessedAt": "2026-09-01",
+      "note": "Official explanation that minimum-only repayment can take years, larger payments reduce time and interest, and statement estimates exclude future purchases."
+    },
+    {
+      "key": "cfpb-card-terms",
+      "title": "Know Before You Owe: Credit Cards",
+      "url": "https://www.consumerfinance.gov/data-research/credit-card-data/know-you-owe-credit-cards/",
+      "publisher": "Consumer Financial Protection Bureau",
+      "version": "Last modified December 12, 2024",
+      "accessedAt": "2026-09-01",
+      "note": "Official guide to APR, fees, minimum payments, due dates, introductory terms, balance transfers, and comparing written card offers by intended use."
+    },
+    {
+      "key": "naic-insurance-basics",
+      "title": "How Does Insurance Work?",
+      "url": "https://content.naic.org/consumer/how-does-insurance-work",
+      "publisher": "National Association of Insurance Commissioners",
+      "accessedAt": "2026-09-01",
+      "note": "Regulator-authored consumer guide defining policy, premium, deductible, coverage, claim, and the insurer's payment share for covered losses."
+    },
+    {
+      "key": "naic-policy-terms",
+      "title": "Understanding Your Homeowners or Renters Policy",
+      "url": "https://content.naic.org/article/consumer-insight-understanding-your-homeowners-or-renters-policy",
+      "publisher": "National Association of Insurance Commissioners",
+      "publishedAt": "2012-07-01",
+      "accessedAt": "2026-09-01",
+      "note": "Regulator-authored guide to declarations, policy periods, coverages, limits, exclusions, endorsements, deductibles, premiums, and provider contacts."
+    },
+    {
+      "key": "investor-introduction",
+      "title": "Introduction to Investing",
+      "url": "https://www.investor.gov/introduction-investing",
+      "publisher": "U.S. Securities and Exchange Commission, Investor.gov",
+      "accessedAt": "2026-09-01",
+      "note": "Official introduction connecting short- and long-term goals, timely access, time horizon, risk tolerance, asset allocation, and diversification."
+    },
+    {
+      "key": "investor-asset-allocation",
+      "title": "Asset Allocation and Diversification",
+      "url": "https://www.investor.gov/introduction-investing/getting-started/asset-allocation",
+      "publisher": "U.S. Securities and Exchange Commission, Investor.gov",
+      "accessedAt": "2026-09-01",
+      "note": "Official guide relating allocation to time horizon and risk tolerance, diversification across and within asset classes, overlapping fund holdings, and rebalancing methods."
+    },
+    {
+      "key": "finra-risk-tolerance",
+      "title": "Know Your Risk Tolerance",
+      "url": "https://www.finra.org/investors/insights/know-your-risk-tolerance",
+      "publisher": "Financial Industry Regulatory Authority",
+      "publishedAt": "2024-10-09",
+      "accessedAt": "2026-09-01",
+      "note": "Official FINRA investor guidance distinguishing financial ability to absorb loss from comfort or willingness to experience loss and volatility."
+    },
+    {
+      "key": "investor-diversification-limits",
+      "title": "Diversify Your Investments",
+      "url": "https://www.investor.gov/introduction-investing/investing-basics/save-and-invest/diversify-your-investments",
+      "publisher": "U.S. Securities and Exchange Commission, Investor.gov",
+      "accessedAt": "2026-09-01",
+      "note": "Official explanation that diversification can reduce concentration losses but cannot guarantee protection when the market falls."
+    },
+    {
+      "key": "investor-fees",
+      "title": "How Fees and Expenses Affect Your Investment Portfolio",
+      "url": "https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins/investor-bulletins/updated",
+      "publisher": "U.S. Securities and Exchange Commission, Investor.gov",
+      "publishedAt": "2025-07-23",
+      "accessedAt": "2026-09-01",
+      "note": "Official bulletin explaining transaction and ongoing fees, fee disclosures, and how fees reduce the amount left to compound over time."
+    },
+    {
+      "key": "investor-performance-claims",
+      "title": "Investor Bulletin: Performance Claims",
+      "url": "https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins/investor-bulletins-47",
+      "publisher": "U.S. Securities and Exchange Commission, Investor.gov",
+      "publishedAt": "2022-09-15",
+      "accessedAt": "2026-09-01",
+      "note": "Official bulletin distinguishing historical, hypothetical, projected, gross, net, benchmarked, and cherry-picked performance and warning that past results do not predict future returns."
+    },
+    {
+      "key": "ftc-investment-scams",
+      "title": "Investment Scams",
+      "url": "https://consumer.ftc.gov/articles/investment-scams",
+      "publisher": "U.S. Federal Trade Commission",
+      "version": "December 2023",
+      "accessedAt": "2026-09-01",
+      "note": "Official consumer guidance identifying guaranteed high returns, little or no risk, missing written details, secret systems, and pressure to act quickly as scam warning signs."
     }
   ],
   "legs": [
     {
-      "key": "financial-resilience",
-      "title": "See the whole position before choosing",
+      "key": "map-money-and-time",
+      "title": "Map Money and Time",
       "stops": [
         {
-          "key": "financial-map",
-          "label": "Separate flows from the balance sheet",
+          "key": "map-financial-position",
+          "label": "Separate position from flow",
           "requires": [],
           "difficultyBand": 1,
           "lesson": {
             "sections": [
               {
-                "key": "flow-and-snapshot",
-                "title": "Cash flow is a period; net worth is a moment",
-                "body": "Income and expenses describe movement over a chosen period, and their difference is cash flow. Assets and liabilities describe a position at a point in time, and their difference is net worth. Neither replaces the other: valuable but illiquid assets may coexist with a near-term cash shortfall, while positive monthly cash flow may coexist with large debt. Map timing, ownership, obligations, and uncertainty before treating one headline number as the whole story.",
-                "sourceAnchor": {
-                  "heading": "1. Build a Financial Map",
-                  "quote": "Net worth is a snapshot, while cash flow is a movie."
-                },
+                "key": "position-versus-flow",
+                "title": "A financial position is a snapshot; cash flow covers a period",
+                "body": "A financial position records assets and liabilities at one stated date. Cash flow records money arriving and leaving across a week, month, or other period. A household can have positive net worth and still face a bill-timing shortfall, or have positive monthly cash flow while carrying more liabilities than assets. Keep the date and period visible so one measure does not impersonate the other.",
+                "sourceCreditKeys": ["fdic-net-worth", "cfpb-cash-flow"],
+                "explorableTerms": []
+              },
+              {
+                "key": "net-worth-worked",
+                "title": "Net worth subtracts current liabilities from current asset values",
+                "body": "Suppose current asset values are $8,000 in accounts and a vehicle that could be sold for $15,000: total assets are $23,000. Current balances owed are a $5,000 vehicle loan and $2,000 card balance: total liabilities are $7,000. Net worth is $23,000 − $7,000 = $16,000 at that date. Count the vehicle value as an asset and its loan balance as a separate liability rather than subtracting the loan twice.",
+                "sourceCreditKeys": ["fdic-net-worth"],
+                "explorableTerms": []
+              },
+              {
+                "key": "liquidity-is-separate",
+                "title": "Value does not guarantee timely access",
+                "body": "An asset's current value contributes to net worth, but it may not be available for a bill without delay, sale risk, fees, or penalties. Cash and accessible reserves serve a different purpose from a vehicle, home, or long-horizon investment. Record both value and access conditions. A strong snapshot does not remove the need to map when cash is available.",
+                "sourceCreditKeys": ["fdic-net-worth", "cfpb-emergency-fund", "investor-risk-inflation"],
                 "explorableTerms": []
               }
             ]
@@ -40,186 +209,613 @@
           "activities": [
             {
               "family": "option_select",
-              "key": "diagnose-cash-position",
-              "prompt": "A household owns a valuable property but cannot meet a bill due tomorrow without new debt. Which diagnosis is best?",
+              "key": "calculate-net-worth",
+              "prompt": "On June 30, an account holds $3,200 and a vehicle could be sold for $9,000. Current balances owed are $2,500 on the vehicle loan and $1,200 on a card. What is net worth for this stated snapshot?",
               "options": [
                 {
-                  "key": "asset-rich-liquidity-shortfall",
-                  "text": "It may have positive net worth and still face a near-term liquidity shortfall"
+                  "key": "eight-thousand-five-hundred",
+                  "text": "$8,500: $12,200 of assets minus $3,700 of liabilities"
                 },
                 {
-                  "key": "positive-net-worth-pays-all",
-                  "text": "Positive net worth automatically makes every current bill affordable"
+                  "key": "twelve-thousand-two-hundred",
+                  "text": "$12,200: add the account and vehicle values without subtracting debts"
                 },
                 {
-                  "key": "bill-proves-negative-income",
-                  "text": "The bill proves that the household received no income this period"
+                  "key": "three-thousand-seven-hundred",
+                  "text": "$3,700: add the two balances owed and treat liabilities as net worth"
                 },
                 {
-                  "key": "property-is-expense",
-                  "text": "The property must be classified as a current expense"
+                  "key": "fifteen-thousand-nine-hundred",
+                  "text": "$15,900: add current asset values and balances owed together"
                 }
               ],
-              "answerKey": "asset-rich-liquidity-shortfall",
+              "answerKey": "eight-thousand-five-hundred",
               "explanation": {
-                "text": "Net worth counts value at a moment, but it does not show whether that value is accessible before an obligation falls due. The household can be asset-rich and cash-constrained at the same time.",
-                "sourceAnchor": {
-                  "heading": "1. Build a Financial Map",
-                  "quote": "A person can own valuable assets yet struggle to pay a near-term bill because those assets cannot quickly be converted into money."
-                }
+                "text": "Current assets total $3,200 + $9,000 = $12,200. Current liabilities total $2,500 + $1,200 = $3,700. Net worth is assets minus liabilities, or $8,500 on June 30.",
+                "sourceCreditKeys": ["fdic-net-worth"]
               }
             },
             {
               "family": "matching",
-              "key": "match-financial-map",
-              "prompt": "Match each quantity to the role it plays in a financial map.",
+              "key": "match-position-and-flow",
+              "prompt": "Match each household record to the role it plays in a dated financial picture.",
               "pairs": [
                 {
-                  "key": "cash-flow-role",
-                  "left": "Cash flow",
-                  "right": "Income minus expenses over a period"
-                },
-                {
-                  "key": "net-worth-role",
-                  "left": "Net worth",
-                  "right": "Assets minus liabilities at a point in time"
+                  "key": "liquid-asset-role",
+                  "left": "Checking-account balance on June 30",
+                  "right": "Liquid asset in the dated position"
                 },
                 {
                   "key": "liability-role",
-                  "left": "Liability",
-                  "right": "An amount owed or another financial obligation"
+                  "left": "Remaining loan balance on June 30",
+                  "right": "Liability in the dated position"
+                },
+                {
+                  "key": "income-flow-role",
+                  "left": "Pay received during June",
+                  "right": "Money arriving during the period"
+                },
+                {
+                  "key": "expense-flow-role",
+                  "left": "Bills paid during June",
+                  "right": "Money leaving during the period"
                 }
               ],
               "explanation": {
-                "text": "Cash flow measures movement, while net worth measures a snapshot assembled from assets and liabilities. Keeping their time frames distinct prevents one measure from hiding a different constraint.",
-                "sourceAnchor": {
-                  "heading": "1. Build a Financial Map",
-                  "quote": "The difference between total assets and total liabilities at a point in time is **net worth**."
-                }
+                "text": "Balances and current values belong to a snapshot date. Income and expenses belong to a stated period. Keeping those roles separate prevents a month's pay or bills from being added directly to a dated net-worth calculation without tracing their balance effects.",
+                "sourceCreditKeys": ["fdic-net-worth", "cfpb-cash-flow"]
               }
             }
           ],
           "supportPaths": []
         },
         {
-          "key": "liquidity-and-time",
-          "label": "Match resources to when they are needed",
-          "requires": ["financial-map"],
+          "key": "build-goal-based-plan",
+          "label": "Turn a goal into a timed plan",
+          "requires": ["map-financial-position"],
           "difficultyBand": 2,
           "lesson": {
             "sections": [
               {
-                "key": "reserve-and-compounding",
-                "title": "Flexibility has value before growth is counted",
-                "body": "An emergency reserve is liquid value held for necessary surprises or interrupted income. Its amount depends on the volatility of cash flow, obligations, support, and access—not a universal formula. Less liquid resources may offer growth, but they can be unavailable when the goal arrives. Compounding rewards time only under the scenario's assumed return; it does not guarantee a result, and inflation determines what the future balance can buy.",
-                "sourceAnchor": {
-                  "heading": "3. Liquidity, Saving, Inflation, and Compounding",
-                  "quote": "An **emergency reserve** is liquid value kept for unplanned, necessary expenses or interruptions in income."
-                },
+                "key": "goal-amount-and-date",
+                "title": "A timed plan begins with the amount still needed",
+                "body": "For a simplified no-interest plan, use the stated amount still needed and divide it by the number of contribution periods remaining. If $1,200 is still needed and 12 months remain, the pace is $100 per month. In this calculation, the supplied goal amount is already the remaining amount. If interest, fees, taxes, or variable contributions matter, state those assumptions rather than treating the simple pace as a forecast.",
+                "sourceCreditKeys": ["cfpb-goal-worksheet"],
+                "explorableTerms": []
+              },
+              {
+                "key": "cash-flow-budget",
+                "title": "A cash-flow budget tests timing, not only monthly totals",
+                "body": "List the beginning balance, then add income when it arrives and subtract bills, daily expenses, and planned savings when they occur. Carry each ending balance into the next period. A month can have enough income in total and still fall short before a late paycheck. Compare planned and actual timing, and keep the dated net worth calculation separate from this flow record.",
+                "sourceCreditKeys": ["cfpb-cash-flow", "fdic-net-worth"],
                 "explorableTerms": [
                   {
-                    "term": "cash flow",
-                    "supportPathKey": "review-cash-flow"
+                    "term": "net worth",
+                    "supportPathKey": "revisit-net-worth"
                   }
                 ]
+              },
+              {
+                "key": "adjust-goal-tradeoffs",
+                "title": "A shortfall calls for a visible trade-off",
+                "body": "Compare the monthly amount needed with cash actually available after current expenses and existing savings. If the plan is short, the adjustable parts are the goal amount, target date, other spending or saving, and income—not the arithmetic. A percentage rule can be a prompt, but no fixed split fits every income, obligation, or goal. Test the plan with actual results and revise the named assumption.",
+                "sourceCreditKeys": ["cfpb-goal-worksheet", "cfpb-cash-flow", "cfpb-budget-guideline"],
+                "explorableTerms": []
               }
             ]
           },
           "activities": [
             {
               "family": "option_select",
-              "key": "choose-reserve-design",
-              "prompt": "Which reserve design best serves a household with irregular income and a fixed payment due in two months?",
+              "key": "test-goal-pace",
+              "prompt": "A learner needs $1,350 more for a course fee due in nine months. No interest or fees are assumed, and the cash-flow plan has $120 per month available. What does the plan show?",
               "options": [
                 {
-                  "key": "accessible-goal-matched-reserve",
-                  "text": "Keep a goal-matched amount accessible and review it against low-income scenarios"
+                  "key": "goal-pace-has-thirty-dollar-gap",
+                  "text": "The remaining amount needs $150 per month, leaving a $30 monthly shortfall in the current plan"
                 },
                 {
-                  "key": "maximum-return-lockup",
-                  "text": "Lock every available unit into the highest projected return regardless of access"
+                  "key": "one-twenty-is-the-pace",
+                  "text": "$120 per month is enough because available cash, rather than the remaining amount and date, sets the goal pace"
                 },
                 {
-                  "key": "universal-one-month-rule",
-                  "text": "Use exactly one month of expenses because the same rule fits every household"
+                  "key": "shortfall-becomes-contribution",
+                  "text": "$30 per month is the needed contribution because only the difference between $150 and $120 is saved"
                 },
                 {
-                  "key": "ignore-fixed-payment",
-                  "text": "Exclude the fixed payment because it has not occurred yet"
+                  "key": "use-ten-months",
+                  "text": "$135 per month is enough because the $1,350 remaining amount should be divided by ten months"
                 }
               ],
-              "answerKey": "accessible-goal-matched-reserve",
+              "answerKey": "goal-pace-has-thirty-dollar-gap",
               "explanation": {
-                "text": "The reserve's purpose is flexibility under disruption, so access, income variability, and the timing of obligations matter more than a universal target or the largest projected return.",
-                "sourceAnchor": {
-                  "heading": "3. Liquidity, Saving, Inflation, and Compounding",
-                  "quote": "The appropriate reserve is not a universal number."
-                }
+                "text": "Dividing the stated $1,350 remaining amount by nine months gives a $150 monthly pace. With $120 available, the plan is short by $30 monthly, so the amount, date, cash-flow allocation, or income assumption must change.",
+                "sourceCreditKeys": ["cfpb-goal-worksheet", "cfpb-cash-flow", "cfpb-budget-guideline"]
               }
             },
             {
               "family": "impostor",
-              "key": "spot-time-value-impostor",
-              "prompt": "Two statements keep projections within their assumptions. One turns a scenario into a promise. Find the impostor.",
+              "key": "audit-spending-plan",
+              "prompt": "Which statement does not preserve a spending plan as a testable model?",
               "statements": [
                 {
-                  "key": "inflation-changes-purchasing-power",
-                  "text": "Inflation can make a larger future balance buy less.",
+                  "key": "schedule-infrequent-expense",
+                  "text": "A known but infrequent expense is entered before its due date so its timing appears in the plan.",
                   "kind": "truth"
                 },
                 {
-                  "key": "liquidity-matches-timing",
-                  "text": "Resource access should be matched to when a goal or obligation arrives.",
+                  "key": "compare-ending-balances",
+                  "text": "Actual ending balances are compared with projected balances to test the plan's assumptions.",
                   "kind": "truth"
                 },
                 {
-                  "key": "time-guarantees-return",
-                  "text": "Given enough time, compounding guarantees the projected return.",
+                  "key": "apply-percentage-guideline",
+                  "text": "A percentage guideline replaces income timing, obligations, and the household's stated goals.",
                   "kind": "impostor"
                 }
               ],
               "explanation": {
-                "text": "Compounding describes what happens under stated rates and timing. Actual returns can vary, so more time does not turn a projection into a guarantee.",
-                "sourceAnchor": {
-                  "heading": "3. Liquidity, Saving, Inflation, and Compounding",
-                  "quote": "Early contributions have more time to grow, but time does not remove risk or guarantee a return."
-                }
+                "text": "The false statement replaces the household's stated inputs with a guideline. A workable plan maps income timing, expenses, obligations, and goals, then compares projected and actual balances; a percentage guideline can prompt a comparison but cannot supply those facts.",
+                "sourceCreditKeys": ["cfpb-goal-worksheet", "cfpb-cash-flow", "cfpb-budget-guideline"]
               }
             }
           ],
           "supportPaths": [
             {
-              "key": "review-cash-flow",
-              "term": "cash flow",
-              "sectionKey": "reserve-and-compounding",
+              "key": "revisit-net-worth",
+              "term": "net worth",
+              "sectionKey": "cash-flow-budget",
               "steps": [
                 {
-                  "stopKey": "financial-map",
-                  "activityKey": "diagnose-cash-position"
+                  "stopKey": "map-financial-position",
+                  "activityKey": "calculate-net-worth"
                 }
               ]
             }
           ]
         },
         {
-          "key": "compare-risk-and-products",
-          "label": "Compare the complete promise",
-          "requires": ["liquidity-and-time"],
+          "key": "build-liquidity-buffer",
+          "label": "Separate reserves by purpose",
+          "requires": ["build-goal-based-plan"],
+          "difficultyBand": 2,
+          "lesson": {
+            "sections": [
+              {
+                "key": "unplanned-versus-known",
+                "title": "An emergency reserve covers unplanned financial shocks",
+                "body": "An emergency fund is cash set aside for unplanned expenses or income loss, such as an urgent repair or interruption of work. A known annual premium or planned course fee is different: its amount and date can be built into a separate savings plan. Naming the purpose keeps a scheduled cost from repeatedly consuming the reserve intended for surprises.",
+                "sourceCreditKeys": ["cfpb-emergency-fund", "cfpb-goal-worksheet"],
+                "explorableTerms": []
+              },
+              {
+                "key": "size-follows-exposure",
+                "title": "Reserve size follows the exposure and cash-flow pattern",
+                "body": "There is no single cash amount that fits every situation. Map essential outflows, income timing and variability, likely unplanned costs, insurance deductibles, and other accessible resources. Then state which events the reserve is intended to absorb. Revisit the amount when the cash flow, obligations, or exposure changes rather than treating a generic number as permanent.",
+                "sourceCreditKeys": ["cfpb-emergency-fund", "cfpb-cash-flow", "naic-insurance-basics"],
+                "explorableTerms": [
+                  {
+                    "term": "cash flow",
+                    "supportPathKey": "revisit-goal-cash-flow"
+                  }
+                ]
+              },
+              {
+                "key": "access-matches-purpose",
+                "title": "Near-term money needs timely access",
+                "body": "A reserve must be reachable when the named shock occurs. A product can have a positive balance yet impose price risk, delay, tax consequences, or an early-withdrawal fee. Keep near-term cash needs separate from long-horizon investments whose value may fluctuate. Compare access, safety, fees, and provider protections in the relevant jurisdiction rather than choosing by headline return alone.",
+                "sourceCreditKeys": ["cfpb-emergency-fund", "investor-risk-inflation", "investor-introduction"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "classify-buffer-use",
+              "prompt": "A renter knows a $480 annual insurance premium is due in four months and also wants cash available for an unpredictable income interruption. Which plan keeps the purposes visible?",
+              "options": [
+                {
+                  "key": "scheduled-savings-plus-emergency-reserve",
+                  "text": "Save $120 monthly for the known premium and keep a separately named reserve for unplanned income loss"
+                },
+                {
+                  "key": "call-both-emergencies",
+                  "text": "Label the scheduled premium and any future income loss as the same emergency because both require cash"
+                },
+                {
+                  "key": "invest-four-month-premium",
+                  "text": "Put the four-month premium amount into a volatile long-horizon asset because its expected return is higher"
+                },
+                {
+                  "key": "ignore-premium-until-due",
+                  "text": "Build only the unplanned reserve and treat the known premium as new information when its due date arrives"
+                }
+              ],
+              "answerKey": "scheduled-savings-plus-emergency-reserve",
+              "explanation": {
+                "text": "The premium has a known $480 amount and four-month date, so a $120 monthly sinking plan fits it. A separately named emergency reserve preserves cash for genuinely unplanned expenses or income loss and can be sized from that exposure.",
+                "sourceCreditKeys": ["cfpb-goal-worksheet", "cfpb-emergency-fund", "investor-introduction"]
+              }
+            },
+            {
+              "family": "matching",
+              "key": "match-liquidity-purposes",
+              "prompt": "Match each pool of money to the purpose its timing describes.",
+              "pairs": [
+                {
+                  "key": "operating-cash-role",
+                  "left": "Bills due before the next paycheck",
+                  "right": "Operating cash for the current flow cycle"
+                },
+                {
+                  "key": "scheduled-savings-role",
+                  "left": "A known license renewal due in six months",
+                  "right": "Goal savings for a dated expense"
+                },
+                {
+                  "key": "emergency-reserve-role",
+                  "left": "Cash reserved for an unpredictable income gap",
+                  "right": "Emergency reserve for an unplanned shock"
+                },
+                {
+                  "key": "long-horizon-role",
+                  "left": "Money not needed for a goal for decades",
+                  "right": "Long-horizon allocation assessed for risk and return"
+                }
+              ],
+              "explanation": {
+                "text": "Current bills, dated known costs, unplanned shocks, and distant goals have different access requirements. Naming the timing and purpose prevents a long-horizon balance or scheduled-cost fund from being mistaken for immediately available emergency cash.",
+                "sourceCreditKeys": ["cfpb-cash-flow", "cfpb-emergency-fund", "cfpb-goal-worksheet", "investor-introduction"]
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "revisit-goal-cash-flow",
+              "term": "cash flow",
+              "sectionKey": "size-follows-exposure",
+              "steps": [
+                {
+                  "stopKey": "build-goal-based-plan",
+                  "activityKey": "test-goal-pace"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "reason-through-time-value",
+          "label": "Track compounding and purchasing power",
+          "requires": ["build-goal-based-plan"],
           "difficultyBand": 3,
           "lesson": {
             "sections": [
               {
-                "key": "drivers-terms-and-tradeoffs",
-                "title": "Names and item counts do not reveal the risk",
-                "body": "Diversification reduces unnecessary dependence only when holdings respond to different underlying drivers; owning many versions of the same exposure is still concentration. It cannot remove broad loss or guarantee profit. Likewise, a financial product is its rights, obligations, cash flows, risks, and services—not its marketing label. Compare alternatives on a common horizon, including fees, access, currencies, adverse scenarios, and who can change the terms. Liquidity remains part of the comparison because a useful asset at the wrong time may not serve the goal.",
-                "sourceAnchor": {
-                  "heading": "6. Investing, Return, and Diversification",
-                  "quote": "**Diversification** spreads exposure among assets whose outcomes are not perfectly linked."
+                "key": "compound-growth-worked",
+                "title": "Compounding applies each period's rate to the new balance",
+                "body": "With no contributions, withdrawals, taxes, or fees, $500 growing at a fixed 4% once per year becomes $520 after year one and $540.80 after year two. The second year's $20.80 growth includes interest on the first year's interest. Principal, contribution timing, number of periods, estimated rate, rate range, and compounding frequency are separate inputs rather than hidden facts.",
+                "sourceCreditKeys": ["investor-compound-interest"],
+                "explorableTerms": []
+              },
+              {
+                "key": "inflation-and-purchasing-power",
+                "title": "Nominal growth and purchasing power answer different questions",
+                "body": "Inflation is a general rise in prices that reduces what a unit of money can buy. If a basket costs $100 and its price rises 3%, it costs $103. A balance that grows from $100 to $102 has increased 2% in nominal dollars but buys less of that basket. This simplified comparison does not predict future inflation; it shows why a positive nominal rate does not by itself establish a real gain.",
+                "sourceCreditKeys": ["investor-risk-inflation"],
+                "explorableTerms": []
+              },
+              {
+                "key": "growth-is-an-assumption-set",
+                "title": "A projection inherits every input",
+                "body": "A compound-growth result changes when the rate, contribution timing, compounding frequency, fees, taxes, withdrawals, or horizon changes. An estimated rate is not a guaranteed return. Show a range when the rate is uncertain and keep the jurisdiction-specific tax or product rule outside a general example unless the current written terms supply it. A precise calculator output is only as certain as its stated inputs.",
+                "sourceCreditKeys": ["investor-compound-interest", "investor-fees", "investor-performance-claims"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "calculate-compound-balance",
+              "prompt": "$800 grows at a fixed 5% compounded once per year for two years, with no contributions, withdrawals, taxes, or fees. What balance follows from those assumptions?",
+              "options": [
+                {
+                  "key": "eight-hundred-eighty-two",
+                  "text": "$882: $800 × 1.05 × 1.05"
                 },
+                {
+                  "key": "eight-hundred-eighty",
+                  "text": "$880: add two years of simple $40 interest to the original balance"
+                },
+                {
+                  "key": "eight-hundred-forty",
+                  "text": "$840: apply the 5% rate for only one of the two years"
+                },
+                {
+                  "key": "nine-hundred-twenty",
+                  "text": "$920: add 5% of the original balance three times"
+                }
+              ],
+              "answerKey": "eight-hundred-eighty-two",
+              "explanation": {
+                "text": "After year one, $800 × 1.05 = $840. After year two, $840 × 1.05 = $882. The extra $2 beyond simple interest comes from applying the second year's rate to the first year's interest under the stated fixed assumptions.",
+                "sourceCreditKeys": ["investor-compound-interest"]
+              }
+            },
+            {
+              "family": "impostor",
+              "key": "audit-time-value-claims",
+              "prompt": "Which statement misapplies the relationship between nominal growth and purchasing power?",
+              "statements": [
+                {
+                  "key": "apply-growth-to-updated-balance",
+                  "text": "Under the stated compounding inputs, later-period growth applies to prior interest in the updated balance.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "compare-balance-and-price-change",
+                  "text": "When prices rise faster than a nominal balance, the updated balance loses purchasing power.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "compare-nominal-change-to-zero",
+                  "text": "A positive nominal rate is compared only with zero to decide whether purchasing power increased.",
+                  "kind": "impostor"
+                }
+              ],
+              "explanation": {
+                "text": "The false statement uses zero as the wrong comparison for purchasing power. Compounding describes how a balance changes under its inputs; deciding whether purchasing power increased also requires comparing that nominal change with the change in prices.",
+                "sourceCreditKeys": ["investor-compound-interest", "investor-risk-inflation"]
+              }
+            }
+          ],
+          "supportPaths": []
+        }
+      ],
+      "guardianActivityKeys": [
+        "calculate-net-worth",
+        "match-position-and-flow",
+        "test-goal-pace",
+        "audit-spending-plan",
+        "classify-buffer-use",
+        "match-liquidity-purposes",
+        "calculate-compound-balance",
+        "audit-time-value-claims"
+      ]
+    },
+    {
+      "key": "borrow-and-protect",
+      "title": "Borrow and Protect",
+      "stops": [
+        {
+          "key": "compare-credit-full-cost",
+          "label": "Compare the whole borrowing contract",
+          "requires": ["build-goal-based-plan"],
+          "difficultyBand": 2,
+          "lesson": {
+            "sections": [
+              {
+                "key": "monthly-payment-is-not-total-cost",
+                "title": "Payment size and full cost answer different questions",
+                "body": "A smaller monthly payment may come from stretching repayment across more months, which can increase total interest. Compare the same amount financed using APR or interest rate, term, payment schedule, and total scheduled payments. Monthly affordability matters, but it does not by itself identify the lower-cost offer.",
+                "sourceCreditKeys": ["cfpb-auto-loan-comparison"],
+                "explorableTerms": []
+              },
+              {
+                "key": "term-tradeoff-worked",
+                "title": "Total the same promised payment path",
+                "body": "For two simplified written offers on the same amount, Offer A requires 24 payments of $280 plus an $80 fee: $6,800 total. Offer B requires 36 payments of $205 plus a $40 fee: $7,420 total. A costs $620 less across the stated path but requires $75 more each month. That arithmetic exposes a trade-off; it does not decide whether A's payment fits a particular cash-flow constraint.",
+                "sourceCreditKeys": ["cfpb-auto-loan-comparison", "cfpb-cash-flow"],
+                "explorableTerms": []
+              },
+              {
+                "key": "compare-written-credit-terms",
+                "title": "Hold the amount, timing, and contract conditions constant",
+                "body": "Use written offers for the same amount and intended timing. Check APR, interest rate type, term, amount financed, payment schedule, fees, and rate-change or late-payment conditions. A headline rate or reward can be offset by another fee or condition. Product rules and consumer protections differ by contract and jurisdiction, so verify the current provider disclosure rather than transferring a worked example as law.",
+                "sourceCreditKeys": ["cfpb-auto-loan-comparison", "cfpb-card-terms"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "compare-loan-offers",
+              "prompt": "Two written offers finance the same $8,000 and have no other stated charges. Offer A is 24 payments of $360 plus a $120 fee. Offer B is 36 payments of $255 plus a $60 fee. Which comparison is complete?",
+              "options": [
+                {
+                  "key": "a-costs-less-but-payment-higher",
+                  "text": "A totals $8,760, which is $480 less than B's $9,240, but A requires $105 more each month"
+                },
+                {
+                  "key": "b-cheaper-by-payment",
+                  "text": "B is the lower-cost offer because its $255 monthly payment is smaller than $360"
+                },
+                {
+                  "key": "a-costs-only-fee",
+                  "text": "A costs $120 in total because the scheduled payments only return the amount financed"
+                },
+                {
+                  "key": "b-lower-by-fee-gap",
+                  "text": "B costs $60 less overall because its stated fee is $60 below A's fee"
+                }
+              ],
+              "answerKey": "a-costs-less-but-payment-higher",
+              "explanation": {
+                "text": "A totals 24 × $360 + $120 = $8,760. B totals 36 × $255 + $60 = $9,240. A is $480 lower over the stated path but its monthly payment is $105 higher, so cost and cash-flow fit remain separate questions.",
+                "sourceCreditKeys": ["cfpb-auto-loan-comparison", "cfpb-cash-flow"]
+              }
+            },
+            {
+              "family": "matching",
+              "key": "match-credit-cost-fields",
+              "prompt": "Match each credit field to the comparison question it answers.",
+              "pairs": [
+                {
+                  "key": "amount-financed-role",
+                  "left": "Amount financed",
+                  "right": "How much principal the offer actually provides"
+                },
+                {
+                  "key": "apr-role",
+                  "left": "APR",
+                  "right": "Annualized credit cost used for like-for-like comparison"
+                },
+                {
+                  "key": "term-role",
+                  "left": "Term",
+                  "right": "How long scheduled repayment lasts"
+                },
+                {
+                  "key": "total-payment-role",
+                  "left": "Payments plus stated fees",
+                  "right": "Dollar outflow across the disclosed repayment path"
+                }
+              ],
+              "explanation": {
+                "text": "Amount financed, APR, term, and total disclosed outflow are related but not interchangeable. Comparing all four prevents a low payment, low headline rate, or small fee from hiding a different principal amount or longer repayment path.",
+                "sourceCreditKeys": ["cfpb-auto-loan-comparison", "cfpb-card-terms"]
+              }
+            }
+          ],
+          "supportPaths": []
+        },
+        {
+          "key": "plan-repayment-with-constraints",
+          "label": "Make the repayment assumption visible",
+          "requires": ["compare-credit-full-cost", "build-goal-based-plan"],
+          "difficultyBand": 3,
+          "lesson": {
+            "sections": [
+              {
+                "key": "minimum-is-a-contract-floor",
+                "title": "The minimum due is not a target payoff date",
+                "body": "A card statement's minimum payment is the amount required to keep the account from being unpaid under its terms. If no new charges are made, paying more than the minimum can reduce interest and payoff time. Statement estimates are based on the current balance and stated assumptions; new purchases or changed terms alter the path. Read the disclosed payoff time and total cost rather than treating ‘minimum’ as ‘optimal.’",
+                "sourceCreditKeys": ["cfpb-card-repayment", "cfpb-card-terms"],
+                "explorableTerms": []
+              },
+              {
+                "key": "repayment-order-context",
+                "title": "Extra payment follows the contract and the cash-flow limit",
+                "body": "First keep each required payment and essential obligation visible. For any extra amount, compare APR, fees, remaining term, required payment, and promotional rate changes. A higher-rate balance can impose more interest per dollar, but a plan that causes another required payment or essential bill to fail is not the same plan. State the cash-flow limit before ranking optional extra payments.",
+                "sourceCreditKeys": ["cfpb-card-repayment", "cfpb-card-terms", "cfpb-auto-loan-comparison", "cfpb-cash-flow"],
                 "explorableTerms": [
                   {
-                    "term": "Liquidity",
-                    "supportPathKey": "review-liquidity-purpose"
+                    "term": "cash-flow limit",
+                    "supportPathKey": "revisit-plan-capacity"
+                  }
+                ]
+              },
+              {
+                "key": "stress-test-repayment",
+                "title": "A payoff estimate inherits its assumptions",
+                "body": "Record the starting balance, payment amount and timing, APR or rate changes, fees, and whether new charges occur. Compare at least one disruption the plan must survive, such as a reduced-income month or promotional rate expiry stated in the contract. Recalculate when an input changes. A precise payoff month is not evidence that the underlying rate and payment assumptions will remain unchanged.",
+                "sourceCreditKeys": ["cfpb-card-repayment", "cfpb-card-terms", "cfpb-cash-flow"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "compare-repayment-paths",
+              "prompt": "For a current $1,200 card balance, the statement estimates 68 months and $1,840 total with minimum-only payments, or 24 months and $1,440 total with a fixed $60 monthly payment. Both assume no new charges and unchanged terms. What is supported?",
+              "options": [
+                {
+                  "key": "four-hundred-less-forty-four-shorter",
+                  "text": "The $60 path is $400 lower and 44 months shorter if its payment and no-new-charge assumptions hold"
+                },
+                {
+                  "key": "minimum-costs-less",
+                  "text": "The minimum-only path costs less because each individual payment starts below $60"
+                },
+                {
+                  "key": "sixty-guarantees-date",
+                  "text": "Paying $60 guarantees payoff in 24 months even if new purchases or rates change"
+                },
+                {
+                  "key": "difference-is-six-forty",
+                  "text": "The $60 path saves $640 because the two reported payoff totals should be subtracted from the balance"
+                }
+              ],
+              "answerKey": "four-hundred-less-forty-four-shorter",
+              "explanation": {
+                "text": "The disclosed totals differ by $1,840 − $1,440 = $400, and the payoff times differ by 68 − 24 = 44 months. That comparison holds only under the stated fixed-payment, unchanged-term, and no-new-charge assumptions and still must fit available cash flow.",
+                "sourceCreditKeys": ["cfpb-card-repayment", "cfpb-cash-flow"]
+              }
+            },
+            {
+              "family": "impostor",
+              "key": "audit-debt-priorities",
+              "prompt": "Which statement does not support a cost comparison for optional extra payment?",
+              "statements": [
+                {
+                  "key": "set-cash-flow-limit",
+                  "text": "Required payments and essential outflows set the cash-flow limit before optional extra payment is assigned.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "compare-credit-cost-fields",
+                  "text": "APR, fees, remaining term, and promotional changes determine how an extra dollar affects disclosed cost.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "use-balance-size-for-ranking",
+                  "text": "Balance size sets the lower-cost target before APR, fees, remaining term, and rate changes are compared.",
+                  "kind": "impostor"
+                }
+              ],
+              "explanation": {
+                "text": "The false statement ranks by balance size before comparing the cost and contract attached to each balance. Balance size can be one planning preference, but it does not mathematically override APR, fees, remaining term, required payments, or promotional changes.",
+                "sourceCreditKeys": ["cfpb-card-repayment", "cfpb-card-terms", "cfpb-auto-loan-comparison"]
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "revisit-plan-capacity",
+              "term": "cash-flow limit",
+              "sectionKey": "repayment-order-context",
+              "steps": [
+                {
+                  "stopKey": "build-goal-based-plan",
+                  "activityKey": "test-goal-pace"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "compare-insurance-coverage",
+          "label": "Price the risk that remains",
+          "requires": ["build-liquidity-buffer"],
+          "difficultyBand": 3,
+          "lesson": {
+            "sections": [
+              {
+                "key": "policy-transfers-defined-risk",
+                "title": "Insurance transfers only the risk named by the policy",
+                "body": "An insurance policy is a written contract. The policyholder pays a premium to keep coverage active; for a covered loss, the policy defines what share the insurer may pay after the policyholder's deductible or other out-of-pocket amount. Paying a premium does not make every event covered. Begin with the named property, person, peril, policy period, and coverage definition.",
+                "sourceCreditKeys": ["naic-insurance-basics", "naic-policy-terms"],
+                "explorableTerms": []
+              },
+              {
+                "key": "retained-and-transferred-risk",
+                "title": "Deductibles, limits, and exclusions locate the retained risk",
+                "body": "The deductible is the amount or percentage paid by the policyholder before the insurer's share for a covered claim. A coverage limit caps the policy's payment for a named coverage. Exclusions identify events or property the policy does not cover, and endorsements can modify the base terms. Compare these together: a low premium can accompany more retained loss, while a high limit does not remove an exclusion.",
+                "sourceCreditKeys": ["naic-insurance-basics", "naic-policy-terms"],
+                "explorableTerms": []
+              },
+              {
+                "key": "coverage-fits-exposure",
+                "title": "Policy fit depends on the exposure and ability to retain loss",
+                "body": "Compare policies for the same insured interest, perils, period, limits, valuation basis, deductible, exclusions, endorsements, and provider. Then compare the retained amount with liquid resources available when a claim occurs. The lowest premium or deductible is not universally best. Verify the current policy form and local insurance regulator because available coverages and rules vary by provider and jurisdiction.",
+                "sourceCreditKeys": ["naic-insurance-basics", "naic-policy-terms", "cfpb-emergency-fund"],
+                "explorableTerms": [
+                  {
+                    "term": "liquid resources",
+                    "supportPathKey": "revisit-liquid-resources"
                   }
                 ]
               }
@@ -228,64 +824,603 @@
           "activities": [
             {
               "family": "option_select",
-              "key": "compare-product-terms",
-              "prompt": "Two products share a label. Which comparison is most decision-relevant?",
+              "key": "compare-policy-terms",
+              "prompt": "For the same property and one-year period, Policy A costs $480 with a $500 deductible, $20,000 limit, and the named water peril covered. Policy B costs $360 with a $2,000 deductible, $10,000 limit, and that water peril excluded. Which comparison is complete?",
               "options": [
                 {
-                  "key": "common-basis-full-terms",
-                  "text": "Compare full cash flows, access, risks, currencies, change rights, and adverse cases on one horizon"
+                  "key": "b-saves-premium-retains-more",
+                  "text": "B saves $120 in premium but retains $1,500 more deductible, halves the stated limit, and excludes the named peril"
                 },
                 {
-                  "key": "headline-rate-only",
-                  "text": "Choose the larger headline rate without checking its period or fees"
+                  "key": "b-is-always-better",
+                  "text": "B is always better because its $120 premium saving is certain, while the deductible, limit, and exclusion matter only after a loss"
                 },
                 {
-                  "key": "brand-category-only",
-                  "text": "Assume products in the same marketing category have equivalent obligations"
+                  "key": "a-covers-every-loss",
+                  "text": "A covers every possible loss because its limit and deductible are more favorable"
                 },
                 {
-                  "key": "past-return-guarantee",
-                  "text": "Treat the strongest recent return as a guarantee of the next period"
+                  "key": "premium-adds-to-limit",
+                  "text": "A provides $20,480 of coverage because its premium is added to the policy limit"
                 }
               ],
-              "answerKey": "common-basis-full-terms",
+              "answerKey": "b-saves-premium-retains-more",
               "explanation": {
-                "text": "A product comparison must expose the actual rights, cash flows, access conditions, and risks on the same basis. A shared name or one advertised number cannot establish equivalence.",
-                "sourceAnchor": {
-                  "heading": "7. Comparing Products, Contracts, and Claims",
-                  "quote": "A financial product is a bundle of rights, obligations, cash flows, risks, and services."
+                "text": "The written differences are a $120 annual premium saving, $1,500 more deductible retained by the policyholder, a $10,000 lower limit, and an exclusion for the named peril. Which trade-off fits depends on the exposure and available liquid resources; the comparison itself does not prescribe a policy.",
+                "sourceCreditKeys": ["naic-insurance-basics", "naic-policy-terms", "cfpb-emergency-fund"]
+              }
+            },
+            {
+              "family": "matching",
+              "key": "match-insurance-terms",
+              "prompt": "Match each policy term to the financial role it names.",
+              "pairs": [
+                {
+                  "key": "premium-role",
+                  "left": "Premium",
+                  "right": "Regular price paid to keep coverage active"
+                },
+                {
+                  "key": "deductible-role",
+                  "left": "Deductible",
+                  "right": "Covered-claim amount retained before the insurer's share"
+                },
+                {
+                  "key": "limit-role",
+                  "left": "Coverage limit",
+                  "right": "Maximum payment boundary for the named coverage"
+                },
+                {
+                  "key": "exclusion-role",
+                  "left": "Exclusion",
+                  "right": "Specified event or property outside coverage"
                 }
+              ],
+              "explanation": {
+                "text": "The premium buys access to the policy; the deductible and limit divide covered loss between policyholder and insurer; an exclusion keeps a named loss outside that coverage. None of the four terms substitutes for the others.",
+                "sourceCreditKeys": ["naic-insurance-basics", "naic-policy-terms"]
               }
             }
           ],
           "supportPaths": [
             {
-              "key": "review-liquidity-purpose",
-              "term": "Liquidity",
-              "sectionKey": "drivers-terms-and-tradeoffs",
+              "key": "revisit-liquid-resources",
+              "term": "liquid resources",
+              "sectionKey": "coverage-fits-exposure",
               "steps": [
                 {
-                  "stopKey": "liquidity-and-time",
-                  "activityKey": "choose-reserve-design"
+                  "stopKey": "build-liquidity-buffer",
+                  "activityKey": "classify-buffer-use"
                 }
               ]
             }
           ]
+        },
+        {
+          "key": "verify-financial-product-claims",
+          "label": "Separate the pitch from the terms",
+          "requires": ["compare-credit-full-cost", "compare-insurance-coverage"],
+          "difficultyBand": 4,
+          "lesson": {
+            "sections": [
+              {
+                "key": "headline-versus-contract",
+                "title": "A headline is not the comparison record",
+                "body": "A financial-product advertisement may emphasize one rate, payment, reward, premium, or past result. The decision record is the current written disclosure or policy: amount, term, fees, rate-change conditions, limits, exclusions, access, and provider identity. Compare the same use and horizon. If a spoken or advertised feature is absent from the written terms, do not silently add it to the contract.",
+                "sourceCreditKeys": ["cfpb-card-terms", "cfpb-auto-loan-comparison", "naic-policy-terms", "investor-fees"],
+                "explorableTerms": []
+              },
+              {
+                "key": "guarantee-projection-history",
+                "title": "Guarantees, projections, and history are different evidence",
+                "body": "A performance projection is hypothetical, and back-testing applies a strategy to past conditions rather than recording live results. Past performance is historical but does not predict future results. Returns on market-risk investments are not made certain by a target, testimonial, chart, or the word ‘guaranteed.’ Identify who makes any contractual guarantee, its conditions, and whether it applies to principal, income, or something else.",
+                "sourceCreditKeys": ["investor-performance-claims", "ftc-investment-scams"],
+                "explorableTerms": []
+              },
+              {
+                "key": "verify-provider-and-jurisdiction",
+                "title": "Slow down and verify the offer independently",
+                "body": "Pressure to act immediately, missing written details, secret methods, and high returns paired with little or no risk are warning signs. Pause, identify the provider and product, obtain the disclosure, and check the relevant regulator or official register in the product's jurisdiction. Provider status does not make every claim accurate or every product fit a goal; return to the costs, risks, access, and horizon in the actual terms.",
+                "sourceCreditKeys": ["ftc-investment-scams", "investor-performance-claims", "naic-insurance-basics"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "audit-promotional-claim",
+              "prompt": "An unsolicited message promises a guaranteed 12% annual return with no risk if funds are sent today. It supplies testimonials and an account screenshot but no written product terms or regulator-verifiable provider identity. What is the best response?",
+              "options": [
+                {
+                  "key": "pause-and-verify",
+                  "text": "Pause; verify the written terms, provider, product, risks, fees, and guarantee independently"
+                },
+                {
+                  "key": "trust-testimonials",
+                  "text": "Treat the testimonials as proof because several customers report the same return"
+                },
+                {
+                  "key": "accept-screen-balance",
+                  "text": "Treat the account screenshot as audited performance because it displays a precise balance"
+                },
+                {
+                  "key": "send-small-amount",
+                  "text": "Send a smaller amount today because reducing the stake removes the need to verify the offer"
+                }
+              ],
+              "answerKey": "pause-and-verify",
+              "explanation": {
+                "text": "Guaranteed high return, no risk, urgency, and missing written details are direct warning signs. Testimonials and screenshots are not independent verification. The safe comparison begins only after the provider, product, contractual terms, fees, risks, and scope of any guarantee can be checked.",
+                "sourceCreditKeys": ["ftc-investment-scams", "investor-performance-claims"]
+              }
+            },
+            {
+              "family": "impostor",
+              "key": "spot-product-comparison-impostor",
+              "prompt": "Which statement misclassifies the evidence in a financial-product comparison?",
+              "statements": [
+                {
+                  "key": "align-comparison-basis",
+                  "text": "Costs and performance are compared over the same use, time period, and fee basis.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "check-written-feature-terms",
+                  "text": "A promoted feature is checked against the current written conditions, exclusions, and provider.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "classify-chart-as-observed",
+                  "text": "A projected return in a professionally prepared chart is classified as observed performance.",
+                  "kind": "impostor"
+                }
+              ],
+              "explanation": {
+                "text": "The false statement changes hypothetical evidence into observed performance because of its presentation. A projection remains hypothetical; historical results do not predict future results; and fees, period, benchmark, risks, provider, and contract conditions still require direct comparison.",
+                "sourceCreditKeys": ["investor-performance-claims", "investor-fees", "ftc-investment-scams"]
+              }
+            }
+          ],
+          "supportPaths": []
         }
       ],
       "guardianActivityKeys": [
-        "match-financial-map",
-        "spot-time-value-impostor",
-        "choose-reserve-design",
-        "compare-product-terms"
+        "compare-loan-offers",
+        "match-credit-cost-fields",
+        "compare-repayment-paths",
+        "audit-debt-priorities",
+        "compare-policy-terms",
+        "match-insurance-terms",
+        "audit-promotional-claim",
+        "spot-product-comparison-impostor"
+      ]
+    },
+    {
+      "key": "invest-and-review",
+      "title": "Invest and Review",
+      "stops": [
+        {
+          "key": "match-goal-horizon-risk",
+          "label": "Match risk to the goal's clock",
+          "requires": ["reason-through-time-value", "build-liquidity-buffer"],
+          "difficultyBand": 3,
+          "lesson": {
+            "sections": [
+              {
+                "key": "time-horizon-before-product",
+                "title": "The goal's date comes before the product label",
+                "body": "A time horizon is the period until money is expected to be used for a goal. A near-term obligation has little time to recover from a market loss and usually needs timely access without major penalty. A distant goal may have more time to experience fluctuations, but a long horizon does not require taking maximum risk. State the amount, use date, and access need before comparing products.",
+                "sourceCreditKeys": ["investor-introduction", "investor-asset-allocation", "investor-risk-inflation"],
+                "explorableTerms": []
+              },
+              {
+                "key": "capacity-willingness-and-need",
+                "title": "Risk tolerance includes ability and willingness to bear loss",
+                "body": "Investor guidance describes risk tolerance as both ability and willingness to accept investment loss. Ability is financial: could a loss be absorbed without disrupting essential spending, an obligation, or the goal that relies on these funds? Willingness is personal comfort with possible loss and market volatility. The amount someone can technically afford to lose can differ from the amount they are comfortable risking. Neither dimension supplies one universal allocation.",
+                "sourceCreditKeys": ["finra-risk-tolerance", "investor-asset-allocation", "investor-introduction"],
+                "explorableTerms": []
+              },
+              {
+                "key": "separate-goal-buckets",
+                "title": "One person can have several horizons",
+                "body": "Money for next year's required payment and money for a goal decades away do not share one use date. Separate the goal amounts and horizons, then assess access, volatility, fees, taxes, and product protections for each. A whole-portfolio view still matters, but it should not hide that a near-term commitment can fail even while a long-term holding later recovers.",
+                "sourceCreditKeys": ["investor-introduction", "investor-asset-allocation", "investor-risk-inflation"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "match-horizon-to-risk",
+              "prompt": "$6,000 is required for tuition in 12 months, while a separate retirement goal is 25 years away. Which reasoning keeps both goals inside their evidence?",
+              "options": [
+                {
+                  "key": "separate-goals-by-horizon-and-access",
+                  "text": "Keep tuition accessible for 12 months; assess the 25-year goal's capacity and tolerance separately"
+                },
+                {
+                  "key": "put-both-in-high-return",
+                  "text": "Put both amounts into the highest projected-return product because the long goal offsets a tuition loss"
+                },
+                {
+                  "key": "put-both-in-cash-forever",
+                  "text": "Keep both amounts in the same cash product because one of the goals is only 12 months away"
+                },
+                {
+                  "key": "average-to-thirteen-years",
+                  "text": "Treat both goals as one 13-year horizon by averaging 12 months and 25 years"
+                }
+              ],
+              "answerKey": "separate-goals-by-horizon-and-access",
+              "explanation": {
+                "text": "The tuition obligation has a fixed 12-month use date and needs timely access without relying on recovery from a market loss. The 25-year goal has a separate horizon and should be assessed using its own loss capacity, willingness, costs, and purpose rather than being averaged with tuition.",
+                "sourceCreditKeys": ["investor-introduction", "investor-asset-allocation", "finra-risk-tolerance", "investor-risk-inflation"]
+              }
+            },
+            {
+              "family": "matching",
+              "key": "match-risk-dimensions",
+              "prompt": "Match each goal constraint to the question it answers before allocation.",
+              "pairs": [
+                {
+                  "key": "horizon-role",
+                  "left": "Time horizon",
+                  "right": "When the money is expected to be used"
+                },
+                {
+                  "key": "loss-capacity-role",
+                  "left": "Ability to bear loss",
+                  "right": "Whether finances can absorb loss without disrupting essential needs or the goal"
+                },
+                {
+                  "key": "loss-willingness-role",
+                  "left": "Willingness to bear loss",
+                  "right": "How comfortable the investor is with possible loss and market volatility"
+                },
+                {
+                  "key": "liquidity-role",
+                  "left": "Liquidity need",
+                  "right": "How quickly value must become spendable without major penalty"
+                }
+              ],
+              "explanation": {
+                "text": "Horizon, financial ability to absorb loss, personal comfort with loss and volatility, and liquidity answer distinct questions. A long date does not establish ability or willingness, and comfort with fluctuation does not make an illiquid product usable for a near-term obligation.",
+                "sourceCreditKeys": ["investor-introduction", "investor-asset-allocation", "finra-risk-tolerance", "investor-risk-inflation"]
+              }
+            }
+          ],
+          "supportPaths": []
+        },
+        {
+          "key": "diversify-concentration-risk",
+          "label": "Look through labels to underlying exposure",
+          "requires": ["match-goal-horizon-risk"],
+          "difficultyBand": 4,
+          "lesson": {
+            "sections": [
+              {
+                "key": "diversify-within-and-across",
+                "title": "Diversification spreads exposure across and within asset classes",
+                "body": "Asset allocation divides holdings among categories such as stocks, bonds, and cash. Diversification also spreads exposure within a category across issuers, sectors, or other independent risk sources. The mix should be assessed against the goal's time horizon and risk tolerance. Counting account or fund names is not enough when the underlying holdings overlap.",
+                "sourceCreditKeys": ["investor-asset-allocation", "investor-introduction"],
+                "explorableTerms": [
+                  {
+                    "term": "time horizon",
+                    "supportPathKey": "revisit-time-horizon"
+                  }
+                ]
+              },
+              {
+                "key": "look-through-overlap",
+                "title": "Several wrappers can contain the same concentration",
+                "body": "A broad fund can hold many investments, while a narrowly focused fund can concentrate in one sector. Several funds may own many of the same top holdings. Look through product names to asset classes, sectors, issuers, geography, and major holdings instead of assuming that several wrappers create different underlying exposure.",
+                "sourceCreditKeys": ["investor-asset-allocation", "investor-introduction"],
+                "explorableTerms": []
+              },
+              {
+                "key": "diversification-has-limits",
+                "title": "Diversification reduces concentration; it does not guarantee against loss",
+                "body": "Spreading exposure can reduce the damage from one investment or sector performing badly. It cannot guarantee that a portfolio will not fall when broad markets decline, and it does not make a risky asset safe for a near-term goal. State which concentration is being reduced and which market, liquidity, inflation, or other risks remain.",
+                "sourceCreditKeys": ["investor-asset-allocation", "investor-diversification-limits", "investor-introduction", "investor-risk-inflation"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "diagnose-hidden-concentration",
+              "prompt": "A portfolio holds three funds with different names, but each fund's eight largest holdings are the same technology companies and all three focus on one sector. What is the most useful next conclusion?",
+              "options": [
+                {
+                  "key": "measure-overlap-and-allocation-fit",
+                  "text": "Fund count overstates diversification; measure shared holdings against the goal and allocation"
+                },
+                {
+                  "key": "three-funds-guarantee-diversification",
+                  "text": "Three separate fund names guarantee diversification even when their largest holdings coincide"
+                },
+                {
+                  "key": "sector-focus-removes-market-risk",
+                  "text": "One-sector focus removes broad-market risk because the companies use different legal names"
+                },
+                {
+                  "key": "choose-highest-recent-fund",
+                  "text": "Keep only the fund with the highest recent return because overlap makes its future return more certain"
+                }
+              ],
+              "answerKey": "measure-overlap-and-allocation-fit",
+              "explanation": {
+                "text": "Different wrappers do not diversify the shared underlying companies or sector. The next step is to measure that overlap and compare the resulting exposure with the goal's horizon, risk tolerance, and intended allocation; diversification still cannot guarantee against market loss.",
+                "sourceCreditKeys": ["investor-asset-allocation", "investor-diversification-limits", "investor-introduction"]
+              }
+            },
+            {
+              "family": "impostor",
+              "key": "audit-diversification-claims",
+              "prompt": "Which statement uses the wrong evidence to assess diversification?",
+              "statements": [
+                {
+                  "key": "inspect-within-and-across",
+                  "text": "Diversification is assessed across asset classes and among underlying holdings within each class.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "retain-broad-market-risk",
+                  "text": "Broad market conditions can lower many holdings in a diversified portfolio at the same time.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "use-fund-name-count",
+                  "text": "Fund-name count is used before the underlying holdings and sector exposures are examined.",
+                  "kind": "impostor"
+                }
+              ],
+              "explanation": {
+                "text": "The false statement uses wrapper count as the evidence before examining what the funds own. Funds can overlap or be narrowly focused, and even diversified holdings can lose value when broad market conditions affect many investments.",
+                "sourceCreditKeys": ["investor-asset-allocation", "investor-diversification-limits", "investor-introduction"]
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "revisit-time-horizon",
+              "term": "time horizon",
+              "sectionKey": "diversify-within-and-across",
+              "steps": [
+                {
+                  "stopKey": "match-goal-horizon-risk",
+                  "activityKey": "match-horizon-to-risk"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "compare-fees-and-performance",
+          "label": "Put costs and claims on one basis",
+          "requires": ["diversify-concentration-risk"],
+          "difficultyBand": 4,
+          "lesson": {
+            "sections": [
+              {
+                "key": "fees-reduce-the-base",
+                "title": "Fees reduce the amount left to compound",
+                "body": "Transaction fees apply when buying, selling, or exchanging an investment; ongoing fees can apply each year or period even without a transaction. Separate transfer or other brokerage fees may apply when moving or closing an account. Because fees leave less money invested, they reduce the base for compound growth across time. Read the fee schedule and product disclosure for percentage and fixed fees, what value each percentage uses, when it is charged, and whether a quoted return is before or after fees.",
+                "sourceCreditKeys": ["investor-fees", "investor-compound-interest"],
+                "explorableTerms": [
+                  {
+                    "term": "compound growth",
+                    "supportPathKey": "revisit-compounding"
+                  }
+                ]
+              },
+              {
+                "key": "fee-impact-worked",
+                "title": "Put fee comparisons on the same base",
+                "body": "In a simplified one-period example, $20,000 earns a 5% gross return before a fee charged on the starting balance. A 1% fee is $200, leaving $20,800; a 0.25% fee is $50, leaving $20,950. The $150 difference belongs to the stated fee assumptions. Real products may charge on different balances or dates and may add fixed, transaction, transfer, or advice fees, so use their actual schedules.",
+                "sourceCreditKeys": ["investor-fees"],
+                "explorableTerms": []
+              },
+              {
+                "key": "performance-needs-a-basis",
+                "title": "Performance needs period, method, risk, benchmark, and fees",
+                "body": "Past performance records a historical period but does not predict future results. Back-tests and projections are hypothetical. Ask whether a return is gross or net of fees, which dates and cash flows it uses, whether weak periods were omitted, and whether the benchmark represents comparable assets and risk. A higher displayed percentage is not a complete comparison when the bases differ.",
+                "sourceCreditKeys": ["investor-performance-claims", "investor-fees"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "compare-fund-presentations",
+              "prompt": "Fund A advertises a 14% best-year gross return and a 1.2% annual expense. Fund B reports a 6% five-year annualized return net of a 0.3% annual expense. Their strategy, benchmark, risk, and full periods are not supplied. What comparison is warranted?",
+              "options": [
+                {
+                  "key": "request-common-basis",
+                  "text": "Neither is comparable yet; align the period, net-fee method, benchmark, risk, and strategy"
+                },
+                {
+                  "key": "a-wins-by-fourteen",
+                  "text": "A is better because 14% is greater than 6% even though the periods and fee bases differ"
+                },
+                {
+                  "key": "b-wins-by-fee-alone",
+                  "text": "B is better for every goal because a lower annual expense guarantees a higher future return"
+                },
+                {
+                  "key": "average-presented-returns",
+                  "text": "The two funds should be treated as earning 10% by averaging the displayed percentages"
+                }
+              ],
+              "answerKey": "request-common-basis",
+              "explanation": {
+                "text": "A best-year gross figure and a five-year annualized net figure are not comparable performance bases. A defensible comparison needs aligned dates and cash-flow method, net fees, a relevant benchmark, strategy, and risk; neither past figure guarantees a future return or goal fit.",
+                "sourceCreditKeys": ["investor-performance-claims", "investor-fees"]
+              }
+            },
+            {
+              "family": "matching",
+              "key": "match-performance-checks",
+              "prompt": "Match each performance field to the question it resolves.",
+              "pairs": [
+                {
+                  "key": "period-role",
+                  "left": "Measurement period",
+                  "right": "Which dates and market conditions the result covers"
+                },
+                {
+                  "key": "net-fee-role",
+                  "left": "Gross or net of fees",
+                  "right": "Whether product costs are deducted from the displayed return"
+                },
+                {
+                  "key": "benchmark-role",
+                  "left": "Benchmark",
+                  "right": "What comparable market or strategy supplies context"
+                },
+                {
+                  "key": "history-projection-role",
+                  "left": "Historical or hypothetical",
+                  "right": "Whether the result occurred or was modeled"
+                }
+              ],
+              "explanation": {
+                "text": "Period, fee basis, benchmark, and historical-versus-hypothetical status define different parts of a performance claim. Aligning them prevents a selected strong year, gross return, mismatched index, or model result from posing as comparable future evidence.",
+                "sourceCreditKeys": ["investor-performance-claims", "investor-fees"]
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "revisit-compounding",
+              "term": "compound growth",
+              "sectionKey": "fees-reduce-the-base",
+              "steps": [
+                {
+                  "stopKey": "reason-through-time-value",
+                  "activityKey": "calculate-compound-balance"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "make-and-update-integrated-plan",
+          "label": "Review the whole decision system",
+          "requires": ["plan-repayment-with-constraints", "compare-insurance-coverage", "compare-fees-and-performance"],
+          "difficultyBand": 5,
+          "lesson": {
+            "sections": [
+              {
+                "key": "whole-position-before-marginal-choice",
+                "title": "A product choice sits inside the whole financial position",
+                "body": "Before directing the next dollar, update the dated assets and liabilities, current cash-flow timing, required payments, liquid reserves, insured exposures, and each goal's amount and horizon. A choice can improve one metric while weakening another: extra repayment may reduce interest but consume required liquidity; a high-return allocation may not fit a near-term obligation; a low premium may retain an unaffordable deductible.",
+                "sourceCreditKeys": ["fdic-net-worth", "cfpb-cash-flow", "cfpb-card-repayment", "naic-policy-terms", "investor-introduction"],
+                "explorableTerms": []
+              },
+              {
+                "key": "scenario-not-prescription",
+                "title": "A scenario comparison is not a universal prescription",
+                "body": "State the goal, horizon, cash-flow capacity, downside exposure, return or rate assumptions, fees, taxes, access conditions, provider, and jurisdiction-specific terms used in a comparison. Then describe what changes when an input changes. A worked scenario can show consequences under those facts; it cannot establish one reserve size, repayment order, insurance design, product, or asset allocation for every learner.",
+                "sourceCreditKeys": ["cfpb-goal-worksheet", "cfpb-auto-loan-comparison", "naic-policy-terms", "investor-asset-allocation", "investor-fees"],
+                "explorableTerms": []
+              },
+              {
+                "key": "review-triggers-and-rebalancing",
+                "title": "Review when goals, terms, or exposures change",
+                "body": "Set a review date or an explicit trigger such as a changed goal date, income pattern, liability term, coverage need, provider fee, or allocation drift. Recalculate from current records rather than rewarding whichever asset or product recently performed best. Rebalancing can restore an intended allocation on a schedule or threshold, but the intended allocation itself must still fit the current horizon and tolerance.",
+                "sourceCreditKeys": ["cfpb-goal-worksheet", "cfpb-cash-flow", "investor-asset-allocation", "investor-performance-claims", "investor-fees"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "choose-integrated-review",
+              "prompt": "Income has become less predictable, an emergency reserve fell from $1,000 to $300 after a repair, a $2,000 course fee is due in ten months, employer stock rose from 20% to 45% of investments, and loan terms are unchanged. What is the best first review?",
+              "options": [
+                {
+                  "key": "recalculate-linked-constraints",
+                  "text": "Update cash-flow timing, reserve exposure, course pace, and concentration before changing repayment or allocation"
+                },
+                {
+                  "key": "buy-recent-winner",
+                  "text": "Direct all available cash to more employer stock because its recent gain proves the strongest future return"
+                },
+                {
+                  "key": "repay-with-entire-reserve",
+                  "text": "Use the remaining $300 reserve for extra loan payment because lower debt always outranks liquidity and the dated goal"
+                },
+                {
+                  "key": "ignore-because-net-worth-rose",
+                  "text": "Make no review because the employer-stock gain increased the current net-worth snapshot"
+                }
+              ],
+              "answerKey": "recalculate-linked-constraints",
+              "explanation": {
+                "text": "The changed income pattern, depleted reserve, ten-month goal, and concentration all alter the decision system even though loan terms are unchanged. Updating those linked facts exposes available cash, required access, and risk before choosing an extra repayment or investment action; recent performance alone is not a forecast.",
+                "sourceCreditKeys": ["cfpb-cash-flow", "cfpb-emergency-fund", "cfpb-goal-worksheet", "investor-asset-allocation", "investor-performance-claims"]
+              }
+            },
+            {
+              "family": "impostor",
+              "key": "audit-plan-updates",
+              "prompt": "Which statement uses the wrong trigger for an integrated plan update?",
+              "statements": [
+                {
+                  "key": "recalculate-after-goal-change",
+                  "text": "A changed goal date or income pattern triggers new cash-flow, liquidity, and horizon calculations.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "compare-current-written-terms",
+                  "text": "A changed fee, rate, limit, exclusion, or provider term is compared on the current written basis.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "use-recent-return-rank",
+                  "text": "Recent-return rank sets the next allocation before current goals and concentration are reviewed.",
+                  "kind": "impostor"
+                }
+              ],
+              "explanation": {
+                "text": "The false statement lets a recent-return ranking set the action before the current decision inputs are reviewed. Recent historical performance is not a forecast; an integrated review responds to current goals, cash flow, exposures, concentration, intended allocation, and written terms.",
+                "sourceCreditKeys": ["investor-performance-claims", "investor-asset-allocation", "cfpb-cash-flow"]
+              }
+            }
+          ],
+          "supportPaths": []
+        }
+      ],
+      "guardianActivityKeys": [
+        "match-horizon-to-risk",
+        "match-risk-dimensions",
+        "diagnose-hidden-concentration",
+        "audit-diversification-claims",
+        "compare-fund-presentations",
+        "match-performance-checks",
+        "choose-integrated-review",
+        "audit-plan-updates"
       ]
     }
   ],
   "expeditionGuardianActivityKeys": [
-    "diagnose-cash-position",
-    "match-financial-map",
-    "spot-time-value-impostor",
-    "choose-reserve-design",
-    "compare-product-terms"
+    "calculate-net-worth",
+    "audit-spending-plan",
+    "match-liquidity-purposes",
+    "calculate-compound-balance",
+    "match-credit-cost-fields",
+    "audit-debt-priorities",
+    "compare-policy-terms",
+    "audit-promotional-claim",
+    "match-risk-dimensions",
+    "audit-diversification-claims",
+    "compare-fund-presentations",
+    "audit-plan-updates"
   ]
 }

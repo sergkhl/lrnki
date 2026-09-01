@@ -44,13 +44,12 @@ The only content authorities are:
 ```text
 content/catalog.json
 content/expeditions/<expeditionKey>/expedition.json
-content/expeditions/<expeditionKey>/source.md
 ```
 
 `catalog.json` owns membership and order. Each Expedition document owns the exact runtime route,
-lessons, activities, Support Paths, source disclosures, and Guardian pools. Its colocated primer is
-the project-owned authoring and inspection basis. No content is compiled, installed, published to
-Postgres, or requalified from a second representation.
+lessons, activities, Support Paths, keyed online source credits, exact teaching references, and
+Guardian pools. No content is compiled, installed, published to Postgres, fetched from source links
+at build/runtime, or requalified from a second representation.
 
 Follow [content/AUTHORING.md](content/AUTHORING.md), then run:
 
@@ -59,8 +58,8 @@ pnpm content:check
 ```
 
 The same all-or-nothing qualifier runs in `pnpm check` and before learner-api begins listening. It
-checks structure and exact source-anchor existence; direct source inspection remains required for
-semantic support and teaching quality.
+checks structure and exact source-credit resolution; direct inspection of the cited online evidence
+remains required for semantic support and teaching quality.
 
 Current catalog order:
 

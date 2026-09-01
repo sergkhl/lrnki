@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { ArrowLeft, BookOpen } from "lucide-react-native";
 
+import { SourceCreditList } from "@/components/SourceCredits";
 import { dispatchLearnerCommand } from "@/lib/actions";
 import { catalogQuery, type CatalogView } from "@/lib/queries";
 import {
@@ -165,20 +166,14 @@ function SourcesDialog({ expeditions }: Readonly<{ expeditions: CatalogView["exp
         <OverlayHeader
           icon={<BookOpen size={20} color={colors.ink} />}
           title="Sources and disclosures"
-          description="Project-owned authoring bases for this catalog. No external factual-verification claim is implied."
+          description="Authored source credits for this catalog. Open a link to inspect its public source; no independent factual-verification claim is implied."
           onClose={() => setOpen(false)}
         />
         <DialogBody>
           {expeditions.map((expedition) => (
             <View key={expedition.expeditionKey} className="gap-2 border-b border-line pb-4 last:border-b-0">
               <Text variant="title">{expedition.title}</Text>
-              {expedition.sourceCredits.map((credit, index) => (
-                <View key={`${expedition.expeditionKey}-${index}`} className="gap-1">
-                  <Text variant="label">{credit.title}{credit.author ? ` — ${credit.author}` : ""}</Text>
-                  <Text variant="caption" color="muted">License: {credit.license}</Text>
-                  {credit.note ? <Text variant="caption" color="muted">{credit.note}</Text> : null}
-                </View>
-              ))}
+              <SourceCreditList sourceCredits={expedition.sourceCredits} />
             </View>
           ))}
         </DialogBody>

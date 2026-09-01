@@ -288,6 +288,7 @@ export const guardianActiveView = {
   remainingShield: 3,
   shieldTotal: 3,
   retreated: false,
+  sourceCredits,
   currentActivity: impostorActivity,
   matchingProgress: null
 };

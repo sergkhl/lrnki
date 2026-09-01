@@ -1,48 +1,133 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "key": "critical-thinking",
   "title": "Critical Thinking",
-  "teaser": "Make reasoning visible, test it against evidence, and revise confidence without pretending to certainty.",
-  "declaredDomain": "Reasoning and decision-making",
-  "audience": "Adult learners building practical reasoning habits",
+  "teaser": "Make reasoning visible, test what the evidence earns, and make decisions that can improve when the world changes.",
+  "declaredDomain": "Reasoning, evidence evaluation, and decision-making",
+  "audience": "Adult learners building practical reasoning habits for work and everyday decisions",
   "sourceCredits": [
     {
-      "title": "Critical Thinking primer",
-      "author": "lrnki project",
-      "license": "Project-owned internal playtest source",
-      "note": "Accepted as a local authoring basis without independent external fact verification."
+      "key": "knachel-logic",
+      "title": "Fundamental Methods of Logic",
+      "url": "https://wisconsin.pressbooks.pub/logicfundamentals/",
+      "author": "Matthew Knachel",
+      "publisher": "University of Wisconsin-Milwaukee",
+      "publishedAt": "2017-09-01",
+      "version": "2017 edition",
+      "accessedAt": "2026-09-01",
+      "license": "Creative Commons Attribution 4.0 International",
+      "note": "Open logic textbook covering arguments, deductive validity and soundness, inductive support, fallacies, causal reasoning, and probability."
+    },
+    {
+      "key": "cornell-source-evaluation",
+      "title": "Instruction Program: Programmatic Learning Outcomes",
+      "url": "https://mann.library.cornell.edu/instruction-program",
+      "publisher": "Cornell University Library",
+      "accessedAt": "2026-09-01",
+      "note": "Information-literacy outcomes covering contextual authority, source fit, strengths and limitations, lateral reading, upstream searching, and bounded conclusions."
+    },
+    {
+      "key": "dig-lateral-reading",
+      "title": "Teaching Lateral Reading",
+      "url": "https://cor.inquirygroup.org/curriculum/collections/teaching-lateral-reading/",
+      "publisher": "Digital Inquiry Group",
+      "accessedAt": "2026-09-01",
+      "note": "Primary curriculum guidance defining lateral reading as leaving a site to investigate what other sources say about it and contrasting that practice with trusting a source's self-description."
+    },
+    {
+      "key": "caulfield-upstream",
+      "title": "Go Upstream to Find the Source",
+      "url": "https://pressbooks.pub/webliteracy/chapter/go-upstream-to-find-the-source/",
+      "author": "Mike Caulfield",
+      "publisher": "Pressbooks",
+      "publishedAt": "2017-01-08",
+      "version": "Web Literacy for Student Fact-Checkers, 2017 edition",
+      "accessedAt": "2026-09-01",
+      "license": "Creative Commons Attribution 4.0 International",
+      "note": "Open instructional chapter defining upstream checking as tracing reported claims toward their original source before evaluating them."
+    },
+    {
+      "key": "nist-populations-sampling",
+      "title": "3.1.3.4. Populations and Sampling",
+      "url": "https://www.itl.nist.gov/div898/handbook/ppc/section1/ppc134.htm",
+      "publisher": "National Institute of Standards and Technology",
+      "accessedAt": "2026-09-01",
+      "note": "Official statistical handbook guidance on target populations, sample adequacy, representativeness, size, variability, precision, and bounded inference."
+    },
+    {
+      "key": "cdc-causal-analysis",
+      "title": "Analyzing and Interpreting Data",
+      "url": "https://www.cdc.gov/field-epi-manual/php/chapters/analyze-interpret-data.html",
+      "author": "Richard C. Dicker",
+      "publisher": "Centers for Disease Control and Prevention",
+      "publishedAt": "2025-01-06",
+      "accessedAt": "2026-09-01",
+      "note": "Field Epidemiology Manual guidance on association, confounding, bias, chance, alternative explanations, and cautious causal interpretation."
+    },
+    {
+      "key": "odni-analytic-standards",
+      "title": "Intelligence Community Directive 203: Analytic Standards",
+      "url": "https://www.dni.gov/files/documents/ICD/ICD-203.pdf",
+      "publisher": "Office of the Director of National Intelligence",
+      "publishedAt": "2015-01-02",
+      "version": "ICD 203 with technical amendments displayed through 2022",
+      "accessedAt": "2026-09-01",
+      "note": "Official standards for source quality, uncertainty, assumptions, alternatives, indicators, relevance, and logical argumentation."
+    },
+    {
+      "key": "green-book-2026",
+      "title": "The Green Book (2026)",
+      "url": "https://www.gov.uk/government/publications/the-green-book-appraisal-and-evaluation-in-central-government/the-green-book-2026",
+      "publisher": "HM Treasury and Government Finance Function",
+      "publishedAt": "2026-02-05",
+      "version": "2026 edition",
+      "accessedAt": "2026-09-01",
+      "license": "Open Government Licence 3.0",
+      "note": "Official guidance for objectives, options, costs, benefits, risks, uncertainty, monitoring, and evaluation in appraisal."
+    },
+    {
+      "key": "aqua-book-2025",
+      "title": "The AQuA Book",
+      "url": "https://www.gov.uk/guidance/the-aqua-book",
+      "publisher": "Government Analysis Function",
+      "publishedAt": "2025-07-30",
+      "version": "2025 edition",
+      "accessedAt": "2026-09-01",
+      "license": "Open Government Licence 3.0",
+      "note": "Government guidance on proportionate analytical quality assurance, verification, validation, uncertainty, independence, and lifecycle review."
     }
   ],
   "legs": [
     {
-      "key": "reasoning-foundations",
-      "title": "From claims to warranted conclusions",
+      "key": "make-reasoning-visible",
+      "title": "Make the Reasoning Visible",
       "stops": [
         {
-          "key": "argument-structure",
-          "label": "See the support structure",
+          "key": "map-an-argument",
+          "label": "Map claims into support",
           "requires": [],
           "difficultyBand": 1,
           "lesson": {
             "sections": [
               {
-                "key": "claims-and-support",
-                "title": "Separate what is claimed from what supports it",
-                "body": "A claim is something that can be accepted or rejected. An argument adds structure: one or more claims act as reasons for another claim, the conclusion. When you evaluate reasoning, first mark those roles. Nearby sentences, a confident tone, or a word such as ‘therefore’ are clues, but the actual support relationship decides which role each claim plays.",
-                "sourceAnchor": {
-                  "heading": "1. Claims, Reasons, Conclusions, and Arguments",
-                  "quote": "An **argument** is a set of claims in which one or more claims are offered as support for another."
-                },
+                "key": "claims-reasons-conclusions",
+                "title": "An argument is a support relationship",
+                "body": "A claim is a statement that can be accepted or rejected. Claims form an argument when one or more are offered as reasons, or premises, for another claim: the conclusion. Begin by asking what the speaker wants you to accept and which claims are meant to support it. A list of facts is not automatically an argument, and disagreement with a conclusion does not change the roles the claims play.",
+                "sourceCreditKeys": ["knachel-logic"],
                 "explorableTerms": []
               },
               {
-                "key": "charitable-reconstruction",
-                "title": "Reconstruct only what the reasoning needs",
-                "body": "Every premise is not always spoken aloud. Supply an implicit premise only when it is needed to connect a stated reason to the conclusion, and choose the weakest plausible version. This makes the reasoning intelligible without turning it into an easier, more extreme target. Then set examples, background details, and emotional wording aside before judging the support.",
-                "sourceAnchor": {
-                  "heading": "1. Claims, Reasons, Conclusions, and Arguments",
-                  "quote": "A charitable reconstruction uses the weakest plausible assumption needed to connect the stated reason to the conclusion."
-                },
+                "key": "argument-map-worked",
+                "title": "Map the relationship before judging it",
+                "body": "Suppose a team says, ‘The client needs a reply today. Mira has the relevant records. Therefore, Mira should draft the reply.’ The requested action is the conclusion. The deadline and Mira’s access are stated reasons. A useful map writes those reasons above an arrow pointing to the conclusion. That simple separation lets you ask later whether the reasons are true and whether they are enough.",
+                "sourceCreditKeys": ["knachel-logic"],
+                "explorableTerms": []
+              },
+              {
+                "key": "indicator-words-are-clues",
+                "title": "Signal words are clues, not proof",
+                "body": "Words such as ‘because,’ ‘so,’ and ‘therefore’ often signal a reason or conclusion, but context decides the actual structure. A sentence can explain why an event occurred without trying to prove that it occurred. Conversely, an argument may omit every signal word. If the stated reasons need an unstated bridge to reach the conclusion, mark that bridge separately as a candidate assumption. Trace the intended support rather than labeling a sentence by one word.",
+                "sourceCreditKeys": ["knachel-logic"],
                 "explorableTerms": []
               }
             ]
@@ -51,201 +136,159 @@
             {
               "family": "option_select",
               "key": "identify-conclusion",
-              "prompt": "A traveler says: ‘The northern road is closed by flooding. The southern road remains open. Therefore, we should take the southern road.’ Which claim is the conclusion?",
+              "prompt": "A dispatcher says: ‘The west route closes at 18:00. Our delivery leaves at 18:15. The east route remains open. So we should use the east route.’ Which claim is the conclusion?",
               "options": [
                 {
-                  "key": "northern-road-closed",
-                  "text": "The northern road is closed by flooding."
+                  "key": "west-closes",
+                  "text": "The west route will close at 18:00."
                 },
                 {
-                  "key": "southern-road-open",
-                  "text": "The southern road remains open."
+                  "key": "delivery-leaves-later",
+                  "text": "The delivery is scheduled to leave at 18:15."
                 },
                 {
-                  "key": "take-southern-road",
-                  "text": "We should take the southern road."
+                  "key": "east-remains-open",
+                  "text": "The east route will still be open at 18:15."
                 },
                 {
-                  "key": "usable-road-needed",
-                  "text": "A usable road is needed to reach the destination."
+                  "key": "use-east-route",
+                  "text": "The delivery should take the east route."
                 }
               ],
-              "answerKey": "take-southern-road",
+              "answerKey": "use-east-route",
               "explanation": {
-                "text": "The two road conditions are offered as reasons. The proposed action—take the southern road—is the claim those reasons support, so it is the conclusion.",
-                "sourceAnchor": {
-                  "heading": "1. Claims, Reasons, Conclusions, and Arguments",
-                  "quote": "The road conditions are reasons. The proposed choice is the conclusion."
-                }
+                "text": "The route facts are offered to support the proposed action. The proposal to use the east route is therefore the conclusion, regardless of whether the dispatcher’s reasoning is ultimately persuasive.",
+                "sourceCreditKeys": ["knachel-logic"]
               }
             },
             {
               "family": "matching",
-              "key": "map-argument-parts",
-              "prompt": "Match each reasoning role to what it does.",
+              "key": "map-reasoning-questions",
+              "prompt": "Match each part of an argument map to the question that finds it.",
               "pairs": [
                 {
-                  "key": "claim-role",
-                  "left": "Claim",
-                  "right": "A statement that can be accepted or rejected"
-                },
-                {
-                  "key": "reason-role",
-                  "left": "Reason",
-                  "right": "A claim offered in support of another claim"
-                },
-                {
-                  "key": "conclusion-role",
+                  "key": "find-conclusion",
                   "left": "Conclusion",
-                  "right": "The claim the reasons are intended to support"
+                  "right": "What claim are the other claims meant to support?"
+                },
+                {
+                  "key": "find-reason",
+                  "left": "Stated reason",
+                  "right": "What claim is offered as support?"
+                },
+                {
+                  "key": "find-assumption",
+                  "left": "Unstated assumption",
+                  "right": "What must connect the stated reason to the conclusion?"
                 }
               ],
               "explanation": {
-                "text": "Claims become an argument through their roles: reasons supply support and the conclusion is what that support is meant to establish.",
-                "sourceAnchor": {
-                  "heading": "1. Claims, Reasons, Conclusions, and Arguments",
-                  "quote": "The supporting claims are **reasons** or **premises**. The supported claim is the **conclusion**."
-                }
+                "text": "An argument map separates the target claim, the support that was stated, and any bridge the reasoning relies on without stating. These questions recover roles rather than merely spotting signal words.",
+                "sourceCreditKeys": ["knachel-logic"]
               }
             }
           ],
           "supportPaths": []
         },
         {
-          "key": "evidence-quality",
-          "label": "Judge how much the evidence earns",
-          "requires": ["argument-structure"],
+          "key": "test-deductive-support",
+          "label": "Test whether the conclusion must follow",
+          "requires": ["map-an-argument"],
           "difficultyBand": 2,
           "lesson": {
             "sections": [
               {
-                "key": "inductive-strength",
-                "title": "Let the conclusion match the uncertainty",
-                "body": "Most practical inferences make a conclusion more or less probable rather than guaranteeing it. Ask how many plausible alternatives remain after seeing the evidence. Strong inductive evidence rules out important alternatives and supports a conclusion within a stated population, setting, and time. The conclusion should say ‘probably,’ ‘often,’ or ‘under these conditions’ when certainty is not earned.",
-                "sourceAnchor": {
-                  "heading": "3. Induction, Evidence, and Uncertainty",
-                  "quote": "An inductive argument is **strong** when its evidence gives substantial support to its conclusion."
-                },
-                "explorableTerms": []
-              },
-              {
-                "key": "representative-evidence",
-                "title": "A large sample can still answer the wrong question",
-                "body": "Sample size narrows random noise, but representativeness determines which population the result can describe. A large volunteer poll may precisely measure its volunteers while missing quieter groups. Recover the support relationship first, then inspect selection, nonresponse, wording, and whether the target population matches the sample before accepting the conclusion.",
-                "sourceAnchor": {
-                  "heading": "3. Induction, Evidence, and Uncertainty",
-                  "quote": "Sample size matters, but representativeness matters too."
-                },
+                "key": "validity-versus-truth",
+                "title": "Validity tests the connection",
+                "body": "A deductive argument is valid when there is no possible case in which all its premises are true and its conclusion is false. This tests the support relationship, not whether the premises are actually true. A valid pattern can start with a false premise, and a true conclusion can be reached by an invalid pattern. Keep the connection test separate from the fact check.",
+                "sourceCreditKeys": ["knachel-logic"],
                 "explorableTerms": [
                   {
                     "term": "support relationship",
-                    "supportPathKey": "review-support-relationship"
+                    "supportPathKey": "revisit-argument-map"
                   }
                 ]
+              },
+              {
+                "key": "counterexample-test",
+                "title": "One counterexample defeats a claim of validity",
+                "body": "To test a deductive form, temporarily grant its premises and try to construct a case where its conclusion is false. For ‘If approved, then labeled; labeled; therefore approved,’ imagine an unapproved item carrying an old label. That coherent case preserves both premises but defeats the conclusion. You have tested the form without needing to know whether the actual item was approved.",
+                "sourceCreditKeys": ["knachel-logic"],
+                "explorableTerms": []
+              },
+              {
+                "key": "soundness-adds-premise-truth",
+                "title": "Soundness adds the fact check",
+                "body": "A sound deductive argument is valid and has true premises. Validity alone tells you the conclusion would be secured if the premises held; premise checking determines whether that guarantee applies to the real case. In a decision, the order matters: first see whether the reasoning form can carry the conclusion, then investigate whether each premise deserves acceptance.",
+                "sourceCreditKeys": ["knachel-logic"],
+                "explorableTerms": []
               }
             ]
           },
           "activities": [
             {
               "family": "option_select",
-              "key": "evaluate-sample",
-              "prompt": "Which study best supports a cautious conclusion about weekly public-transport use among commuters in one city during the survey month?",
+              "key": "test-counterexample",
+              "prompt": "A policy says: ‘If a vendor is approved, its profile displays a badge.’ A profile displays a badge, so a manager concludes that the vendor is approved. Which possibility most directly shows that this inference is invalid?",
               "options": [
                 {
-                  "key": "random-city-commuters",
-                  "text": "A large random sample drawn from that city’s commuter registry, with nonresponse reported"
+                  "key": "badge-copied",
+                  "text": "An unapproved vendor kept a badge after an earlier approval expired."
                 },
                 {
-                  "key": "transit-fan-volunteers",
-                  "text": "A much larger voluntary poll shared by a public-transport fan group"
+                  "key": "approval-recorded",
+                  "text": "An approved vendor received its badge only after the approval was recorded."
                 },
                 {
-                  "key": "different-city-riders",
-                  "text": "A random sample of riders in a different city five years earlier"
+                  "key": "badge-delayed",
+                  "text": "An approved vendor’s badge appeared several minutes after approval was granted."
                 },
                 {
-                  "key": "one-memorable-commuter",
-                  "text": "A detailed interview with one especially memorable commuter"
+                  "key": "manager-checked",
+                  "text": "The manager verified the approval register after noticing the visible badge."
                 }
               ],
-              "answerKey": "random-city-commuters",
+              "answerKey": "badge-copied",
               "explanation": {
-                "text": "The registry sample is closest to the named population, place, and period, and it exposes nonresponse. A larger biased sample can be more precise while still describing the wrong population.",
-                "sourceAnchor": {
-                  "heading": "3. Induction, Evidence, and Uncertainty",
-                  "quote": "A very large biased sample can give a precise estimate of the wrong population."
-                }
-              }
-            },
-            {
-              "family": "option_select",
-              "key": "test-common-cause",
-              "prompt": "Ice-cream sales and sunburn cases both rise during the same weeks. Which alternative should be tested before claiming that buying ice cream causes sunburn?",
-              "options": [
-                {
-                  "key": "sunny-weather-common-cause",
-                  "text": "Hot, sunny weather may increase both ice-cream purchases and sun exposure."
-                },
-                {
-                  "key": "sales-prove-causation",
-                  "text": "The association itself proves that ice-cream purchases cause sunburn."
-                },
-                {
-                  "key": "reverse-cause-certain",
-                  "text": "Sunburn must cause people to buy ice cream."
-                },
-                {
-                  "key": "ignore-weekly-pattern",
-                  "text": "A repeated weekly pattern makes alternative explanations irrelevant."
-                }
-              ],
-              "answerKey": "sunny-weather-common-cause",
-              "explanation": {
-                "text": "Sunny weather is a plausible common cause: it can increase both the proposed cause and the outcome, creating an association without the claimed causal link.",
-                "sourceAnchor": {
-                  "heading": "5. Causal Reasoning",
-                  "quote": "Severity is a **confounder**: a factor related to both the proposed cause and the outcome that can create or distort an association."
-                }
+                "text": "The expired badge creates the required counterexample: the profile has a badge while the vendor is not approved. That makes the premises compatible with a false conclusion and defeats validity.",
+                "sourceCreditKeys": ["knachel-logic"]
               }
             },
             {
               "family": "impostor",
-              "key": "spot-evidence-impostor",
-              "prompt": "Two statements respect evidence limits. One overclaims. Find the impostor.",
+              "key": "separate-validity-soundness",
+              "prompt": "Two statements keep validity and truth separate. One merges them incorrectly. Find the impostor.",
               "statements": [
                 {
-                  "key": "random-selection-reduces-bias",
-                  "text": "Random selection can reduce selection bias, though nonresponse can still distort a result.",
+                  "key": "validity-conditional-guarantee",
+                  "text": "Validity asks whether true premises and a false conclusion could occur together in the same case.",
                   "kind": "truth"
                 },
                 {
-                  "key": "anecdote-shows-possibility",
-                  "text": "An anecdote can show that something can happen without establishing how common it is.",
+                  "key": "soundness-two-checks",
+                  "text": "Soundness requires a valid connection plus premises that are true in the case at hand.",
                   "kind": "truth"
                 },
                 {
-                  "key": "size-cures-bias",
-                  "text": "Once a sample is very large, selection bias no longer matters.",
+                  "key": "validity-settles-facts",
+                  "text": "Once a pattern is valid, checking whether its premises are true becomes optional.",
                   "kind": "impostor"
                 }
               ],
               "explanation": {
-                "text": "Size does not repair selection into the wrong population. It can make the wrong estimate look impressively precise, so the third statement is the impostor.",
-                "sourceAnchor": {
-                  "heading": "3. Induction, Evidence, and Uncertainty",
-                  "quote": "A very large biased sample can give a precise estimate of the wrong population."
-                }
+                "text": "A valid pattern supplies only a conditional guarantee. Whether its premises hold determines whether that guarantee bears on the actual conclusion, so premise checking remains essential.",
+                "sourceCreditKeys": ["knachel-logic"]
               }
             }
           ],
           "supportPaths": [
             {
-              "key": "review-support-relationship",
+              "key": "revisit-argument-map",
               "term": "support relationship",
-              "sectionKey": "representative-evidence",
+              "sectionKey": "validity-versus-truth",
               "steps": [
                 {
-                  "stopKey": "argument-structure",
+                  "stopKey": "map-an-argument",
                   "activityKey": "identify-conclusion"
                 }
               ]
@@ -253,81 +296,193 @@
           ]
         },
         {
-          "key": "causal-claims",
-          "label": "Test the causal story",
-          "requires": ["evidence-quality"],
-          "difficultyBand": 3,
+          "key": "weigh-inductive-support",
+          "label": "Match confidence to evidence",
+          "requires": ["map-an-argument"],
+          "difficultyBand": 2,
           "lesson": {
             "sections": [
               {
-                "key": "association-vs-cause",
-                "title": "Association leaves several causal stories open",
-                "body": "When two variables move together, the observation alone does not tell you whether the first causes the second, the second causes the first, a third factor affects both, or the pattern is accidental. A causal judgment needs a comparison that separates those stories and a defined contrast: what change, compared with what alternative, for whom and over what period?",
-                "sourceAnchor": {
-                  "heading": "5. Causal Reasoning",
-                  "quote": "A **correlation** or association means that two variables are related in observed data. It does not by itself establish which variable causes the other, whether a third factor affects both, or whether the pattern is accidental."
-                },
+                "key": "induction-supports-degrees",
+                "title": "Inductive support comes in degrees",
+                "body": "Most practical reasoning does not guarantee its conclusion. An inductive argument is stronger when accepting its premises makes the conclusion substantially more probable, and weaker when important alternatives remain. New information can strengthen or weaken the same inference. The right question is not simply ‘proof or no proof,’ but how much support this evidence adds in this setting.",
+                "sourceCreditKeys": ["knachel-logic"],
                 "explorableTerms": []
               },
               {
-                "key": "confounding-and-comparison",
-                "title": "Look for a common cause before intervening",
-                "body": "A confounder is related to both the proposed cause and the outcome, so it can create or distort their association. In the fire example, severity brings both more emergency vehicles and more damage; sending fewer vehicles would not remove the common cause. Compare credible alternatives, check that the proposed cause comes first, and ask whether an intervention changes the outcome as predicted.",
-                "sourceAnchor": {
-                  "heading": "5. Causal Reasoning",
-                  "quote": "Severity is a **confounder**: a factor related to both the proposed cause and the outcome that can create or distort an association."
-                },
-                "explorableTerms": [
-                  {
-                    "term": "confounder",
-                    "supportPathKey": "review-evidence-quality"
-                  }
-                ]
+                "key": "scope-the-conclusion",
+                "title": "Do not outrun the population, time, or measure",
+                "body": "A conclusion should preserve the scope of its evidence. A representative sample from current night-shift staff can support a cautious claim about current night-shift staff; it does not directly establish the same pattern for every employee, a different year, or a different outcome. Sample size can reduce random variation, but it cannot by itself repair a sample drawn from the wrong group.",
+                "sourceCreditKeys": ["knachel-logic", "nist-populations-sampling"],
+                "explorableTerms": []
+              },
+              {
+                "key": "compare-live-alternatives",
+                "title": "Strength depends on what remains plausible",
+                "body": "Ask what else could produce the observations. Evidence is more discriminating when it is expected under the proposed conclusion but less expected under serious alternatives. An anecdote may establish that an event can occur while saying little about how often it occurs. A voluntary poll may describe its respondents well while leaving uncertainty about people who chose not to respond.",
+                "sourceCreditKeys": ["knachel-logic", "odni-analytic-standards"],
+                "explorableTerms": []
               }
             ]
           },
           "activities": [
             {
               "family": "option_select",
-              "key": "diagnose-fire-correlation",
-              "prompt": "Neighborhood fires with more emergency vehicles also show more property damage. Which explanation best blocks the claim that sending more vehicles causes more damage?",
+              "key": "bound-an-inference",
+              "prompt": "A random sample of 240 current night-shift employees at one factory finds that 62% prefer a revised break schedule. Which conclusion best matches the evidence?",
               "options": [
                 {
-                  "key": "severity-common-cause",
-                  "text": "More severe fires cause both a larger emergency response and more damage."
+                  "key": "current-night-shift-likely",
+                  "text": "Most current night-shift employees at that factory likely prefer the revised schedule."
                 },
                 {
-                  "key": "vehicles-always-protect",
-                  "text": "Emergency vehicles can never be involved in property damage."
+                  "key": "all-factory-employees-likely",
+                  "text": "Most current employees across all shifts at that factory likely prefer the revised schedule."
                 },
                 {
-                  "key": "correlation-proves-reverse",
-                  "text": "The correlation proves that damage summons vehicles after the fire ends."
+                  "key": "all-factories-current",
+                  "text": "Most current night-shift employees across the region likely prefer the revised schedule."
                 },
                 {
-                  "key": "all-associations-accidental",
-                  "text": "Every association in observational data is accidental."
+                  "key": "future-night-shift-certain",
+                  "text": "Most future night-shift employees at that factory will likely prefer the revised schedule."
                 }
               ],
-              "answerKey": "severity-common-cause",
+              "answerKey": "current-night-shift-likely",
               "explanation": {
-                "text": "Fire severity is a plausible common cause of both variables. The association therefore does not show that reducing the response would reduce damage.",
-                "sourceAnchor": {
-                  "heading": "5. Causal Reasoning",
-                  "quote": "Fire severity causes both the number of vehicles and the damage."
+                "text": "The first conclusion retains the sampled workplace, shift, and time and uses cautious language. The other options expand to unsampled groups or a future population without additional evidence.",
+                "sourceCreditKeys": ["knachel-logic", "nist-populations-sampling"]
+              }
+            },
+            {
+              "family": "matching",
+              "key": "classify-support-strength",
+              "prompt": "Match each evidence pattern to the most defensible conclusion.",
+              "pairs": [
+                {
+                  "key": "complete-register",
+                  "left": "Every entry in a complete current register was checked",
+                  "right": "A claim about all entries in that register"
+                },
+                {
+                  "key": "representative-sample",
+                  "left": "A representative sample from a named current population was checked",
+                  "right": "A cautious estimate about that named population"
+                },
+                {
+                  "key": "volunteer-stories",
+                  "left": "Several volunteers described the same experience",
+                  "right": "A claim that the experience can occur among respondents"
                 }
+              ],
+              "explanation": {
+                "text": "The warranted scope changes with the evidence: a complete register can support a claim about that register, a representative sample supports a bounded estimate, and volunteer stories establish possibility more readily than prevalence.",
+                "sourceCreditKeys": ["knachel-logic", "nist-populations-sampling"]
+              }
+            }
+          ],
+          "supportPaths": []
+        },
+        {
+          "key": "expose-key-assumptions",
+          "label": "Expose the bridge the argument needs",
+          "requires": ["map-an-argument"],
+          "difficultyBand": 3,
+          "lesson": {
+            "sections": [
+              {
+                "key": "assumptions-bridge-gaps",
+                "title": "An assumption can be the load-bearing bridge",
+                "body": "An assumption is a supposition used to frame or support an argument. Some are harmless background conditions; a linchpin assumption is one the main judgment depends on. Make a linchpin explicit when stated reasons cannot reach the conclusion without it. Then ask what the conclusion would look like if the assumption failed instead of letting the bridge hide inside fluent prose.",
+                "sourceCreditKeys": ["knachel-logic", "odni-analytic-standards"],
+                "explorableTerms": [
+                  {
+                    "term": "conclusion",
+                    "supportPathKey": "revisit-conclusion-role"
+                  }
+                ]
+              },
+              {
+                "key": "make-linchpins-explicit",
+                "title": "State the dependency the judgment actually uses",
+                "body": "Reconstruct the assumption that connects the stated reason to the actual conclusion, without replacing either claim. If a proposal says evening opening will help learners because many classes end late, the relevant bridge concerns whether late learners need the service then. Staffing and budget may also matter, but they are separate feasibility conditions rather than that reason-to-demand bridge. Naming each role prevents one hidden dependency from being defended as though it were another.",
+                "sourceCreditKeys": ["knachel-logic", "odni-analytic-standards"],
+                "explorableTerms": []
+              },
+              {
+                "key": "stress-test-linchpins",
+                "title": "Turn assumptions into tests and indicators",
+                "body": "For each linchpin, write the evidence that currently supports it, the implication if it is wrong, and an observable indicator that would change your judgment. This converts ‘we assumed’ from a disclaimer into a review plan. An assumption that could reverse the decision deserves earlier or stronger testing than one that would only change a minor detail.",
+                "sourceCreditKeys": ["odni-analytic-standards"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "find-linchpin",
+              "prompt": "A clinic proposes Saturday appointments because weekday slots fill before many shift workers can attend. Which assumption most directly connects the scheduling fact to demand for the new block?",
+              "options": [
+                {
+                  "key": "shift-workers-use-saturday",
+                  "text": "Some patients blocked by weekday schedules would book the Saturday appointments."
+                },
+                {
+                  "key": "all-patients-prefer-weekends",
+                  "text": "Most current patients would prefer weekend appointments to every weekday slot."
+                },
+                {
+                  "key": "saturday-staffing-feasible",
+                  "text": "The clinic can staff Saturday appointments within the proposed operating budget."
+                },
+                {
+                  "key": "weekday-demand-persists",
+                  "text": "Weekday appointment slots will keep filling early throughout the next quarter."
+                }
+              ],
+              "answerKey": "shift-workers-use-saturday",
+              "explanation": {
+                "text": "The requested bridge links weekday access limits to patient demand for Saturday appointments. Staffing within budget is a separate feasibility condition; general weekend preference and continued weekday pressure do not establish who would use the new block.",
+                "sourceCreditKeys": ["knachel-logic", "odni-analytic-standards"]
+              }
+            },
+            {
+              "family": "impostor",
+              "key": "audit-assumptions",
+              "prompt": "Two practices make assumptions testable. One practice quietly protects the preferred conclusion. Find the impostor.",
+              "statements": [
+                {
+                  "key": "state-linchpin",
+                  "text": "State the linchpin assumption and record what would change in the judgment if it is wrong.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "name-indicator",
+                  "text": "Name an observable indicator that would increase or reduce confidence in the assumption.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "require-current-contradiction",
+                  "text": "Treat the linchpin as stable unless the current evidence already contradicts it.",
+                  "kind": "impostor"
+                }
+              ],
+              "explanation": {
+                "text": "A linchpin remains an assumption even when current evidence does not contradict it. Stating its consequences and observable update conditions makes the dependency inspectable and revisable.",
+                "sourceCreditKeys": ["odni-analytic-standards"]
               }
             }
           ],
           "supportPaths": [
             {
-              "key": "review-evidence-quality",
-              "term": "confounder",
-              "sectionKey": "confounding-and-comparison",
+              "key": "revisit-conclusion-role",
+              "term": "conclusion",
+              "sectionKey": "assumptions-bridge-gaps",
               "steps": [
                 {
-                  "stopKey": "evidence-quality",
-                  "activityKey": "test-common-cause"
+                  "stopKey": "map-an-argument",
+                  "activityKey": "identify-conclusion"
                 }
               ]
             }
@@ -335,18 +490,789 @@
         }
       ],
       "guardianActivityKeys": [
-        "map-argument-parts",
-        "spot-evidence-impostor",
-        "test-common-cause",
-        "diagnose-fire-correlation"
+        "map-reasoning-questions",
+        "test-counterexample",
+        "separate-validity-soundness",
+        "classify-support-strength",
+        "find-linchpin",
+        "audit-assumptions"
+      ]
+    },
+    {
+      "key": "interrogate-the-evidence",
+      "title": "Interrogate the Evidence",
+      "stops": [
+        {
+          "key": "investigate-source-fit",
+          "label": "Check who, how, and fit",
+          "requires": [],
+          "difficultyBand": 2,
+          "lesson": {
+            "sections": [
+              {
+                "key": "credibility-is-contextual",
+                "title": "Start with the claim and the decision",
+                "body": "A source is useful in relation to a particular question. Ask whether it addresses the same population, period, outcome, and level of consequence as your claim. A source may be credible about one subject and poorly placed to answer another. Higher-stakes decisions justify more scrutiny, corroboration, and attention to gaps than low-consequence orientation does.",
+                "sourceCreditKeys": ["cornell-source-evaluation", "odni-analytic-standards"],
+                "explorableTerms": []
+              },
+              {
+                "key": "read-laterally",
+                "title": "Leave the page to investigate the page",
+                "body": "Lateral reading means opening other sources to investigate the author, publisher, and claims instead of judging only the page in front of you. See what informed independent sources say about the publisher’s expertise and record. Trace important claims toward original data or methods. A polished design, familiar domain ending, or technical vocabulary can be present whether the underlying work is strong or weak.",
+                "sourceCreditKeys": ["cornell-source-evaluation", "dig-lateral-reading", "caulfield-upstream", "odni-analytic-standards"],
+                "explorableTerms": []
+              },
+              {
+                "key": "describe-source-limits",
+                "title": "Describe strengths and limits, not a prestige score",
+                "body": "Source quality can depend on accuracy, completeness, currency, access, expertise, possible bias, and method. Record the factors that matter to the judgment rather than replacing them with one label such as ‘reliable.’ If a central claim rests on a weak or indirect source, either narrow the conclusion, find stronger corroboration, or make the remaining uncertainty visible.",
+                "sourceCreditKeys": ["odni-analytic-standards"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "choose-lateral-check",
+              "prompt": "A polished article from an unfamiliar institute makes a high-impact claim from a chart whose data source is unclear. Which first check is most informative?",
+              "options": [
+                {
+                  "key": "investigate-elsewhere",
+                  "text": "Open independent sources about the institute and trace the chart toward its data and method."
+                },
+                {
+                  "key": "inspect-about-page",
+                  "text": "Read the institute’s own About page and treat its mission statement as the credibility test."
+                },
+                {
+                  "key": "score-page-design",
+                  "text": "Compare the page’s visual polish and technical vocabulary with other professional sites."
+                },
+                {
+                  "key": "count-article-links",
+                  "text": "Count the article’s external links and use the total as a proxy for evidence quality."
+                }
+              ],
+              "answerKey": "investigate-elsewhere",
+              "explanation": {
+                "text": "The independent investigation checks who stands behind the claim and whether the chart can be traced to inspectable evidence. Self-description, design, and link counts do not answer those questions by themselves.",
+                "sourceCreditKeys": ["dig-lateral-reading", "caulfield-upstream", "odni-analytic-standards"]
+              }
+            },
+            {
+              "family": "matching",
+              "key": "match-credibility-checks",
+              "prompt": "Match each credibility question to the check that addresses it.",
+              "pairs": [
+                {
+                  "key": "who-stands-behind",
+                  "left": "Who stands behind this?",
+                  "right": "Investigate the author and publisher through independent coverage"
+                },
+                {
+                  "key": "what-supports-claim",
+                  "left": "What supports the main claim?",
+                  "right": "Trace citations to the original data, method, or evidence"
+                },
+                {
+                  "key": "does-it-fit",
+                  "left": "Does it fit this decision?",
+                  "right": "Compare its population, date, outcome, and purpose with the question"
+                }
+              ],
+              "explanation": {
+                "text": "The checks answer different questions: independent investigation informs who produced the source, tracing informs the evidentiary basis, and contextual comparison informs whether the source bears on the decision at hand.",
+                "sourceCreditKeys": ["cornell-source-evaluation", "dig-lateral-reading", "caulfield-upstream", "odni-analytic-standards"]
+              }
+            }
+          ],
+          "supportPaths": []
+        },
+        {
+          "key": "distinguish-causal-support",
+          "label": "Separate association from cause",
+          "requires": ["weigh-inductive-support", "investigate-source-fit"],
+          "difficultyBand": 3,
+          "lesson": {
+            "sections": [
+              {
+                "key": "association-is-a-start",
+                "title": "An association does not identify its own cause",
+                "body": "When an exposure and an outcome vary together, the association is evidence to explain, not a complete causal verdict. The exposure may influence the outcome, the outcome may influence the exposure, both may respond to another factor, or the pattern may be distorted by chance, selection, measurement, or analysis. A bounded conclusion states what was observed before adding a causal interpretation.",
+                "sourceCreditKeys": ["cdc-causal-analysis", "knachel-logic"],
+                "explorableTerms": [
+                  {
+                    "term": "bounded conclusion",
+                    "supportPathKey": "revisit-inference-scope"
+                  }
+                ]
+              },
+              {
+                "key": "confounding-third-factor",
+                "title": "A third factor can distort the comparison",
+                "body": "Confounding occurs when another factor is related to both the proposed cause and the outcome and distorts their observed association. If volunteers choose a wellness program, baseline health or motivation may differ between participants and nonparticipants before the program begins. Comparing their later sick days without addressing those differences can attribute pre-existing differences to the program.",
+                "sourceCreditKeys": ["cdc-causal-analysis"],
+                "explorableTerms": []
+              },
+              {
+                "key": "causal-case-is-a-bundle",
+                "title": "Build a causal case from design and alternatives",
+                "body": "A stronger causal interpretation considers timing, the quality of measurement, the comparison design, plausible mechanisms, consistency with other evidence, and serious alternative explanations. Statistical significance alone does not resolve bias or confounding. The practical response is not to demand impossible certainty; it is to say which alternatives were addressed, which remain, and how much confidence the design earns.",
+                "sourceCreditKeys": ["cdc-causal-analysis"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "detect-confounder",
+              "prompt": "Employees who volunteered for a new skills course later completed a task faster than employees who did not enroll. Which fact is the most direct potential confounder?",
+              "options": [
+                {
+                  "key": "baseline-experience-differs",
+                  "text": "Volunteers already had more task experience and faster completion times before enrollment."
+                },
+                {
+                  "key": "timer-rounds-minutes",
+                  "text": "The same timer rounded every employee’s completion time before results were reported."
+                },
+                {
+                  "key": "slides-revised-midway",
+                  "text": "The course slides were revised halfway through enrollment, after early volunteers began."
+                },
+                {
+                  "key": "report-omits-errors",
+                  "text": "The summary compared task speed without displaying the error rates recorded for either group."
+                }
+              ],
+              "answerKey": "baseline-experience-differs",
+              "explanation": {
+                "text": "Prior experience and baseline speed can influence both voluntary enrollment and later completion time. That pre-existing difference can create or inflate the observed association even if the course contributes little.",
+                "sourceCreditKeys": ["cdc-causal-analysis"]
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "revisit-inference-scope",
+              "term": "bounded conclusion",
+              "sectionKey": "association-is-a-start",
+              "steps": [
+                {
+                  "stopKey": "weigh-inductive-support",
+                  "activityKey": "bound-an-inference"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "compare-plausible-explanations",
+          "label": "Make alternatives compete",
+          "requires": ["distinguish-causal-support"],
+          "difficultyBand": 4,
+          "lesson": {
+            "sections": [
+              {
+                "key": "alternatives-reduce-surprise",
+                "title": "Name more than the favored story",
+                "body": "Analysis of alternatives systematically compares plausible hypotheses, outcomes, or futures. Its purpose is not to invent doubt about everything; it is to reduce surprise when uncertainty or complexity makes one story fragile. Include alternatives that fit important observations or would matter if true, and state the assumptions and implications associated with each.",
+                "sourceCreditKeys": ["odni-analytic-standards"],
+                "explorableTerms": []
+              },
+              {
+                "key": "seek-discriminating-evidence",
+                "title": "Prefer observations that separate the stories",
+                "body": "Evidence that every live explanation predicts does little to choose among them. Look for a result expected under one explanation but less expected under another. If support tickets fell after a new guide launched, a simultaneous comparison between teams that did and did not receive the guide can be more discriminating than another before-and-after count affected by seasonality.",
+                "sourceCreditKeys": ["cdc-causal-analysis", "odni-analytic-standards"],
+                "explorableTerms": []
+              },
+              {
+                "key": "contrary-information-and-indicators",
+                "title": "Record what would change the ranking",
+                "body": "For each serious alternative, note contrary information, important gaps, and an indicator that would raise or lower its likelihood. Apply comparable standards across explanations: do not demand perfect proof from alternatives while forgiving missing evidence for the favorite. A ranking is a current judgment tied to evidence, not a permanent label attached to one story.",
+                "sourceCreditKeys": ["odni-analytic-standards"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "choose-discriminating-test",
+              "prompt": "Appointment cancellations fell after reminder messages began, but cancellations also fall each spring. Which observation would best help separate a reminder effect from seasonality?",
+              "options": [
+                {
+                  "key": "same-time-clinic-comparison",
+                  "text": "During the same spring weeks, similar clinics with reminders improved more than clinics waiting."
+                },
+                {
+                  "key": "patients-liked-messages",
+                  "text": "During the same spring weeks, surveyed patients said the reminder messages were clear and helpful."
+                },
+                {
+                  "key": "cancellations-kept-falling",
+                  "text": "During the same spring weeks, total cancellations continued falling after reminders began."
+                },
+                {
+                  "key": "spring-was-quieter",
+                  "text": "During the same spring weeks, clinic managers described patient demand as quieter than usual."
+                }
+              ],
+              "answerKey": "same-time-clinic-comparison",
+              "explanation": {
+                "text": "The same-time clinic comparison exposes both groups to the spring period while varying reminder use. It is therefore better able to discriminate a reminder effect from seasonality than another trend or opinion.",
+                "sourceCreditKeys": ["cdc-causal-analysis", "odni-analytic-standards"]
+              }
+            },
+            {
+              "family": "impostor",
+              "key": "test-alternatives-fairly",
+              "prompt": "Two practices make explanations compete fairly. One shields the favored explanation. Find the impostor.",
+              "statements": [
+                {
+                  "key": "shared-observations",
+                  "text": "Apply the same evidentiary standard to each serious explanation, including the current favorite.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "update-indicators",
+                  "text": "Record an observation that would raise or lower each serious explanation’s standing.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "unequal-evidence-bar",
+                  "text": "Keep the favored explanation unless an alternative can account for every observed detail.",
+                  "kind": "impostor"
+                }
+              ],
+              "explanation": {
+                "text": "Requiring an alternative to explain every detail while preserving a favorite with unresolved gaps applies unequal standards. Each serious explanation should face the same important observations and revisable indicators.",
+                "sourceCreditKeys": ["odni-analytic-standards"]
+              }
+            }
+          ],
+          "supportPaths": []
+        },
+        {
+          "key": "diagnose-reasoning-failures",
+          "label": "Repair the broken support",
+          "requires": ["weigh-inductive-support", "compare-plausible-explanations"],
+          "difficultyBand": 4,
+          "lesson": {
+            "sections": [
+              {
+                "key": "fallacy-labels-are-diagnostics",
+                "title": "Name the failure only after locating it",
+                "body": "A fallacy label is useful when it identifies why the premises fail to support the conclusion. Calling an argument ‘biased’ or ‘a straw man’ without mapping the actual claims merely replaces analysis with a verdict. Reconstruct the argument charitably, identify the support relationship, and then state the repair: missing relevant evidence, an unrepresentative basis, a false choice, or a distorted target.",
+                "sourceCreditKeys": ["knachel-logic"],
+                "explorableTerms": [
+                  {
+                    "term": "support relationship",
+                    "supportPathKey": "rebuild-argument-roles"
+                  }
+                ]
+              },
+              {
+                "key": "relevance-and-source-attacks",
+                "title": "A motive can prompt scrutiny without settling the claim",
+                "body": "Information about a speaker’s incentives or expertise can affect source evaluation, but it does not by itself show that a claim is false. Ask how the concern bears on access, method, omissions, or credibility, then inspect the evidence. Rejecting a conclusion only because of who voiced it leaves the support untouched; ignoring a relevant conflict of interest leaves a source-quality question untouched.",
+                "sourceCreditKeys": ["knachel-logic", "cornell-source-evaluation", "odni-analytic-standards"],
+                "explorableTerms": []
+              },
+              {
+                "key": "small-basis-and-false-choice",
+                "title": "Watch for a basis that is too small or a menu that is too narrow",
+                "body": "A hasty generalization extends from too little or unrepresentative evidence. A false dilemma presents a limited set of options as though it exhausts the live possibilities. The repairs differ: improve the sample or narrow the conclusion in the first case; add plausible alternatives or justify the constraint in the second. Both failures can hide behind a conclusion that happens to be true.",
+                "sourceCreditKeys": ["knachel-logic"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "diagnose-source-attack",
+              "prompt": "A reviewer dismisses Lina’s audit finding solely because Lina would benefit if the process changed, without examining her records or method. What is the most precise diagnosis?",
+              "options": [
+                {
+                  "key": "motive-replaces-evidence",
+                  "text": "The possible incentive has replaced a check of whether the records support the finding."
+                },
+                {
+                  "key": "motive-proves-false",
+                  "text": "The possible incentive is enough to reject the finding before checking the records."
+                },
+                {
+                  "key": "records-settle-motive",
+                  "text": "If the records are accurate, Lina’s incentive is no longer relevant to source quality."
+                },
+                {
+                  "key": "benefit-makes-neutral",
+                  "text": "Because Lina disclosed the benefit, her evidence can be treated as neutral without more checks."
+                }
+              ],
+              "answerKey": "motive-replaces-evidence",
+              "explanation": {
+                "text": "The incentive can justify closer scrutiny of Lina’s access, method, or omissions, but it does not settle the finding. The reviewer has used a fact about the speaker in place of evaluating the offered support.",
+                "sourceCreditKeys": ["knachel-logic", "cornell-source-evaluation", "odni-analytic-standards"]
+              }
+            },
+            {
+              "family": "matching",
+              "key": "match-failure-repairs",
+              "prompt": "Match each reasoning failure to the repair that addresses it.",
+              "pairs": [
+                {
+                  "key": "hasty-generalization-repair",
+                  "left": "A broad conclusion from a few volunteers",
+                  "right": "Use representative evidence or narrow the population claim"
+                },
+                {
+                  "key": "false-dilemma-repair",
+                  "left": "Two options presented as the whole menu",
+                  "right": "Search for other live options or justify the constraint"
+                },
+                {
+                  "key": "straw-target-repair",
+                  "left": "A weaker version substituted for the actual position",
+                  "right": "Restate the strongest supported version before evaluating it"
+                },
+                {
+                  "key": "source-attack-repair",
+                  "left": "A claim rejected only because of its speaker",
+                  "right": "Connect source concerns to method, evidence, access, or omissions"
+                }
+              ],
+              "explanation": {
+                "text": "Each repair targets the broken link: scope needs better evidence, a forced menu needs alternatives, a distorted target needs reconstruction, and a source concern needs a reasoned connection to the evidence.",
+                "sourceCreditKeys": ["knachel-logic", "cornell-source-evaluation", "odni-analytic-standards"]
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "rebuild-argument-roles",
+              "term": "support relationship",
+              "sectionKey": "fallacy-labels-are-diagnostics",
+              "steps": [
+                {
+                  "stopKey": "map-an-argument",
+                  "activityKey": "identify-conclusion"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "guardianActivityKeys": [
+        "choose-lateral-check",
+        "match-credibility-checks",
+        "detect-confounder",
+        "choose-discriminating-test",
+        "test-alternatives-fairly",
+        "match-failure-repairs"
+      ]
+    },
+    {
+      "key": "decide-and-revise",
+      "title": "Decide and Revise",
+      "stops": [
+        {
+          "key": "calibrate-uncertainty",
+          "label": "Say what is likely and why",
+          "requires": ["weigh-inductive-support", "investigate-source-fit"],
+          "difficultyBand": 3,
+          "lesson": {
+            "sections": [
+              {
+                "key": "likelihood-versus-confidence",
+                "title": "Likelihood and confidence answer different questions",
+                "body": "Likelihood describes the assessed chance that an event or outcome will occur. Confidence describes how strongly the logic and evidentiary basis support that assessment. You can judge an event likely while holding only moderate confidence because the data are sparse or old. You can also have high confidence that a low-probability event remains unlikely. Keep the two judgments distinct.",
+                "sourceCreditKeys": ["odni-analytic-standards"],
+                "explorableTerms": []
+              },
+              {
+                "key": "explain-uncertainty-basis",
+                "title": "Name the reason for uncertainty",
+                "body": "An uncertainty statement becomes useful when it identifies its basis: limited quantity, uneven quality, old information, measurement problems, missing access, a volatile system, or dependence on assumptions. Use probability terms consistently enough that readers can compare judgments. Avoid using confidence as a synonym for event probability; it describes the basis for the assessment, not the event’s frequency.",
+                "sourceCreditKeys": ["odni-analytic-standards"],
+                "explorableTerms": []
+              },
+              {
+                "key": "calibration-guides-action",
+                "title": "Uncertainty changes the action, not just the wording",
+                "body": "The same central judgment can support different actions depending on consequences and reversibility. With weak evidence and a reversible choice, a small pilot may be sensible. With severe downside, low-confidence reassurance may justify safeguards or more evidence. Record which information or indicator would materially change the probability assessment or confidence so that caution has a concrete follow-up.",
+                "sourceCreditKeys": ["odni-analytic-standards", "green-book-2026"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "separate-likelihood-confidence",
+              "prompt": "A forecast estimates a 65% chance that a river will exceed its alert level, but a key upstream gauge often fails during storms. Which statement keeps likelihood and confidence distinct?",
+              "options": [
+                {
+                  "key": "likely-moderate-confidence",
+                  "text": "Exceeding the alert level is likely; confidence is moderate because a key gauge is unreliable."
+                },
+                {
+                  "key": "event-moderately-confident",
+                  "text": "The forecast is moderately confident, so the river has a moderate chance of exceeding the alert level."
+                },
+                {
+                  "key": "confidence-equals-chance",
+                  "text": "Confidence is high because a 65% event probability is above the halfway point."
+                },
+                {
+                  "key": "gauge-failure-reverses-event",
+                  "text": "The unreliable gauge makes exceeding the alert level unlikely despite the 65% estimate."
+                }
+              ],
+              "answerKey": "likely-moderate-confidence",
+              "explanation": {
+                "text": "The keyed option states event likelihood and then separately qualifies confidence in the evidentiary basis. An unreliable gauge can reduce confidence without mechanically reversing the assessed direction of probability.",
+                "sourceCreditKeys": ["odni-analytic-standards"]
+              }
+            },
+            {
+              "family": "matching",
+              "key": "match-uncertainty-roles",
+              "prompt": "Match each uncertainty element to the question it answers.",
+              "pairs": [
+                {
+                  "key": "likelihood-role",
+                  "left": "Likelihood",
+                  "right": "How probable is the event or outcome?"
+                },
+                {
+                  "key": "confidence-role",
+                  "left": "Confidence",
+                  "right": "How strong is the logic and evidentiary basis?"
+                },
+                {
+                  "key": "gap-role",
+                  "left": "Information gap",
+                  "right": "What important evidence is missing or weak?"
+                },
+                {
+                  "key": "indicator-role",
+                  "left": "Update indicator",
+                  "right": "What observation would change the current judgment?"
+                }
+              ],
+              "explanation": {
+                "text": "These elements work together without collapsing into one score: likelihood concerns the event, confidence concerns the basis, gaps name weaknesses, and indicators define evidence that should trigger an update.",
+                "sourceCreditKeys": ["odni-analytic-standards"]
+              }
+            }
+          ],
+          "supportPaths": []
+        },
+        {
+          "key": "test-decision-assumptions",
+          "label": "Turn linchpins into tests",
+          "requires": ["expose-key-assumptions", "compare-plausible-explanations", "calibrate-uncertainty"],
+          "difficultyBand": 4,
+          "lesson": {
+            "sections": [
+              {
+                "key": "separate-information-assumption-judgment",
+                "title": "Label what was observed, assumed, and concluded",
+                "body": "Underlying information reports what the evidence shows. An assumption supplies a supposition needed to interpret or bridge gaps; a linchpin assumption is one the main judgment depends on. A judgment is the conclusion reached from information, analysis, and assumptions. Labeling these roles prevents a convenient assumption from being repeated later as though it were observed. It also shows where new evidence can change the reasoning.",
+                "sourceCreditKeys": ["odni-analytic-standards"],
+                "explorableTerms": [
+                  {
+                    "term": "linchpin assumption",
+                    "supportPathKey": "revisit-linchpin"
+                  }
+                ]
+              },
+              {
+                "key": "prioritize-decision-sensitive-tests",
+                "title": "Test what could change the choice",
+                "body": "Not every unknown deserves equal effort. Prioritize a linchpin assumption when a plausible failure would reverse the option ranking, breach a critical constraint, or create serious harm. Seek evidence that resembles the intended population, conditions, price, or operating environment. A test of an easy neighboring question can be precise while leaving the decision-sensitive assumption untouched.",
+                "sourceCreditKeys": ["odni-analytic-standards", "green-book-2026"],
+                "explorableTerms": []
+              },
+              {
+                "key": "precommit-update-condition",
+                "title": "Define the update before the result arrives",
+                "body": "Write what result would strengthen, weaken, or retire the assumption before seeing the data. This makes it harder to reinterpret every result as support for the preferred decision. If no feasible observation could alter the assumption, treat it as an untested commitment and expose that limitation rather than calling it evidence-backed.",
+                "sourceCreditKeys": ["odni-analytic-standards", "aqua-book-2025"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "select-assumption-test",
+              "prompt": "A service expansion depends on the linchpin assumption that target customers will buy at the planned price. Which test most directly informs that assumption before a full rollout?",
+              "options": [
+                {
+                  "key": "target-price-pilot",
+                  "text": "Offer target customers a limited real purchase at the planned price and record take-up."
+                },
+                {
+                  "key": "general-interest-survey",
+                  "text": "Ask a broad audience whether the service sounds useful without showing the planned price."
+                },
+                {
+                  "key": "staff-feature-ranking",
+                  "text": "Ask internal staff to rank the proposed service features they personally prefer using."
+                },
+                {
+                  "key": "competitor-traffic-count",
+                  "text": "Count visits to a competitor’s free information page during the proposed pilot month."
+                }
+              ],
+              "answerKey": "target-price-pilot",
+              "explanation": {
+                "text": "The limited purchase test observes the target population making the relevant choice at the planned price. The other checks change the population, omit price, or measure attention rather than purchase behavior.",
+                "sourceCreditKeys": ["odni-analytic-standards", "green-book-2026"]
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "revisit-linchpin",
+              "term": "linchpin assumption",
+              "sectionKey": "separate-information-assumption-judgment",
+              "steps": [
+                {
+                  "stopKey": "expose-key-assumptions",
+                  "activityKey": "find-linchpin"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "compare-decision-options",
+          "label": "Compare options against the objective",
+          "requires": ["test-decision-assumptions"],
+          "difficultyBand": 4,
+          "lesson": {
+            "sections": [
+              {
+                "key": "objective-before-options",
+                "title": "Define success before choosing a favorite",
+                "body": "An objective states the outcome the decision is meant to achieve. A critical success factor is a condition an option must satisfy to remain viable. Define both before ranking options so a familiar solution does not quietly redefine the problem. Include a realistic baseline or business-as-usual option; choosing to change is itself a comparison against what is expected without the proposal.",
+                "sourceCreditKeys": ["green-book-2026"],
+                "explorableTerms": []
+              },
+              {
+                "key": "compare-whole-consequences",
+                "title": "Compare material benefits, costs, risks, and distribution",
+                "body": "Assess options against the same objective and material criteria. Consider monetised and non-monetised effects, who receives benefits or bears costs, implementation demands, and risk. An option that produces the largest headline benefit may fail a critical constraint or impose a downside hidden outside the headline measure. Record the evidence and assumptions behind each estimate.",
+                "sourceCreditKeys": ["green-book-2026"],
+                "explorableTerms": []
+              },
+              {
+                "key": "use-uncertainty-in-ranking",
+                "title": "Test whether the ranking survives uncertainty",
+                "body": "Do not hide uncertainty by presenting a single estimate as exact. Use ranges, sensitivity tests, or plausible scenarios to see which assumptions drive the ranking. A preferred option is more robust when it remains acceptable across credible conditions; when the ranking flips, identify the threshold and decide whether further evidence, safeguards, or a reversible pilot is warranted.",
+                "sourceCreditKeys": ["green-book-2026", "aqua-book-2025"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "compare-options-under-constraint",
+              "prompt": "A team must reduce unfilled shifts while keeping overtime growth below 5%. Option A is expected to reduce unfilled shifts by 30% with 12% overtime growth. Option B reduces them by 22% with 2% overtime growth. Option C reduces them by 10% with 0% overtime growth. Which appraisal is best supported?",
+              "options": [
+                {
+                  "key": "choose-b",
+                  "text": "Option B best meets the objective among the options that satisfy the overtime constraint."
+                },
+                {
+                  "key": "choose-a",
+                  "text": "Option A ranks first because the largest reduction should outweigh the overtime constraint."
+                },
+                {
+                  "key": "choose-c",
+                  "text": "Option C ranks first because avoiding overtime growth should replace the shift objective."
+                },
+                {
+                  "key": "options-tie",
+                  "text": "The options rank equally because each improves at least one of the two stated measures."
+                }
+              ],
+              "answerKey": "choose-b",
+              "explanation": {
+                "text": "Option A breaches the stated critical constraint. Among the remaining options, B produces the larger expected reduction in unfilled shifts while staying below the overtime limit.",
+                "sourceCreditKeys": ["green-book-2026"]
+              }
+            },
+            {
+              "family": "matching",
+              "key": "match-appraisal-roles",
+              "prompt": "Match each piece of decision information to its role in an appraisal.",
+              "pairs": [
+                {
+                  "key": "objective-role",
+                  "left": "Reduce missed appointments",
+                  "right": "Outcome the decision is meant to achieve"
+                },
+                {
+                  "key": "constraint-role",
+                  "left": "Keep added weekly staff time below 20 hours",
+                  "right": "Condition a viable option must satisfy"
+                },
+                {
+                  "key": "baseline-role",
+                  "left": "Continue the current reminder process",
+                  "right": "Comparison showing what happens without the proposal"
+                },
+                {
+                  "key": "sensitivity-role",
+                  "left": "Recalculate if response rates are 10 points lower",
+                  "right": "Test whether uncertainty changes the option ranking"
+                }
+              ],
+              "explanation": {
+                "text": "Objectives define success, constraints screen viability, the baseline anchors incremental effects, and sensitivity checks reveal whether uncertain assumptions can change the ranking.",
+                "sourceCreditKeys": ["green-book-2026"]
+              }
+            }
+          ],
+          "supportPaths": []
+        },
+        {
+          "key": "decide-learn-and-update",
+          "label": "Make the decision revisable",
+          "requires": ["compare-decision-options"],
+          "difficultyBand": 5,
+          "lesson": {
+            "sections": [
+              {
+                "key": "record-decision-basis",
+                "title": "Preserve why the decision made sense now",
+                "body": "A decision record should capture the objective, options considered, evidence, important assumptions, uncertainties, expected consequences, and reason for the selected option. This is not bureaucracy for its own sake. It lets a later reviewer distinguish a reasonable decision made under uncertainty from a result that happened to turn out well, and it makes changed reasoning visible when new information arrives.",
+                "sourceCreditKeys": ["green-book-2026", "aqua-book-2025", "odni-analytic-standards"],
+                "explorableTerms": []
+              },
+              {
+                "key": "monitor-decision-indicators",
+                "title": "Monitor indicators tied to the reasoning",
+                "body": "Choose measures that correspond to the objective, critical risks, and linchpin assumptions. Give each important indicator a review point or threshold and an owner before implementation. A metric that is easy to collect but unrelated to the decision can create activity without learning. When a threshold is crossed, revisit the relevant assumption or option ranking rather than merely noting the number.",
+                "sourceCreditKeys": ["green-book-2026", "odni-analytic-standards"],
+                "explorableTerms": [
+                  {
+                    "term": "objective",
+                    "supportPathKey": "revisit-decision-objective"
+                  }
+                ]
+              },
+              {
+                "key": "verify-and-validate",
+                "title": "Check both correctness and fitness for purpose",
+                "body": "Verification asks whether the analysis was carried out correctly and meets its specification. Validation asks whether the analysis and its use are appropriate for the intended purpose. Quality assurance should be proportionate to risk and considered throughout the lifecycle; independent review can reveal assumptions and failure modes the original analyst no longer notices. A clean calculation can still answer the wrong decision question.",
+                "sourceCreditKeys": ["aqua-book-2025"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "choose-review-trigger",
+              "prompt": "A pilot is approved because demand is expected to stay above 500 uses per month, which is the threshold for covering its ongoing cost. Which monitoring rule best supports a genuine update?",
+              "options": [
+                {
+                  "key": "two-month-threshold",
+                  "text": "Reassess the option if verified demand stays below 500 uses for two consecutive months."
+                },
+                {
+                  "key": "monthly-observation",
+                  "text": "Read the demand total each month and discuss it when the team finds the number surprising."
+                },
+                {
+                  "key": "positive-comments",
+                  "text": "Continue the pilot while positive user comments remain available in the feedback inbox."
+                },
+                {
+                  "key": "annual-calendar",
+                  "text": "Wait for the annual review date even if demand falls materially below the cost threshold."
+                }
+              ],
+              "answerKey": "two-month-threshold",
+              "explanation": {
+                "text": "The first rule ties a predeclared, verified indicator to the assumption that justified the decision and specifies when to reassess. The other rules are discretionary, indirect, or detached from the decision-sensitive threshold.",
+                "sourceCreditKeys": ["green-book-2026", "odni-analytic-standards"]
+              }
+            },
+            {
+              "family": "impostor",
+              "key": "run-decision-update-loop",
+              "prompt": "Two practices make a decision capable of learning. One confuses a correct procedure with a fit decision. Find the impostor.",
+              "statements": [
+                {
+                  "key": "record-current-basis",
+                  "text": "Record the evidence, assumptions, uncertainty, and option comparison behind the current choice.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "predefine-reassessment",
+                  "text": "Define observable indicators and thresholds that trigger reassessment of the relevant reasoning.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "verification-equals-validation",
+                  "text": "If calculations match their specification, the analysis is fit for the current decision.",
+                  "kind": "impostor"
+                }
+              ],
+              "explanation": {
+                "text": "Verification can show that calculations were performed as specified, but validation separately asks whether the analysis is appropriate for the intended purpose. A technically correct answer to the wrong question is not decision-ready.",
+                "sourceCreditKeys": ["aqua-book-2025"]
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "revisit-decision-objective",
+              "term": "objective",
+              "sectionKey": "monitor-decision-indicators",
+              "steps": [
+                {
+                  "stopKey": "compare-decision-options",
+                  "activityKey": "compare-options-under-constraint"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "guardianActivityKeys": [
+        "separate-likelihood-confidence",
+        "match-uncertainty-roles",
+        "select-assumption-test",
+        "compare-options-under-constraint",
+        "match-appraisal-roles",
+        "choose-review-trigger",
+        "run-decision-update-loop"
       ]
     }
   ],
   "expeditionGuardianActivityKeys": [
-    "identify-conclusion",
-    "map-argument-parts",
-    "spot-evidence-impostor",
-    "test-common-cause",
-    "diagnose-fire-correlation"
+    "test-counterexample",
+    "classify-support-strength",
+    "audit-assumptions",
+    "choose-lateral-check",
+    "match-credibility-checks",
+    "test-alternatives-fairly",
+    "detect-confounder",
+    "separate-likelihood-confidence",
+    "match-appraisal-roles",
+    "run-decision-update-loop"
   ]
 }

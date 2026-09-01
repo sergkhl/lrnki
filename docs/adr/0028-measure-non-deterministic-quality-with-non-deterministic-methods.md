@@ -12,6 +12,9 @@ questions with a deterministic proxy that pretends one semantic answer is mechan
 Deterministic code may veto only provable structural guarantees. [ADR-0013](0013-verify-quality-by-real-source-inspection.md)
 owns the source-inspection boundary.
 
+Exact Leg/Stop counts, reference resolution, uniqueness, and prerequisite order are structural
+guarantees. They must not be used as proxies for teaching depth, source support, or challenge quality.
+
 ## Context
 
 Authored content is deterministic as data, but its quality is still a human judgment. Treating word

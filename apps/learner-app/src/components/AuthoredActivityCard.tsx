@@ -5,6 +5,10 @@ import { Check, RotateCcw, X } from "lucide-react-native";
 import { dispatchLearnerCommand, type LearnerTransitionDto } from "@/lib/actions";
 import type { ExpeditionView } from "@/lib/queries";
 import {
+  SourceCreditsExpander,
+  type SourceCredit
+} from "./SourceCredits";
+import {
   Badge,
   Button,
   Card,
@@ -22,6 +26,7 @@ export function AuthoredActivityCard({
   expeditionKey,
   stopKey,
   activity,
+  sourceCredits,
   source,
   expectedStateVersion,
   disabled = false,
@@ -30,6 +35,7 @@ export function AuthoredActivityCard({
   expeditionKey: string;
   stopKey: string;
   activity: AuthoredActivity;
+  sourceCredits: readonly SourceCredit[];
   source: AcquisitionSource;
   expectedStateVersion: string;
   disabled?: boolean;
@@ -199,6 +205,13 @@ export function AuthoredActivityCard({
         >
           <Text variant="label">{effect.correct ? "Correct." : "Not quite."}</Text>
           {effect.feedback ? <Text color="muted">{effect.feedback}</Text> : null}
+          {effect.feedback && effect.feedbackSourceCreditKeys.length > 0 ? (
+            <SourceCreditsExpander
+              sourceCredits={sourceCredits}
+              sourceCreditKeys={effect.feedbackSourceCreditKeys}
+              contextLabel="this graded explanation"
+            />
+          ) : null}
           {effect.newlyCompletedStop ? (
             <Text variant="label" color="trail">Stop mastered · +{effect.pointsAwarded} weekly points</Text>
           ) : null}

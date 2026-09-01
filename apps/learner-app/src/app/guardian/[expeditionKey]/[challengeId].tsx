@@ -6,6 +6,7 @@ import { ArrowLeft, Check, RotateCcw, Trophy } from "lucide-react-native";
 
 import { CrystalGuardian } from "@/components/CrystalGuardian";
 import { CrystalSpecimen } from "@/components/CrystalSpecimen";
+import { SourceCreditsExpander } from "@/components/SourceCredits";
 import { dispatchLearnerCommand, type LearnerTransitionDto } from "@/lib/actions";
 import { guardianQuery, type GuardianView } from "@/lib/queries";
 import {
@@ -191,6 +192,13 @@ export default function GuardianPage() {
               >
                 <Text variant="label">{answeredCorrectly ? "Ward resolved." : "The shield took the hit."}</Text>
                 {effect?.feedback ? <Text color="muted">{effect.feedback}</Text> : null}
+                {effect?.feedback && effect.feedbackSourceCreditKeys.length > 0 ? (
+                  <SourceCreditsExpander
+                    sourceCredits={view.sourceCredits}
+                    sourceCreditKeys={effect.feedbackSourceCreditKeys}
+                    contextLabel="this graded Guardian explanation"
+                  />
+                ) : null}
               </View>
             ) : null}
           </Card>

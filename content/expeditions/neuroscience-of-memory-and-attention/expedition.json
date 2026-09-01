@@ -1,38 +1,318 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "key": "neuroscience-of-memory-and-attention",
   "title": "Neuroscience of Memory and Attention",
-  "teaser": "Connect neural evidence to cautious cognitive explanations and design learning around attention and retrieval.",
-  "declaredDomain": "Cognitive neuroscience of memory and attention",
-  "audience": "Adult learners interpreting neuroscience and learning claims",
+  "teaser": "Read neural evidence at the right level, trace how memories are encoded and changed, and turn behavioral learning evidence into cautious design choices.",
+  "declaredDomain": "Non-clinical cognitive neuroscience of attention and human memory, from measurement and plasticity through encoding, consolidation, retrieval, forgetting, and evidence-bounded learning design",
+  "audience": "Adult learners interpreting neuroscience and learning claims without assuming specialist laboratory training",
   "sourceCredits": [
     {
-      "title": "Neuroscience of Memory and Attention primer",
-      "author": "lrnki project",
-      "license": "Project-owned internal playtest source",
-      "note": "Accepted as a local authoring basis without independent external fact verification or clinical advice."
+      "key": "bold-interpretation",
+      "title": "Interpreting BOLD: towards a dialogue between cognitive and cellular neuroscience",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC5003850/",
+      "author": "Catherine N. Hall, Clare Howarth, Zebulun Kurth-Nelson, and Anusha Mishra",
+      "publisher": "Philosophical Transactions of the Royal Society B",
+      "publishedAt": "2016-10-05",
+      "version": "Version of record, DOI 10.1098/rstb.2015.0348",
+      "accessedAt": "2026-09-01",
+      "note": "Review of what blood-oxygen-level-dependent fMRI measures, how neurovascular coupling relates it to neuronal activity, and why region, condition, and timing affect interpretation."
+    },
+    {
+      "key": "reverse-inference",
+      "title": "Can cognitive processes be inferred from neuroimaging data?",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/16406760/",
+      "author": "Russell A. Poldrack",
+      "publisher": "Trends in Cognitive Sciences",
+      "publishedAt": "2006-02",
+      "version": "PubMed record for DOI 10.1016/j.tics.2005.12.004",
+      "accessedAt": "2026-09-01",
+      "note": "Analysis of reverse inference: activation in a region does not deductively establish a cognitive process, and informativeness depends on the selectivity of the activation."
+    },
+    {
+      "key": "brain-stimulation-causality",
+      "title": "Inferring Causality from Noninvasive Brain Stimulation in Cognitive Neuroscience",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/32530381/",
+      "author": "Til Ole Bergmann and Gesa Hartwigsen",
+      "publisher": "Journal of Cognitive Neuroscience",
+      "publishedAt": "2021-02",
+      "version": "PubMed record for DOI 10.1162/jocn_a_01591",
+      "accessedAt": "2026-09-01",
+      "note": "Review of the causal chain from stimulation through local and connected neural effects to cognition and behavior, including confounds and control requirements."
+    },
+    {
+      "key": "synaptic-plasticity-memory",
+      "title": "The synaptic plasticity and memory hypothesis: encoding, storage and persistence",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3843897/",
+      "author": "Tomonori Takeuchi, Adrian J. Duszkiewicz, and Richard G. M. Morris",
+      "publisher": "Philosophical Transactions of the Royal Society B",
+      "publishedAt": "2014-01-05",
+      "version": "PMC full-text version of record as accessed 2026-09-01",
+      "accessedAt": "2026-09-01",
+      "note": "Review organizing evidence for a synaptic-plasticity account around detectability, anterograde and retrograde alteration, and mimicry rather than treating observed change as sufficient proof."
+    },
+    {
+      "key": "engram-neurons",
+      "title": "Engram neurons: Encoding, consolidation, retrieval, and forgetting of memory",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10618102/",
+      "author": "Axel Guskjolen and Mark S. Cembrowski",
+      "publisher": "Molecular Psychiatry",
+      "publishedAt": "2023-08",
+      "version": "Version of record, DOI 10.1038/s41380-023-02137-5",
+      "accessedAt": "2026-09-01",
+      "note": "Review of how engram-neuron participation and connectivity can change across encoding, consolidation, retrieval, and forgetting, including limits of a fixed-membership account."
+    },
+    {
+      "key": "biased-competition",
+      "title": "Top-down and bottom-up mechanisms in biasing competition in the human brain",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2740806/",
+      "author": "Diane M. Beck and Sabine Kastner",
+      "publisher": "Vision Research",
+      "publishedAt": "2009-05",
+      "version": "Author manuscript of version of record, DOI 10.1016/j.visres.2008.07.012",
+      "accessedAt": "2026-09-01",
+      "note": "Review of limited visual-processing capacity, competitive representation, and top-down and bottom-up biases in selective attention."
+    },
+    {
+      "key": "working-memory-attention",
+      "title": "Working Memory and Attention — A Conceptual Analysis and Review",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC6688548/",
+      "author": "Klaus Oberauer",
+      "publisher": "Journal of Cognition",
+      "publishedAt": "2019-08-08",
+      "version": "Version of record, DOI 10.5334/joc.58",
+      "accessedAt": "2026-09-01",
+      "license": "CC BY 4.0",
+      "note": "Conceptual review distinguishing attention as resource from attention as selection and mapping several evidence-bounded relationships between attention and working memory."
+    },
+    {
+      "key": "working-memory-capacity",
+      "title": "What is working memory capacity, and how can we measure it?",
+      "url": "https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2013.00433/full",
+      "author": "Oliver Wilhelm, Andrea Hildebrandt, and Klaus Oberauer",
+      "publisher": "Frontiers in Psychology",
+      "publishedAt": "2013-07-24",
+      "version": "Version of record, DOI 10.3389/fpsyg.2013.00433",
+      "accessedAt": "2026-09-01",
+      "license": "CC BY",
+      "note": "Study comparing working-memory task classes and interpreting capacity through maintenance, updating, temporary bindings, secondary memory, and interference rather than one context-free item count."
+    },
+    {
+      "key": "declarative-memory",
+      "title": "Declarative Memory",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2790294/",
+      "author": "Lila Davachi and Ian G. Dobbins",
+      "publisher": "Current Directions in Psychological Science",
+      "publishedAt": "2008-04",
+      "version": "Author manuscript of version of record, DOI 10.1111/j.1467-8721.2008.00559.x",
+      "accessedAt": "2026-09-01",
+      "note": "Synthesis of encoding as a family of cognitive operations, item and relational memory, cue elaboration, retrieval control, and transfer-appropriate processing."
+    },
+    {
+      "key": "relational-memory-hippocampus",
+      "title": "Relational Memory and the Hippocampus: Representations and Methods",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2751650/",
+      "author": "Alex Konkel and Neal J. Cohen",
+      "publisher": "Frontiers in Neuroscience",
+      "publishedAt": "2009-09-15",
+      "version": "PMC full-text version of record as accessed 2026-09-01",
+      "accessedAt": "2026-09-01",
+      "note": "Account of hippocampal relational representations across items, time, location, sequence, and other dimensions, with flexible retrieval from a multidimensional organization."
+    },
+    {
+      "key": "hippocampal-pattern-separation",
+      "title": "Pattern separation in the hippocampus",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3183227/",
+      "author": "Michael A. Yassa and Craig E. L. Stark",
+      "publisher": "Trends in Neurosciences",
+      "publishedAt": "2011-10",
+      "version": "Author manuscript of version of record, DOI 10.1016/j.tins.2011.06.006",
+      "accessedAt": "2026-09-01",
+      "note": "Review defining separation and completion as transformations between input and output patterns and warning that upstream input must be characterized before locating the computation."
+    },
+    {
+      "key": "cortico-hippocampal-networks",
+      "title": "What does the functional organization of cortico-hippocampal networks tell us about the functional organization of memory?",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC6467646/",
+      "author": "Zachariah M. Reagh and Charan Ranganath",
+      "publisher": "Neuroscience Letters",
+      "publishedAt": "2018-07-27",
+      "version": "Author manuscript of version of record, DOI 10.1016/j.neulet.2018.04.050",
+      "accessedAt": "2026-09-01",
+      "note": "Review distinguishing hippocampal formation from adjacent medial-temporal and cortical systems and using network organization to constrain memory claims."
+    },
+    {
+      "key": "consolidation-transformation",
+      "title": "The Consolidation and Transformation of Memory",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/26447570/",
+      "author": "Yadin Dudai, Avi Karni, and Jan Born",
+      "publisher": "Neuron",
+      "publishedAt": "2015-10-07",
+      "version": "PubMed record for DOI 10.1016/j.neuron.2015.09.004",
+      "accessedAt": "2026-09-01",
+      "note": "Review defining consolidation as transformation over time through cellular and circuit change, recurrent reactivation, redistribution, and integration, while identifying gaps in knowledge."
+    },
+    {
+      "key": "sleep-systems-consolidation",
+      "title": "Mechanisms of systems memory consolidation during sleep",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/31451802/",
+      "author": "Jens G. Klinzing, Niels Niethard, and Jan Born",
+      "publisher": "Nature Neuroscience",
+      "publishedAt": "2019-10",
+      "version": "PubMed record for DOI 10.1038/s41593-019-0467-3",
+      "accessedAt": "2026-09-01",
+      "note": "Review of active systems consolidation during sleep, including replay, network oscillations, synaptic downscaling, and qualitative transformation of memory."
+    },
+    {
+      "key": "sleep-reactivation",
+      "title": "Neural reactivation during human sleep",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10754334/",
+      "author": "Dan Denis and Scott A. Cairney",
+      "publisher": "Emerging Topics in Life Sciences",
+      "publishedAt": "2023-12-06",
+      "version": "Version of record, DOI 10.1042/ETLS20230109",
+      "accessedAt": "2026-09-01",
+      "license": "CC BY 4.0",
+      "note": "Review of converging electrophysiological and imaging evidence for human memory reactivation during sleep and its coupling to non-REM oscillatory events."
+    },
+    {
+      "key": "sleep-targeted-reactivation-meta",
+      "title": "Promoting memory consolidation during sleep: A meta-analysis of targeted memory reactivation",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7144680/",
+      "author": "Xiaoqing Hu, Larry Y. Cheng, Man Hey Chiu, and Ken A. Paller",
+      "publisher": "Psychological Bulletin",
+      "publishedAt": "2020-03",
+      "version": "Author manuscript of version of record, DOI 10.1037/bul0000223",
+      "accessedAt": "2026-09-01",
+      "note": "Meta-analysis finding a small-to-moderate aggregate effect of targeted memory reactivation, with stage, task, and outcome moderators and explicit limits on educational or clinical generalization."
+    },
+    {
+      "key": "retrieval-practice-meta",
+      "title": "The effect of testing versus restudy on retention: a meta-analytic review of the testing effect",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/25150680/",
+      "author": "Christopher A. Rowland",
+      "publisher": "Psychological Bulletin",
+      "publishedAt": "2014-11",
+      "version": "PubMed record for DOI 10.1037/a0037559",
+      "accessedAt": "2026-09-01",
+      "note": "Meta-analysis of testing versus restudy, including evidence that effortful processing and recall-format practice moderate retention benefits."
+    },
+    {
+      "key": "classroom-retrieval-review",
+      "title": "Retrieval Practice Consistently Benefits Student Learning: a Systematic Review of Applied Research in Schools and Classrooms",
+      "url": "https://doi.org/10.1007/s10648-021-09595-9",
+      "author": "Pooja K. Agarwal, Ludmila D. Nunes, and Janell R. Blunt",
+      "publisher": "Educational Psychology Review",
+      "publishedAt": "2021-03-14",
+      "version": "Version of record, volume 33, pages 1409–1453",
+      "accessedAt": "2026-09-01",
+      "note": "Systematic review of 50 classroom experiments, reporting broad benefits alongside design variation and limited representation outside WEIRD settings."
+    },
+    {
+      "key": "reconsolidation-updating",
+      "title": "An Update on Memory Reconsolidation Updating",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC5605913/",
+      "author": "Jonathan L. C. Lee, Karim Nader, and Daniela Schiller",
+      "publisher": "Trends in Cognitive Sciences",
+      "publishedAt": "2017-07",
+      "version": "Author manuscript of version of record, DOI 10.1016/j.tics.2017.04.006",
+      "accessedAt": "2026-09-01",
+      "note": "Review distinguishing retrieval, destabilization, reconsolidation, and updating, with prediction error, boundary conditions, alternative explanations, and replication challenges."
+    },
+    {
+      "key": "proactive-interference",
+      "title": "Brain mechanisms of proactive interference in working memory",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/16337090/",
+      "author": "John Jonides and Derek Evan Nee",
+      "publisher": "Neuroscience",
+      "publishedAt": "2006-04-28",
+      "version": "PubMed record for DOI 10.1016/j.neuroscience.2005.06.042",
+      "accessedAt": "2026-09-01",
+      "note": "Review of behavioral and cognitive-neuroscience evidence for proactive interference in working-memory tasks and competing explanatory models."
+    },
+    {
+      "key": "interference-inhibition-review",
+      "title": "The Mechanisms Underlying Interference and Inhibition: A Review of Current Behavioral and Neuroimaging Research",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8467325/",
+      "author": "Oliver Kliegl and Karl-Heinz T. Bäuml",
+      "publisher": "Brain Sciences",
+      "publishedAt": "2021-09-20",
+      "version": "PMC version of record as accessed 2026-09-01",
+      "accessedAt": "2026-09-01",
+      "note": "Review distinguishing proactive, retroactive, and retrieval-induced interference, passive competition and active inhibition, task dependence, and neural correlates."
+    },
+    {
+      "key": "distributed-practice-meta",
+      "title": "Distributed practice in verbal recall tasks: A review and quantitative synthesis",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/16719566/",
+      "author": "Nicholas J. Cepeda, Harold Pashler, Edward Vul, John T. Wixted, and Doug Rohrer",
+      "publisher": "Psychological Bulletin",
+      "publishedAt": "2006-05",
+      "version": "PubMed record for DOI 10.1037/0033-2909.132.3.354",
+      "accessedAt": "2026-09-01",
+      "note": "Quantitative synthesis of distributed practice showing that spacing and target retention interval interact, rather than supporting one universal review interval."
+    },
+    {
+      "key": "interleaving-meta",
+      "title": "Similarity matters: A meta-analysis of interleaved learning and its moderators",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/31556629/",
+      "author": "Matthias Brunmair and Tobias Richter",
+      "publisher": "Psychological Bulletin",
+      "publishedAt": "2019-11",
+      "version": "PubMed record for DOI 10.1037/bul0000209",
+      "accessedAt": "2026-09-01",
+      "note": "Meta-analysis showing that interleaving effects vary by material, between-category similarity, within-category similarity, and complexity, with null or adverse results in some domains."
+    },
+    {
+      "key": "effective-learning-techniques",
+      "title": "Improving Students' Learning With Effective Learning Techniques: Promising Directions From Cognitive and Educational Psychology",
+      "url": "https://www.psychologicalscience.org/publications/journals/pspi/learning-techniques.html",
+      "author": "John Dunlosky, Katherine A. Rawson, Elizabeth J. Marsh, Mitchell J. Nathan, and Daniel T. Willingham",
+      "publisher": "Association for Psychological Science",
+      "publishedAt": "2013-01-07",
+      "version": "Official APS overview of the Psychological Science in the Public Interest report, DOI 10.1177/1529100612453266",
+      "accessedAt": "2026-09-01",
+      "note": "Authoritative synthesis rating practice testing and distributed practice highly while emphasizing technique conditions, learner groups, materials, and target skills."
     }
   ],
   "legs": [
     {
-      "key": "evidence-attention-and-retrieval",
-      "title": "From measured signals to useful learning design",
+      "key": "read-evidence-and-control",
+      "title": "Read evidence and control at the right level",
       "stops": [
         {
-          "key": "levels-of-explanation",
-          "label": "Keep measurement and explanation distinct",
+          "key": "separate-signal-process-and-cause",
+          "label": "Separate a neural signal from a cognitive cause",
           "requires": [],
-          "difficultyBand": 2,
+          "difficultyBand": 1,
           "lesson": {
             "sections": [
               {
-                "key": "signal-representation-and-cause",
-                "title": "A measured difference is one link in an explanation",
-                "body": "Neural measurements expose different spatial, temporal, and causal properties. Decoding can show that information is available in a measured signal without proving that the region is necessary or that another system reads the same code. Blood-oxygen changes are not action potentials, and perturbations that support causal conclusions can still affect a wider network. A mature explanation connects the task's problem, a possible representation and transformation, an implementing circuit, and discriminating behavioral and neural evidence. Do not substitute evidence from one level for another.",
-                "sourceAnchor": {
-                  "heading": "1. Connecting Neural Signals to Cognitive Explanations",
-                  "quote": "evidence at one level should not be silently substituted for evidence at another."
-                },
+                "key": "bold-is-a-coupled-measure",
+                "title": "BOLD is a blood-oxygen measure coupled to neural activity",
+                "body": "A positive BOLD fMRI response reflects a net change in blood oxygenation produced through neurovascular coupling. In many adult experimental settings it tracks net neuronal activity, especially local synaptic processing, but it is not a direct count of action potentials. The relationship can vary with brain region, timing, state, development, and vascular conditions. Report the measured contrast first, then state each extra assumption needed to interpret the underlying activity.",
+                "sourceCreditKeys": [
+                  "bold-interpretation"
+                ],
+                "explorableTerms": []
+              },
+              {
+                "key": "activation-does-not-name-process",
+                "title": "A location does not identify one mental operation",
+                "body": "Finding that a region is more active during a task can localize a condition-related signal. Inferring that one particular cognitive process occurred because that region was active is a reverse inference. It is not deductively valid, because a region may participate in several processes; its evidential value depends on how selectively that pattern occurs. Task contrasts, competing process models, and behavior can narrow the interpretation without turning activation into a process label.",
+                "sourceCreditKeys": [
+                  "reverse-inference",
+                  "bold-interpretation"
+                ],
+                "explorableTerms": []
+              },
+              {
+                "key": "perturbation-has-a-causal-chain",
+                "title": "Perturbation adds causal leverage through a chain of assumptions",
+                "body": "Changing neural activity and observing a behavioral consequence can support a causal claim more directly than observing correlation alone. Yet a stimulation result still passes through a chain: delivered field, local and connected neural effects, cognitive operation, and behavioral measure. Sensory side effects, remote network changes, dose-response shape, and task strategy can confound a link. A strong account combines controlled perturbation, appropriate neural measurement, and a behavior that discriminates the proposed operation from alternatives.",
+                "sourceCreditKeys": [
+                  "brain-stimulation-causality",
+                  "bold-interpretation"
+                ],
                 "explorableTerms": []
               }
             ]
@@ -40,238 +320,422 @@
           "activities": [
             {
               "family": "option_select",
-              "key": "interpret-blood-oxygen-signal",
-              "prompt": "An fMRI study finds a larger blood-oxygen-level signal in one condition. Which conclusion is warranted from that result alone?",
+              "key": "evaluate-neural-contrast",
+              "prompt": "During delayed recall, one condition produces a larger hippocampal BOLD contrast and higher recall than a comparison condition. No perturbation was used. Which conclusion fits those results?",
               "options": [
                 {
-                  "key": "measurement-differs",
-                  "text": "The measured blood-oxygen-related signal differs under the study's conditions"
+              "key": "neural-contrast-d",
+                  "text": "The conditions differed in a blood-oxygen-related signal and recall behavior; the observational contrast does not identify which link caused the other"
                 },
                 {
-                  "key": "more-neuron-firing-certain",
-                  "text": "Every neuron in the region fired more action potentials"
+              "key": "neural-contrast-a",
+              "text": "The regional contrast localizes the memory representation, while the recall difference shows that this representation was necessary for the observed recall"
                 },
                 {
-                  "key": "region-causes-ability",
-                  "text": "The region is proven to be the sole cause of the mental ability"
+              "key": "neural-contrast-b",
+                  "text": "The larger BOLD value estimates a proportional increase in the region's spike output, although it does not identify individual active neurons"
                 },
                 {
-                  "key": "better-performance-certain",
-                  "text": "The larger signal necessarily means better performance"
+              "key": "neural-contrast-c",
+                  "text": "The joint signal and recall advantage identifies a promising learning method, with replication needed only to estimate how broadly it transfers"
                 }
               ],
-              "answerKey": "measurement-differs",
+          "answerKey": "neural-contrast-d",
               "explanation": {
-                "text": "The observation is a difference in a blood-oxygen-related measurement. Inferring action-potential rate, necessity, a sole cause, or better performance requires additional evidence and alternatives.",
-                "sourceAnchor": {
-                  "heading": "1. Connecting Neural Signals to Cognitive Explanations",
-                  "quote": "blood oxygenation over seconds, not action potentials directly."
-                }
+                "text": "The study directly supplies a BOLD contrast and a behavioral contrast under stated conditions. BOLD is coupled to neural activity but is not a proportional spike count, and joint observation does not establish direction of cause, necessity, a storage location, or an educational method.",
+                "sourceCreditKeys": [
+                  "bold-interpretation",
+                  "reverse-inference"
+                ]
               }
             },
             {
               "family": "matching",
-              "key": "match-explanation-levels",
-              "prompt": "Match each part of a mature explanation to the question it asks.",
+              "key": "match-evidence-to-inference",
+              "prompt": "Match each evidence form to the inference it can most directly strengthen.",
               "pairs": [
                 {
-                  "key": "function-level",
-                  "left": "Functional problem",
-                  "right": "What must the system accomplish?"
+              "key": "measure-pair-a",
+                  "left": "Controlled BOLD contrast",
+                  "right": "Where and when a blood-oxygen-related signal differs between conditions"
                 },
                 {
-                  "key": "representation-level",
-                  "left": "Representation and transformation",
-                  "right": "What information and operation could solve it?"
+              "key": "measure-pair-b",
+                  "left": "Criterion behavior",
+                  "right": "Whether the learner performed the operation or retained the target relation"
                 },
                 {
-                  "key": "implementation-level",
-                  "left": "Circuit and plasticity",
-                  "right": "How could neural systems implement it?"
+              "key": "measure-pair-c",
+                  "left": "Controlled neural perturbation",
+                  "right": "Whether changing part of a neural chain changes the measured outcome"
                 },
                 {
-                  "key": "evidence-level",
-                  "left": "Predicted evidence",
-                  "right": "What behavior and signal should follow?"
+              "key": "measure-pair-d",
+                  "left": "Process-selectivity evidence",
+                  "right": "How diagnostic an activation pattern is of one proposed cognitive operation"
                 }
               ],
               "explanation": {
-                "text": "A strong account links the problem, a representational solution, a possible implementation, and observations that distinguish it from alternatives rather than collapsing all four into a region name.",
-                "sourceAnchor": {
-                  "heading": "1. Connecting Neural Signals to Cognitive Explanations",
-                  "quote": "A mature explanation links four questions."
-                }
+                "text": "Each form addresses a different link. A BOLD contrast measures a hemodynamic signal, behavior tests performance, perturbation can probe causal dependence when its chain is controlled, and selectivity determines how informative a reverse inference may be.",
+                "sourceCreditKeys": [
+                  "bold-interpretation",
+                  "reverse-inference",
+                  "brain-stimulation-causality"
+                ]
               }
             }
           ],
           "supportPaths": []
         },
         {
-          "key": "attention-and-working-memory",
-          "label": "Protect the operation that matters",
-          "requires": ["levels-of-explanation"],
-          "difficultyBand": 3,
+          "key": "test-plasticity-and-engram-claims",
+          "label": "Test what a plasticity or engram result establishes",
+          "requires": [
+            "separate-signal-process-and-cause"
+          ],
+          "difficultyBand": 2,
           "lesson": {
             "sections": [
               {
-                "key": "selection-control-and-load",
-                "title": "Attention selects; working memory keeps goals usable",
-                "body": "Selective attention biases competition toward information relevant to current goals, while salient or learned distractions can capture priority. Working memory keeps information functionally available for ongoing action; its load depends on structure, interference, and prior knowledge rather than one universal item count. What is called multitasking often switches task rules and goals instead of performing two demanding control operations at once. Reduce irrelevant competition and externalize intermediate states, but retain the comparison, explanation, or retrieval that produces learning. A measurement of effort is not itself proof that the useful operation occurred.",
-                "sourceAnchor": {
-                  "heading": "4. Working Memory and Cognitive Control",
-                  "quote": "Working memory is the temporary availability of information for ongoing cognition."
-                },
+                "key": "plasticity-is-change-not-proof",
+                "title": "Plasticity names change, not a completed memory explanation",
+                "body": "Synaptic plasticity is activity-dependent change in the efficacy or organization of connections. Detecting a learning-associated change in a relevant circuit supports a storage hypothesis, but detection alone does not show that the change was necessary, sufficient, or the information-bearing part of the memory. Several forms of potentiation, depression, structural change, and homeostatic regulation can coexist. The claim must match which change was measured and which behavioral consequence was tested.",
+                "sourceCreditKeys": [
+                  "synaptic-plasticity-memory"
+                ],
+                "explorableTerms": []
+              },
+              {
+                "key": "necessity-sufficiency-and-controls",
+                "title": "Build converging tests of necessity and sufficiency",
+                "body": "A plasticity account becomes stronger when learning-induced change is detectable, blocking or reversing that change alters memory in the predicted direction, and experimentally producing the relevant pattern can mimic an expected memory consequence. Each test needs a causal intervention with controls for performance, motivation, tissue spread, and alternate pathways. These criteria are complementary: one positive result cannot silently inherit the authority of the others.",
+                "sourceCreditKeys": [
+                  "synaptic-plasticity-memory",
+                  "brain-stimulation-causality"
+                ],
                 "explorableTerms": [
                   {
-                    "term": "measurement",
-                    "supportPathKey": "review-measurement-limits"
+                    "term": "causal intervention",
+                    "supportPathKey": "review-causal-chain"
                   }
                 ]
+              },
+              {
+                "key": "engrams-are-distributed-and-dynamic",
+                "title": "An engram is a tested ensemble account, not one permanent cell",
+                "body": "Engram research asks which cells or other biological components carry lasting learning-related change and contribute to later retrieval. Encoding activity, persistent physical change, reactivation, and causal contribution provide different evidence. Recent work also shows that the ensemble can be dynamic: some neurons matter mainly during encoding, others are recruited during consolidation, and retrieval can involve active as well as inhibited components. Treat fixed membership across all stages as a hypothesis, not a definition.",
+                "sourceCreditKeys": [
+                  "engram-neurons",
+                  "synaptic-plasticity-memory"
+                ],
+                "explorableTerms": []
               }
             ]
           },
           "activities": [
             {
               "family": "option_select",
-              "key": "reduce-irrelevant-competition",
-              "prompt": "A novice must compare three unfamiliar mechanisms. Which redesign best protects the intended reasoning without removing it?",
+              "key": "choose-plasticity-evidence-package",
+              "prompt": "A lab proposes that one learning-induced synaptic change stores a task relation. Which evidence package most directly tests that proposal?",
               "options": [
                 {
-                  "key": "stable-terms-external-table",
-                  "text": "Use stable terms and an external comparison table, then ask the learner to explain the diagnostic difference"
+              "key": "plasticity-test-a",
+                  "text": "Measure the task-linked change, disrupt it with performance controls, and test whether reinstating its pattern restores the predicted relation-specific behavior"
                 },
                 {
-                  "key": "add-notification-stream",
-                  "text": "Add frequent unrelated notifications to train general concentration"
+              "key": "plasticity-test-d",
+              "text": "Measure the task-linked change and its correlation with improvement across learners, then use regional activation to establish where the relation is stored"
                 },
                 {
-                  "key": "remove-all-comparison",
-                  "text": "Remove the comparison and show only the correct label"
+              "key": "plasticity-test-b",
+              "text": "Block induction of the proposed change and measure impaired task performance, then treat this necessity result as a complete storage account for this task"
                 },
                 {
-                  "key": "switch-rules-every-line",
-                  "text": "Require a different task rule on every sentence"
+              "key": "plasticity-test-c",
+              "text": "Artificially induce the proposed pattern and measure the expected behavior, then infer that ordinary learning uses and requires the same change in this task"
                 }
               ],
-              "answerKey": "stable-terms-external-table",
+          "answerKey": "plasticity-test-a",
               "explanation": {
-                "text": "Stable terminology and an external representation reduce maintenance and distraction while preserving the productive operation: comparing and explaining the mechanisms.",
-                "sourceAnchor": {
-                  "heading": "4. Working Memory and Cognitive Control",
-                  "quote": "Reducing all difficulty is not desirable; reducing irrelevant"
-                }
+                "text": "The converging package separately tests detectability, necessity through disruption, and a form of sufficiency through reinstatement, while controls protect the causal chain. Correlation, necessity, or sufficiency evidence alone leaves the other criteria unresolved.",
+                "sourceCreditKeys": [
+                  "synaptic-plasticity-memory",
+                  "brain-stimulation-causality"
+                ]
               }
             },
             {
               "family": "impostor",
-              "key": "spot-attention-impostor",
-              "prompt": "Two statements respect capacity and selection. One overclaims. Find the impostor.",
+              "key": "audit-engram-claims",
+              "prompt": "Which statement overstates what makes an engram account credible?",
               "statements": [
                 {
-                  "key": "switching-has-costs",
-                  "text": "Switching demanding tasks can require rules and goals to be retrieved again.",
+              "key": "engram-claim-c",
+                  "text": "Cells contributing to encoding, consolidation, and retrieval can overlap without having identical membership at every stage.",
                   "kind": "truth"
                 },
                 {
-                  "key": "selection-target-matters",
-                  "text": "Attention can strengthen learning of the wrong relationship if the wrong structure is selected.",
+              "key": "engram-claim-b",
+                  "text": "Reactivation is informative, but causal contribution and persistent change answer additional questions about an ensemble.",
                   "kind": "truth"
                 },
                 {
-                  "key": "practice-removes-all-bottlenecks",
-                  "text": "Enough practice makes every pair of demanding tasks free of shared bottlenecks.",
+              "key": "engram-claim-a",
+              "text": "Encoding-retrieval overlap can define ensemble membership, while later-recruited neurons are treated as supporting context.",
                   "kind": "impostor"
                 }
               ],
               "explanation": {
-                "text": "Practice may make component operations more efficient, but overlapping control and response-selection demands can still create bottlenecks. Everyday multitasking often hides rapid switching.",
-                "sourceAnchor": {
-                  "heading": "3. Selective Attention as Biased Competition",
-                  "quote": "rapid switching rather than simultaneous high-level processing."
-                }
+            "text": "The false statement treats encoding-retrieval overlap as a membership rule despite evidence that stage-specific neurons, including later-recruited or actively inhibited components, can contribute to an engram. Credibility comes from persistent change, participation, reactivation, manipulation, and behavior together.",
+                "sourceCreditKeys": [
+                  "engram-neurons",
+                  "synaptic-plasticity-memory"
+                ]
               }
             }
           ],
           "supportPaths": [
             {
-              "key": "review-measurement-limits",
-              "term": "measurement",
-              "sectionKey": "selection-control-and-load",
+              "key": "review-causal-chain",
+              "term": "causal intervention",
+              "sectionKey": "necessity-sufficiency-and-controls",
               "steps": [
                 {
-                  "stopKey": "levels-of-explanation",
-                  "activityKey": "interpret-blood-oxygen-signal"
+                  "stopKey": "separate-signal-process-and-cause",
+                  "activityKey": "evaluate-neural-contrast"
                 }
               ]
             }
           ]
         },
         {
-          "key": "retrieval-for-learning",
-          "label": "Retrieve in the form knowledge will be used",
-          "requires": ["attention-and-working-memory"],
-          "difficultyBand": 4,
+          "key": "select-relevant-information",
+          "label": "Model selective attention as biased competition",
+          "requires": [
+            "separate-signal-process-and-cause"
+          ],
+          "difficultyBand": 3,
           "lesson": {
             "sections": [
               {
-                "key": "diagnostic-retrieval-design",
-                "title": "Use retrieval to expose and strengthen the target relation",
-                "body": "Retrieval is active and cue-dependent: familiarity or immediate recognition does not prove future independent access. Practice retrieval in the form required by the goal—recall for production, discrimination for confusable alternatives, and explanation or application for relationships. Delay some attempts enough to require reconstruction and provide timely corrective feedback. Manage working-memory demand so the learner can perform that operation, and judge the design by delayed criterion-relevant performance rather than by fluency or a neural signal alone.",
-                "sourceAnchor": {
-                  "heading": "8. Retrieval, Reinstatement, and Reconsolidation",
-                  "quote": "Retrieval itself promotes learning."
-                },
-                "explorableTerms": [
-                  {
-                    "term": "working-memory demand",
-                    "supportPathKey": "review-working-memory-load"
-                  }
-                ]
+                "key": "representations-compete",
+                "title": "Selection changes which representation wins competition",
+                "body": "Visual systems cannot process every object with equal priority. When several representations compete, strengthening one can reduce the relative influence of others. Selective attention is therefore not simply more total processing; it changes the distribution of processing toward a location, feature, object, or task-relevant relation. The useful question is what was selected and what competitor lost priority, not whether a learner looked generally alert.",
+                "sourceCreditKeys": [
+                  "biased-competition",
+                  "working-memory-attention"
+                ],
+                "explorableTerms": []
+              },
+              {
+                "key": "goals-and-salience-bias",
+                "title": "Goals and stimulus properties can bias the same competition",
+                "body": "A top-down template can favor information matching the current goal, such as the color of a sought object. Bottom-up properties such as salience, contrast, or pop-out can also bias selection. These influences can cooperate or conflict: a conspicuous alert may win against a weak task goal, while a stable diagnostic cue can help the intended feature win. Calling both effects attention does not make their sources identical.",
+                "sourceCreditKeys": [
+                  "biased-competition",
+                  "working-memory-attention"
+                ],
+                "explorableTerms": []
+              },
+              {
+                "key": "selected-relation-controls-learning",
+                "title": "Attention can select the wrong relation efficiently",
+                "body": "Selection supports learning only when it prioritizes the feature or relation the learner must later use. A learner may attend successfully to a bright label while missing the diagnostic contrast between two mechanisms. Design should reduce irrelevant competition, make the target relation discriminable, and then measure whether that relation guides behavior. A neural attention signal or long viewing time alone does not establish that the intended structure was learned.",
+                "sourceCreditKeys": [
+                  "biased-competition",
+                  "reverse-inference"
+                ],
+                "explorableTerms": []
               }
             ]
           },
           "activities": [
             {
               "family": "option_select",
-              "key": "choose-diagnostic-practice",
-              "prompt": "The goal is to distinguish two easily confused mechanisms in new cases. Which practice best matches that criterion?",
+              "key": "choose-attention-design",
+              "prompt": "A learner must distinguish two mechanisms by one diagnostic pattern, but a dashboard flashes unrelated status alerts beside every example. Which redesign targets selective attention while preserving the comparison?",
               "options": [
                 {
-                  "key": "delayed-discrimination-with-feedback",
-                  "text": "After a delay, classify varied new cases and explain the diagnostic feature, then receive corrective feedback"
+              "key": "attention-design-c",
+                  "text": "Stabilize the diagnostic cue, pause unrelated alert motion during comparison, and test whether varied cases are classified by that cue"
                 },
                 {
-                  "key": "immediate-rereading",
-                  "text": "Immediately reread the same highlighted definitions until they feel familiar"
+              "key": "attention-design-a",
+              "text": "Make the diagnostic cue brighter than the alerts during training, then use attention to the highlighted area as the outcome at test"
                 },
                 {
-                  "key": "recognize-heading-only",
-                  "text": "Recognize the chapter heading while the full answer remains visible"
+              "key": "attention-design-d",
+              "text": "Remove the alerts and display the correct mechanism beside each example so attention no longer has to resolve the comparison at test"
                 },
                 {
-                  "key": "measure-activation-only",
-                  "text": "Measure neural activation without testing the intended distinction"
+              "key": "attention-design-b",
+              "text": "Pause the alerts but retain the original display, then infer successful selection from an attention-associated regional signal across cases"
                 }
               ],
-              "answerKey": "delayed-discrimination-with-feedback",
+          "answerKey": "attention-design-c",
               "explanation": {
-                "text": "Varied discrimination and explanation rehearse the relationship that the learner must later use. Delay requires reconstruction, and feedback corrects plausible errors before they become familiar.",
-                "sourceAnchor": {
-                  "heading": "10. Designing Learning with Mechanistic Restraint",
-                  "quote": "Fourth, retrieve the knowledge in the form in which it will be used."
+                "text": "The redesign biases competition toward the goal-relevant feature, reduces an irrelevant bottom-up competitor, preserves the intended discrimination, and verifies the selected relation behaviorally. Highlight attention, supplied labels, or a regional signal do not show that the cue controlled transfer cases.",
+                "sourceCreditKeys": [
+                  "biased-competition",
+                  "working-memory-attention",
+                  "reverse-inference"
+                ]
+              }
+            },
+            {
+              "family": "matching",
+              "key": "match-attention-forces",
+              "prompt": "Match each attention concept to the event it describes.",
+              "pairs": [
+                {
+                  "key": "top-down-template-role",
+                  "left": "Top-down template",
+                  "right": "A current goal increases priority for matching information"
+                },
+                {
+                  "key": "bottom-up-salience-role",
+                  "left": "Bottom-up salience",
+                  "right": "A stimulus property gains priority without being the current goal"
+                },
+                {
+                  "key": "competition-role",
+                  "left": "Representational competition",
+                  "right": "Priority for one candidate changes the relative influence of others"
+                },
+                {
+                  "key": "criterion-role",
+                  "left": "Behavioral criterion",
+                  "right": "Performance shows whether the selected relation guided the response"
                 }
+              ],
+              "explanation": {
+                "text": "A goal-driven template and stimulus-driven salience are distinct sources of bias within competitive processing. The behavioral criterion is a separate outcome measure that tests whether the intended feature or relation actually controlled performance.",
+                "sourceCreditKeys": [
+                  "biased-competition",
+                  "working-memory-attention"
+                ]
+              }
+            }
+          ],
+          "supportPaths": []
+        },
+        {
+          "key": "manage-working-memory-control",
+          "label": "Protect working-memory control without inventing a fixed limit",
+          "requires": [
+            "select-relevant-information"
+          ],
+          "difficultyBand": 3,
+          "lesson": {
+            "sections": [
+              {
+                "key": "working-memory-keeps-representations-usable",
+                "title": "Working memory keeps current representations available for action",
+                "body": "Working memory refers broadly to mechanisms that keep the representations most needed for an ongoing task available for processing. Selective attention can choose which external or internal information receives priority, while working memory can maintain target templates and task sets that guide that selection. The systems are closely linked but not interchangeable: selection, maintenance, updating, and action control are different operations that a task may combine.",
+                "sourceCreditKeys": [
+                  "working-memory-attention"
+                ],
+                "explorableTerms": [
+                  {
+                    "term": "Selective attention",
+                    "supportPathKey": "review-selective-attention"
+                  }
+                ]
+              },
+              {
+                "key": "capacity-depends-on-task-structure",
+                "title": "Capacity depends on bindings, interference, and measurement",
+                "body": "Working-memory capacity is not one context-free number of items. Tasks differ in whether they require temporary bindings, updating, serial order, distraction resistance, or retrieval from longer-term memory. Similar representations can interfere, prior knowledge can compress structure, and a single test carries task-specific variance. A capacity estimate is therefore evidence about performance under that measurement design, not a universal ceiling for every learner and material.",
+                "sourceCreditKeys": [
+                  "working-memory-capacity",
+                  "proactive-interference"
+                ],
+                "explorableTerms": []
+              },
+              {
+                "key": "externalize-state-preserve-operation",
+                "title": "Externalize intermediate state while preserving the target operation",
+                "body": "When maintenance competes with reasoning, a stable table, visible intermediate result, or consistent terminology can keep task state accessible. The redesign should preserve the comparison, update, or explanation that produces the learning. Removing every decision may make the screen easier while eliminating the target operation. Likewise, frequent task switching can require goals and task sets to be restored, so a switching cost is not proof of a permanently small memory store.",
+                "sourceCreditKeys": [
+                  "working-memory-attention",
+                  "working-memory-capacity"
+                ],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "choose-working-memory-support",
+              "prompt": "A novice must compare four unfamiliar processes across trigger, transformation, and output, but keeps losing which row belongs to which process. What is the most targeted support?",
+              "options": [
+                {
+              "key": "working-memory-support-b",
+                  "text": "Keep process names and all three fields visible in a stable table, then ask the learner to explain the diagnostic difference"
+                },
+                {
+              "key": "working-memory-support-c",
+              "text": "Present two processes at a time and hide earlier rows, then ask for one final comparison from memory after all pairs without notes"
+                },
+                {
+              "key": "working-memory-support-d",
+              "text": "Group each process under a memorable initialism and test recall of the initials before asking which fields differ later"
+                },
+                {
+              "key": "working-memory-support-a",
+              "text": "Keep the full table visible but supply the final diagnostic difference, then ask the learner to repeat that statement across examples"
+                }
+              ],
+          "answerKey": "working-memory-support-b",
+              "explanation": {
+                "text": "The stable table externalizes item-field bindings while retaining the productive operation: comparing and explaining. Hidden rows preserve the maintenance bottleneck, an initialism does not represent the field relations, and supplying the final difference removes the reasoning.",
+                "sourceCreditKeys": [
+                  "working-memory-attention",
+                  "working-memory-capacity",
+                  "proactive-interference"
+                ]
+              }
+            },
+            {
+              "family": "impostor",
+              "key": "audit-working-memory-claims",
+              "prompt": "Which statement treats a working-memory result as more general than the evidence allows?",
+              "statements": [
+                {
+              "key": "working-memory-claim-a",
+                  "text": "A task can combine selection, maintenance, updating, and control even though those operations are conceptually separable.",
+                  "kind": "truth"
+                },
+                {
+              "key": "working-memory-claim-c",
+              "text": "Binding complexity, interference, prior knowledge, material, and the measurement task can all change observed performance.",
+                  "kind": "truth"
+                },
+                {
+              "key": "working-memory-claim-b",
+              "text": "A span result estimates general capacity, while materials and goals mainly change how efficiently that fixed capacity is used.",
+                  "kind": "impostor"
+                }
+              ],
+              "explanation": {
+            "text": "The false statement turns a shared general factor into one fixed, context-free capacity. Binding, updating, secondary-memory retrieval, and interference differ across measures, so a span result does not set capacity across materials and goals.",
+                "sourceCreditKeys": [
+                  "working-memory-capacity",
+                  "working-memory-attention"
+                ]
               }
             }
           ],
           "supportPaths": [
             {
-              "key": "review-working-memory-load",
-              "term": "working-memory demand",
-              "sectionKey": "diagnostic-retrieval-design",
+              "key": "review-selective-attention",
+              "term": "Selective attention",
+              "sectionKey": "working-memory-keeps-representations-usable",
               "steps": [
                 {
-                  "stopKey": "attention-and-working-memory",
-                  "activityKey": "reduce-irrelevant-competition"
+                  "stopKey": "select-relevant-information",
+                  "activityKey": "choose-attention-design"
                 }
               ]
             }
@@ -279,18 +743,1006 @@
         }
       ],
       "guardianActivityKeys": [
-        "match-explanation-levels",
-        "spot-attention-impostor",
-        "reduce-irrelevant-competition",
-        "choose-diagnostic-practice"
+        "evaluate-neural-contrast",
+        "match-evidence-to-inference",
+        "choose-plasticity-evidence-package",
+        "audit-engram-claims",
+        "choose-attention-design",
+        "match-attention-forces",
+        "choose-working-memory-support",
+        "audit-working-memory-claims"
+      ]
+    },
+    {
+      "key": "build-and-transform-memory",
+      "title": "Build and transform a usable memory",
+      "stops": [
+        {
+          "key": "encode-for-future-use",
+          "label": "Encode the relations that future use will require",
+          "requires": [
+            "manage-working-memory-control"
+          ],
+          "difficultyBand": 3,
+          "lesson": {
+            "sections": [
+              {
+                "key": "encoding-is-an-operation",
+                "title": "Encoding is a family of operations, not a recording button",
+                "body": "Encoding is the set of cognitive and neural processes through which an event becomes a representation that can later guide behavior. What is encoded depends on what the learner perceives, attends to, compares, elaborates, and organizes. The same page can support memory for a word, its source, its position, or its relation to another idea, and success on one later test does not establish that every feature was preserved.",
+                "sourceCreditKeys": [
+                  "declarative-memory",
+                  "working-memory-attention"
+                ],
+                "explorableTerms": []
+              },
+              {
+                "key": "bind-items-context-and-relations",
+                "title": "Item information and relational organization support different uses",
+                "body": "Recognizing that an item appeared can rely on information different from recovering where, when, or with what it appeared. Relational encoding binds items to contextual, temporal, spatial, or conceptual structure. If future performance requires distinguishing two mechanisms, encoding their diagnostic relation is more relevant than remembering only that both names were present. State the later criterion before choosing which features and relations to organize.",
+                "sourceCreditKeys": [
+                  "declarative-memory",
+                  "relational-memory-hippocampus"
+                ],
+                "explorableTerms": []
+              },
+              {
+                "key": "future-cues-shape-use",
+                "title": "Future access depends on the overlap between encoding and retrieval operations",
+                "body": "A memory representation may support one retrieval goal but not another. Retrieval improves when the available cue and the operations it evokes overlap with features that mattered during encoding, a principle often described as transfer-appropriate processing. This does not require reproducing every surface detail. It calls for encoding and later practice that preserve the diagnostic information and cognitive operation the future task will demand.",
+                "sourceCreditKeys": [
+                  "declarative-memory"
+                ],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "choose-goal-matched-encoding",
+        "prompt": "A learner will later reconstruct why steps in an unfamiliar safety-check process must occur in a particular order. Which study activity best encodes information for that use?",
+              "options": [
+                {
+              "key": "encoding-practice-b",
+              "text": "For varied processes, arrange each step by the condition it creates for the next, explain the dependencies, and reconstruct the order from partial cues"
+                },
+                {
+              "key": "encoding-practice-d",
+              "text": "Explain what each step does in the original worked process, then recognize that process while its numbered sequence and dependency arrows remain visible"
+                },
+                {
+              "key": "encoding-practice-c",
+              "text": "Sort step names by the equipment mentioned in their descriptions, then explain where each item appears in the original process diagram from memory"
+                },
+                {
+              "key": "encoding-practice-a",
+              "text": "Memorize one phrase for each numbered step, then use those phrases to reconstruct only the original worked process from a complete cue list at test"
+                }
+              ],
+          "answerKey": "encoding-practice-b",
+              "explanation": {
+            "text": "The future criterion is reconstructing dependency order in a new process, so organizing varied steps by the conditions they create and practicing from partial cues encodes the relevant temporal and causal relations. Recognition with the sequence visible, equipment sorting, and phrase memory for one worked process can succeed without supporting that transfer.",
+                "sourceCreditKeys": [
+                  "declarative-memory",
+                  "relational-memory-hippocampus"
+                ]
+              }
+            },
+            {
+              "family": "matching",
+              "key": "match-goal-to-encoding-operation",
+              "prompt": "Match each future memory goal to the encoding operation that most directly prepares it.",
+              "pairs": [
+                {
+                  "key": "source-memory-operation",
+                  "left": "Identify who made a claim",
+                  "right": "Bind the claim to its speaker and context"
+                },
+                {
+                  "key": "sequence-memory-operation",
+                  "left": "Reconstruct a process order",
+                  "right": "Organize steps by their temporal and causal relations"
+                },
+                {
+                  "key": "discrimination-operation",
+                  "left": "Distinguish confusable cases",
+                  "right": "Contrast the features that separate the categories"
+                },
+                {
+                  "key": "application-operation",
+                  "left": "Apply a principle in a new setting",
+                  "right": "Explain the relation across varied examples"
+                }
+              ],
+              "explanation": {
+                "text": "Encoding operations should preserve the information structure needed later: source-context binding, temporal and causal organization, diagnostic contrast, or a relation that transfers across examples. Simply increasing exposure does not make these operations interchangeable.",
+                "sourceCreditKeys": [
+                  "declarative-memory",
+                  "relational-memory-hippocampus"
+                ]
+              }
+            }
+          ],
+          "supportPaths": []
+        },
+        {
+          "key": "organize-hippocampal-networks",
+          "label": "Interpret hippocampal organization without a region-as-container story",
+          "requires": [
+            "encode-for-future-use"
+          ],
+          "difficultyBand": 4,
+          "lesson": {
+            "sections": [
+              {
+                "key": "hippocampus-supports-relations",
+                "title": "The hippocampus helps organize relations across experience",
+                "body": "Evidence from amnesia, behavior, recording, and imaging supports an important hippocampal role in relational memory: linking items with time, place, sequence, source, and other dimensions so those relations can later be used flexibly. This is not the claim that one region contains every detail of an episode. Item information, contextual information, control processes, and sensory representations involve interacting medial-temporal and cortical systems.",
+                "sourceCreditKeys": [
+                  "relational-memory-hippocampus",
+                  "cortico-hippocampal-networks",
+                  "declarative-memory"
+                ],
+                "explorableTerms": []
+              },
+              {
+                "key": "network-inputs-shape-relational-encoding",
+                "title": "Network organization constrains what a hippocampal signal can mean",
+                "body": "Perirhinal, parahippocampal, entorhinal, hippocampal, and broader cortical networks contribute different representational inputs and transformations. Relational encoding depends on the information arriving from those systems and on the retrieval goal. Treating medial temporal lobe and hippocampus as synonyms hides these distinctions. A measured hippocampal effect should therefore be interpreted with the task, input representation, connected network, and behavioral result.",
+                "sourceCreditKeys": [
+                  "cortico-hippocampal-networks",
+                  "relational-memory-hippocampus"
+                ],
+                "explorableTerms": [
+                  {
+                    "term": "Relational encoding",
+                    "supportPathKey": "review-relational-encoding"
+                  }
+                ]
+              },
+              {
+                "key": "separation-and-completion-are-transformations",
+                "title": "Pattern separation and completion compare inputs with outputs",
+                "body": "Pattern separation describes an output representation becoming less similar than overlapping inputs; pattern completion describes an output becoming more similar from a partial or noisy input. Observing distinct or stable output patterns is not enough to locate the computation. To claim that a region performed separation or completion, the study must characterize the upstream input and show the transformation, while acknowledging resolution limits and alternative computations.",
+                "sourceCreditKeys": [
+                  "hippocampal-pattern-separation",
+                  "bold-interpretation"
+                ],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "interpret-pattern-change",
+        "prompt": "A study asks whether a hippocampal network stage completes partial route memories. For each route, researchers have a full-route reference pattern, the pattern entering the stage on a partial-cue trial, the pattern leaving it, and the learner's route choice. Which analysis most directly tests the claim?",
+              "options": [
+                {
+              "key": "pattern-analysis-d",
+              "text": "Test whether the output moves closer than the input to the correct full-route reference, and whether that change predicts the route choice"
+                },
+                {
+              "key": "pattern-analysis-b",
+              "text": "Test whether outputs resemble their full-route references more than unrelated routes, without comparing the measured inputs with those outputs"
+                },
+                {
+              "key": "pattern-analysis-a",
+              "text": "Use mean regional signal to separate correct from incorrect route choices, then treat stronger signal as completion of the missing route details"
+                },
+                {
+              "key": "pattern-analysis-c",
+              "text": "Train an output decoder to identify routes and infer that successful decoding locates a complete route representation in that network stage"
+                }
+              ],
+          "answerKey": "pattern-analysis-d",
+              "explanation": {
+            "text": "Completion is an input-to-output similarity transformation. Comparing each measured partial input with its output and the correct full-route reference tests whether this stage moved the representation toward completion; relating that change to route choice adds the criterion behavior. Output resemblance, mean signal, or decoder success without the input comparison does not locate the transformation.",
+                "sourceCreditKeys": [
+                  "hippocampal-pattern-separation",
+                  "bold-interpretation"
+                ]
+              }
+            },
+            {
+              "family": "impostor",
+              "key": "audit-hippocampal-claims",
+              "prompt": "Which statement collapses a network account into an unsupported region story?",
+              "statements": [
+                {
+              "key": "hippocampal-claim-a",
+                  "text": "Hippocampal relational organization can link items across temporal, spatial, source, and conceptual dimensions.",
+                  "kind": "truth"
+                },
+                {
+              "key": "hippocampal-claim-b",
+                  "text": "A hippocampal effect is interpreted with its cortical inputs, task contrast, retrieval goal, and behavioral consequence.",
+                  "kind": "truth"
+                },
+                {
+              "key": "hippocampal-claim-c",
+              "text": "Observed hippocampal binding locates the episode there, while cortical patterns mainly supply its component content.",
+                  "kind": "impostor"
+                }
+              ],
+              "explanation": {
+            "text": "The false statement turns relational binding into a region-owned episode with cortical systems reduced to inputs. Memory depends on interactions among hippocampal, adjacent medial-temporal, cortical, sensory, and control systems, with different evidence supporting different links.",
+                "sourceCreditKeys": [
+                  "relational-memory-hippocampus",
+                  "cortico-hippocampal-networks",
+                  "declarative-memory"
+                ]
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "review-relational-encoding",
+              "term": "Relational encoding",
+              "sectionKey": "network-inputs-shape-relational-encoding",
+              "steps": [
+                {
+                  "stopKey": "encode-for-future-use",
+                  "activityKey": "choose-goal-matched-encoding"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "trace-consolidation-over-time",
+          "label": "Trace consolidation as transformation over time",
+          "requires": [
+            "organize-hippocampal-networks"
+          ],
+          "difficultyBand": 4,
+          "lesson": {
+            "sections": [
+              {
+                "key": "consolidation-is-time-dependent-change",
+                "title": "Consolidation is transformation, not a one-time file copy",
+                "body": "Memory consolidation refers to time-dependent transformation of an experience-dependent representation and its biological support. It includes stabilization, recurrent reactivation, redistribution across circuits, and integration with existing knowledge. These processes can preserve some information while reorganizing or abstracting other aspects. A delayed memory should not be assumed to be an unchanged readout of the initial encoding episode.",
+                "sourceCreditKeys": [
+                  "consolidation-transformation",
+                  "sleep-systems-consolidation"
+                ],
+                "explorableTerms": []
+              },
+              {
+                "key": "synaptic-and-systems-scales",
+                "title": "Synaptic and systems consolidation answer different scale questions",
+                "body": "Synaptic consolidation concerns cellular and molecular changes that stabilize learning-related connectivity over relatively local circuits. Systems consolidation concerns how representations and their dependence on interacting regions change across longer periods and repeated reactivation. The labels do not imply a single clock or a simple handoff from one storage box to another. Evidence should identify the time scale, representation, circuit, manipulation, and behavioral expression actually tested.",
+                "sourceCreditKeys": [
+                  "synaptic-plasticity-memory",
+                  "consolidation-transformation",
+                  "sleep-systems-consolidation"
+                ],
+                "explorableTerms": []
+              },
+              {
+                "key": "reactivation-can-preserve-and-transform",
+                "title": "Reactivation can support persistence and qualitative change",
+                "body": "Reactivation occurs during wake and sleep and is a candidate mechanism for strengthening, integrating, or transforming representations. Its consequences depend on which components reactivate, the surrounding network state, existing knowledge, and later experience. A reactivation-like signal does not by itself prove successful consolidation; delayed behavior and interventions that discriminate competing mechanisms are needed to connect the signal to a memory consequence.",
+                "sourceCreditKeys": [
+                  "consolidation-transformation",
+                  "sleep-reactivation",
+                  "reverse-inference"
+                ],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "interpret-delayed-change",
+              "prompt": "Two groups perform equally immediately after learning. After 48 hours, one group retains the central relation better but recalls fewer surface details. What does this pattern establish by itself?",
+              "options": [
+                {
+              "key": "delayed-change-d",
+              "text": "The delayed memory expressions differ in retained relation and surface detail, a pattern compatible with different post-encoding transformations at test"
+                },
+                {
+              "key": "delayed-change-b",
+                  "text": "The delayed trade-off is evidence that systems consolidation abstracted the relation from its details, even though no neural process was measured"
+                },
+                {
+              "key": "delayed-change-c",
+                  "text": "Equal immediate performance establishes matched initial representations, so the later difference must have arisen during offline consolidation"
+                },
+                {
+              "key": "delayed-change-a",
+              "text": "Fewer surface details show that their traces weakened, while the unchanged central relation was merely protected from forgetting during the delay"
+                }
+              ],
+          "answerKey": "delayed-change-d",
+              "explanation": {
+                "text": "The behavior establishes a delayed difference in what is expressed and is compatible with post-encoding transformation. It does not isolate a systems mechanism, prove identical initial representations, or distinguish transformation from separate changes in access and forgetting.",
+                "sourceCreditKeys": [
+                  "consolidation-transformation",
+                  "sleep-systems-consolidation"
+                ]
+              }
+            },
+            {
+              "family": "matching",
+              "key": "match-memory-time-processes",
+              "prompt": "Match each memory-process term to the question it is used to ask.",
+              "pairs": [
+                {
+                  "key": "encoding-time-role",
+                  "left": "Encoding",
+                  "right": "Which operations initially form a usable representation"
+                },
+                {
+                  "key": "synaptic-time-role",
+                  "left": "Synaptic consolidation",
+                  "right": "Which cellular changes stabilize learning-related connectivity"
+                },
+                {
+                  "key": "systems-time-role",
+                  "left": "Systems consolidation",
+                  "right": "How representation and regional dependence change across networks over time"
+                },
+                {
+                  "key": "reactivation-time-role",
+                  "left": "Reactivation",
+                  "right": "When a prior representation becomes active again during wake or sleep"
+                }
+              ],
+              "explanation": {
+                "text": "The terms identify different questions and scales. Encoding forms the initial representation, synaptic consolidation concerns local biological stabilization, systems consolidation concerns longer-term network organization, and reactivation is a candidate event within several later processes.",
+                "sourceCreditKeys": [
+                  "declarative-memory",
+                  "synaptic-plasticity-memory",
+                  "consolidation-transformation",
+                  "sleep-reactivation"
+                ]
+              }
+            }
+          ],
+          "supportPaths": []
+        },
+        {
+          "key": "evaluate-sleep-memory-evidence",
+          "label": "Evaluate sleep-memory evidence without a magic-storage claim",
+          "requires": [
+            "trace-consolidation-over-time"
+          ],
+          "difficultyBand": 4,
+          "lesson": {
+            "sections": [
+              {
+                "key": "sleep-coordinates-candidate-mechanisms",
+                "title": "Sleep provides states in which memory-related activity is coordinated",
+                "body": "Human electrophysiology and imaging provide converging evidence that learning-related activity can recur during sleep, especially in coordination with non-REM slow oscillations, spindles, and hippocampal events. Active-systems accounts propose that this coordination supports consolidation through communication and plasticity across hippocampal and cortical networks. The evidence concerns probabilistic mechanisms and task-dependent outcomes, not a nightly transfer of every experience into permanent storage.",
+                "sourceCreditKeys": [
+                  "sleep-systems-consolidation",
+                  "sleep-reactivation"
+                ],
+                "explorableTerms": [
+                  {
+                    "term": "consolidation",
+                    "supportPathKey": "review-consolidation-change"
+                  }
+                ]
+              },
+              {
+                "key": "targeted-reactivation-is-a-bounded-test",
+                "title": "Targeted memory reactivation manipulates one candidate pathway",
+                "body": "In targeted memory reactivation studies, a cue linked to prior learning is presented during a selected sleep stage and cued items are compared with uncued controls. A meta-analysis found a small-to-moderate aggregate memory benefit, most clearly in non-REM stages 2 and 3, with effects varying by task and outcome. That result supports a bounded experimental method; it does not establish a universal cue, sleep stage, or educational benefit.",
+                "sourceCreditKeys": [
+                  "sleep-targeted-reactivation-meta",
+                  "sleep-reactivation"
+                ],
+                "explorableTerms": []
+              },
+              {
+                "key": "separate-sleep-signal-from-memory-outcome",
+                "title": "A sleep signal and a later memory outcome are separate links",
+                "body": "A learning-related pattern during sleep can be evidence of reactivation, while a later recall or transfer test measures a behavioral consequence. Connecting the two requires timing, controls, and preferably manipulation; neither measure substitutes for the other. Sleep studies also differ in participants, deprivation or cue procedures, tasks, and outcomes. Report those conditions instead of turning a laboratory effect into personal sleep treatment or a claim about every kind of learning.",
+                "sourceCreditKeys": [
+                  "sleep-reactivation",
+                  "sleep-targeted-reactivation-meta",
+                  "brain-stimulation-causality"
+                ],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "interpret-sleep-cue-study",
+              "prompt": "Items are paired with sounds before sleep. During non-REM stage 2, half the sounds are replayed under a randomized within-person design. Cued items show a small later recall advantage. Which claim fits?",
+              "options": [
+                {
+              "key": "sleep-study-c",
+                  "text": "Under this task and stage-2 cueing procedure, targeted reactivation changed later recall relative to the learner's uncued items"
+                },
+                {
+              "key": "sleep-study-d",
+              "text": "The randomized advantage identifies reactivation-driven systems consolidation as the cause, although other tasks and stages require testing"
+                },
+                {
+              "key": "sleep-study-b",
+                  "text": "The cue advantage shows that stage 2 is the effective reactivation stage for this material, so future cue schedules can use it directly"
+                },
+                {
+              "key": "sleep-study-a",
+                  "text": "The later recall difference shows that each cued representation was strengthened, even though the experiment did not measure its neural change"
+                }
+              ],
+          "answerKey": "sleep-study-c",
+              "explanation": {
+                "text": "The randomized cued-versus-uncued comparison supports a bounded effect of this targeted-reactivation procedure on later recall. It does not uniquely identify the intervening systems mechanism, select a general schedule, or show neural strengthening of each item.",
+                "sourceCreditKeys": [
+                  "sleep-targeted-reactivation-meta",
+                  "sleep-reactivation"
+                ]
+              }
+            },
+            {
+              "family": "impostor",
+              "key": "audit-sleep-memory-claims",
+              "prompt": "Which statement confuses a candidate sleep mechanism with an established memory outcome?",
+              "statements": [
+                {
+              "key": "sleep-memory-claim-a",
+                  "text": "Coordinated non-REM oscillatory events are candidate mechanisms for communication and plasticity across memory networks.",
+                  "kind": "truth"
+                },
+                {
+              "key": "sleep-memory-claim-c",
+                  "text": "Targeted-reactivation effects vary across sleep stage, task, and outcome, so the tested conditions belong in the claim.",
+                  "kind": "truth"
+                },
+                {
+              "key": "sleep-memory-claim-b",
+              "text": "Expected reactivation and non-REM oscillations establish strengthening, with later behavior serving as its readout.",
+                  "kind": "impostor"
+                }
+              ],
+              "explanation": {
+            "text": "The false statement lets coupled neural events establish strengthening and demotes later performance to a readout. A sleep signal and later behavior address different links; their relationship must be tested under specified conditions.",
+                "sourceCreditKeys": [
+                  "sleep-reactivation",
+                  "sleep-targeted-reactivation-meta",
+                  "reverse-inference"
+                ]
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "review-consolidation-change",
+              "term": "consolidation",
+              "sectionKey": "sleep-coordinates-candidate-mechanisms",
+              "steps": [
+                {
+                  "stopKey": "trace-consolidation-over-time",
+                  "activityKey": "interpret-delayed-change"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "guardianActivityKeys": [
+        "choose-goal-matched-encoding",
+        "match-goal-to-encoding-operation",
+        "interpret-pattern-change",
+        "audit-hippocampal-claims",
+        "interpret-delayed-change",
+        "match-memory-time-processes",
+        "interpret-sleep-cue-study",
+        "audit-sleep-memory-claims"
+      ]
+    },
+    {
+      "key": "retrieve-update-and-design",
+      "title": "Retrieve, update, and design with restraint",
+      "stops": [
+        {
+          "key": "practice-criterion-retrieval",
+          "label": "Practice retrieval in the form future use requires",
+          "requires": [
+            "evaluate-sleep-memory-evidence"
+          ],
+          "difficultyBand": 4,
+          "lesson": {
+            "sections": [
+              {
+                "key": "retrieval-is-cue-guided-construction",
+                "title": "Retrieval uses cues, control, and a decision about what was recovered",
+                "body": "Retrieval is not a literal replay of a stored file. A cue is elaborated into a search description, candidate information becomes available, and the rememberer evaluates whether it fits the current goal. Performance depends on the overlap between retrieval operations and features emphasized during encoding. Familiarity with a visible answer can therefore coexist with failure to produce, discriminate, source, or apply the same knowledge later.",
+                "sourceCreditKeys": [
+                  "declarative-memory",
+                  "engram-neurons"
+                ],
+                "explorableTerms": []
+              },
+              {
+                "key": "retrieval-practice-is-a-learning-event",
+                "title": "Attempted retrieval can change later retention",
+                "body": "Meta-analytic evidence shows that testing previously studied information can improve later retention relative to restudy. Benefits vary with the retrieval format and conditions; effortful recall often produces larger effects than recognition. Classroom studies also report benefits across many levels, subjects, delays, and feedback arrangements, while representation outside WEIRD settings remains limited. Describe the task and population instead of treating every quiz as equivalent.",
+                "sourceCreditKeys": [
+                  "retrieval-practice-meta",
+                  "classroom-retrieval-review"
+                ],
+                "explorableTerms": []
+              },
+              {
+                "key": "match-practice-to-criterion",
+                "title": "Use delayed, criterion-relevant attempts with corrective information",
+                "body": "Choose retrieval that exercises the future operation: produce a procedure, discriminate close cases, recover a source, or apply a relation. Delay some attempts enough that the answer is no longer continuously visible, vary surface details when transfer matters, and provide a way to compare the response with the correct relation. Judge the design by later criterion performance, not immediate fluency, quiz completion, or an activation measure alone.",
+                "sourceCreditKeys": [
+                  "retrieval-practice-meta",
+                  "classroom-retrieval-review",
+                  "effective-learning-techniques",
+                  "declarative-memory"
+                ],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "choose-criterion-retrieval",
+              "prompt": "The goal is to identify which of three attention mechanisms explains a new case and justify the diagnostic cue. Which practice most closely matches that criterion?",
+              "options": [
+                {
+              "key": "retrieval-practice-a",
+              "text": "After a delay, classify varied cases from minimal cues, justify each distinction, and compare the response with corrective feedback at test"
+                },
+                {
+              "key": "retrieval-practice-d",
+                  "text": "After a delay, classify the original worked cases from complete definitions, then review feedback on the selected mechanism names"
+                },
+                {
+              "key": "retrieval-practice-c",
+                  "text": "Immediately recall each definition without cues, then study varied cases with their classifications and explanations already supplied"
+                },
+                {
+              "key": "retrieval-practice-b",
+              "text": "Study varied cases and explain their diagnostic cues, then self-rate familiarity instead of attempting a delayed classification at test"
+                }
+              ],
+          "answerKey": "retrieval-practice-a",
+              "explanation": {
+                "text": "Delayed classification from minimal cues rehearses the future discrimination and explanation, varied cases test transfer, and corrective feedback exposes errors. Original-case recognition, definition recall followed by supplied answers, and familiarity ratings leave part of that criterion untested.",
+                "sourceCreditKeys": [
+                  "retrieval-practice-meta",
+                  "classroom-retrieval-review",
+                  "declarative-memory"
+                ]
+              }
+            },
+            {
+              "family": "matching",
+              "key": "match-retrieval-to-criterion",
+              "prompt": "Match each future criterion to the retrieval-practice format that most directly rehearses it.",
+              "pairs": [
+                {
+                  "key": "production-retrieval-format",
+                  "left": "Produce a procedure",
+                  "right": "Reconstruct the ordered steps from a minimal prompt"
+                },
+                {
+                  "key": "discrimination-retrieval-format",
+                  "left": "Distinguish confusable categories",
+                  "right": "Classify mixed cases and state the diagnostic feature"
+                },
+                {
+                  "key": "source-retrieval-format",
+                  "left": "Attribute a claim",
+                  "right": "Recover the claim together with its source context"
+                },
+                {
+                  "key": "transfer-retrieval-format",
+                  "left": "Apply a relation",
+                  "right": "Solve a surface-different case using the same structure"
+                }
+              ],
+              "explanation": {
+                "text": "Retrieval practice is most diagnostic when it rehearses the intended future operation. Production, discrimination, source attribution, and structural transfer use different cues and response demands even when they begin from the same lesson.",
+                "sourceCreditKeys": [
+                  "declarative-memory",
+                  "retrieval-practice-meta",
+                  "classroom-retrieval-review"
+                ]
+              }
+            }
+          ],
+          "supportPaths": []
+        },
+        {
+          "key": "bound-reconsolidation-updating",
+          "label": "Bound claims about reconsolidation and updating",
+          "requires": [
+            "practice-criterion-retrieval"
+          ],
+          "difficultyBand": 4,
+          "lesson": {
+            "sections": [
+              {
+                "key": "reactivation-may-not-destabilize",
+                "title": "Retrieval, destabilization, and reconsolidation are not synonyms",
+                "body": "A reminder can retrieve or reactivate a memory without necessarily making its biological support labile. Reconsolidation is the restabilization process required after destabilization. Whether destabilization occurs can depend on prediction error, memory strength, reminder conditions, timing, and other boundary conditions. Observing that a memory was recalled does not by itself establish that a reconsolidation window opened.",
+                "sourceCreditKeys": [
+                  "reconsolidation-updating"
+                ],
+                "explorableTerms": []
+              },
+              {
+                "key": "updating-needs-mechanism-controls",
+                "title": "Behavioral change does not uniquely identify reconsolidation",
+                "body": "New information presented around reactivation can weaken, strengthen, or modify later memory expression in some experiments. To attribute that change specifically to reconsolidation, a study must establish reactivation dependence, plausible destabilization, timing, durability, and alternatives such as extinction, new learning, or retrieval competition. Replication failures and uncertain markers of destabilization make mechanism-level claims narrower than a simple pre-to-post performance difference.",
+                "sourceCreditKeys": [
+                  "reconsolidation-updating",
+                  "interference-inhibition-review"
+                ],
+                "explorableTerms": []
+              },
+              {
+                "key": "revision-can-coexist-with-old-knowledge",
+                "title": "Use contradiction to revise a model without promising erasure",
+                "body": "For ordinary learning, a retrieval cue can expose what the learner currently predicts, and corrective evidence can make the mismatch explicit. The learner can then retrieve the revised relation in varied contexts. This is a defensible cognitive learning design, but it does not prove that an original trace was erased or reconsolidated. Old and new knowledge may coexist and compete, so later tests should include the cues and contexts where the outdated answer is tempting.",
+                "sourceCreditKeys": [
+                  "reconsolidation-updating",
+                  "interference-inhibition-review",
+                  "classroom-retrieval-review"
+                ],
+                "explorableTerms": [
+                  {
+                    "term": "retrieval cue",
+                    "supportPathKey": "review-retrieval-cues"
+                  }
+                ]
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "interpret-corrected-memory",
+              "prompt": "Learners retrieve an outdated rule, see a contradiction and the current rule, and later answer more new cases correctly. No marker or manipulation of destabilization was included. What can the result support?",
+              "options": [
+                {
+              "key": "memory-correction-c",
+                  "text": "The sequence improved later use of the current rule, while reconsolidation, new learning, and competition remain unresolved explanations"
+                },
+                {
+              "key": "memory-correction-a",
+              "text": "The contradiction supplied prediction error after retrieval, so the improvement supports reconsolidation updating rather than new learning"
+                },
+                {
+              "key": "memory-correction-b",
+                  "text": "The declining error rate supports weakening of the original rule, although the experiment cannot determine whether it was fully erased"
+                },
+                {
+              "key": "memory-correction-d",
+                  "text": "The correction created a competing current-rule memory while leaving the old trace unchanged, because no biological manipulation occurred"
+                }
+              ],
+          "answerKey": "memory-correction-c",
+              "explanation": {
+                "text": "The design shows better later performance after retrieval, contradiction, and correction. Without evidence of destabilization and controls for alternatives, it cannot choose reconsolidation over new learning or competition, nor determine whether the original trace weakened, persisted unchanged, or was erased.",
+                "sourceCreditKeys": [
+                  "reconsolidation-updating",
+                  "interference-inhibition-review"
+                ]
+              }
+            },
+            {
+              "family": "impostor",
+              "key": "audit-reconsolidation-claims",
+              "prompt": "Which statement turns a conditional reconsolidation account into an automatic rule?",
+              "statements": [
+                {
+              "key": "reconsolidation-claim-b",
+                  "text": "Prediction error and other boundary conditions can affect whether reactivation is followed by destabilization.",
+                  "kind": "truth"
+                },
+                {
+              "key": "reconsolidation-claim-c",
+              "text": "Later change can reflect reconsolidation, new learning, extinction, or competition unless a design separates them.",
+                  "kind": "truth"
+                },
+                {
+              "key": "reconsolidation-claim-a",
+              "text": "Reminder prediction error by itself establishes destabilization before corrective information is presented.",
+                  "kind": "impostor"
+                }
+              ],
+              "explanation": {
+            "text": "The false statement treats prediction error by itself as proof of destabilization. Prediction error can contribute, but memory strength, reminder conditions, timing, and unresolved biological markers prevent that inference from the reminder alone.",
+                "sourceCreditKeys": [
+                  "reconsolidation-updating"
+                ]
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "review-retrieval-cues",
+              "term": "retrieval cue",
+              "sectionKey": "revision-can-coexist-with-old-knowledge",
+              "steps": [
+                {
+                  "stopKey": "practice-criterion-retrieval",
+                  "activityKey": "choose-criterion-retrieval"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "diagnose-interference-and-forgetting",
+          "label": "Diagnose interference before declaring a trace lost",
+          "requires": [
+            "bound-reconsolidation-updating"
+          ],
+          "difficultyBand": 5,
+          "lesson": {
+            "sections": [
+              {
+                "key": "old-and-new-learning-can-interfere",
+                "title": "Interference has a direction relative to the target memory",
+                "body": "Proactive interference occurs when earlier learning impairs access to or encoding of newer target information. Retroactive interference occurs when later learning impairs access to older target information. The labels describe the order of the interfering and target materials; they do not identify one neural mechanism. Similar cues, overlapping responses, and weak contextual separation can increase competition in both directions.",
+                "sourceCreditKeys": [
+                  "proactive-interference",
+                  "interference-inhibition-review"
+                ],
+                "explorableTerms": []
+              },
+              {
+                "key": "retrieval-failure-is-not-trace-loss",
+                "title": "Failure on one test does not prove that a representation vanished",
+                "body": "Forgetting can reflect ineffective encoding, changed cues, competition at retrieval, reduced accessibility, active inhibition, or changes to the representation itself. Different tests can reveal different effects: a cue may restore access that free recall missed, while recognition can bypass part of a retrieval-route problem. Diagnose across independent cues and tasks before converting a performance failure into a claim that a trace decayed or was erased.",
+                "sourceCreditKeys": [
+                  "interference-inhibition-review",
+                  "declarative-memory"
+                ],
+                "explorableTerms": []
+              },
+              {
+                "key": "selective-retrieval-changes-competition",
+                "title": "Selective retrieval can help a target and disadvantage a competitor",
+                "body": "Retrieving some members of a related set can strengthen the practiced material while later access to related unpracticed material declines, a pattern called retrieval-induced forgetting. Blocking and inhibitory accounts make different mechanism claims, and the effect depends on task and test. Learning design should retrieve every relation that remains important, contrast confusable alternatives, and test each independently rather than repeatedly selecting only one member of a crowded set.",
+                "sourceCreditKeys": [
+                  "interference-inhibition-review",
+                  "retrieval-practice-meta"
+                ],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "diagnose-proactive-interference",
+              "prompt": "A team learned that code R7 meant “archive.” After a migration, R7 means “restore.” On new trials they often choose the old action even though they can state the new rule when shown it. What is the most direct diagnosis?",
+              "options": [
+                {
+              "key": "interference-case-c",
+                  "text": "The earlier mapping competes with retrieval of the newer target mapping, which is a proactive-interference pattern"
+                },
+                {
+              "key": "interference-case-d",
+                  "text": "The later mapping retroactively disrupts the older action because the migration occurred after the original learning"
+                },
+                {
+              "key": "interference-case-b",
+                  "text": "The newer mapping was incompletely encoded, while successful cued statements reflect recognition rather than stored knowledge"
+                },
+                {
+              "key": "interference-case-a",
+                  "text": "The old response has become a motor habit, which excludes competition between the two mappings as an explanation"
+                }
+              ],
+          "answerKey": "interference-case-c",
+              "explanation": {
+                "text": "The target is the newer R7-to-restore mapping and the earlier archive mapping disrupts its retrieval, which is a proactive-interference pattern. The cue result argues against declaring the new rule absent, and the scenario does not isolate a motor-habit mechanism.",
+                "sourceCreditKeys": [
+                  "proactive-interference",
+                  "interference-inhibition-review",
+                  "declarative-memory"
+                ]
+              }
+            },
+            {
+              "family": "matching",
+              "key": "match-interference-types",
+              "prompt": "Match each interference term to the target-and-competitor relationship it describes.",
+              "pairs": [
+                {
+                  "key": "proactive-interference-role",
+                  "left": "Proactive interference",
+                  "right": "Earlier information disrupts a newer target"
+                },
+                {
+                  "key": "retroactive-interference-role",
+                  "left": "Retroactive interference",
+                  "right": "Later information disrupts an older target"
+                },
+                {
+                  "key": "retrieval-competition-role",
+                  "left": "Retrieval competition",
+                  "right": "A non-target response becomes available and obstructs target selection"
+                },
+                {
+                  "key": "retrieval-induced-forgetting-role",
+                  "left": "Retrieval-induced forgetting",
+                  "right": "Selective practice is followed by poorer access to related unpracticed material"
+                }
+              ],
+              "explanation": {
+                "text": "Proactive and retroactive labels depend on temporal direction relative to the target. Retrieval competition describes an access conflict, while retrieval-induced forgetting is an empirical pattern after selective practice; none of the terms alone proves one neural mechanism.",
+                "sourceCreditKeys": [
+                  "proactive-interference",
+                  "interference-inhibition-review"
+                ]
+              }
+            }
+          ],
+          "supportPaths": []
+        },
+        {
+          "key": "design-learning-from-behavioral-evidence",
+          "label": "Design learning from outcomes, conditions, and uncertainty",
+          "requires": [
+            "diagnose-interference-and-forgetting"
+          ],
+          "difficultyBand": 5,
+          "lesson": {
+            "sections": [
+              {
+                "key": "start-with-criterion-behavior",
+                "title": "Start with the behavior the learner must later perform",
+                "body": "Define the delayed criterion—recall, discrimination, explanation, transfer, or source judgment—then choose practice and measures that exercise it. Neural evidence can constrain a mechanism hypothesis, but it does not replace behavior or turn a laboratory association into an educational instruction. A responsible design states the population, material, comparison condition, delay, outcome, and uncertainty before describing why the result might occur.",
+                "sourceCreditKeys": [
+                  "effective-learning-techniques",
+                  "classroom-retrieval-review",
+                  "reverse-inference"
+                ],
+                "explorableTerms": []
+              },
+              {
+                "key": "space-retrieval-for-the-horizon",
+                "title": "Space practice for a target horizon rather than a magic interval",
+                "body": "Distributed practice generally improves later verbal recall relative to massed repetition, but the useful spacing interval changes with the desired retention interval and other task conditions. Combine spaced opportunities with criterion-relevant retrieval and corrective information, then measure delayed performance. A schedule is an empirical design choice, not a universal neural constant, and a longer gap is not automatically better when retrieval becomes unproductive.",
+                "sourceCreditKeys": [
+                  "distributed-practice-meta",
+                  "retrieval-practice-meta",
+                  "effective-learning-techniques"
+                ],
+                "explorableTerms": []
+              },
+              {
+                "key": "interleave-when-contrast-is-the-operation",
+                "title": "Interleave to practice contrast only where evidence fits",
+                "body": "Interleaving can improve inductive discrimination by placing categories close enough for their differences to be compared, especially when categories are similar and examples within a category vary. Its meta-analytic effects differ by material: benefits were moderate overall but ambiguous for expository text and adverse for words in the reviewed studies. Use interleaving when contrast is the target operation, monitor interference, and compare it with a credible blocked alternative on the actual delayed criterion.",
+                "sourceCreditKeys": [
+                  "interleaving-meta",
+                  "interference-inhibition-review"
+                ],
+                "explorableTerms": [
+                  {
+                    "term": "interference",
+                    "supportPathKey": "review-interference-direction"
+                  }
+                ]
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "choose-learning-evidence-pilot",
+              "prompt": "A course must teach discrimination among four visually similar categories for a delayed novel-case test. Which pilot most responsibly tests a learning design?",
+              "options": [
+                {
+              "key": "learning-pilot-b",
+                  "text": "Compare credible schedules, use spaced retrieval with feedback and category contrasts, then score delayed novel-case discrimination"
+                },
+                {
+              "key": "learning-pilot-d",
+                  "text": "Compare spaced schedules with category contrasts, but select the winner from immediate practice accuracy rather than the delayed criterion"
+                },
+                {
+              "key": "learning-pilot-a",
+                  "text": "Compare blocked and interleaved schedules on delayed recognition of studied cases, then generalize the result to novel-case discrimination"
+                },
+                {
+              "key": "learning-pilot-c",
+                  "text": "Compare delayed novel-case discrimination after interleaving, but omit a credible alternative because meta-analysis supplies the benchmark"
+                }
+              ],
+          "answerKey": "learning-pilot-b",
+              "explanation": {
+                "text": "The pilot aligns practice with the delayed novel-case criterion and compares spacing and category-contrast choices under the actual material. Immediate accuracy, recognition of studied cases, or an unopposed treatment does not answer the same causal and transfer question.",
+                "sourceCreditKeys": [
+                  "distributed-practice-meta",
+                  "retrieval-practice-meta",
+                  "interleaving-meta",
+                  "classroom-retrieval-review"
+                ]
+              }
+            },
+            {
+              "family": "impostor",
+              "key": "audit-learning-prescriptions",
+              "prompt": "Which statement crosses from evidence-bounded design into an unsupported prescription?",
+              "statements": [
+                {
+              "key": "learning-design-claim-a",
+                  "text": "A learning claim identifies the target behavior, delay, material, population, comparison, and uncertainty.",
+                  "kind": "truth"
+                },
+                {
+              "key": "learning-design-claim-b",
+              "text": "Spacing and interleaving should be selected and evaluated with task, material, and outcome moderators in view.",
+                  "kind": "truth"
+                },
+                {
+              "key": "learning-design-claim-c",
+              "text": "Activation and immediate improvement can provisionally validate a method before delayed criterion behavior is tested.",
+                  "kind": "impostor"
+                }
+              ],
+              "explanation": {
+            "text": "The false statement lets an activation contrast and immediate behavior establish provisional validity before the intended delayed criterion is tested. Responsible design carries study conditions and moderators forward and tests the behavior the learner must later perform.",
+                "sourceCreditKeys": [
+                  "reverse-inference",
+                  "effective-learning-techniques",
+                  "interleaving-meta",
+                  "distributed-practice-meta"
+                ]
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "review-interference-direction",
+              "term": "interference",
+              "sectionKey": "interleave-when-contrast-is-the-operation",
+              "steps": [
+                {
+                  "stopKey": "diagnose-interference-and-forgetting",
+                  "activityKey": "diagnose-proactive-interference"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "guardianActivityKeys": [
+        "choose-criterion-retrieval",
+        "match-retrieval-to-criterion",
+        "interpret-corrected-memory",
+        "audit-reconsolidation-claims",
+        "diagnose-proactive-interference",
+        "match-interference-types",
+        "choose-learning-evidence-pilot",
+        "audit-learning-prescriptions"
       ]
     }
   ],
   "expeditionGuardianActivityKeys": [
-    "interpret-blood-oxygen-signal",
-    "match-explanation-levels",
-    "spot-attention-impostor",
-    "reduce-irrelevant-competition",
-    "choose-diagnostic-practice"
+    "match-evidence-to-inference",
+    "audit-engram-claims",
+    "choose-attention-design",
+    "audit-working-memory-claims",
+    "choose-goal-matched-encoding",
+    "interpret-pattern-change",
+    "match-memory-time-processes",
+    "interpret-sleep-cue-study",
+    "choose-criterion-retrieval",
+    "audit-reconsolidation-claims",
+    "match-interference-types",
+    "choose-learning-evidence-pilot"
   ]
 }

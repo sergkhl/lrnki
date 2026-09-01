@@ -12,6 +12,8 @@ For every learner-visible asset, record `PASS` or `FIX_FIRST`:
 - each matching board is a genuine bijection;
 - each impostor board has two or more supported truths, one false statement, and a useful reveal;
 - every explanation supports the keyed distinction rather than merely repeating it;
+- every Lesson credit is available before grading, every explanation credit appears only after its
+  explanation is revealed, and each displayed key resolves to the exact authored source metadata;
 - every Explorable Term is rendered exactly and its Support destination repairs the local confusion;
 - prerequisites do not assume unavailable material and the route is coherent and completable;
 - difficulty forms a plausible challenge curve without becoming a hidden gate;

@@ -24,6 +24,17 @@ const authored = (() => {
   if (!document) throw new Error("Critical Thinking test content is missing");
   return document;
 })();
+const authoredStops = authored.legs.flatMap((leg) => leg.stops);
+const firstLeg = authored.legs[0];
+const firstStop = firstLeg?.stops[0];
+const secondStop = firstLeg?.stops[1];
+const thirdStop = firstLeg?.stops[2];
+const supportOwner = authoredStops.find((stop) => stop.supportPaths.length > 0);
+const supportPath = supportOwner?.supportPaths[0];
+const supportStep = supportPath?.steps[0];
+if (!firstLeg || !firstStop || !secondStop || !thirdStop || !supportOwner || !supportPath || !supportStep) {
+  throw new Error("Critical Thinking must retain one complete first Leg and one Support Path fixture");
+}
 
 type MutableClock = { current: Date };
 
@@ -177,7 +188,7 @@ async function completeStop(harness: Harness, stopKey: string): Promise<void> {
       })
     );
     assert.equal(result.status, "applied");
-    assert.equal(result.effect.correct, true);
+    assert.equal(result.effect.correct, true, `expected ${activity.key} to grade correct`);
   }
 }
 
@@ -281,8 +292,10 @@ test("adoption, activation, reads, and public projections use authored keys with
   assert.equal(view.progress[0].state, "available");
   assert.equal(view.progress[1].state, "locked");
   const serialized = JSON.stringify(view);
-  assert.doesNotMatch(serialized, /answerKey|"kind":"impostor"|sourceAnchor/);
-  assert.doesNotMatch(serialized, /take-southern-road.*correct|size-cures-bias.*impostor/);
+  assert.doesNotMatch(
+    serialized,
+    /answerKey|"kind":"impostor"|sourceAnchor|feedbackSourceCreditKeys/
+  );
 });
 
 test("stale commands change nothing, duplicates replay the committed effect, and request ids cannot be reused", async () => {
@@ -337,7 +350,7 @@ test("concurrent commands with one expected version serialize without losing sta
       command: {
         kind: "record_lesson_read",
         expeditionKey: "critical-thinking",
-        stopKey: "argument-structure"
+        stopKey: firstStop.key
       }
     }),
     runtime.dispatch("learner-a", {
@@ -346,7 +359,7 @@ test("concurrent commands with one expected version serialize without losing sta
       command: {
         kind: "set_calibration_known",
         expeditionKey: "critical-thinking",
-        stopKey: "argument-structure"
+        stopKey: firstStop.key
       }
     })
   ]);
@@ -389,7 +402,7 @@ test("lesson plus all current Activity families earns one immutable scored compl
   const { runtime, store } = setup();
   const harness = new Harness(runtime);
   await harness.adopt();
-  await completeStop(harness, "argument-structure");
+  await completeStop(harness, firstStop.key);
   let view = await harness.expedition();
   assert.equal(view.progress[0].state, "mastered");
   assert.deepEqual(view.progress[0].firstGradedCompletion, {
@@ -398,12 +411,16 @@ test("lesson plus all current Activity families earns one immutable scored compl
     points: 1
   });
 
+  const firstOption = firstStop.activities.find((activity) => activity.family === "option_select");
+  if (!firstOption) throw new Error("The first Stop must retain an option-select Activity");
+  const wrongOption = firstOption.options.find((option) => option.key !== firstOption.answerKey);
+  if (!wrongOption) throw new Error("The first option-select Activity needs one wrong option");
   const wrong = await harness.dispatch({
     kind: "answer_option_select",
     expeditionKey: "critical-thinking",
-    stopKey: "argument-structure",
-    activityKey: "identify-conclusion",
-    chosenOptionKey: "northern-road-closed",
+    stopKey: firstStop.key,
+    activityKey: firstOption.key,
+    chosenOptionKey: wrongOption.key,
     source: { kind: "trail" }
   });
   assert.equal(wrong.status, "applied");
@@ -415,8 +432,8 @@ test("lesson plus all current Activity families earns one immutable scored compl
   const corrected = await harness.dispatch(
     correctAcquisitionCommand({
       view,
-      stopKey: "argument-structure",
-      activityKey: "identify-conclusion"
+      stopKey: firstStop.key,
+      activityKey: firstOption.key
     })
   );
   assert.equal(corrected.status, "applied");
@@ -434,40 +451,46 @@ test("known calibration closes authored prerequisites, scores nothing, clears, a
   const known = await harness.dispatch({
     kind: "set_calibration_known",
     expeditionKey: "critical-thinking",
-    stopKey: "evidence-quality"
+    stopKey: "distinguish-causal-support"
   });
   assert.equal(known.status, "applied");
   let view = await harness.expedition();
-  assert.equal(view.progress.find((entry) => entry.stopKey === "argument-structure")?.state, "known");
-  assert.equal(view.progress.find((entry) => entry.stopKey === "evidence-quality")?.state, "known");
-  assert.equal(view.progress.find((entry) => entry.stopKey === "causal-claims")?.state, "available");
+  assert.equal(view.progress.find((entry) => entry.stopKey === "weigh-inductive-support")?.state, "known");
+  assert.equal(view.progress.find((entry) => entry.stopKey === "investigate-source-fit")?.state, "known");
+  assert.equal(view.progress.find((entry) => entry.stopKey === "distinguish-causal-support")?.state, "known");
+  assert.equal(view.progress.find((entry) => entry.stopKey === "compare-plausible-explanations")?.state, "available");
 
   await harness.dispatch({
     kind: "record_lesson_read",
     expeditionKey: "critical-thinking",
-    stopKey: "causal-claims"
+    stopKey: "compare-plausible-explanations"
   });
+  const transferStop = authoredStops.find((stop) => stop.key === "compare-plausible-explanations");
+  const transferActivity = transferStop?.activities.find((activity) => activity.family === "option_select");
+  if (!transferStop || !transferActivity) throw new Error("Calibration fixture lost its transfer Activity");
+  const transferWrong = transferActivity.options.find((option) => option.key !== transferActivity.answerKey);
+  if (!transferWrong) throw new Error("Calibration fixture needs a wrong transfer option");
   await harness.dispatch({
     kind: "answer_option_select",
     expeditionKey: "critical-thinking",
-    stopKey: "causal-claims",
-    activityKey: "diagnose-fire-correlation",
-    chosenOptionKey: "vehicles-always-protect",
+    stopKey: transferStop.key,
+    activityKey: transferActivity.key,
+    chosenOptionKey: transferWrong.key,
     source: { kind: "trail" }
   });
   view = await harness.expedition();
   assert.deepEqual(
-    view.progress.find((entry) => entry.stopKey === "causal-claims")?.restorationStopKeys,
-    ["evidence-quality"]
+    view.progress.find((entry) => entry.stopKey === transferStop.key)?.restorationStopKeys,
+    ["distinguish-causal-support"]
   );
 
   await harness.dispatch({
     kind: "clear_calibration_known",
     expeditionKey: "critical-thinking",
-    stopKey: "evidence-quality"
+    stopKey: "distinguish-causal-support"
   });
   view = await harness.expedition();
-  assert.equal(view.progress.find((entry) => entry.stopKey === "causal-claims")?.state, "locked");
+  assert.equal(view.progress.find((entry) => entry.stopKey === transferStop.key)?.state, "locked");
   const stored = await store.read("learner-a");
   assert.equal(stored.found, true);
   assert.equal(Object.keys(stored.state.expeditions["critical-thinking"].firstGradedStopCompletions).length, 0);
@@ -481,40 +504,40 @@ test("authored Support opens, hides, restores, and reuses ordinary target eviden
   const opened = await harness.dispatch({
     kind: "open_support_path",
     expeditionKey: "critical-thinking",
-    stopKey: "evidence-quality",
-    supportPathKey: "review-support-relationship"
+    stopKey: supportOwner.key,
+    supportPathKey: supportPath.key
   });
   assert.equal(opened.status, "applied");
   let view = await harness.expedition();
-  assert.equal(view.supportPaths.find((path) => path.supportPathKey === "review-support-relationship")?.status, "open");
+  assert.equal(view.supportPaths.find((path) => path.supportPathKey === supportPath.key)?.status, "open");
 
   const answered = await harness.dispatch(
     correctAcquisitionCommand({
       view,
-      stopKey: "argument-structure",
-      activityKey: "identify-conclusion",
-      source: { kind: "support", supportPathKey: "review-support-relationship" }
+      stopKey: supportStep.stopKey,
+      activityKey: supportStep.activityKey,
+      source: { kind: "support", supportPathKey: supportPath.key }
     })
   );
   assert.equal(answered.status, "applied");
-  assert.equal(answered.effect.stopKey, "argument-structure");
+  assert.equal(answered.effect.stopKey, supportStep.stopKey);
   assert.equal(answered.effect.newlyCompletedStop, false);
   await harness.dispatch({
     kind: "hide_support_path",
     expeditionKey: "critical-thinking",
-    supportPathKey: "review-support-relationship"
+    supportPathKey: supportPath.key
   });
   await harness.dispatch({
     kind: "open_support_path",
     expeditionKey: "critical-thinking",
-    stopKey: "evidence-quality",
-    supportPathKey: "review-support-relationship"
+    stopKey: supportOwner.key,
+    supportPathKey: supportPath.key
   });
   view = await harness.expedition();
-  assert.equal(view.supportPaths.find((path) => path.supportPathKey === "review-support-relationship")?.status, "open");
+  assert.equal(view.supportPaths.find((path) => path.supportPathKey === supportPath.key)?.status, "open");
   const stored = await store.read("learner-a");
   assert.equal(stored.found, true);
-  assert.equal(stored.state.expeditions["critical-thinking"].firstGradedStopCompletions["evidence-quality"], undefined);
+  assert.equal(stored.state.expeditions["critical-thinking"].firstGradedStopCompletions[supportOwner.key], undefined);
   assert.equal(stored.state.expeditions["critical-thinking"].acquisitionAttempts[0].source.kind, "support");
 });
 
@@ -525,7 +548,7 @@ test("Guardian preserves lineup exposure, shield/recovery, queueing, first win, 
   const locked = await harness.dispatch({
     kind: "create_guardian",
     expeditionKey: "critical-thinking",
-    scope: { kind: "leg", legKey: "reasoning-foundations" }
+    scope: { kind: "leg", legKey: firstLeg.key }
   });
   assert.equal(locked.status, "refused");
   assert.equal(locked.reason, "guardian_locked");
@@ -534,16 +557,21 @@ test("Guardian preserves lineup exposure, shield/recovery, queueing, first win, 
   const created = await harness.dispatch({
     kind: "create_guardian",
     expeditionKey: "critical-thinking",
-    scope: { kind: "leg", legKey: "reasoning-foundations" }
+    scope: { kind: "leg", legKey: firstLeg.key }
   });
   assert.equal(created.status, "applied");
   assert.equal(created.view.kind, "guardian");
+  if (created.view.state === "won") assert.fail("a new Guardian cannot already be won");
+  assert.deepEqual(
+    created.view.sourceCredits.map((credit) => credit.key),
+    authored.sourceCredits.map((credit) => credit.key)
+  );
   const challengeId = created.effect.challengeId;
   assert.ok(challengeId);
   const conflict = await harness.dispatch({
     kind: "create_guardian",
     expeditionKey: "critical-thinking",
-    scope: { kind: "leg", legKey: "reasoning-foundations" }
+    scope: { kind: "leg", legKey: firstLeg.key }
   });
   assert.equal(conflict.status, "refused");
   assert.equal(conflict.reason, "active_guardian_exists");
@@ -637,7 +665,7 @@ test("Guardian preserves lineup exposure, shield/recovery, queueing, first win, 
   const rematch = await harness.dispatch({
     kind: "create_guardian",
     expeditionKey: "critical-thinking",
-    scope: { kind: "leg", legKey: "reasoning-foundations" }
+    scope: { kind: "leg", legKey: firstLeg.key }
   });
   assert.equal(rematch.status, "applied");
   assert.ok(rematch.effect.challengeId);
@@ -659,7 +687,7 @@ test("Guardian retreat/resume/abandon is durable and never changes acquisition e
   const created = await harness.dispatch({
     kind: "create_guardian",
     expeditionKey: "critical-thinking",
-    scope: { kind: "leg", legKey: "reasoning-foundations" }
+    scope: { kind: "leg", legKey: firstLeg.key }
   });
   assert.equal(created.status, "applied");
   const challengeId = created.effect.challengeId;
@@ -667,6 +695,9 @@ test("Guardian retreat/resume/abandon is durable and never changes acquisition e
   const before = await store.read("learner-a");
   assert.equal(before.found, true);
   const attemptCount = before.state.expeditions["critical-thinking"].acquisitionAttempts.length;
+  const completionCount = Object.keys(
+    before.state.expeditions["critical-thinking"].firstGradedStopCompletions
+  ).length;
 
   const retreated = await harness.dispatch({
     kind: "retreat_guardian",
@@ -709,7 +740,10 @@ test("Guardian retreat/resume/abandon is durable and never changes acquisition e
   const after = await store.read("learner-a");
   assert.equal(after.found, true);
   assert.equal(after.state.expeditions["critical-thinking"].acquisitionAttempts.length, attemptCount);
-  assert.equal(after.state.expeditions["critical-thinking"].firstGradedStopCompletions.argument, undefined);
+  assert.equal(
+    Object.keys(after.state.expeditions["critical-thinking"].firstGradedStopCompletions).length,
+    completionCount
+  );
 });
 
 test("Expedition Guardian stays locked until every winnable Leg first win, then awards one summit reward", async () => {
@@ -725,14 +759,16 @@ test("Expedition Guardian stays locked until every winnable Leg first win, then 
   assert.equal(final.status, "refused");
   assert.equal(final.reason, "guardian_locked");
 
-  const leg = await harness.dispatch({
-    kind: "create_guardian",
-    expeditionKey: "critical-thinking",
-    scope: { kind: "leg", legKey: "reasoning-foundations" }
-  });
-  assert.equal(leg.status, "applied");
-  assert.ok(leg.effect.challengeId);
-  await winGuardian(harness, leg.effect.challengeId);
+  for (const authoredLeg of authored.legs) {
+    const leg = await harness.dispatch({
+      kind: "create_guardian",
+      expeditionKey: "critical-thinking",
+      scope: { kind: "leg", legKey: authoredLeg.key }
+    });
+    assert.equal(leg.status, "applied");
+    assert.ok(leg.effect.challengeId);
+    await winGuardian(harness, leg.effect.challengeId);
+  }
   final = await harness.dispatch({
     kind: "create_guardian",
     expeditionKey: "critical-thinking",
@@ -752,7 +788,7 @@ test("leaderboard uses immutable first completions, includes zero-state viewers,
   const { runtime } = setup(["learner-a", "learner-b"]);
   const a = new Harness(runtime, "learner-a");
   await a.adopt();
-  await completeStop(a, "argument-structure");
+  await completeStop(a, firstStop.key);
   const first = await runtime.read("learner-a", { kind: "leaderboard" });
   const second = await runtime.read("learner-a", { kind: "leaderboard" });
   assert.equal(first.status, "ok");
@@ -784,10 +820,10 @@ test("prior-week podium award is lazy, typed, and deduplicated", async () => {
   for (const learnerRef of learners) {
     const harness = new Harness(runtime, learnerRef);
     await harness.adopt();
-    await completeStop(harness, "argument-structure");
+    await completeStop(harness, firstStop.key);
     if (learnerRef === "learner-0") {
-      await completeStop(harness, "evidence-quality");
-      await completeStop(harness, "causal-claims");
+      await completeStop(harness, secondStop.key);
+      await completeStop(harness, thirdStop.key);
     }
   }
   clock.current = new Date("2026-08-31T12:00:00.000Z");
@@ -804,7 +840,10 @@ test("prior-week podium award is lazy, typed, and deduplicated", async () => {
   const podiums = stored.state.awards.filter((award) => award.type === "weekly_podium");
   assert.equal(podiums.length, 1);
   assert.equal(podiums[0].rank, 1);
-  assert.equal(podiums[0].points, 6);
+  assert.equal(
+    podiums[0].points,
+    firstStop.difficultyBand + secondStop.difficultyBand + thirdStop.difficultyBand
+  );
 });
 
 test("content revision mismatches fail closed on reads and commands without mutation", async () => {
@@ -835,7 +874,7 @@ test("content revision mismatches fail closed on reads and commands without muta
     command: {
       kind: "record_lesson_read",
       expeditionKey: "critical-thinking",
-      stopKey: "argument-structure"
+      stopKey: firstStop.key
     }
   });
   assert.equal(command.status, "content_changed");
@@ -850,7 +889,7 @@ test("learners are isolated and unknown Better Auth identities are never created
   const { runtime, store } = setup(["learner-a", "learner-b"]);
   const a = new Harness(runtime, "learner-a");
   await a.adopt();
-  await completeStop(a, "argument-structure");
+  await completeStop(a, firstStop.key);
   const bJournal = await runtime.read("learner-b", { kind: "journal" });
   assert.equal(bJournal.status, "ok");
   assert.equal(bJournal.view.kind, "journal");

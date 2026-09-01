@@ -1,38 +1,238 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "key": "probability-and-statistics",
   "title": "Probability and Statistics",
-  "teaser": "Reason from samples and uncertain events without letting a calculation outrun its evidence.",
-  "declaredDomain": "Probability and statistical reasoning",
-  "audience": "Adult learners making evidence-based decisions",
+  "teaser": "Describe what the data show, reason through uncertain events, and keep every inference inside the evidence that earned it.",
+  "declaredDomain": "Data production, probability, statistical inference, prediction, and causal reasoning",
+  "audience": "Adult learners interpreting quantitative evidence for work and everyday decisions",
   "sourceCredits": [
     {
-      "title": "Probability and Statistics primer",
-      "author": "lrnki project",
-      "license": "Project-owned internal playtest source",
-      "note": "Accepted as a local authoring basis without independent external fact verification."
+      "key": "openstax-key-terms",
+      "title": "1.1 Definitions of Statistics, Probability, and Key Terms",
+      "url": "https://openstax.org/books/introductory-statistics-2e/pages/1-1-definitions-of-statistics-probability-and-key-terms",
+      "author": "Barbara Illowsky and Susan Dean",
+      "publisher": "OpenStax, Rice University",
+      "publishedAt": "2023-12-13",
+      "version": "Introductory Statistics 2e",
+      "accessedAt": "2026-09-01",
+      "license": "Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International",
+      "note": "Open textbook section defining populations, samples, variables, data, parameters, statistics, and the roles of descriptive and inferential statistics."
+    },
+    {
+      "key": "openstax-sampling",
+      "title": "1.2 Data, Sampling, and Variation in Data and Sampling",
+      "url": "https://openstax.org/books/introductory-statistics-2e/pages/1-2-data-sampling-and-variation-in-data-and-sampling",
+      "author": "Barbara Illowsky and Susan Dean",
+      "publisher": "OpenStax, Rice University",
+      "publishedAt": "2023-12-13",
+      "version": "Introductory Statistics 2e",
+      "accessedAt": "2026-09-01",
+      "license": "Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International",
+      "note": "Open textbook section covering data types, sampling methods, sampling variation, nonresponse, and sampling bias."
+    },
+    {
+      "key": "openstax-descriptive",
+      "title": "2.6 Skewness and the Mean, Median, and Mode",
+      "url": "https://openstax.org/books/introductory-statistics-2e/pages/2-6-skewness-and-the-mean-median-and-mode",
+      "author": "Barbara Illowsky and Susan Dean",
+      "publisher": "OpenStax, Rice University",
+      "publishedAt": "2023-12-13",
+      "version": "Introductory Statistics 2e",
+      "accessedAt": "2026-09-01",
+      "license": "Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International",
+      "note": "Open textbook section relating distribution shape and extreme values to the mean and median."
+    },
+    {
+      "key": "openstax-spread",
+      "title": "2.7 Measures of the Spread of the Data",
+      "url": "https://openstax.org/books/introductory-statistics-2e/pages/2-7-measures-of-the-spread-of-the-data",
+      "author": "Barbara Illowsky and Susan Dean",
+      "publisher": "OpenStax, Rice University",
+      "publishedAt": "2023-12-13",
+      "version": "Introductory Statistics 2e",
+      "accessedAt": "2026-09-01",
+      "license": "Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International",
+      "note": "Open textbook section explaining variability, standard deviation in data units, quartile summaries, and the connection between shape and spread."
+    },
+    {
+      "key": "openstax-outliers",
+      "title": "12.6 Outliers",
+      "url": "https://openstax.org/books/introductory-statistics-2e/pages/12-6-outliers",
+      "author": "Barbara Illowsky and Susan Dean",
+      "publisher": "OpenStax, Rice University",
+      "publishedAt": "2023-12-13",
+      "version": "Introductory Statistics 2e",
+      "accessedAt": "2026-09-01",
+      "license": "Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International",
+      "note": "Open textbook section distinguishing erroneous, informative, and influential unusual observations and requiring them to be examined rather than discarded automatically."
+    },
+    {
+      "key": "openstax-probability",
+      "title": "3.1 Terminology",
+      "url": "https://openstax.org/books/introductory-statistics-2e/pages/3-1-terminology",
+      "author": "Barbara Illowsky and Susan Dean",
+      "publisher": "OpenStax, Rice University",
+      "publishedAt": "2023-12-13",
+      "version": "Introductory Statistics 2e",
+      "accessedAt": "2026-09-01",
+      "license": "Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International",
+      "note": "Open textbook section defining sample spaces, events, complements, unions, intersections, and conditional probability."
+    },
+    {
+      "key": "openstax-event-relations",
+      "title": "3.2 Independent and Mutually Exclusive Events",
+      "url": "https://openstax.org/books/introductory-statistics-2e/pages/3-2-independent-and-mutually-exclusive-events",
+      "author": "Barbara Illowsky and Susan Dean",
+      "publisher": "OpenStax, Rice University",
+      "publishedAt": "2023-12-13",
+      "version": "Introductory Statistics 2e",
+      "accessedAt": "2026-09-01",
+      "license": "Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International",
+      "note": "Open textbook section distinguishing independence from mutual exclusivity through conditional and intersection checks."
+    },
+    {
+      "key": "openstax-probability-rules",
+      "title": "3.3 Two Basic Rules of Probability",
+      "url": "https://openstax.org/books/introductory-statistics-2e/pages/3-3-two-basic-rules-of-probability",
+      "author": "Barbara Illowsky and Susan Dean",
+      "publisher": "OpenStax, Rice University",
+      "publishedAt": "2023-12-13",
+      "version": "Introductory Statistics 2e",
+      "accessedAt": "2026-09-01",
+      "license": "Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International",
+      "note": "Open textbook section deriving general and independence-specific multiplication rules and the addition rule with overlap."
+    },
+    {
+      "key": "openstax-discrete-random-variable",
+      "title": "4.1 Probability Distribution Function for a Discrete Random Variable",
+      "url": "https://openstax.org/books/introductory-statistics-2e/pages/4-1-probability-distribution-function-pdf-for-a-discrete-random-variable",
+      "author": "Barbara Illowsky and Susan Dean",
+      "publisher": "OpenStax, Rice University",
+      "publishedAt": "2023-12-13",
+      "version": "Introductory Statistics 2e",
+      "accessedAt": "2026-09-01",
+      "license": "Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International",
+      "note": "Open textbook section defining a discrete random variable through its possible values and a probability distribution whose probabilities lie from zero to one and sum to one."
+    },
+    {
+      "key": "openstax-expectation",
+      "title": "4.2 Mean or Expected Value and Standard Deviation",
+      "url": "https://openstax.org/books/introductory-statistics-2e/pages/4-2-mean-or-expected-value-and-standard-deviation",
+      "author": "Barbara Illowsky and Susan Dean",
+      "publisher": "OpenStax, Rice University",
+      "publishedAt": "2023-12-13",
+      "version": "Introductory Statistics 2e",
+      "accessedAt": "2026-09-01",
+      "license": "Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International",
+      "note": "Open textbook section teaching expected value as a probability-weighted long-run average and standard deviation as spread around it."
+    },
+    {
+      "key": "openstax-sampling-distribution",
+      "title": "7.1 The Central Limit Theorem for Sample Means (Averages)",
+      "url": "https://openstax.org/books/introductory-statistics-2e/pages/7-1-the-central-limit-theorem-for-sample-means-averages",
+      "author": "Barbara Illowsky and Susan Dean",
+      "publisher": "OpenStax, Rice University",
+      "publishedAt": "2023-12-13",
+      "version": "Introductory Statistics 2e",
+      "accessedAt": "2026-09-01",
+      "license": "Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International",
+      "note": "Open textbook section explaining repeated-sample distributions, standard error, and the square-root relationship between sample size and precision."
+    },
+    {
+      "key": "nist-confidence-intervals",
+      "title": "7.1.4. What are confidence intervals?",
+      "url": "https://www.itl.nist.gov/div898/handbook/prc/section1/prc14.htm",
+      "publisher": "National Institute of Standards and Technology",
+      "accessedAt": "2026-09-01",
+      "note": "Official statistical handbook explanation of interval estimates, repeated-sampling confidence levels, and the role of sample size and estimated variability."
+    },
+    {
+      "key": "asa-p-values",
+      "title": "ASA Statement on Statistical Significance and P-Values",
+      "url": "https://www.amstat.org/asa/files/pdfs/p-valuestatement.pdf",
+      "publisher": "American Statistical Association",
+      "publishedAt": "2016-03-07",
+      "accessedAt": "2026-09-01",
+      "note": "Official six-principle statement on correct p-value interpretation, transparency, effect size, context, and why one threshold cannot carry a decision."
+    },
+    {
+      "key": "openstax-test-errors",
+      "title": "9.2 Outcomes and the Type I and Type II Errors",
+      "url": "https://openstax.org/books/introductory-statistics-2e/pages/9-2-outcomes-and-the-type-i-and-type-ii-errors",
+      "author": "Barbara Illowsky and Susan Dean",
+      "publisher": "OpenStax, Rice University",
+      "publishedAt": "2023-12-13",
+      "version": "Introductory Statistics 2e",
+      "accessedAt": "2026-09-01",
+      "license": "Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International",
+      "note": "Open textbook section distinguishing Type I and Type II errors, their consequences, and test power."
+    },
+    {
+      "key": "openstax-regression",
+      "title": "12.3 The Regression Equation",
+      "url": "https://openstax.org/books/introductory-statistics-2e/pages/12-3-the-regression-equation",
+      "author": "Barbara Illowsky and Susan Dean",
+      "publisher": "OpenStax, Rice University",
+      "publishedAt": "2023-12-13",
+      "version": "Introductory Statistics 2e",
+      "accessedAt": "2026-09-01",
+      "license": "Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International",
+      "note": "Open textbook section explaining linear association, least-squares prediction, residuals, model checks, and bounded use of a fitted line."
+    },
+    {
+      "key": "openstax-experimental-design",
+      "title": "1.4 Experimental Design and Ethics",
+      "url": "https://openstax.org/books/introductory-statistics-2e/pages/1-4-experimental-design-and-ethics",
+      "author": "Barbara Illowsky and Susan Dean",
+      "publisher": "OpenStax, Rice University",
+      "publishedAt": "2023-12-13",
+      "version": "Introductory Statistics 2e",
+      "accessedAt": "2026-09-01",
+      "license": "Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International",
+      "note": "Open textbook section distinguishing observational comparisons from randomized experiments and explaining assignment, controls, blinding, and lurking variables."
+    },
+    {
+      "key": "cdc-causal-analysis",
+      "title": "Analyzing and Interpreting Data",
+      "url": "https://www.cdc.gov/field-epi-manual/php/chapters/analyze-interpret-data.html",
+      "author": "Richard C. Dicker",
+      "publisher": "Centers for Disease Control and Prevention",
+      "publishedAt": "2025-01-06",
+      "accessedAt": "2026-09-01",
+      "note": "Field Epidemiology Manual guidance on association, chance, selection and information bias, confounding, effect magnitude, and cautious causal interpretation."
     }
   ],
   "legs": [
     {
-      "key": "evidence-under-uncertainty",
-      "title": "From observations to warranted decisions",
+      "key": "produce-and-describe-data",
+      "title": "Produce and Describe Data",
       "stops": [
         {
-          "key": "sampling-claims",
-          "label": "Name what the data can represent",
+          "key": "frame-the-study",
+          "label": "Name the units and target",
           "requires": [],
           "difficultyBand": 1,
           "lesson": {
             "sections": [
               {
-                "key": "population-sample-and-bias",
-                "title": "Start with the population, not the spreadsheet",
-                "body": "A population is the complete set of units named by the question; a sample is the subset actually observed. Before summarizing it, identify what one row represents, the time window, and how units entered the sample. More observations reduce random noise, but they do not repair a selection process that systematically misses part of the target population. A large volunteer poll can therefore measure its volunteers precisely while supporting little about everyone else.",
-                "sourceAnchor": {
-                  "heading": "1. Data, Variables, Populations, and Samples",
-                  "quote": "The **population** is the complete set of units about which a question is asked. A **sample** is the subset actually observed."
-                },
+                "key": "question-defines-units",
+                "title": "Begin with the unit and variable",
+                "body": "A statistical question names a target population, a unit that can enter that population, and a variable recorded for each unit. In a delivery study, the unit might be one order, the variable might be delivery time in minutes, and the population might be all orders completed by one service during September. Stating the unit, measurement units, place, and time window keeps a table from silently answering a broader question.",
+                "sourceCreditKeys": ["openstax-key-terms"],
+                "explorableTerms": []
+              },
+              {
+                "key": "sample-statistic-parameter",
+                "title": "A sample statistic estimates a population parameter",
+                "body": "The sample is the subset actually observed. A statistic is a number calculated from that sample; a parameter is the corresponding feature of the full target population. If 120 sampled orders average 42 minutes, 42 minutes is the sample mean statistic. The unknown mean delivery time for every September order is the population parameter. Repeating the sample could change the statistic even though the target parameter is treated as fixed for this question.",
+                "sourceCreditKeys": ["openstax-key-terms"],
+                "explorableTerms": []
+              },
+              {
+                "key": "scope-follows-definition",
+                "title": "Definitions bound the conclusion",
+                "body": "A numerical result inherits the scope of the units that could be observed. Data from completed urban orders do not automatically describe cancelled orders, rural routes, or next year's service. Before accepting a claim, restate it with the population, time window, variable, and units. If those details differ from the study frame, the analysis may still describe its sample but does not yet earn the broader conclusion.",
+                "sourceCreditKeys": ["openstax-key-terms", "openstax-sampling"],
                 "explorableTerms": []
               }
             ]
@@ -40,252 +240,1217 @@
           "activities": [
             {
               "family": "option_select",
-              "key": "choose-representative-sample",
-              "prompt": "A city wants to estimate commute times for all registered commuters this month. Which design best supports that target?",
+              "key": "identify-population-parameter",
+              "prompt": "A cooperative samples 80 of its 2,400 active members and finds that the sampled members made a mean of 3.6 purchases in August. Which quantity is the population parameter for the stated study?",
               "options": [
                 {
-                  "key": "registry-random-sample",
-                  "text": "Randomly sample the commuter registry and report nonresponse"
+                  "key": "all-member-mean",
+                  "text": "The mean August purchases for all 2,400 active members"
                 },
                 {
-                  "key": "cycling-club-poll",
-                  "text": "Invite a very large cycling club to answer voluntarily"
+                  "key": "sample-member-count",
+                  "text": "The 80 active members selected for the August sample"
                 },
                 {
-                  "key": "station-morning-only",
-                  "text": "Interview only people at one train station before 8 a.m."
+                  "key": "sample-purchase-mean",
+                  "text": "The observed mean of 3.6 August purchases in the sample"
                 },
                 {
-                  "key": "one-detailed-commuter",
-                  "text": "Study one commuter's route in exceptional detail"
+                  "key": "individual-purchase-count",
+                  "text": "One selected member's number of purchases during August"
                 }
               ],
-              "answerKey": "registry-random-sample",
+              "answerKey": "all-member-mean",
               "explanation": {
-                "text": "The registry gives each target unit a defined route into selection, and reporting nonresponse exposes a remaining threat. Merely enlarging a biased convenience sample does not remove that bias.",
-                "sourceAnchor": {
-                  "heading": "1. Data, Variables, Populations, and Samples",
-                  "quote": "More data reduce random sampling noise; they do not automatically remove systematic bias."
-                }
+                "text": "The parameter is the unknown numerical feature of the full target population: mean August purchases per active member across all 2,400 members. The 3.6-purchase value is the sample statistic used to estimate it.",
+                "sourceCreditKeys": ["openstax-key-terms"]
               }
             },
             {
               "family": "matching",
-              "key": "match-data-roles",
-              "prompt": "Match each statistical role to its meaning.",
+              "key": "match-study-roles",
+              "prompt": "Match each study element to its role in a question about September delivery times.",
               "pairs": [
                 {
-                  "key": "population-role",
-                  "left": "Population",
-                  "right": "The complete set named by the question"
+                  "key": "unit-role",
+                  "left": "One completed order",
+                  "right": "Unit represented by one observation"
+                },
+                {
+                  "key": "variable-role",
+                  "left": "Delivery time in minutes",
+                  "right": "Measured feature recorded for each unit"
                 },
                 {
                   "key": "sample-role",
-                  "left": "Sample",
-                  "right": "The subset actually observed"
+                  "left": "The 120 orders inspected",
+                  "right": "Subset whose data were observed"
                 },
                 {
-                  "key": "statistic-role",
-                  "left": "Statistic",
-                  "right": "A number computed from a sample"
+                  "key": "parameter-role",
+                  "left": "Mean time for all September orders",
+                  "right": "Population feature the study seeks to estimate"
                 }
               ],
               "explanation": {
-                "text": "The sample supplies observations, a statistic summarizes those observations, and the population is the larger target the analysis may or may not represent.",
-                "sourceAnchor": {
-                  "heading": "1. Data, Variables, Populations, and Samples",
-                  "quote": "A number computed from a sample is a **statistic**."
-                }
+                "text": "The unit determines what one record represents, the variable states what is measured and in which units, the sample supplies observed records, and the parameter belongs to the defined population.",
+                "sourceCreditKeys": ["openstax-key-terms"]
               }
             }
           ],
           "supportPaths": []
         },
         {
-          "key": "conditional-probability",
-          "label": "Keep the condition in the denominator",
-          "requires": ["sampling-claims"],
+          "key": "produce-representative-data",
+          "label": "Make entry into the data visible",
+          "requires": ["frame-the-study"],
           "difficultyBand": 2,
           "lesson": {
             "sections": [
               {
-                "key": "conditional-reference-group",
-                "title": "The condition changes who is being counted",
-                "body": "Conditional probability narrows the reference group to cases where the condition is known to hold. That makes P(attachment given urgent) a different question from P(urgent given attachment): their numerators may count the same overlap, but their denominators count different groups. Write the conditioning group in words before calculating, especially when interpreting screening or classification results.",
-                "sourceAnchor": {
-                  "heading": "3. Probability, Conditional Probability, and Independence",
-                  "quote": "A **conditional probability** updates the reference group."
-                },
+                "key": "selection-path-matters",
+                "title": "A sampling path connects data to a population",
+                "body": "To learn about a target population, describe how each eligible unit could enter the sample. Random selection from a suitable frame can reduce systematic selection differences. Convenience and voluntary-response samples may overrepresent units that are easy to reach or unusually motivated. A larger biased sample can estimate the people it repeatedly reaches with high precision while still missing the target population.",
+                "sourceCreditKeys": ["openstax-sampling"],
                 "explorableTerms": [
                   {
-                    "term": "reference group",
-                    "supportPathKey": "review-target-population"
+                    "term": "target population",
+                    "supportPathKey": "revisit-study-target"
                   }
                 ]
+              },
+              {
+                "key": "nonresponse-and-measurement",
+                "title": "Selection is not the only production risk",
+                "body": "Nonresponse can bias a sample when selected units who provide no usable answer differ from those who respond. Questions can influence answers, and a defective collection device can record incorrect data. Increasing the sample size does not repair these systematic response or measurement problems. Treat selection, response, and measurement as separate parts of the data-production process.",
+                "sourceCreditKeys": ["openstax-sampling"],
+                "explorableTerms": []
+              },
+              {
+                "key": "selection-versus-assignment",
+                "title": "Selection and assignment answer different design questions",
+                "body": "Random selection concerns which units enter a sample and therefore supports generalizing to the population represented by the frame. Random assignment concerns which treatment sampled units receive and therefore makes treatment groups comparable on average before intervention. A study can have one without the other. Record both processes rather than using the single word ‘random’ as if it settled representation and causation at once.",
+                "sourceCreditKeys": ["openstax-sampling", "openstax-experimental-design"],
+                "explorableTerms": []
               }
             ]
           },
           "activities": [
             {
               "family": "option_select",
-              "key": "reverse-the-condition",
-              "prompt": "Among 1,000 messages, 100 are urgent, 200 have attachments, and 30 are both urgent and attached. What is P(urgent | attachment)?",
+              "key": "choose-sampling-design",
+              "prompt": "A library wants the proportion of all active borrowers who had trouble renewing a loan this quarter. Which plan best supports that population claim?",
               "options": [
                 {
-                  "key": "fifteen-percent",
-                  "text": "30 / 200 = 15%"
+                  "key": "borrower-frame-sample",
+                  "text": "Randomly sample the active-borrower register and report response and contact failures"
                 },
                 {
-                  "key": "thirty-percent",
-                  "text": "30 / 100 = 30%"
+                  "key": "help-desk-volunteers",
+                  "text": "Invite every borrower who contacts the help desk to complete a voluntary poll"
                 },
                 {
-                  "key": "three-percent",
-                  "text": "30 / 1,000 = 3%"
+                  "key": "weekend-entrance",
+                  "text": "Question visitors entering the largest branch on one Saturday afternoon"
                 },
                 {
-                  "key": "fifty-percent",
-                  "text": "100 / 200 = 50%"
+                  "key": "staff-memory-count",
+                  "text": "Ask branch staff to recall the renewal complaints they remember from the quarter"
                 }
               ],
-              "answerKey": "fifteen-percent",
+              "answerKey": "borrower-frame-sample",
               "explanation": {
-                "text": "The condition is attachment, so the denominator is the 200 attached messages. Thirty of those are urgent, giving 15%; 30% answers the reversed question.",
-                "sourceAnchor": {
-                  "heading": "3. Probability, Conditional Probability, and Independence",
-                  "quote": "Reversing the condition changes the denominator, so these two probabilities are generally different."
-                }
+                "text": "The active-borrower register gives the target units a defined route into random selection, while reporting failed contact and nonresponse exposes remaining threats. The other plans select on help-seeking, place and time, or staff recall.",
+                "sourceCreditKeys": ["openstax-sampling"]
               }
             },
             {
               "family": "impostor",
-              "key": "spot-probability-impostor",
-              "prompt": "Two statements preserve the probability model. One confuses distinct relationships. Find the impostor.",
+              "key": "audit-data-production",
+              "prompt": "Two statements correctly bound what a data-production choice earns. One overclaims. Find the impostor.",
               "statements": [
                 {
-                  "key": "condition-changes-group",
-                  "text": "Conditioning changes the reference group used in the denominator.",
+                  "key": "large-sample-bias-remains",
+                  "text": "More observations can reduce random sampling variation without repairing a systematic selection gap.",
                   "kind": "truth"
                 },
                 {
-                  "key": "independence-needs-justification",
-                  "text": "Independence is a modeling claim that needs justification.",
+                  "key": "nonresponse-needs-audit",
+                  "text": "A probability sample can still be distorted when response differs in a way related to the measured outcome.",
                   "kind": "truth"
                 },
                 {
-                  "key": "exclusive-means-independent",
-                  "text": "Two non-impossible events that cannot occur together must be independent.",
+                  "key": "random-word-solves-both",
+                  "text": "Random assignment of recruited volunteers also makes their sample representative of the target population.",
                   "kind": "impostor"
                 }
               ],
               "explanation": {
-                "text": "If one non-impossible event occurs and excludes the other, observing it changes the other's probability to zero. Mutual exclusivity therefore creates dependence rather than independence.",
-                "sourceAnchor": {
-                  "heading": "3. Probability, Conditional Probability, and Independence",
-                  "quote": "Independence is not the same as mutual exclusivity."
-                }
+                "text": "The false statement collapses two distinct procedures. Random selection can support population representation; random assignment can support a treatment comparison. Either claim also depends on the actual design and its execution.",
+                "sourceCreditKeys": ["openstax-sampling", "openstax-experimental-design"]
               }
             }
           ],
           "supportPaths": [
             {
-              "key": "review-target-population",
-              "term": "reference group",
-              "sectionKey": "conditional-reference-group",
+              "key": "revisit-study-target",
+              "term": "target population",
+              "sectionKey": "selection-path-matters",
               "steps": [
                 {
-                  "stopKey": "sampling-claims",
-                  "activityKey": "choose-representative-sample"
+                  "stopKey": "frame-the-study",
+                  "activityKey": "identify-population-parameter"
                 }
               ]
             }
           ]
         },
         {
-          "key": "prediction-and-causation",
-          "label": "Separate association from intervention",
-          "requires": ["conditional-probability"],
-          "difficultyBand": 3,
+          "key": "describe-a-distribution",
+          "label": "Read shape, center, and spread together",
+          "requires": ["frame-the-study"],
+          "difficultyBand": 2,
           "lesson": {
             "sections": [
               {
-                "key": "causal-alternatives",
-                "title": "Prediction does not identify what to change",
-                "body": "An association can help predict while leaving the causal story unresolved. The proposed cause may affect the outcome, the outcome may affect the proposed cause, a common cause may affect both, or selection may distort the observed relationship. A causal claim needs a design and assumptions that connect a comparison to an intervention. Its evidence must also match the target population where the intervention is meant to operate.",
-                "sourceAnchor": {
-                  "heading": "7. Association, Regression, Prediction, and Causation",
-                  "quote": "A high correlation does not imply that observations lie close to the line in practically useful units, and it does not establish causation."
-                },
+                "key": "distribution-before-summary",
+                "title": "A distribution is more than its average",
+                "body": "A distribution shows which values a variable takes and how often. For quantitative data, inspect shape, center, spread, and unusual values before compressing the observations into one number. For categorical data, counts and proportions usually make more sense than a numerical mean. Keep the variable's units attached: a center of 12 is incomplete until it says 12 minutes, 12 defects, or 12 percentage points.",
+                "sourceCreditKeys": ["openstax-descriptive", "openstax-spread", "openstax-key-terms"],
+                "explorableTerms": []
+              },
+              {
+                "key": "mean-median-worked",
+                "title": "Shape helps choose a center",
+                "body": "Consider five repair times: 5, 6, 6, 7, and 16 minutes. The mean is 8 minutes because all 40 minutes are divided across five repairs; the median is 6 minutes because it is the middle ordered value. The single long repair pulls the mean upward but does not move the median as far. If the parameter of interest is a typical repair time in a right-skewed population, the median may fit that purpose; the mean remains useful when totals or every magnitude matter.",
+                "sourceCreditKeys": ["openstax-descriptive"],
                 "explorableTerms": [
                   {
-                    "term": "target population",
-                    "supportPathKey": "review-population-scope"
+                    "term": "parameter",
+                    "supportPathKey": "revisit-parameter-role"
                   }
                 ]
+              },
+              {
+                "key": "spread-and-outliers",
+                "title": "Spread and unusual values change the decision",
+                "body": "The interquartile range spans the middle half of ordered values. Variance averages squared deviations from the mean; standard deviation is its square root, returning the spread measure to the variable's units. Neither spread summary replaces the other automatically. Investigate an outlier before deleting it: it may be an error, a rare valid case, or evidence of a second process. Report a center with a compatible spread and enough shape information for the intended comparison.",
+                "sourceCreditKeys": ["openstax-spread", "openstax-outliers"],
+                "explorableTerms": []
               }
             ]
           },
           "activities": [
             {
               "family": "option_select",
-              "key": "diagnose-common-cause",
-              "prompt": "Workers who use a wellness room more often also report fewer injuries. Which fact most directly challenges the claim that room visits caused the reduction?",
+              "key": "choose-skew-summary",
+              "prompt": "A sample of seven delivery delays is 1, 2, 2, 3, 3, 4, and 27 minutes. Which first summary best communicates a typical delay without hiding the extreme case?",
               "options": [
                 {
-                  "key": "safety-program-common-cause",
-                  "text": "Teams with stronger safety programs both encourage room use and prevent injuries"
+                  "key": "median-middle-half-unusual",
+                  "text": "Use the 3-minute median and middle-half spread, and report 27 minutes as an unusual observed delay"
                 },
                 {
-                  "key": "association-is-positive",
-                  "text": "The association points in a beneficial direction"
+                  "key": "mean-standard-deviation-complete",
+                  "text": "Use the 6-minute mean and standard deviation, and report them as the complete delay summary"
                 },
                 {
-                  "key": "visits-are-counted",
-                  "text": "Room visits are recorded as a count"
+                  "key": "median-middle-half-trimmed",
+                  "text": "Use the 3-minute median and middle-half spread, calculated only from delays of 1 through 4 minutes"
                 },
                 {
-                  "key": "injuries-are-unpleasant",
-                  "text": "Injuries are outcomes workers would prefer to avoid"
+                  "key": "two-centers-as-spread",
+                  "text": "Use the 6-minute mean and 3-minute median, and report their 3-minute difference as the delay spread"
                 }
               ],
-              "answerKey": "safety-program-common-cause",
+              "answerKey": "median-middle-half-unusual",
               "explanation": {
-                "text": "A stronger safety program is a plausible common cause of both room use and fewer injuries. The association alone cannot separate that explanation from an effect of the room.",
-                "sourceAnchor": {
-                  "heading": "7. Association, Regression, Prediction, and Causation",
-                  "quote": "A **confounder** is a common cause, or a suitable proxy for a common cause, of both the proposed exposure and the outcome."
+                "text": "The right-skewed sample has a 3-minute median that represents its middle. A middle-half spread resists the extreme value, while reporting the observed 27-minute delay keeps the unusual case visible for investigation.",
+                "sourceCreditKeys": ["openstax-descriptive", "openstax-spread", "openstax-outliers"]
+              }
+            },
+            {
+              "family": "matching",
+              "key": "match-distribution-features",
+              "prompt": "Match each distribution feature to the question it helps answer.",
+              "pairs": [
+                {
+                  "key": "shape-question",
+                  "left": "Shape",
+                  "right": "Are values symmetric, skewed, clustered, or split into modes?"
+                },
+                {
+                  "key": "center-question",
+                  "left": "Center",
+                  "right": "Where does a typical or balancing value lie?"
+                },
+                {
+                  "key": "spread-question",
+                  "left": "Spread",
+                  "right": "How much do values vary around the center?"
+                },
+                {
+                  "key": "outlier-question",
+                  "left": "Unusual value",
+                  "right": "Is this an error, rare case, or sign of another process?"
                 }
+              ],
+              "explanation": {
+                "text": "Shape, center, spread, and unusual values answer different questions. Reading them together prevents one convenient average from concealing skew, instability, or a second data-generating process.",
+                "sourceCreditKeys": ["openstax-descriptive", "openstax-spread", "openstax-outliers"]
               }
             }
           ],
           "supportPaths": [
             {
-              "key": "review-population-scope",
-              "term": "target population",
-              "sectionKey": "causal-alternatives",
+              "key": "revisit-parameter-role",
+              "term": "parameter",
+              "sectionKey": "mean-median-worked",
               "steps": [
                 {
-                  "stopKey": "sampling-claims",
-                  "activityKey": "choose-representative-sample"
+                  "stopKey": "frame-the-study",
+                  "activityKey": "identify-population-parameter"
                 }
               ]
             }
           ]
+        },
+        {
+          "key": "compare-groups-in-context",
+          "label": "Compare like with like",
+          "requires": ["produce-representative-data", "describe-a-distribution"],
+          "difficultyBand": 3,
+          "lesson": {
+            "sections": [
+              {
+                "key": "counts-rates-denominators",
+                "title": "Use a shared reference group and unit",
+                "body": "Raw counts answer how many; rates and proportions answer how many out of a defined reference group. If Site A has 20 late orders out of 100 and Site B has 18 out of 60, the late-order rates are 20% and 30%. Site B has fewer late orders but a higher late-order rate. State both denominators, the same time window, and the percentage-point difference so the comparison cannot change meaning mid-sentence.",
+                "sourceCreditKeys": ["openstax-key-terms", "openstax-descriptive"],
+                "explorableTerms": []
+              },
+              {
+                "key": "compare-whole-distributions",
+                "title": "A group difference is not only a difference in means",
+                "body": "Compare groups using the same variable definition and compatible displays. A similar mean can hide different spread, skew, or subgroups; a different mean can be driven by one unusual case. Describe the direction and magnitude in domain units, then inspect within-group variation. A 4-minute mean difference has a practical meaning that a unitless statement such as ‘Group A is higher’ does not provide.",
+                "sourceCreditKeys": ["openstax-descriptive", "openstax-spread"],
+                "explorableTerms": []
+              },
+              {
+                "key": "comparison-scope",
+                "title": "Description does not erase the production process",
+                "body": "A descriptive difference is real for the records summarized when calculation and coding are correct. Extending it to a population still depends on selection, response, and measurement. Explaining it as a treatment effect needs a causal design and assumptions. Keep three claims separate: what differed in the observed sample, what may differ in the target population, and what might change under an intervention.",
+                "sourceCreditKeys": ["openstax-sampling", "openstax-experimental-design"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "compare-group-rates",
+              "prompt": "During the same month, Hub North has 24 damaged parcels among 300 handled, and Hub South has 15 among 100 handled. Which comparison is numerically and contextually correct?",
+              "options": [
+                {
+                  "key": "south-higher-rate",
+                  "text": "South's damage rate is 15% versus North's 8%, a 7-percentage-point difference"
+                },
+                {
+                  "key": "north-higher-count",
+                  "text": "North performs worse because its 24 damaged parcels exceed South's count of 15"
+                },
+                {
+                  "key": "rates-equalized",
+                  "text": "The hubs have equal damage rates after both parcel counts are expressed as percentages"
+                },
+                {
+                  "key": "south-sixty-two-point-five",
+                  "text": "South's rate is 62.5% because 15/24 compares the damaged-parcel counts across hubs"
+                }
+              ],
+              "answerKey": "south-higher-rate",
+              "explanation": {
+                "text": "North's rate is 24/300 = 8%; South's is 15/100 = 15%. With the same one-month scope and parcel unit, South is higher by 7 percentage points even though North has the larger raw count.",
+                "sourceCreditKeys": ["openstax-key-terms", "openstax-descriptive"]
+              }
+            },
+            {
+              "family": "impostor",
+              "key": "spot-comparison-impostor",
+              "prompt": "Two statements preserve the scope of a group comparison. One goes beyond the evidence. Find the impostor.",
+              "statements": [
+                {
+                  "key": "same-definition-needed",
+                  "text": "A fair comparison uses the same outcome definition, units, and time window for both groups.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "distribution-can-differ",
+                  "text": "Equal means can coexist with different spreads, shapes, or unusual values within the groups.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "description-proves-cause",
+                  "text": "Once groups use the same units and window, their observed mean difference is the effect of group membership.",
+                  "kind": "impostor"
+                }
+              ],
+              "explanation": {
+                "text": "The false statement turns description into causation. Selection, measurement, preexisting differences, and other explanations remain possible unless design and assumptions identify a treatment contrast.",
+                "sourceCreditKeys": ["openstax-sampling", "openstax-descriptive", "openstax-spread", "openstax-experimental-design"]
+              }
+            }
+          ],
+          "supportPaths": []
         }
       ],
       "guardianActivityKeys": [
-        "match-data-roles",
-        "spot-probability-impostor",
-        "reverse-the-condition",
-        "diagnose-common-cause"
+        "match-study-roles",
+        "choose-sampling-design",
+        "audit-data-production",
+        "choose-skew-summary",
+        "match-distribution-features",
+        "compare-group-rates",
+        "spot-comparison-impostor"
+      ]
+    },
+    {
+      "key": "reason-under-chance",
+      "title": "Reason Under Chance",
+      "stops": [
+        {
+          "key": "build-event-models",
+          "label": "Define outcomes before calculating",
+          "requires": [],
+          "difficultyBand": 2,
+          "lesson": {
+            "sections": [
+              {
+                "key": "sample-space-and-events",
+                "title": "Probability begins with a defined possibility set",
+                "body": "A sample space is the set of possible outcomes in the model. An event is a chosen subset of those outcomes. Before calculating, name the process, one trial, the reference set, and the event. Probabilities range from 0 to 1. Counting favorable outcomes over all outcomes works only when the listed outcomes are mutually exclusive, exhaustive, and equally likely under the stated model.",
+                "sourceCreditKeys": ["openstax-probability"],
+                "explorableTerms": []
+              },
+              {
+                "key": "complements-and-overlap",
+                "title": "Complements cover what the event leaves out",
+                "body": "The complement of event A contains every modeled outcome where A does not occur, so its probability is 1 minus P(A). If 24% of invoices are overdue, the model assigns 76% to not overdue. For ‘A or B,’ include outcomes in either event but avoid counting their overlap twice. For ‘A and B,’ keep only outcomes shared by both events.",
+                "sourceCreditKeys": ["openstax-probability", "openstax-probability-rules"],
+                "explorableTerms": []
+              },
+              {
+                "key": "probability-model-assumptions",
+                "title": "A probability belongs to its model",
+                "body": "A probability is not detached from assumptions. A fair-die model makes six faces equally likely; a worn or deliberately loaded die may not. An empirical proportion estimates chance under the population and conditions that produced the observations. State whether probabilities come from a mechanism, historical data, or judgment, and preserve the relevant population and time conditions when using them for a decision.",
+                "sourceCreditKeys": ["openstax-probability", "openstax-sampling"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "identify-probability-reference-set",
+              "prompt": "Among 250 support requests logged by one service in May, 35 were escalated. Using those 250 requests as the empirical reference set, what is the estimated probability that a randomly selected request was not escalated?",
+              "options": [
+                {
+                  "key": "two-fifteen-over-two-fifty",
+                  "text": "215/250 = 86%, the complement of the escalated event"
+                },
+                {
+                  "key": "thirty-five-over-two-fifty",
+                  "text": "35/250 = 14%, the proportion in the escalated event"
+                },
+                {
+                  "key": "two-fifteen-over-two-eighty-five",
+                  "text": "215/285 ≈ 75%, after adding the escalated count to the reference-set total"
+                },
+                {
+                  "key": "thirty-five-over-two-fifteen",
+                  "text": "35/215 ≈ 16%, the escalated count divided by the non-escalated count"
+                }
+              ],
+              "answerKey": "two-fifteen-over-two-fifty",
+              "explanation": {
+                "text": "The reference set contains all 250 May requests. The complement contains 250 − 35 = 215 requests, so the empirical probability is 215/250 = 0.86, or 86%.",
+                "sourceCreditKeys": ["openstax-probability"]
+              }
+            },
+            {
+              "family": "matching",
+              "key": "match-event-language",
+              "prompt": "Match each event expression to the outcomes it keeps.",
+              "pairs": [
+                {
+                  "key": "event-a-role",
+                  "left": "A",
+                  "right": "Outcomes that satisfy the event definition"
+                },
+                {
+                  "key": "complement-role",
+                  "left": "Not A",
+                  "right": "Every sample-space outcome outside A"
+                },
+                {
+                  "key": "intersection-role",
+                  "left": "A and B",
+                  "right": "Outcomes shared by both events"
+                },
+                {
+                  "key": "union-role",
+                  "left": "A or B",
+                  "right": "Outcomes in either event, including their overlap"
+                }
+              ],
+              "explanation": {
+                "text": "Event language selects parts of one defined sample space. Complements exclude A, intersections retain overlap, and unions retain membership in either event while counting shared outcomes only once.",
+                "sourceCreditKeys": ["openstax-probability"]
+              }
+            }
+          ],
+          "supportPaths": []
+        },
+        {
+          "key": "condition-on-evidence",
+          "label": "Keep the condition in the denominator",
+          "requires": ["build-event-models"],
+          "difficultyBand": 3,
+          "lesson": {
+            "sections": [
+              {
+                "key": "conditional-denominator",
+                "title": "The condition narrows the reference group",
+                "body": "P(A given B) asks for the proportion in A among cases already known to be in B. The denominator is therefore the size or probability of B, not the original sample space. Write the condition in words before dividing. P(faulty given alert) counts faulty units among alerted units; P(alert given faulty) counts alerts among faulty units. The overlap may be identical, but the reference group changes.",
+                "sourceCreditKeys": ["openstax-probability"],
+                "explorableTerms": [
+                  {
+                    "term": "reference group",
+                    "supportPathKey": "revisit-event-reference-set"
+                  }
+                ]
+              },
+              {
+                "key": "screening-base-rate-worked",
+                "title": "Base rates affect what a signal means",
+                "body": "Suppose 1,000 devices include 100 faulty devices. An alert marks 80 of the faulty devices and 90 of the 900 working devices. P(alert given faulty) is 80/100 = 80%. But an alerted device comes from 170 alerts in total, so P(faulty given alert) is 80/170, about 47%. Signal accuracy in one condition does not by itself determine the reversed probability; the population base rate also contributes.",
+                "sourceCreditKeys": ["openstax-probability"],
+                "explorableTerms": []
+              },
+              {
+                "key": "condition-scope-decision",
+                "title": "Use the conditioning population you actually face",
+                "body": "A conditional estimate transfers only when the new setting has a sufficiently similar outcome definition, signal process, and base rate or when those differences are modeled. A screening result from a high-risk referral group can mislead in a general population. For a decision, report both directions when confusion is likely and name the population whose denominator produced each value.",
+                "sourceCreditKeys": ["openstax-probability", "openstax-sampling"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "condition-on-alerts",
+              "prompt": "An access log contains 900 attempts: 180 were unauthorized. A review flag marked 144 unauthorized attempts and 72 authorized attempts. Among flagged attempts, what proportion were unauthorized?",
+              "options": [
+                {
+                  "key": "one-forty-four-over-two-sixteen",
+                  "text": "144/216 ≈ 67%, using all flagged attempts as the denominator"
+                },
+                {
+                  "key": "one-forty-four-over-one-eighty",
+                  "text": "144/180 = 80%, using all unauthorized attempts as the denominator"
+                },
+                {
+                  "key": "seventy-two-over-seven-twenty",
+                  "text": "72/720 = 10%, using all authorized attempts as the denominator"
+                },
+                {
+                  "key": "two-sixteen-over-nine-hundred",
+                  "text": "216/900 = 24%, using the entire access log as the denominator"
+                }
+              ],
+              "answerKey": "one-forty-four-over-two-sixteen",
+              "explanation": {
+                "text": "The condition is that a review flag occurred. There are 144 + 72 = 216 flagged attempts, of which 144 were unauthorized, so P(unauthorized given flagged) is 144/216, about 67%.",
+                "sourceCreditKeys": ["openstax-probability"]
+              }
+            },
+            {
+              "family": "impostor",
+              "key": "audit-conditional-claims",
+              "prompt": "Two statements preserve conditional direction and population scope. One reverses the evidence. Find the impostor.",
+              "statements": [
+                {
+                  "key": "condition-defines-denominator",
+                  "text": "In P(A given B), the denominator represents cases where B is known to hold.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "base-rate-matters",
+                  "text": "The meaning of a positive signal can change when the underlying outcome rate changes.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "directions-identical",
+                  "text": "Because both directions share the same overlap, either conditional can interpret what an alert means.",
+                  "kind": "impostor"
+                }
+              ],
+              "explanation": {
+                "text": "The false statement ignores the denominators. Both directions count the joint cases in their numerators, but one divides by all faulty cases and the other by all alerted cases.",
+                "sourceCreditKeys": ["openstax-probability"]
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "revisit-event-reference-set",
+              "term": "reference group",
+              "sectionKey": "conditional-denominator",
+              "steps": [
+                {
+                  "stopKey": "build-event-models",
+                  "activityKey": "identify-probability-reference-set"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "separate-event-relations",
+          "label": "Distinguish independence from exclusion",
+          "requires": ["condition-on-evidence"],
+          "difficultyBand": 3,
+          "lesson": {
+            "sections": [
+              {
+                "key": "independence-means-no-update",
+                "title": "Independence is a no-update relationship",
+                "body": "Events A and B are independent when learning that B occurred does not change the probability of A: the conditional probability P(A given B) equals P(A), when B has positive probability. The same relationship can be checked by P(A and B) = P(A) × P(B). Independence is a claim about the modeled process, not a default label; it must be justified from how the outcomes arise.",
+                "sourceCreditKeys": ["openstax-event-relations"],
+                "explorableTerms": [
+                  {
+                    "term": "conditional probability",
+                    "supportPathKey": "revisit-conditioning-direction"
+                  }
+                ]
+              },
+              {
+                "key": "exclusive-is-not-independent",
+                "title": "Mutually exclusive events cannot co-occur",
+                "body": "Mutually exclusive events have no shared outcome, so P(A and B) = 0. If both events have positive probability, observing A makes B impossible and therefore changes B's probability; they are dependent, not independent. On one chosen invoice, ‘paid early’ and ‘paid late’ may be mutually exclusive. ‘Paid late’ and ‘sent by email’ can overlap and might or might not be independent.",
+                "sourceCreditKeys": ["openstax-event-relations"],
+                "explorableTerms": []
+              },
+              {
+                "key": "addition-and-multiplication",
+                "title": "Choose a rule from the relationship",
+                "body": "For A or B, add P(A) and P(B) and subtract P(A and B) so overlap is counted once. For A and B, multiply P(B) by P(A given B); simplify to P(A) × P(B) only when independence is justified. Label whether the question asks for a union or intersection, then state the relationship assumption before substituting numbers.",
+                "sourceCreditKeys": ["openstax-event-relations", "openstax-probability-rules"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "distinguish-event-relations",
+              "prompt": "For randomly selected orders, P(late) = 0.20, P(damaged) = 0.10, and P(late and damaged) = 0.02. What do these values establish in this model?",
+              "options": [
+                {
+                  "key": "independent-not-exclusive",
+                  "text": "The events are independent and not mutually exclusive because 0.20 × 0.10 = 0.02"
+                },
+                {
+                  "key": "exclusive-not-independent",
+                  "text": "The events are mutually exclusive and dependent because each has positive probability"
+                },
+                {
+                  "key": "independent-and-exclusive",
+                  "text": "The events are both independent and mutually exclusive because the overlap is small"
+                },
+                {
+                  "key": "relation-unknown",
+                  "text": "The event relationship cannot be assessed unless both marginal probabilities are equal"
+                }
+              ],
+              "answerKey": "independent-not-exclusive",
+              "explanation": {
+                "text": "The observed intersection equals the product of the marginal probabilities, which satisfies the independence relation. The 0.02 intersection is positive, so the events are not mutually exclusive.",
+                "sourceCreditKeys": ["openstax-event-relations"]
+              }
+            },
+            {
+              "family": "matching",
+              "key": "match-probability-rules",
+              "prompt": "Match each probability question to the relationship or operation it requires.",
+              "pairs": [
+                {
+                  "key": "complement-rule",
+                  "left": "Not A",
+                  "right": "Subtract P(A) from 1"
+                },
+                {
+                  "key": "union-rule",
+                  "left": "A or B",
+                  "right": "Add both probabilities and subtract their overlap"
+                },
+                {
+                  "key": "general-intersection-rule",
+                  "left": "A and B in general",
+                  "right": "Multiply P(B) by P(A given B)"
+                },
+                {
+                  "key": "independence-check",
+                  "left": "A and B are independent",
+                  "right": "Check whether the intersection equals the product of marginals"
+                }
+              ],
+              "explanation": {
+                "text": "The operation follows the event relationship. Complements exhaust the sample space, unions adjust for overlap, general intersections use conditioning, and independence permits the product of marginal probabilities.",
+                "sourceCreditKeys": ["openstax-event-relations", "openstax-probability-rules"]
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "revisit-conditioning-direction",
+              "term": "conditional probability",
+              "sectionKey": "independence-means-no-update",
+              "steps": [
+                {
+                  "stopKey": "condition-on-evidence",
+                  "activityKey": "condition-on-alerts"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "weigh-random-outcomes",
+          "label": "Balance long-run value and variability",
+          "requires": ["build-event-models"],
+          "difficultyBand": 4,
+          "lesson": {
+            "sections": [
+              {
+                "key": "random-variable-distribution",
+                "title": "A random variable assigns numbers to uncertain outcomes",
+                "body": "A random variable names a numerical result before the uncertain process is observed: repair cost in dollars, calls in an hour, or delay in minutes. Its probability distribution lists possible values and their probabilities for a discrete model. The values carry units, the probabilities sum to 1, and the model's population and conditions determine where the distribution applies.",
+                "sourceCreditKeys": ["openstax-discrete-random-variable"],
+                "explorableTerms": []
+              },
+              {
+                "key": "expected-value-worked",
+                "title": "Expected value is a probability-weighted average",
+                "body": "Multiply each possible value by its probability and add the products. If a repeated job produces a net gain of $12 with probability 0.30 and a net loss of $3 with probability 0.70, the expected net is $12 × 0.30 + (−$3) × 0.70 = $1.50 per job. This is a long-run center under the model, not a promise that any single job returns $1.50.",
+                "sourceCreditKeys": ["openstax-expectation"],
+                "explorableTerms": []
+              },
+              {
+                "key": "variability-and-consequences",
+                "title": "Equal expectation can hide different risk",
+                "body": "Variance and standard deviation describe how far modeled outcomes spread around expected value; standard deviation returns to the outcome's units. Two probability distributions can share an expected value while one concentrates near that center and the other places more probability far from it. Expected value alone therefore does not describe a distribution. Keep the possible values, their probabilities, and the spread visible under the stated repeated-use model.",
+                "sourceCreditKeys": ["openstax-expectation"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "compute-expected-cost",
+              "prompt": "Under a stable repeated-use model, an inventory inspection takes 6 minutes with probability 0.75 and 30 minutes with probability 0.25. What is its expected duration per inspection?",
+              "options": [
+                {
+                  "key": "twelve-minute-expectation",
+                  "text": "12 minutes, from 6 × 0.75 plus 30 × 0.25"
+                },
+                {
+                  "key": "four-point-five-minutes",
+                  "text": "4.5 minutes, from weighting only the 6-minute outcome"
+                },
+                {
+                  "key": "eighteen-minute-average",
+                  "text": "18 minutes, from averaging 6 and 30 without their probabilities"
+                },
+                {
+                  "key": "twenty-four-minute-gap",
+                  "text": "24 minutes, from subtracting the two possible durations"
+                }
+              ],
+              "answerKey": "twelve-minute-expectation",
+              "explanation": {
+                "text": "The probability-weighted duration is (6 × 0.75) + (30 × 0.25) = 4.5 + 7.5 = 12 minutes per inspection over repeated use of the stated model. An individual inspection still takes either 6 or 30 minutes.",
+                "sourceCreditKeys": ["openstax-expectation"]
+              }
+            },
+            {
+              "family": "impostor",
+              "key": "audit-expectation-claims",
+              "prompt": "Two statements correctly use expectation and spread. One misstates what the calculation guarantees. Find the impostor.",
+              "statements": [
+                {
+                  "key": "expectation-long-run",
+                  "text": "Expected value is a probability-weighted center for repeated use of the stated model.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "equal-centers-different-spread",
+                  "text": "Distributions with equal expected value can assign different probability to outcomes far from that center.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "expectation-single-guarantee",
+                  "text": "For a one-off job, expected value is the most likely net outcome that the job will produce.",
+                  "kind": "impostor"
+                }
+              ],
+              "explanation": {
+                "text": "The false statement confuses a probability-weighted average with the most probable single result. Expected value can differ from every possible one-off outcome, and equal expected values do not make two distributions or their spreads equal.",
+                "sourceCreditKeys": ["openstax-expectation"]
+              }
+            }
+          ],
+          "supportPaths": []
+        }
+      ],
+      "guardianActivityKeys": [
+        "identify-probability-reference-set",
+        "match-event-language",
+        "condition-on-alerts",
+        "audit-conditional-claims",
+        "distinguish-event-relations",
+        "match-probability-rules",
+        "compute-expected-cost",
+        "audit-expectation-claims"
+      ]
+    },
+    {
+      "key": "infer-predict-and-decide",
+      "title": "Infer, Predict, and Decide",
+      "stops": [
+        {
+          "key": "quantify-sampling-uncertainty",
+          "label": "Separate sample variation from population scope",
+          "requires": ["frame-the-study", "produce-representative-data"],
+          "difficultyBand": 3,
+          "lesson": {
+            "sections": [
+              {
+                "key": "sampling-distribution",
+                "title": "A statistic varies across possible samples",
+                "body": "Imagine repeatedly drawing random samples of the same size from one population and calculating the same statistic. The distribution of those possible statistics is a sampling distribution. Its standard deviation is the standard error. Standard error describes random sampling variability of an estimator; it is not the spread of individual observations and does not measure selection bias or a poorly defined variable.",
+                "sourceCreditKeys": ["openstax-sampling-distribution", "openstax-sampling"],
+                "explorableTerms": [
+                  {
+                    "term": "statistic",
+                    "supportPathKey": "revisit-statistic-parameter"
+                  }
+                ]
+              },
+              {
+                "key": "sample-size-and-standard-error",
+                "title": "Independent information improves precision by a square root",
+                "body": "For an independent random sample mean under the usual model, standard error equals the population standard deviation divided by the square root of sample size. With a 20-minute population standard deviation, a sample of 25 has a 4-minute standard error and a sample of 100 has a 2-minute standard error. Four times the independent sample size halves this source of uncertainty; dependence and bias can invalidate that simple comparison.",
+                "sourceCreditKeys": ["openstax-sampling-distribution"],
+                "explorableTerms": []
+              },
+              {
+                "key": "confidence-interval-scope",
+                "title": "A confidence interval describes a repeated method",
+                "body": "A 95% confidence procedure is constructed so that, under its sampling and model assumptions, about 95% of intervals from repeated samples contain the fixed population parameter. One reported interval is a range of parameter values compatible with that method and data. It does not give every unit a 95% chance of falling inside, and its margin does not automatically cover nonresponse, measurement error, model failure, or a population outside the sampling frame.",
+                "sourceCreditKeys": ["nist-confidence-intervals", "openstax-sampling-distribution", "openstax-sampling"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "reason-about-standard-error",
+              "prompt": "Under an independent random-sampling model, package fill weights have an 18-gram population standard deviation. How do standard errors of the sample mean compare for n = 36 and n = 144?",
+              "options": [
+                {
+                  "key": "three-versus-one-point-five",
+                  "text": "They are 3 grams and 1.5 grams; quadrupling n halves the standard error"
+                },
+                {
+                  "key": "eighteen-versus-eighteen",
+                  "text": "They are both 18 grams, using the spread of individual fill weights as standard error"
+                },
+                {
+                  "key": "half-versus-one-eighth",
+                  "text": "They are 0.5 gram and 0.125 gram, dividing the 18-gram spread directly by n"
+                },
+                {
+                  "key": "six-versus-twelve",
+                  "text": "They are 6 grams and 12 grams, using square root of n without the 18-gram spread"
+                }
+              ],
+              "answerKey": "three-versus-one-point-five",
+              "explanation": {
+                "text": "Using standard deviation divided by square root of n gives 18/6 = 3 grams for n = 36 and 18/12 = 1.5 grams for n = 144. This comparison assumes independent random sampling from the stated population.",
+                "sourceCreditKeys": ["openstax-sampling-distribution"]
+              }
+            },
+            {
+              "family": "impostor",
+              "key": "spot-interval-impostor",
+              "prompt": "Two statements correctly bound a classical confidence interval. One gives it a meaning the method does not support. Find the impostor.",
+              "statements": [
+                {
+                  "key": "procedure-coverage",
+                  "text": "A 95% procedure captures the fixed parameter in about 95% of repeated intervals under its assumptions.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "interval-does-not-fix-bias",
+                  "text": "A narrow interval can still miss the target when selection or measurement introduces systematic bias.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "parameter-random-after-interval",
+                  "text": "For this calculated interval, 95% of the parameter's remaining probability lies between its endpoints.",
+                  "kind": "impostor"
+                }
+              ],
+              "explanation": {
+                "text": "The false statement assigns a post-data probability distribution to the fixed parameter. In this method, the 95% belongs to the long-run coverage of the interval procedure under its assumptions.",
+                "sourceCreditKeys": ["nist-confidence-intervals", "openstax-sampling"]
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "revisit-statistic-parameter",
+              "term": "statistic",
+              "sectionKey": "sampling-distribution",
+              "steps": [
+                {
+                  "stopKey": "frame-the-study",
+                  "activityKey": "identify-population-parameter"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "evaluate-test-decisions",
+          "label": "Interpret evidence, errors, and effects",
+          "requires": ["quantify-sampling-uncertainty"],
+          "difficultyBand": 4,
+          "lesson": {
+            "sections": [
+              {
+                "key": "p-value-under-a-model",
+                "title": "A p-value starts by assuming a model",
+                "body": "A p-value uses the model's sampling variability: assuming a specified null hypothesis and statistical model, it is the probability of a test result at least as incompatible with that null as the observed result. A p-value of 0.03 says such data or more extreme data occur 3% of the time under that model. It is not a 3% probability that the null is true, a 97% probability that a preferred explanation is true, or the probability that chance alone produced the data.",
+                "sourceCreditKeys": ["asa-p-values"],
+                "explorableTerms": [
+                  {
+                    "term": "sampling variability",
+                    "supportPathKey": "revisit-sampling-precision"
+                  }
+                ]
+              },
+              {
+                "key": "error-types-and-power",
+                "title": "Every test rule trades between errors",
+                "body": "A Type I error rejects a true null; a Type II error fails to reject a false null for a specified alternative. Power is the probability of rejecting the null when that alternative is true. The consequences can be asymmetric: a false alarm and a missed hazard may carry very different costs. In the test setting described by the model, increasing sample size can increase power, but it does not change what the two error types mean.",
+                "sourceCreditKeys": ["openstax-test-errors"],
+                "explorableTerms": []
+              },
+              {
+                "key": "effect-size-before-threshold",
+                "title": "Magnitude and uncertainty carry the decision",
+                "body": "Statistical significance does not measure effect size or practical importance. Report the effect in domain units with an interval and compare it with consequences or a meaningful tolerance. A tiny effect can be estimated precisely in a huge sample; an important effect can remain uncertain in a small study. Study design, transparency, repeated analyses, and other evidence still matter on both sides of a threshold.",
+                "sourceCreditKeys": ["asa-p-values", "cdc-causal-analysis"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "interpret-p-value",
+              "prompt": "A prespecified study compares mean checkout time, in minutes, between two queue designs at participating stores. Under a null model of no mean difference and the stated random-sampling assumptions, p = 0.08. Which interpretation is warranted by the p-value itself?",
+              "options": [
+                {
+                  "key": "eight-percent-under-null",
+                  "text": "Under that null model, mean differences at least this incompatible occur with probability about 8%"
+                },
+                {
+                  "key": "eight-percent-null-probability",
+                  "text": "There is an 8% probability that the two queue designs truly have equal mean checkout time"
+                },
+                {
+                  "key": "ninety-two-percent-design-probability",
+                  "text": "There is a 92% probability that one queue design truly reduces mean checkout time"
+                },
+                {
+                  "key": "important-time-proof",
+                  "text": "The observed difference is established as large enough to justify changing the queue design"
+                }
+              ],
+              "answerKey": "eight-percent-under-null",
+              "explanation": {
+                "text": "The p-value describes mean checkout-time differences at least as incompatible as the observed result under the specified null and sampling model. It does not assign probabilities to the two hypotheses or establish the difference's magnitude, practical importance, or causal explanation.",
+                "sourceCreditKeys": ["asa-p-values"]
+              }
+            },
+            {
+              "family": "matching",
+              "key": "match-test-errors",
+              "prompt": "A safety monitor tests the null claim that a batch meets the limit. Match each outcome to its test-decision role.",
+              "pairs": [
+                {
+                  "key": "type-one-role",
+                  "left": "Reject a compliant batch",
+                  "right": "Type I error: reject a true null"
+                },
+                {
+                  "key": "type-two-role",
+                  "left": "Fail to flag a noncompliant batch",
+                  "right": "Type II error: do not reject a false null"
+                },
+                {
+                  "key": "power-role",
+                  "left": "Flag a specified noncompliant batch",
+                  "right": "Power: reject when that alternative is true"
+                },
+                {
+                  "key": "effect-role",
+                  "left": "Exceed the limit by 4 units",
+                  "right": "Effect magnitude in the decision's domain units"
+                }
+              ],
+              "explanation": {
+                "text": "Error labels depend on both the real state and the test decision. Power concerns detecting a specified departure, while the 4-unit excess describes practical magnitude rather than an error probability.",
+                "sourceCreditKeys": ["openstax-test-errors", "asa-p-values"]
+              }
+            }
+          ],
+          "supportPaths": [
+            {
+              "key": "revisit-sampling-precision",
+              "term": "sampling variability",
+              "sectionKey": "p-value-under-a-model",
+              "steps": [
+                {
+                  "stopKey": "quantify-sampling-uncertainty",
+                  "activityKey": "reason-about-standard-error"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "bound-prediction",
+          "label": "Use association without inventing cause",
+          "requires": ["describe-a-distribution", "compare-groups-in-context"],
+          "difficultyBand": 4,
+          "lesson": {
+            "sections": [
+              {
+                "key": "association-and-correlation",
+                "title": "Association describes how variables vary together",
+                "body": "A scatterplot shows paired quantitative observations. Correlation summarizes the direction and strength of a linear association from −1 to 1; it has no measurement units. A value near zero can coexist with a curved relationship, and an outlier can substantially change the coefficient. Inspect the plot and preserve the variable definitions and observed range instead of treating one coefficient as the relationship itself.",
+                "sourceCreditKeys": ["openstax-regression", "openstax-outliers"],
+                "explorableTerms": []
+              },
+              {
+                "key": "regression-and-residuals",
+                "title": "A regression line predicts, then residuals show what it missed",
+                "body": "A simple least-squares line predicts an outcome from a predictor within a fitted linear relationship. Its slope gives the modeled change in predicted outcome for one unit of predictor change. A residual is observed outcome minus predicted outcome in the outcome's units. Curved residual patterns, changing spread, or influential points warn that a straight-line summary is missing structure even when a numerical fit looks impressive.",
+                "sourceCreditKeys": ["openstax-regression", "openstax-outliers"],
+                "explorableTerms": []
+              },
+              {
+                "key": "prediction-boundaries",
+                "title": "Prediction needs range and model checks",
+                "body": "A line fitted between predictor values of 10 and 40 does not earn a prediction at 65 merely because the formula accepts that input. Predictions from a fitted line stay tied to the observed predictor range, while scatterplots and residuals can show that a straight-line form misses structure even inside that range. Inspect those diagnostics before using the equation. A regression association also does not show that intervening on the predictor will change the outcome.",
+                "sourceCreditKeys": ["openstax-regression"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "bound-regression-prediction",
+              "prompt": "A straight-line model relates battery load from 2 to 12 amperes to runtime. Its residuals become increasingly negative near 12 amperes. An engineer asks for predicted runtime at 30 amperes. What is the best statistical response?",
+              "options": [
+                {
+                  "key": "treat-thirty-as-extrapolation",
+                  "text": "Treat 30 amperes as unsupported extrapolation and collect relevant data or justify another model form"
+                },
+                {
+                  "key": "extend-load-line",
+                  "text": "Extend the fitted line to 30 amperes and widen its interval because it is the available model"
+                },
+                {
+                  "key": "reuse-boundary-runtime",
+                  "text": "Use the fitted runtime at 12 amperes as the estimate for 30 amperes because both loads are high"
+                },
+                {
+                  "key": "claim-load-intervention",
+                  "text": "Treat the projected association as an intervention effect because load is recorded before runtime"
+                }
+              ],
+              "answerKey": "treat-thirty-as-extrapolation",
+              "explanation": {
+                "text": "The requested 30-ampere load is outside the observed 2-to-12-ampere range, and the residual pattern already challenges the straight-line form near the boundary. The fitted line does not support that extrapolation, and regression alone does not identify an intervention effect.",
+                "sourceCreditKeys": ["openstax-regression"]
+              }
+            },
+            {
+              "family": "matching",
+              "key": "match-regression-parts",
+              "prompt": "Match each regression element to the question it answers.",
+              "pairs": [
+                {
+                  "key": "slope-role",
+                  "left": "Slope",
+                  "right": "How much predicted outcome changes per predictor unit"
+                },
+                {
+                  "key": "residual-role",
+                  "left": "Residual",
+                  "right": "Observed outcome minus predicted outcome"
+                },
+                {
+                  "key": "scatterplot-role",
+                  "left": "Scatterplot",
+                  "right": "Whether paired observations show form, groups, or outliers"
+                },
+                {
+                  "key": "range-role",
+                  "left": "Observed predictor range",
+                  "right": "Where fitted predictions have direct data support"
+                }
+              ],
+              "explanation": {
+                "text": "The slope interprets a fitted change, residuals measure misses in outcome units, the scatterplot exposes structure before compression, and the observed predictor range bounds where the fitted line has direct data support.",
+                "sourceCreditKeys": ["openstax-regression"]
+              }
+            }
+          ],
+          "supportPaths": []
+        },
+        {
+          "key": "separate-cause-and-scope",
+          "label": "Match causal claims to design",
+          "requires": ["produce-representative-data", "evaluate-test-decisions", "bound-prediction"],
+          "difficultyBand": 5,
+          "lesson": {
+            "sections": [
+              {
+                "key": "assignment-versus-generalization",
+                "title": "Random assignment and random selection earn different claims",
+                "body": "Random assignment can balance preexisting factors across treatment groups on average, making an outcome difference evidence about the assigned intervention when implementation, attrition, and measurement are sound. Random selection supports generalizing from sampled units to the target population. A randomized experiment in a narrow volunteer sample can have strong causal identification for those participants while leaving broader population transport uncertain.",
+                "sourceCreditKeys": ["openstax-experimental-design", "openstax-sampling"],
+                "explorableTerms": []
+              },
+              {
+                "key": "confounding-and-alternatives",
+                "title": "Association has competing explanations",
+                "body": "A confounder is a third factor associated with both a proposed exposure and outcome without being a consequence of that exposure. An observed association can also reflect selection, measurement error, chance, reverse direction, or a true causal effect. Timing, suitable comparison groups, design knowledge, and checks against plausible alternatives matter. A small p-value addresses compatibility with a model; it does not remove these non-chance explanations.",
+                "sourceCreditKeys": ["cdc-causal-analysis"],
+                "explorableTerms": []
+              },
+              {
+                "key": "causal-decision-boundary",
+                "title": "A responsible decision states the intervention and limits",
+                "body": "Translate a causal claim into an intervention, comparison, outcome, time horizon, and population. Then state assumptions, effect magnitude and uncertainty, possible harms, and evidence that would trigger revision. When randomization is impossible, converging designs and sensitivity to alternative explanations can strengthen a case without creating certainty. The decision consequence determines how much residual uncertainty and which error risks are acceptable.",
+                "sourceCreditKeys": ["cdc-causal-analysis", "openstax-experimental-design", "asa-p-values"],
+                "explorableTerms": []
+              }
+            ]
+          },
+          "activities": [
+            {
+              "family": "option_select",
+              "key": "choose-causal-design",
+              "prompt": "Two hundred volunteers are randomly assigned to a new training program or usual practice, and completion rates are measured for eight weeks. What claim is best supported if follow-up and implementation are sound?",
+              "options": [
+                {
+                  "key": "participant-causal-effect",
+                  "text": "Random assignment supports a causal comparison here; wider generalization needs population evidence"
+                },
+                {
+                  "key": "all-worker-generalization",
+                  "text": "The average effect transfers to workers with similar roles because treatment assignment was random"
+                },
+                {
+                  "key": "observational-only",
+                  "text": "The result is only an uncontrolled association because volunteers were placed into treatment groups"
+                },
+                {
+                  "key": "individual-guarantee",
+                  "text": "The average group difference shows that most individual volunteers improved by that amount"
+                }
+              ],
+              "answerKey": "participant-causal-effect",
+              "explanation": {
+                "text": "Random assignment supports a causal comparison of the assigned programs for the study participants under sound execution. Volunteer recruitment is not random sampling from every worker, so transport to a broader population needs additional evidence.",
+                "sourceCreditKeys": ["openstax-experimental-design", "openstax-sampling"]
+              }
+            },
+            {
+              "family": "impostor",
+              "key": "audit-causal-claims",
+              "prompt": "Two statements keep causal identification, association, and generalization distinct. One collapses them. Find the impostor.",
+              "statements": [
+                {
+                  "key": "assignment-supports-comparison",
+                  "text": "Random assignment can support a treatment comparison without automatically making the sample population-representative.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "chance-not-only-alternative",
+                  "text": "A small p-value does not by itself remove confounding, selection, measurement, or reverse direction.",
+                  "kind": "truth"
+                },
+                {
+                  "key": "prediction-identifies-intervention",
+                  "text": "If prediction stays accurate on new cases, changing the predictor is a justified way to change the outcome.",
+                  "kind": "impostor"
+                }
+              ],
+              "explanation": {
+                "text": "The false statement confuses forecasting with intervention. A predictor can be useful because it is a proxy, symptom, or shared consequence; causal action needs an identifying design and assumptions.",
+                "sourceCreditKeys": ["cdc-causal-analysis", "openstax-experimental-design"]
+              }
+            }
+          ],
+          "supportPaths": []
+        }
+      ],
+      "guardianActivityKeys": [
+        "reason-about-standard-error",
+        "spot-interval-impostor",
+        "interpret-p-value",
+        "match-test-errors",
+        "bound-regression-prediction",
+        "match-regression-parts",
+        "choose-causal-design",
+        "audit-causal-claims"
       ]
     }
   ],
   "expeditionGuardianActivityKeys": [
-    "choose-representative-sample",
-    "match-data-roles",
-    "spot-probability-impostor",
-    "reverse-the-condition",
-    "diagnose-common-cause"
+    "identify-population-parameter",
+    "audit-data-production",
+    "match-distribution-features",
+    "compare-group-rates",
+    "match-event-language",
+    "audit-conditional-claims",
+    "distinguish-event-relations",
+    "compute-expected-cost",
+    "spot-interval-impostor",
+    "match-test-errors",
+    "bound-regression-prediction",
+    "audit-causal-claims"
   ]
 }
