@@ -12,6 +12,9 @@ routes shared mechanics through the `plan-lifecycle` skill from the globally ins
 
 ## Active implementation plans (execution order)
 
-_None._
+- [Re-author three-Leg Expeditions from online research](./2026-09-01-research-authored-three-leg-expeditions.md)
+  — **Ready; priority 1.** Replace all five primer-bound three-Stop routes with independently reviewed,
+  self-contained online-researched Expeditions: exactly three Legs of four-to-seven Stops, visible
+  source references, one atomic no-model cutover, and bounded real-use/native proof.
 
 <!-- Lifecycle adoption and overrides: AGENTS.md → Documentation workflow. -->

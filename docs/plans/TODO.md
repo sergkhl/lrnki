@@ -2,7 +2,12 @@
 
 ## TODO
 
-_None._
+- **Re-author all five Expeditions from online research — ready.** Follow the
+  [priority-1 plan](./2026-09-01-research-authored-three-leg-expeditions.md): each Expedition gets
+  exactly three Legs of four-to-seven Stops, self-contained learner-visible online source credits,
+  and a fresh reviewer-as-Learner simulation. Land one atomic retirement of `source.md` and exact
+  anchors, amend current ADRs in place, preserve the offline/no-runtime-model boundary, reset only
+  owned local/test state, and validate through bounded web plus emulator/simulator evidence.
 
 ## COMPLETED
 
