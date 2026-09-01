@@ -20,8 +20,8 @@ closure, keep exactly one Open findings section, and never link tracked document
   Unit 5 Machine Learning revision `60366ccf1de0448021bce06437bb642cdf3e2f81abd779834d561b4d140e4e82`,
   and Unit 6 Neuroscience revision `07bd08f859242913a8f1d01bfc2f022482755c240e5e01af223df285340feca3`
   passed complete learner/private-source review after every finding was repaired.
-- **NEXT:** Land the five reviewed exact documents and complete the atomic content, runtime, UI,
-  ADR, and documentation cutover in Unit 7.
+- **NEXT:** Run the final deterministic, database, intercepted-web, real-backend-web, Android
+  emulator, and iOS simulator gates in Unit 8, then reconcile and close in Unit 9.
 - **Exit:** All five reviewed documents, the atomic cutover, and the evidence in this plan pass with
   `Open findings: _None._` and every durable rule in its canonical home.
 
