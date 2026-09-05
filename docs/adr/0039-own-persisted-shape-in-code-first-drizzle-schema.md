@@ -2,25 +2,18 @@
 
 Status: Accepted
 
-## Decision
+The internal [Drizzle schema](../../packages/infrastructure-postgres/src/schema/) owns persisted
+shape; adapters do not expose its tables as public interfaces. Baseline SQL, snapshot, and journal
+are regenerated together, never edited or applied by hand, and checked offline against the source.
 
-The internal Drizzle schema under `packages/infrastructure-postgres/src/schema` is the only
-hand-edited persisted-shape definition. Runtime adapters do not expose schema tables as a public
-interface.
+One programmatic migrator serializes classification/application with an advisory lock. It applies
+only to an empty application schema, accepts only the exact current lineage as a no-op, and refuses
+every other state before DDL.
 
-The generated baseline SQL, snapshot, and journal are one mechanical lineage. They are regenerated
-together, never edited or applied by hand, and an offline drift check compares them with source.
+Greenfield development keeps one regenerated baseline, making schema changes reset-required for
+existing development databases. The guarded reset is schema-scoped and permits only `lrnki` and
+`lrnki_test`. Data-preserving incremental migrations require a later decision.
 
-One programmatic migrator applies the baseline only to an empty application schema, is a no-op only
-for the exact current lineage, serializes classification/application with an advisory lock, and fails
-before DDL for every unrecognized state.
-
-Greenfield development keeps one regenerated baseline. Schema changes make existing development
-databases reset-required; a data-preserving incremental migration policy requires a later decision.
-The explicit guarded reset is schema-scoped and refuses database names other than `lrnki` and
-`lrnki_test`.
-
-## Context
-
-Code-first shape, generated artifacts, and one fail-closed applicator prevent drift and competing DDL
-authorities while the product remains greenfield.
+This trades preservation of disposable development data for one verifiable schema lineage.
+[Database operations](../../README.md#database) and
+[Better Auth schema generation](../../packages/infrastructure-postgres/README.md) own the procedures.

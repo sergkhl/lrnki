@@ -5,51 +5,25 @@ description: Route and qualify lrnki validation across local automated checks, a
 
 # Validate lrnki
 
-Use the smallest environment that can prove the changed behavior, then name the evidence class
-exactly. One green class never upgrades another.
+Apply the repository's [evidence authority](../../../AGENTS.md#validation-authority) and
+[execution authority](../../../AGENTS.md#execution-authority).
 
 ## Route
 
-1. Classify the claim before running anything:
-   - deterministic structure/logic/build;
-   - authored-content semantic and teaching quality;
-   - intercepted Expo web presentation;
-   - real Better Auth/Hono/Postgres web behavior;
-   - Android emulator native behavior;
-   - iOS Debug simulator behavior;
-   - deployed route behavior;
-   - physical-device behavior.
-2. Read only the matching reference below plus any owning rig README it names.
-3. Run the smallest relevant gate first. Escalate only when the claim crosses a real boundary.
-4. On failure, preserve the first causal error, classify whether the harness or product failed, and
-   rerun only after naming the changed cause. A retry without a cause is not evidence.
-5. Record command, environment, identity/scope, result, and what it does not prove in the active
-   plan's Validation Log.
+1. Classify the claim using the table below, then read only its reference and owning rig README.
+2. Run the smallest gate that exercises the change; escalate when the claim crosses a boundary.
+3. On failure, preserve the first causal error, distinguish harness from product failure, and name
+   the changed cause before rerunning.
+4. Record command, environment, identity/scope, result, and evidence limits in the active plan's
+   Validation Log, or the latest plan-less validation in [TODO](../../../docs/plans/TODO.md).
 
-## References
-
-- [Local automated](references/local-automated.md)
-- [Authored real-use quality](references/real-use-quality.md)
-- [Intercepted web](references/web-intercepted.md)
-- [Real-backend web](references/web-real-backend.md)
-- [Android emulator](references/native-android.md)
-- [iOS simulator](references/native-ios.md)
-- [Deployed](references/deployed.md)
-- [Physical device](references/physical-device.md)
-
-## Qualification rules
-
-- `pnpm content:check` proves schema/reference guarantees and exact source-credit resolution. It does
-  not prove semantic support, answer quality, teaching sufficiency, or playability.
-- Deterministic and database suites prove runtime/store contracts, not learner-visible quality.
-- Intercepted web proves the production-format Expo artifact against owned DTO fixtures and proves no
-  unmatched request escaped. It does not prove Hono, Postgres, or Better Auth.
-- Real-backend web proves the local real API/database path it actually exercises. It does not prove
-  deployment, native rendering, or physical-device behavior.
-- Emulator and simulator results remain platform-specific Debug evidence. They do not imply a store
-  artifact or physical pass.
-- Deployed reads do not authorize production writes, resets, or releases.
-- Physical-device runs are user-initiated. Do not handle credentials or claim a pass from emulator
-  evidence.
-- Keep reports, screenshots, traces, and diagnostics in gitignored `tmp/`; retained facts belong in
-  the active plan or owning README, never links to `tmp/`.
+| Claim | Route |
+| --- | --- |
+| Content structure, logic, types, schema parity, builds | [Local automated](references/local-automated.md) |
+| Teaching and semantic source support | [Authored real-use quality](references/real-use-quality.md) |
+| Expo presentation against owned DTO fixtures | [Intercepted web](references/web-intercepted.md) |
+| Local Better Auth/Hono/Postgres web behavior | [Real-backend web](references/web-real-backend.md) |
+| Android emulator integration | [Android](references/native-android.md) |
+| iOS Debug simulator integration | [iOS](references/native-ios.md) |
+| Authorized deployed routes | [Deployed](references/deployed.md) |
+| User-initiated physical-device behavior | [Physical device](references/physical-device.md) |

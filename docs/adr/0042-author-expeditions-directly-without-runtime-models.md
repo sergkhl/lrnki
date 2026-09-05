@@ -2,25 +2,20 @@
 
 Status: Accepted
 
-## Decision
+Codex CLI is an offline author: it researches online evidence and writes the exact Expedition
+document consumed by learner-runtime. The repository contains no model client, model port, prompt,
+compiler, content package, installer, publication transaction, source packet, or content database.
+Build and runtime never call models or fetch source links; those links are learner-visible metadata.
 
-Codex CLI is an offline author. It researches inspectable online evidence and writes the exact
-declarative Expedition document consumed by learner-runtime. The repository contains no Codex/model
-client, model port, prompt, compiler, package, installer, publication transaction, source packet,
-content database, or build/runtime model or source-fetch call.
+[The tracked catalog](../../content/catalog.json) owns exact membership and order. Each Expedition
+owns its route and content, with human-readable authored keys and authoritative array order. Runtime
+code does not infer prerequisites, Support destinations, difficulty, Guardian pools, or a competing
+route. [Source types](../../packages/learner-runtime/src/contentSchema.ts) own the document shape.
 
-The tracked catalog owns exact membership and order. Each Expedition document owns its presentation,
-source disclosures, ordered Legs and Stops, prerequisites, difficulty, Lessons, Activities, Support
-Paths, and Guardian pools. Human-readable authored keys and array order are authoritative; runtime
-code does not derive a competing route.
+One pure all-or-nothing qualifier runs in authoring checks, CI, tests, and API startup. It derives
+only in-memory lookup/projection data and canonical revisions, never a second content representation.
+Semantic changes alter the revision; JSON formatting and property order do not.
 
-One pure all-or-nothing qualifier is used by authoring checks, CI, tests, and learner-api startup. It
-derives only in-memory lookup/projection data and canonical revisions; it never emits a second content
-representation. A semantic document change changes the revision, while JSON formatting and property
-order do not. Source links are learner-visible metadata and are never fetched by build or runtime.
-
-## Context
-
-The previous model pipeline made authoring, installation, publication, inspection, and learner
-projection separate systems. Direct documents preserve private grading and the full learner game
-while making the structure editable, reviewable, and usable without any model service.
+Direct documents avoid separate authoring, installation, and publication systems while keeping the
+catalog reviewable and usable without a model service. [The authoring guide](../../content/AUTHORING.md)
+owns the working procedure.

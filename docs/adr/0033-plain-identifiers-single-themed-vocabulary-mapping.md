@@ -1,17 +1,11 @@
-# Use authored keys and one themed learner vocabulary mapping
+# Keep themed vocabulary downstream of content identity
 
 Status: Accepted
 
-## Decision
+Documents, types, commands, persistence, and API DTOs use plain engineering names. Learner-facing
+language is rendered through the Expo vocabulary mapping; raw enums, database details, and internal
+identifiers are not displayed directly.
 
-Authored documents, TypeScript types, commands, persistence, and API DTOs use plain engineering names
-and human-readable authored keys. Learner-facing theme language is rendered only through the Expo
-vocabulary mapping.
-
-Raw enums, database details, and internal identifiers are not displayed directly. A theme change
-updates presentation vocabulary, not content identity, runtime commands, or persisted state.
-
-## Context
-
-The game needs a coherent voice without allowing theme copy to become durable architecture. One
-downstream mapping keeps identifiers stable and searchable.
+A theme change updates this presentation mapping without changing content identity, runtime commands,
+or persisted state. This keeps game copy from becoming a durable storage or API contract. Authored
+key policy belongs to [ADR-0042](0042-author-expeditions-directly-without-runtime-models.md).

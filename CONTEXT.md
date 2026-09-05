@@ -1,65 +1,39 @@
 # Lrnki Context
 
-Lrnki presents directly authored learning Expeditions through a server-owned game runtime. This file
-is the project glossary; behavior belongs in ADRs and exact shapes belong in source.
-
 ## Authored learning content
 
-**Authored Catalog**:
-The tracked ordered membership of learner-visible Expeditions. _Avoid_: installed catalog, database
-catalog, generated package.
+**Authored Catalog**: The ordered membership of learner-visible Expeditions.
 
-**Authored Expedition**:
-One complete declarative learning journey researched and written offline, then consumed directly by
-the server. _Avoid_: generated course, content package, graph projection.
+**Authored Expedition**: One complete learning journey researched and authored offline for direct
+consumption by the learner runtime.
 
-**Leg**:
-An authored milestone containing an ordered group of four to seven Stops and one Guardian scope;
-every Expedition has exactly three Legs.
-_Avoid_: generated section, database chapter.
+**Leg**: An authored milestone grouping ordered Stops and one Guardian scope.
 
-**Stop**:
-One authored learning objective with a Lesson, Activities, prerequisite references, difficulty, and
-optional Support Paths. _Avoid_: Concept, node, checkpoint identity.
+**Stop**: One learning objective with a Lesson, Activities, prerequisites, difficulty, and optional
+Support Paths.
 
-**Lesson**:
-The ungraded teaching material for one Stop, divided into sections with keyed Source Credit
-references. _Avoid_: prompt, quiz explanation, generated grounding.
+**Lesson**: The ungraded teaching material for one Stop, divided into sections with Source Credits.
 
-**Source Credit**:
-Learner-visible authority and link metadata for one inspectable online source, referenced by authored
-teaching and graded explanations. _Avoid_: source packet, copied page, runtime fetch.
+**Source Credit**: Learner-visible authority and link metadata for an inspectable online source cited
+by teaching or graded explanations.
 
-**Activity**:
-A server-graded option-select, matching, or impostor exercise with a private answer and a
-source-referenced explanation. _Avoid_: Study Item, card bank, self-report.
+**Activity**: A server-graded exercise with a private answer and a source-referenced explanation.
 
-**Explorable Term**:
-An exact rendered lesson substring that opens one explicitly authored Support Path. _Avoid_: keyword,
-search result, generated prerequisite.
+**Explorable Term**: An exact rendered Lesson substring that opens an authored Support Path.
 
-**Support Path**:
-An authored optional branch that reuses ordinary Activities from other Stops to repair a named local
-confusion. _Avoid_: generated detour, retry state, second Expedition.
+**Support Path**: An optional authored branch that reuses Activities from other Stops to repair a
+named local confusion.
 
-**Guardian**:
-A server-owned Leg or Expedition challenge assembled from an explicit authored activity pool, with
-durable combat, recovery, rematch, and reward state. _Avoid_: mastery-affecting quiz, client battle.
+**Guardian**: A Leg or Expedition retrieval challenge drawn from an explicit authored Activity pool.
 
-**Content Revision**:
-The canonical identity of one qualified Expedition's semantic document.
-_Avoid_: file hash, formatting hash, database version.
+**Content Revision**: The canonical identity of one qualified Expedition's semantic document.
 
 ## Learner experience
 
-**Learner State**:
-The authenticated learner's versioned durable journey aggregate, separate from authored content and
-private grading material. _Avoid_: content state, client cache, session cookie.
+**Learner State**: The authenticated learner's versioned journey aggregate, separate from authored
+content and private grading material.
 
-**Expedition Journal**:
-The learner's entry view over catalog order, adoption, active journey, progress, rewards, and current
-leaderboard. _Avoid_: database projection, generation timeline.
+**Expedition Journal**: The learner's entry view over catalog adoption, the active journey, progress,
+rewards, and leaderboard.
 
-**Calibration Known**:
-An explicit learner assertion that a Stop is known, satisfying prerequisite closure without creating
-a graded attempt, crystal, or weekly point. _Avoid_: correct answer, mastery score.
+**Calibration Known**: An explicit learner assertion of prior knowledge, distinct from graded evidence.

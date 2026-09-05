@@ -8,8 +8,8 @@ with validated Learner State and returns finished views. Hono derives identity, 
 and maps results; neither Hono nor Expo assembles policy from storage rows or content documents.
 
 The app imports learner-api DTOs only, never runtime, persistence, or authored server documents.
-Private grading and answer keys stay behind this boundary. Exact interfaces are owned by the
-[runtime types](../../packages/learner-runtime/src/runtimeTypes.ts) and
+Private grading and answer keys stay behind this boundary; explanations are revealed only after
+grading. Exact interfaces are owned by the [runtime types](../../packages/learner-runtime/src/runtimeTypes.ts) and
 [API contract](../../apps/learner-api/src/client.ts).
 
 The web artifact is a client-rendered static SPA. Native/web differences stay behind file-level

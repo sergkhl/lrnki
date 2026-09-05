@@ -1,22 +1,11 @@
-# Use authored activity families and one learner-response identity
+# Use one acquisition identity across Activity entry points
 
 Status: Accepted
 
-## Decision
+Support references reuse the target Activity's ordinary acquisition identity, so replay or another
+entry point cannot award the same progress twice. Guardian responses have a separate challenge
+identity and never change acquisition mastery or weekly acquisition points. Calibration is a
+self-report governed by [the mastery decision](0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
-Each Stop owns authored option-select, matching, and optional impostor Activities. Answer material is
-server-private; the learner API sends only playable pre-answer projections and returns explanation
-after grading.
-
-An acquisition response is identified by learner, Expedition revision, Stop, Activity, and source
-context. A Support Path that references an Activity reuses that ordinary acquisition identity rather
-than cloning evidence. Guardian responses remain a separate challenge identity and never change
-acquisition mastery or weekly acquisition points.
-
-Calibration is an explicit self-report, not a graded response. Exact unions and payloads remain
-source-owned.
-
-## Context
-
-Typed play supports distinct mechanics, while one response identity prevents replay, Support reuse,
-and challenge play from awarding the same learning progress through competing paths.
+The [learner-state types](../../packages/learner-runtime/src/learnerState.ts) own response shapes and
+provenance. [The API boundary](0035-separate-learner-app-static-spa-typed-api.md) owns grading privacy.

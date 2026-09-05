@@ -1,9 +1,7 @@
 # Plans
 
-This directory indexes live coordination and ready or in-progress implementation plans. Plan
-lifecycle is adopted and overridden in [AGENTS.md](../../AGENTS.md#documentation-workflow), which
-routes shared mechanics through the `plan-lifecycle` skill from the globally installed
-`agent-workflow-core` plugin.
+Live coordination and implementation order. Lifecycle adoption and overrides live in
+[AGENTS.md](../../AGENTS.md#documentation-workflow).
 
 ## Live coordination
 
@@ -13,5 +11,3 @@ routes shared mechanics through the `plan-lifecycle` skill from the globally ins
 ## Active implementation plans (execution order)
 
 _None._
-
-<!-- Lifecycle adoption and overrides: AGENTS.md → Documentation workflow. -->

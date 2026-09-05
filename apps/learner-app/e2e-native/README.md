@@ -1,143 +1,122 @@
 # Native Maestro gates
 
-The Android gate drives the real standalone e2e APK on an Android emulator. The app talks to a
-loopback server that loads the tracked authored catalog, runs the production content qualifier, and
-uses the production learner runtime with its in-memory state adapter. Only Better Auth persistence
-and Postgres are replaced by deterministic fixture identity and memory. The gate never touches a
-real database, deployment, or physical device.
+Android runs a standalone Debug e2e APK on an emulator; iOS runs a Debug simulator build through the
+Expo development client. Both use a loopback fixture with the tracked catalog, production content
+qualifier, and learner runtime. Fixture identity and in-memory state replace auth persistence and
+Postgres. Neither gate touches a real database, deployment, or physical device.
 
-The iOS gate drives a fresh Debug simulator build through its Expo development client and the same
-fixture/runtime seam. It is separately named Debug-simulator integration evidence; it is not an
-Android authority transfer, distributable build, or physical-device result.
-
-General evidence authority lives in [AGENTS.md](../../../AGENTS.md#validation), and execution and
-triage live in the [Android validation route](../../../.agents/skills/validate-lrnki/references/native-android.md).
+[AGENTS.md](../../../AGENTS.md#validation-authority) owns evidence authority. The platform results
+remain distinct integration evidence, separate from distributable and physical passes.
 
 ## Scenario claims
 
-- `android-runtime-reliability.yaml` retains automatic authority for the Support Path dialog at a
-  320 dp viewport. Its title, body, footer, and close/restore assertions are all required. The body
-  and footer are the sensitivity oracle for the historical isolated dialog-collapse mutant; a
-  title-only assertion did not distinguish that mutant. The same flow now also proves the exact
-  first Lesson's compact source disclosure and all three authored Leg titles using fixture-supplied
-  Stop, section, Support, and Leg keys.
-- The swipe needed to reach the Support action is navigation evidence only. It does not claim the
-  separately physical-device-owned touch-responder class.
-- `signin.yaml` is native integration coverage for a visible wrong-password refusal followed by a
-  successful session. Other scenarios use the fixture-only one-tap sign-in, which still exercises
-  the app's Better Auth cookie path.
-- `crystal-guardian-obelisk.yaml` closes the expected first-visit board celebration before capturing
-  the authored Leg and Expedition Guardian presentations. Its screenshots are judgment evidence
-  only; no rendering mutant gives it automatic authority.
+- `android-runtime-reliability.yaml` retains automatic authority for the Support Path dialog at
+  320 dp. Title, body, footer, and close/restore assertions are required. Body/footer assertions
+  detect the historical isolated dialog-collapse mutant; a title-only assertion did not. The flow
+  also covers the first Lesson's compact source disclosure and all authored Leg titles through
+  fixture-supplied keys.
+- The swipe reaching Support is navigation evidence, not the physical-device-owned touch-responder
+  class.
+- `signin.yaml` covers a visible wrong-password refusal followed by a successful session. Other
+  scenarios use fixture-only one-tap sign-in through the app's Better Auth cookie path.
+- `crystal-guardian-obelisk.yaml` closes the first-visit board celebration before capturing Leg and
+  Expedition Guardians. Its screenshots have judgment authority only.
 
-Emulator evidence is not physical-device or distributable-build evidence.
+To requalify the Support class, run the positive flow and an isolated behavior-only negative control
+that must fail at the body/footer assertion. Retain the correlated user-recorded physical pass in
+this README before granting automatic authority. Other visual/smoke results do not inherit it.
 
 ## Prerequisites and build
 
-- JDK 17.
-- Android SDK plus a booted emulator.
-- Maestro CLI.
-- A fresh e2e APK built after the latest app change:
+Use JDK 17, the Android SDK, a booted emulator, and Maestro CLI. After app changes, build a fresh APK:
 
-```bash
+```sh
 scripts/build-learner-android.sh e2e
 ```
 
-The build writes `apps/learner-app/lrnki-learner-e2e.apk`. It is gitignored, must not be uploaded or
-distributed, enables cleartext only for the emulator fixture, and embeds
-`http://10.0.2.2:8799` as its learner API URL. A checked-out APK is not evidence that it matches the
-working tree; rebuild it whenever app code changes.
+The gitignored `apps/learner-app/lrnki-learner-e2e.apk` embeds `http://10.0.2.2:8799` and enables
+cleartext for the fixture. Never upload or distribute it. Rebuild after app changes; an existing APK
+does not establish correspondence to the working tree.
 
-For iOS, keep a fresh Debug build and Metro server running against the fixture origin:
-
-```bash
-EXPO_PUBLIC_LEARNER_API_URL=http://127.0.0.1:8799 pnpm dev:ios
-```
-
-The iOS runner fails closed unless exactly one simulator is booted (or `--device <udid>` selects
-one), the configured bundle is installed, and Metro answers at `http://127.0.0.1:8881/status`.
-
-## Run
+## Android execution
 
 From the repository root:
 
-```bash
+```sh
 caffeinate -dimsu pnpm e2e:native:maestro
-caffeinate -dimsu pnpm e2e:native:maestro --device emulator-5554
 ```
 
-The runner fails closed when tools, the APK, or an unambiguous ready device are missing. It starts
-the fixture on `:8799`, installs the APK, passes the fixture-only identity and production-created
-Guardian challenge ids to Maestro, runs each flow separately, then stops the fixture. JUnit and
-screenshot evidence lands in `tmp/2026-08-31-authored-learner-runtime/native/`.
-Set `NATIVE_MAESTRO` or `NATIVE_ADB` to exact compatible binaries when diagnosing a host-level
-tool regression; the selected binaries remain explicit evidence.
+The runner refuses missing tools/APK or ambiguous device selection. It starts the fixture on `:8799`,
+installs the APK, passes fixture identity and production-created challenge ids to Maestro, runs each
+flow separately, then stops the fixture. Use the runner's artifact directory for JUnit and screenshots.
+Set `NATIVE_MAESTRO` or `NATIVE_ADB` to exact compatible binaries when diagnosing tool regressions and
+record the selected binaries.
 
-For the required narrow run, set a 1080 px-wide emulator to 540 dpi, then restore it even after a
-failure:
+For the required narrow run, select a 1080 px-wide emulator from `adb devices -l` and set
+`LRNKI_EMULATOR_SERIAL` to its serial. Apply 540 dpi and restore density even after failure:
 
-```bash
-adb -s emulator-5554 shell wm density 540
-pnpm e2e:native:maestro --device emulator-5554
-adb -s emulator-5554 shell wm density reset
+```sh
+(
+  set -e
+  trap 'adb -s "$LRNKI_EMULATOR_SERIAL" shell wm density reset' EXIT
+  adb -s "$LRNKI_EMULATOR_SERIAL" shell wm density 540
+  pnpm e2e:native:maestro --device "$LRNKI_EMULATOR_SERIAL"
+)
 ```
 
-Maestro and `adb` do not interpret ambient device selection identically, so the runner resolves one
-serial and passes it to both. If installation reports an incompatible signature, the runner removes
-only the configured app id and retries once; that removal erases the resident app's local data.
+The runner passes one resolved serial to both Maestro and `adb`. An incompatible-signature install
+removes only the configured app id and retries once, erasing that app's local data.
 
-Keep the host awake and unlocked. Emulator System UI or autofill overlays invalidate a product
-claim; stabilize the host/AVD and rerun instead of treating coordinates, sleeps, or repeated taps as
-a fix.
+Keep the host awake and unlocked. System UI/autofill overlays invalidate product claims; stabilize
+the host/AVD before rerunning. Coordinates, sleeps, and repeated taps are not a repair.
 
-### iOS Debug simulator
+## iOS Debug simulator
 
-With `pnpm dev:ios` still serving Metro, run:
+Keep a fresh Debug build and Metro server running against the fixture:
 
-```bash
+```sh
+EXPO_PUBLIC_LEARNER_API_URL=http://127.0.0.1:8799 pnpm dev:ios
+```
+
+Then run:
+
+```sh
 pnpm e2e:native:maestro:ios
-pnpm e2e:native:maestro:ios --device <simulator-udid>
 ```
 
-The runner owns three host/tooling corrections that are prerequisites to meaningful app evidence:
+The runner requires one booted simulator, the installed bundle, and Metro at
+`http://127.0.0.1:8881/status`. With multiple booted simulators, select one using `--device` and its
+UDID from `xcrun simctl list devices booted`.
 
-- Maestro enumerates Android endpoints even for an explicit iOS UDID. Its bundled DADB client
-  probes IPv4 `localhost:5555` directly; Docker Desktop can accept that socket as a non-ADB
-  listener and leave device discovery blocked before XCUITest starts. The runner scopes
-  `-Djava.net.preferIPv6Addresses=true` to the Maestro JVM so that unrelated IPv4 listener is not
-  mistaken for an Android emulator. XCUITest continues to use its explicit `127.0.0.1` endpoint.
-- `clearState` reinstalls an Expo Debug client and erases its remembered Metro endpoint. The flow
-  therefore opens the exact `exp+lrnki://expo-development-client` URL supplied by the runner.
-  `app.config.ts` disables the client-only onboarding, launch menu, and floating Tools button so
-  they cannot obscure learner controls; the standard simulator/device gesture still opens the
-  developer menu when a human needs it.
-- iOS Keychain data survives an app reinstall. `clearKeychain: true` is required before the auth
-  refusal/recovery path; `clearState` alone is not a clean Better Auth start.
+Preserve these host/tooling corrections:
 
-The single iOS flow covers keyboard-backed wrong-password recovery, Journal and board celebration,
-the exact first Lesson source disclosure, all three authored Leg titles, the Support dialog
-body/footer, both Guardian scopes, leaderboard rendering, and a no-reset process restart. Evidence
-lands in
-`tmp/2026-08-31-authored-learner-runtime/native-ios/`.
+- Maestro's DADB discovery probes IPv4 `localhost:5555` even with an iOS UDID; Docker Desktop can
+  accept that socket without speaking ADB and block discovery. The runner scopes
+  `-Djava.net.preferIPv6Addresses=true` to Maestro's JVM; XCUITest retains its explicit `127.0.0.1`
+  endpoint. Remove the correction only after a plain hierarchy probe and the whole flow pass without
+  it. Do not stop Docker, edit `/etc/hosts`, or add unbounded retries to work around it.
+- `clearState` reinstalls the Debug client and loses its Metro endpoint. The flow opens the runner's
+  exact `exp+lrnki://expo-development-client` URL. App config hides onboarding, the launch menu, and
+  the Tools button; the standard simulator/device gesture still opens the developer menu.
+- Keychain survives reinstall. `clearKeychain: true` is required for a clean auth refusal/recovery
+  path; `clearState` alone is insufficient.
 
-Do not replace the JVM-scoped hostname correction with stopping Docker Desktop, editing `/etc/hosts`,
-or an unbounded retry. If Maestro changes its discovery behavior, remove the correction only after a
-plain hierarchy probe and this whole flow pass without it.
+The iOS flow covers keyboard-backed wrong-password recovery, Journal/board celebration, first Lesson
+source disclosure, all Leg titles, Support body/footer, both Guardian scopes, leaderboard, and a
+no-reset process restart. It owns Debug-simulator integration smoke, without automatic visual
+regression authority. Use the runner's artifact directory for JUnit and screenshots.
 
 ## Fixture and selectors
 
-`server.ts` qualifies `content/`, creates one deterministic learner in `MemoryLearnerStateStore`,
-adopts and completes all 12 Critical Thinking Stops with production commands, wins each Leg
-Guardian, and creates real Leg-rematch and Expedition Guardian challenges. It exports the qualified
-first Stop/section/source, representative Support, and all three Leg titles to the flows rather than
-duplicating content prose. Every subsequent GET and `POST /game/commands` is delegated to the same
-`LearnerRuntime` used by learner-api. Answer keys remain server-side.
+[The fixture](server.ts) qualifies the catalog, creates one learner in `MemoryLearnerStateStore`,
+completes Critical Thinking through production commands, wins each Leg Guardian, and creates Leg
+rematch and Expedition challenges. It exports representative content keys and labels instead of
+copying prose into flows. Learner reads and commands delegate to `LearnerRuntime`; keys stay private.
 
-Identity is faked only at the wire seam. The committed `.invalid` address authenticates only against
-this fixture. The cookie name is `better-auth.session_token`, it is deliberately non-`Secure` for
-loopback HTTP, and `/auth/get-session` returns `null` without that cookie so `clearState: true`
-actually returns to the gate.
+Identity is faked at the wire seam. The committed `.invalid` address works only in this fixture. Its
+`better-auth.session_token` cookie is non-`Secure` for loopback HTTP; `/auth/get-session` returns
+`null` without it so clearing state returns to sign-in.
 
-Flows use accessibility labels and app-owned test ids, never coordinates or generated prose. A
-wait and its action must target the same node; scroll it to full visibility, assert it is enabled,
-then tap it. That rule prevents fixed chrome from intercepting an apparently visible descendant.
+Use accessibility labels and app-owned test ids, never coordinates or generated prose. A wait and
+its action must target the same node: scroll it fully into view, assert enabled, then tap, so fixed
+chrome cannot intercept an apparently visible descendant.

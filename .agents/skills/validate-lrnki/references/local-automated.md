@@ -1,39 +1,20 @@
 # Local automated validation
 
-Use this route for content structure, pure/runtime/store behavior, types, lint, builds, schema parity,
-and deterministic intercepted web.
-
-Start with the narrow owner:
+Use this route for deterministic structure, runtime/store contracts, types, lint, builds, and schema
+parity. Start with the owning workspace's test command:
 
 ```sh
-pnpm content:check
-pnpm --filter @lrnki/learner-runtime test
-pnpm --filter @lrnki/learner-api test
-pnpm --filter @lrnki/learner-app test
-pnpm --filter @lrnki/infrastructure-postgres test
+pnpm --filter <owning-workspace> test
 ```
 
-Escalate to:
+For content qualification and database schema parity, use the root README's
+[content](../../../../README.md#directly-authored-content) and
+[database](../../../../README.md#database) commands. Other narrow checks are declared in
+[package.json](../../../../package.json); the full gate is documented under
+[Validation](../../../../README.md#validation).
 
-```sh
-pnpm typecheck
-pnpm test
-pnpm lint
-pnpm build
-pnpm db:check
-pnpm e2e:web
-pnpm check
-```
+DB-backed tests must use `pnpm test:db`. It serializes destructive runs, exercises the migration
+matrix, resets only the `lrnki_test` application schemas, and then runs workspace suites.
 
-Run DB-backed tests separately:
-
-```sh
-pnpm test:db
-```
-
-`test:db` refuses any target except `lrnki_test`, serializes destructive runs, exercises the
-migration state matrix, resets only the test application schemas, and then runs workspace suites.
-Do not repoint it at development or shared data.
-
-Report exact counts and any skipped tests. A green automated gate is structural/behavioral evidence,
-not authored teaching-quality, real-backend, deployed, native, or physical evidence.
+Report exact counts and skipped tests. Content qualification proves structure and credit resolution;
+[semantic acceptance](../../../../content/AUTHORING.md#semantic-quality-rubric) requires direct review.

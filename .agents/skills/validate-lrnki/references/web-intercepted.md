@@ -6,13 +6,10 @@ Run:
 pnpm e2e:web
 ```
 
-The rig exports a production-format Expo web artifact, serves it locally, and intercepts the entire
-learner API at owned phone and desktop viewports. It must fail any unmatched request.
+The rig exports a production-format Expo web artifact and intercepts the entire learner API at
+owned phone and desktop viewports. Fail every unmatched request. The
+[owned scenarios and fixtures](../../../../apps/learner-app/e2e/) define journey, auth recovery,
+loading/error, and retired-route absence assertions.
 
-Cover Journal/catalog, adoption/activation, authored trail, all Activity families, calibration,
-Support, Guardian, formation/reward, leaderboard, auth refusal/recovery, loading, and named error
-surfaces. Assert the absence of topic planning, generation progress, retry/polling, and deleted routes.
-
-Qualify the result as intercepted production-format web only. DTO fixtures prove client behavior and
-transport expectations; they do not prove Better Auth, Hono, Postgres, startup qualification, or a
-deployed route.
+Qualify this as Expo presentation against DTO fixtures. Better Auth, Hono, Postgres, and API startup
+are outside the exercised seam.

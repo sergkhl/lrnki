@@ -1,127 +1,94 @@
 # Authored Expedition guide
 
-This directory is learner content, not generated build output. Codex CLI is an offline author: it
-researches inspectable online sources, writes the exact `expedition.json` consumed by the learner
-server, runs the repository qualifier, and repairs every diagnostic. The repository has no Codex
-client, prompt, model port, compiler, package, installer, source fetcher, or database representation
-for content.
+Author the exact runtime document under [ADR-0042](../docs/adr/0042-author-expeditions-directly-without-runtime-models.md).
+The [content schema](../packages/learner-runtime/src/contentSchema.ts) owns shapes and the
+[qualifier](../packages/learner-runtime/src/contentQualifier.ts) owns structural/reference guarantees.
 
 ## Authoring loop
 
-1. Research the domain through current, inspectable online sources. Prefer open original or official
-   material and authoritative syntheses that support the exact claim; do not rely on remembered facts.
-2. Choose a coherent learner-visible route and author its Legs, Stops, prerequisites, lessons,
-   activities, Support Paths, and Guardian pools directly in `expedition.json`.
-3. Use lowercase kebab-case human-readable keys. Never add UUIDs, hashes, indexes, generated
-   identities, database keys, or derived route metadata.
-4. Run `pnpm content:check` from the repository root. Read every structured diagnostic and repair the
-   document; never suppress or weaken a refusal to admit one Expedition.
-5. Give a fresh-context reviewer only the learner-safe projection. The reviewer records every answer
-   and rationale before seeing private grading or opening sources, and notes teaching sufficiency,
-   cueing, pacing, Support use, and Guardian repetition.
-6. Then give the same reviewer the exact private document and every cited source. It inspects every
-   visible claim, answer, alternative, explanation, pair, impostor reveal, prerequisite, Support
-   target, difficulty step, and Guardian pool against the cited evidence.
-7. Record `PASS` or concrete `FIX_FIRST` findings in the active plan's Validation Log. Repair every
-   `FIX_FIRST` and re-run the same boundary on the exact repaired revision before acceptance.
+1. Research current, inspectable online sources. Prefer original or official material and
+   authoritative syntheses supporting the exact claims; remembered facts are insufficient.
+2. Author the Expedition directly in `expedition.json`, using lowercase kebab-case human-readable
+   keys and an explicit route. Do not add generated identities or derived route metadata.
+3. Run `pnpm content:check` from the repository root and repair every diagnostic without suppressing
+   or weakening a refusal.
+4. Give a fresh-context reviewer only the learner-safe projection. It records every answer and
+   rationale before seeing private grading or opening sources, noting teaching sufficiency, cueing,
+   pacing, Support use, and Guardian repetition.
+5. Give the same reviewer the exact private document and every cited source. Inspect every authored
+   surface against the [semantic quality rubric](#semantic-quality-rubric).
+6. Record `PASS` or concrete `FIX_FIRST` findings in the active plan's Validation Log. Repair every
+   `FIX_FIRST` and repeat the same review boundary on the exact repaired revision before acceptance.
 
-`pnpm content:check` proves structure and exact source-credit resolution. It does not prove that
-prose teaches, that a source supports a claim semantically, or that a route feels coherent. Those
-remain direct-inspection and real-use judgments.
+## Teaching and Activity design
 
-## Teaching depth
+Use enough Lesson sections to teach the objective before grading; do not add filler to meet a word
+or section count. Section kinds and exact reference resolution are not teaching-quality proxies.
 
-The old generation pipeline often reduced a lesson to one paragraph even when its source held
-several useful lines of evidence. Direct authoring resolves that supply problem without replacing it
-with a word-count target. The learner-visible goal is a compact lesson that gives the learner enough
-of a mental model to reason before being graded.
+A worked example may scaffold acquisition. Higher-band and Guardian-eligible Activities require
+transfer to a fresh setting, preserving the reasoning structure without repeating the example's
+objects and answer-bearing contrast.
 
-For each Stop:
-
-- state the idea in language appropriate to the declared audience;
-- show how to recognize or use it, preferably with a concrete contrast or worked example;
-- surface the misconception most likely to produce a tempting wrong answer;
-- explain what changes in a judgment or decision when the idea is applied;
-- use as many distinct sections as those teaching moves require, ordinarily two to four, and never
-  add filler merely to meet a count;
-- keep one section only when it genuinely teaches the complete small idea rather than merely naming
-  it;
-- ensure every activity is answerable from the lesson and its cited source, while avoiding copy that
-  simply gives away the answer by position or formatting.
-
-A worked example may scaffold first acquisition, but difficulty and Guardian authority require
-transfer. Higher-band and Guardian-eligible Activities use a fresh setting whose underlying
-reasoning structure is the same; they do not repeat the worked example's objects and answer-bearing
-contrast closely enough to reward recall of the example.
-
-Section kinds are not a proxy for quality. Exact source resolution establishes provenance; direct
-inspection establishes whether the source supports the authored teaching. Authored prose is never
-misrepresented as a source quotation.
+Alternatives must remain plausible under a named local misconception and comparable in length,
+tone, qualification, and grammatical fit. The correct answer must not be identifiable as the
+longest, most polished, least absolute, or only carefully bounded choice.
 
 ## Route and game contract
 
-- Array order is instructional order. Author exactly three Legs with four to seven Stops each and
-  only reference prerequisite Stops that occur earlier in the Expedition.
-- Every Stop has one lesson and at least one option-select activity. Every Expedition contains
-  option-select, matching, and impostor play; each Leg contains matching or impostor play that is
-  available in its Guardian pool.
-- Options must be mutually distinguishable in the context of the prompt. Matching must be a genuine
-  bijection with unique left and right labels. An impostor activity has exactly one false statement,
-  at least two source-supported truths, and a reveal that explains the distinction.
-- All alternatives remain plausible under a named local misconception and comparable in length,
-  tone, qualification, and grammatical fit. The correct response is not identifiable as the longest,
-  most polished, least absolute, or only carefully bounded choice.
-- Learner-safe correctness is a presentation property, not merely a field-removal property. Public
-  option, statement, and matching-column order is stable for one Activity but derived independently
-  from authored order; no universal position or transform may reveal an answer or pair map.
-- Guardian pools reference existing activity keys. A Leg pool references only activities in that
-  Leg. The Expedition pool exercises all three families.
-- `requires` expresses necessary learning order, not a desire to make a trail look linear. Do not
-  add a prerequisite when a learner can understand the Stop independently.
+Follow the schema's Leg/Stop limits and the qualifier's Activity-family and Guardian-pool rules.
+Array order is instructional order. Prerequisites reference earlier Stops only and express necessary
+learning order; do not add dependencies merely to make a trail look linear.
+
+Use the [mastery/game policy](../docs/adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md)
+when choosing pacing and challenges. Learner-safe correctness includes presentation order: no
+universal option position, statement position, or matching transform may reveal a key. Public order
+is stable for an Activity and derived independently of authored order.
 
 ## Exact-reference Support Paths
 
-An Explorable Term is an exact substring in one rendered lesson section. It names one Support Path
-on that Stop. The Support Path explicitly references one or more option-select activities on other
-Stops in the same Expedition; it never points back to its parent Stop.
+An Explorable Term must be an exact substring in a rendered Lesson section and name a Support Path
+on that Stop. Each path explicitly references option-select Activities on other Stops in the same
+Expedition, never its parent.
 
-Choose a Support target that actually helps the learner repair the local confusion. There is no
-label search, generated fallback, retry, polling, or generating/failed Support state. A missing or
-poor destination is an authoring defect to repair in the document.
+Choose targets that repair the term's likely confusion. A missing or poor destination is an authoring
+defect; there is no search or generated fallback. Runtime evidence and visibility follow
+[the Support decision](../docs/adr/0037-persist-learner-scoped-scaffold-detours.md).
 
 ## Source credits and disclosures
 
-Each Expedition owns one keyed `sourceCredits` collection. Every Lesson section and every
-answer-bearing explanation carries a non-empty ordered `sourceCreditKeys` array whose keys resolve
-inside that Expedition. Credits identify the source with a canonical public HTTPS URL, learner-useful
-title and authority metadata, an access date, and version/date information when the source exposes it.
+Assign Source Credits to each claim's supporting evidence. A page naming a technique is insufficient
+for a procedure unless it explains that procedure; add a supporting source or narrow the teaching.
+Shared vocabulary and link reachability do not establish support.
 
-Source credit assignment is claim-specific: a page that names a technique does not support an
-authored procedure unless it substantively explains that procedure. Add a directly inspectable
-source that teaches the operation or narrow the teaching and grading to what the cited material
-actually establishes. Shared vocabulary and link reachability are never semantic evidence.
+Follow the source schema for credit metadata and ordered references. Preserve a canonical public
+HTTPS URL, a learner-useful title and authority, the access date, and source version/date when
+available. Teaching remains original prose and must not be presented as a source quotation.
 
-Authored teaching remains original prose; do not copy source passages or keep a second tracked source
-packet. Source credits and Lesson references are public. Activity explanation references remain
-private until grading reveals the explanation. No source fetch occurs in build or runtime, and link
-availability is never a learner-api startup dependency.
+Lesson references are public before grading. Explanation references stay private until the graded
+explanation is revealed, under [the API boundary](../docs/adr/0035-separate-learner-app-static-spa-typed-api.md).
 
 ## Semantic quality rubric
 
-Record `FIX_FIRST` for any of these:
+Inspect every Lesson, Activity, answer, alternative, explanation, pair, impostor reveal, prerequisite,
+Explorable Term, Support target, difficulty step, and Guardian pool. Record `FIX_FIRST` for:
 
-- a learner-visible material claim is unsupported by its cited online evidence;
-- an answer is incorrect, non-unique, or distinguishable only through a trick unrelated to mastery;
-- a lesson or activity assumes knowledge across an unsatisfied prerequisite;
-- a Support destination does not repair the term's likely confusion;
-- the authored order does not form a coherent completable route;
-- a Guardian pool cannot exercise the mastery it claims to protect;
-- private correctness information appears in a pre-answer learner view.
+- a material claim unsupported by its cited online evidence, or a Lesson insufficient to reason
+  through its Activities;
+- an incorrect/non-unique answer, implausible alternatives, or correctness cued independently of
+  mastery; Matching must be a genuine bijection and each impostor board must have exactly one false
+  statement, at least two supported truths, and a useful reveal;
+- an explanation that fails to support the keyed distinction, or displayed credits that do not
+  resolve to the exact authored source metadata at the required point in grading;
+- prerequisite leakage or an incoherent, incomplete route;
+- an unrendered Explorable Term or a Support destination that does not repair its local confusion;
+- a difficulty curve acting as a hidden prerequisite, or Guardian pools that are unwinnable or cannot
+  exercise the mastery they claim to protect;
+- private correctness in a pre-answer view, including truth kinds, pair maps, positional channels,
+  or server content objects.
 
-Sparse coverage, explicit asset absence, uncertain optional edges, and non-material wording,
-difficulty, or ordering imperfections are safe incompleteness only when they cannot change source
-support, grading, prerequisite closure, or completion. Record them without weakening qualification.
+Record review agreement and uncertainty. Sparse coverage, explicit asset absence, uncertain optional
+edges, and non-material wording, difficulty, or ordering imperfections may remain only when they
+cannot change source support, grading, prerequisite closure, or completion.
 
-A `PASS` is bounded to the exact sources and authored claims inspected on the recorded revision. It
-does not establish independent factual truth, support arbitrary external sources, or promise that a
-source URL will never move.
+A `PASS` is bounded to the exact sources, authored claims, and revision inspected. It does not prove
+independent factual truth, support arbitrary external sources, or guarantee future URL availability.
