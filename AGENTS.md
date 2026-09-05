@@ -64,7 +64,7 @@ repair their references in the same change.
 1. This is greenfield development. Breaking changes and guarded local development/test database
    resets are allowed; do not preserve compatibility unless explicitly requested.
 
-2. Enforce [ADR-0001](docs/adr/0001-adopt-greenfield-deep-module-architecture.md). Prefer one deep
+2. Enforce [ADR-0035](docs/adr/0035-separate-learner-app-static-spa-typed-api.md). Prefer one deep
    learner-runtime interface to transport-shaped helpers or duplicated policy.
 
 3. Use the project language in [CONTEXT.md](CONTEXT.md).
@@ -97,8 +97,7 @@ repair their references in the same change.
 10. Tracked learner sources and documents belong under `content/`; reports, screenshots, generated
     build artifacts, and scratch output belong in gitignored `tmp/`.
 
-11. Enforce [ADR-0013](docs/adr/0013-verify-quality-by-real-source-inspection.md) and
-    [ADR-0028](docs/adr/0028-measure-non-deterministic-quality-with-non-deterministic-methods.md).
+11. Enforce [ADR-0013](docs/adr/0013-verify-quality-by-real-source-inspection.md).
     A green deterministic suite does not establish authored teaching quality.
 
 12. A deterministic qualifier may hard-veto only a provable structural guarantee. Semantic source

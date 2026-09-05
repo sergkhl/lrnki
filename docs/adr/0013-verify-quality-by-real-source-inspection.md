@@ -2,22 +2,14 @@
 
 Status: Accepted
 
-## Decision
+Teaching sufficiency, semantic source support, difficulty, route coherence, Support usefulness, and
+Guardian appropriateness require direct inspection and real use. Every learner-visible teaching and
+grading surface is inspected against its cited online evidence on the exact authored revision.
 
-Teaching and answer quality are established by inspecting every learner-visible claim, answer,
-explanation, pair, impostor reveal, Support destination, and Guardian pool against the exact online
-evidence cited by that authored surface. Structural qualification proves only deterministic
-guarantees and exact credit-key resolution; it cannot declare semantic support or instructional
-coherence.
+Deterministic qualifiers may veto only provable structural and reference guarantees. Counts, lexical
+overlap, and similar proxies cannot establish semantic quality: they would replace the reviewer's
+uncertainty with a false mechanical oracle.
 
-Record `PASS` or `FIX_FIRST` in the active plan. An unsupported material claim, incorrect or
-non-unique key, prerequisite leak, unhelpful Support target, or incoherent route is `FIX_FIRST` and
-must be repaired before acceptance. A `PASS` is bounded to the exact cited sources, authored claims,
-and document revision inspected; it is not independent factual verification or evidence for
-arbitrary sources.
-
-## Context
-
-A deterministic oracle for nuanced teaching would duplicate the content authority and turn surface
-similarity into truth. Direct, reviewable inspection keeps the judgment honest while automated tests
-retain high leverage over the structural envelope.
+The [authoring guide](../../content/AUTHORING.md#authoring-loop) owns the review sequence and
+[acceptance rubric](../../content/AUTHORING.md#semantic-quality-rubric), including bounded `PASS`
+claims and mandatory repair of `FIX_FIRST` findings.

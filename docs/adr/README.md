@@ -5,14 +5,10 @@ scope, amendment, and retirement rules live in [AGENTS.md](../../AGENTS.md#docum
 
 ## Current decisions
 
-- [0001 — Greenfield deep-module architecture](./0001-adopt-greenfield-deep-module-architecture.md)
 - [0003 — PostgreSQL only for identity and learner state](./0003-use-postgres-json-table-artifact-store.md)
 - [0013 — Direct authored-source quality inspection](./0013-verify-quality-by-real-source-inspection.md)
 - [0024 — Authored comparative difficulty bands](./0024-learner-neutral-intrinsic-difficulty.md)
 - [0026 — Authored Activities and learner-response identity](./0026-typed-study-item-bank.md)
-- [0027 — One learner-runtime projection boundary](./0027-serve-inspection-through-read-model-ports.md)
-- [0028 — Judgment-based authored quality measurement](./0028-measure-non-deterministic-quality-with-non-deterministic-methods.md)
-- [0031 — Lessons teach before Activities test](./0031-concept-lesson-teaching-substrate.md)
 - [0032 — Mastery-aligned Learner App game UX](./0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md)
 - [0033 — Authored keys and one themed vocabulary mapping](./0033-plain-identifiers-single-themed-vocabulary-mapping.md)
 - [0035 — Universal Expo app over typed Hono API](./0035-separate-learner-app-static-spa-typed-api.md)
