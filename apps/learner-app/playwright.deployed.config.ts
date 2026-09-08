@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-// The deployed smoke loads the real Pages artifact but intercepts its only API read. Keep this
+// The deployed smoke loads the real Caddy artifact but intercepts the learner API. Keep this
 // assignment in the config so every invocation uses the production API origin baked into that
 // artifact while the shared fixture fulfills the request before it reaches the network.
 process.env.E2E_API_ORIGIN = "https://api.lrnki.globesoul.com";

@@ -35,7 +35,7 @@ type ExpoSessionPlugin = Omit<ReturnType<typeof expoClient>, "getActions"> & {
 export const authClient = createAuthClient({
   baseURL: API_URL,
   basePath: "/auth",
-  // Web only: the cookie is HttpOnly and cross-origin (Pages ↔ VPS api), so every auth call
+  // Web only: the cookie is HttpOnly and cross-origin (web hostname ↔ API hostname), so every auth call
   // must opt in or the browser neither sends nor stores it. The expo plugin sets its own
   // credentials mode on native, where there is no browser jar to opt into.
   ...(IS_WEB ? { fetchOptions: { credentials: "include" as const } } : {}),

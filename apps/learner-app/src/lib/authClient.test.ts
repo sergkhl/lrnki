@@ -64,7 +64,7 @@ test("web opts the browser's HttpOnly cookie in, and never invents a cookie head
   mockStoredCookie = "lrnki.session_token=leaked";
   const { sessionTransport: transport } = loadAuthClient("web");
 
-  // The cookie is cross-origin (Pages web ↔ VPS api) and HttpOnly: without `include` the
+  // The cookie is cross-origin (web hostname ↔ API hostname) and HttpOnly: without `include` the
   // browser neither sends nor stores it, and a header is impossible — reading one here could
   // only mean the app is holding a credential it must not have.
   expect(transport.init.credentials).toBe("include");

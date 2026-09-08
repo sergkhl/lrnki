@@ -5,9 +5,19 @@
 .env
 .env.*
 !.env.example
+**/.env
+**/.env.*
+!**/.env.example
+.data
+.cache
+.local
+.venv
 node_modules
 **/node_modules
 tmp
+**/tmp
+test-results
+**/test-results
 dist
 **/dist
 **/dist-e2e
@@ -26,3 +36,5 @@ apps/learner-app/lrnki-learner-*.apk
 docs
 fixtures
 .git
+# An older shared PostgreSQL container can still bind this retired, host-preserved initializer.
+scripts/docker/postgres/01-init-litellm-db.sql

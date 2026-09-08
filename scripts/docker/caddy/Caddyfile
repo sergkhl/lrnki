@@ -1,5 +1,5 @@
-# Public TLS terminator for the learner API (U2). Caddy auto-provisions a Let's Encrypt
-# certificate for this hostname (A record → VPS IP). Caddy overwrites any incoming
+# Public TLS terminator for the learner website and API. Caddy auto-provisions certificates
+# for their hostnames (A records → VPS IP). Caddy overwrites any incoming
 # X-Forwarded-For with the real client IP by default, so the session rate limiter's
 # first-XFF read is not spoofable — no application change needed.
 #
@@ -10,4 +10,24 @@
 # only convert a restart-window 502 into a 503.
 api.lrnki.globesoul.com {
 	reverse_proxy learner-api:8787
+}
+
+lrnki.globesoul.com {
+	root * /srv/lrnki
+	encode zstd gzip
+
+	# Expo's asset namespaces must fail with 404, never a successful HTML fallback.
+	@assets path /_expo/* /assets/* /favicon.ico
+	handle @assets {
+		file_server
+	}
+
+	handle {
+		# Apply the HTML header after rewriting a client route to the SPA shell.
+		route {
+			try_files {path} /index.html
+			header /index.html Cache-Control "public, max-age=0, must-revalidate"
+			file_server
+		}
+	}
 }

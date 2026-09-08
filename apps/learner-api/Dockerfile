@@ -16,5 +16,8 @@ WORKDIR /app
 COPY . .
 RUN pnpm install --frozen-lockfile --filter @lrnki/learner-api...
 
+ARG LRNKI_DEPLOY_REVISION=development
+LABEL org.opencontainers.image.revision=$LRNKI_DEPLOY_REVISION
+
 # tsx runs the ESM TypeScript entrypoint directly — no build step, matching the dev runtime.
 CMD ["node_modules/.bin/tsx", "apps/learner-api/src/index.ts"]

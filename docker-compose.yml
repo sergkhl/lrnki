@@ -79,6 +79,8 @@ services:
     build:
       context: .
       dockerfile: apps/learner-api/Dockerfile
+      args:
+        LRNKI_DEPLOY_REVISION: ${LRNKI_DEPLOY_REVISION:-development}
     # Pinned explicitly, not left to compose's `<project>-<service>` default: the `migrate` service
     # above references this tag, and a project-name override would otherwise repoint it.
     image: lrnki-learner-api
@@ -133,11 +135,9 @@ services:
         - action: rebuild
           path: ./pnpm-lock.yaml
 
-  # Public TLS terminator (U2): owns 80/443 and reverse-proxies to the learner API. Nothing else
-  # on the VPS owns those ports, so Caddy joins this compose file directly. The Caddyfile is baked
-  # into a built image (not bind-mounted — the daemon's FS view diverges from the checkout, so
-  # file binds break); config change => `docker compose up -d --build caddy`. Caddy reaches its one
-  # upstream over the lrnki network, so it needs no route to the host (ADR-0040).
+  # Public web delivery: Caddy serves the Expo export and reverse-proxies the API hostname.
+  # Both the SPA and Caddyfile are baked into the image; only certificate/config storage persists.
+  # Caddy reaches its API upstream over the lrnki network (ADR-0040).
   #
   # Profiled because it is meaningful only on the host that owns the public hostname. Off that host
   # it endlessly retries ACME for api.lrnki.globesoul.com — which cannot succeed, since Let's Encrypt
@@ -146,7 +146,11 @@ services:
   # profiled service explicitly (it passes `caddy` to both build and up) activates its profile.
   caddy:
     build:
-      context: ./scripts/docker/caddy
+      context: .
+      dockerfile: scripts/docker/caddy/Dockerfile
+      args:
+        LRNKI_DEPLOY_REVISION: ${LRNKI_DEPLOY_REVISION:-development}
+    image: lrnki-caddy
     container_name: lrnki-caddy
     profiles: ["public"]
     networks:

@@ -150,6 +150,42 @@ Deploy from the saved deploy checkout on that host:
 scripts/deploy-learner-api.sh
 ```
 
-The script refuses a running Compose watcher, optionally fast-forwards Git, builds the API/Caddy
-images, waits for Postgres, verifies/applies the migration, and recreates and verifies the API and
-public TLS route. A refused migration leaves the previous API running. It never resets a database.
+The script requires a clean checkout, refuses a running Compose watcher, optionally fast-forwards
+Git, and builds the API and Caddy images with the release commit in their image labels. Caddy's
+multi-stage build exports the Expo SPA with the production API origin and includes only public
+files in the final serving image. It serves `https://lrnki.globesoul.com`; the API remains at
+`https://api.lrnki.globesoul.com`. Both DNS-only A records point to `31.220.78.189`.
+
+Deployment reuses the healthy PostgreSQL container, which can host unrelated databases. It creates
+Postgres only when missing and refuses an unhealthy existing container; it does not reconcile its
+configuration. Migration runs before application replacement, then the API and Caddy start detached
+with `--no-deps`. A refused migration leaves the previous API running. The script never resets a
+database. A separately authorized reset uses the [guarded reset](#guarded-development-reset) after
+the new images are built and validated and the old API is stopped.
+
+When reusing an older PostgreSQL container, preserve any retired initializer it still bind-mounts
+at the existing host path until an explicitly scheduled PostgreSQL recreation removes that mount.
+Keep that host-only file in `.git/info/exclude` and outside Docker build inputs; deleting a live bind
+source can prevent a later container restart even though the running database remains healthy.
+
+For an exact revision transferred to the saved host checkout, set `LRNKI_SKIP_GIT_PULL=1`. To prepare
+images before an authorized reset, build them from the clean release checkout:
+
+```sh
+export LRNKI_DEPLOY_REVISION="$(git rev-parse HEAD)"
+docker compose build learner-api caddy
+docker run --rm --network none --entrypoint caddy lrnki-caddy validate --config /etc/caddy/Caddyfile
+```
+
+Then `LRNKI_SKIP_GIT_PULL=1 LRNKI_SKIP_BUILD=1 scripts/deploy-learner-api.sh` deploys those images,
+refusing labels that do not match the checkout. Health probes verify the running image, API origin,
+public API TLS, and byte-for-byte equality between the public SPA shell and the running Caddy image.
+`LRNKI_API_HEALTH_URL` and `LRNKI_WEB_URL` override probe URLs; changing the served domains also
+requires matching Caddy, Expo, and authentication configuration.
+
+The SPA serves assets directly, returns 404 for missing assets, and serves `index.html` for client
+routes, including direct Expedition and Guardian links. HTML revalidates to avoid stale bundle
+references, following [Caddy's SPA pattern](https://caddyserver.com/docs/caddyfile/patterns#single-page-apps-spas)
+and [Expo's single-page export model](https://docs.expo.dev/guides/publishing-websites/).
+GitHub Pages is no longer a deployment target. Apply the [deployed validation route](.agents/skills/validate-lrnki/references/deployed.md)
+for browser checks; HTTP availability alone does not prove an authenticated learner journey.
