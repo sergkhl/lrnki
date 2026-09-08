@@ -10,5 +10,4 @@ Live coordination and implementation order. Lifecycle adoption and overrides liv
 
 ## Active implementation plans (execution order)
 
-1. [Focused learning cards and main-journey UX](2026-09-08-focused-learning-cards.md) — validated;
-   preserve its validation record, then retire the implemented plan.
+_None._
