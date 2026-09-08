@@ -9,6 +9,8 @@ export default defineConfig({
   testDir: "./e2e",
   testMatch: ["oauth-return.spec.ts", "deep-links.spec.ts"],
   fullyParallel: true,
+  // Routing fixtures disable browser HTTP caching; serialize downloads from the public origin.
+  workers: 1,
   forbidOnly: !!process.env.CI,
   retries: 0,
   reporter: [["list"], ["html", { outputFolder: "tmp/e2e-deployed-report", open: "never" }]],
