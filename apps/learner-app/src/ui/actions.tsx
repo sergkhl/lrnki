@@ -165,7 +165,7 @@ export function Button({
   className?: string;
   testID?: string;
 }>) {
-  const height = size === "default" ? "h-control" : "h-target";
+  const height = size === "default" ? "min-h-control" : "min-h-target";
   const textVariant: TextVariant = "label";
   return (
     <PressableSurface
@@ -176,13 +176,13 @@ export function Button({
       expanded={expanded}
       haptic={haptic}
       onPress={onPress}
-      className={`${height} flex-row items-center justify-center gap-2 rounded-control px-4 ${BUTTON_BOX[variant]} ${disabled ? "opacity-50" : ""} ${className ?? ""}`}
+      className={`${height} min-w-0 shrink flex-row items-center justify-center gap-2 rounded-control px-[16px] py-[8px] ${BUTTON_BOX[variant]} ${disabled ? "opacity-50" : ""} ${className ?? ""}`}
       pressedClassName={BUTTON_PRESSED[variant]}
     >
       {/* Busy keeps the label footprint (dimensions stay stable) and overlays a spinner. */}
-      <View className={`flex-row items-center justify-center gap-2 ${busy ? "opacity-0" : ""}`}>
+      <View className={`min-w-0 shrink flex-row items-center justify-center gap-2 ${busy ? "opacity-0" : ""}`}>
         {icon}
-        <AppText variant={textVariant} color={BUTTON_TEXT_COLOR[variant]}>
+        <AppText variant={textVariant} color={BUTTON_TEXT_COLOR[variant]} className="min-w-0 shrink text-center">
           {label}
         </AppText>
       </View>

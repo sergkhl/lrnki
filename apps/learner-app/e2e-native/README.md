@@ -1,40 +1,49 @@
 # Native Maestro gates
 
-Android runs a standalone Debug e2e APK on an emulator; iOS runs a Debug simulator build through the
+Android runs a standalone e2e APK on the connected physical device; iOS runs a Debug simulator build through the
 Expo development client. Both use a loopback fixture with the tracked catalog, production content
 qualifier, and learner runtime. Fixture identity and in-memory state replace auth persistence and
-Postgres. Neither gate touches a real database, deployment, or physical device.
+Postgres. Neither gate touches a real database or deployment.
 
 [AGENTS.md](../../../AGENTS.md#validation-authority) owns evidence authority. The platform results
-remain distinct integration evidence, separate from distributable and physical passes.
+remain distinct integration evidence, separate from distributable and user-recorded physical acceptance.
 
 ## Scenario claims
 
-- `android-runtime-reliability.yaml` retains automatic authority for the Support Path dialog at
-  320 dp. Title, body, footer, and close/restore assertions are required. Body/footer assertions
-  detect the historical isolated dialog-collapse mutant; a title-only assertion did not. The flow
-  also covers the first Lesson's compact source disclosure and all authored Leg titles through
-  fixture-supplied keys.
-- The swipe reaching Support is navigation evidence, not the physical-device-owned touch-responder
-  class.
-- `signin.yaml` covers a visible wrong-password refusal followed by a successful session. Other
+- `android-runtime-reliability.yaml` runs the shared focused-learning scenario: theory
+  progression, a source dialog, instant question submission with held feedback, contextual Support
+  body/footer and return, and Leg titles in the Trail drawer. The fixture supplies authored selectors.
+  This is integration smoke. The replaced centered Support dialog's historical collapse oracle and
+  physical correlation do not grant automatic visual authority to the new full-screen flow.
+- Scrolling to Help establishes automated navigation on the recorded target; it does not establish
+  user-recorded touch or visual acceptance.
+- `signin.yaml` covers signup reflow with the software keyboard open, a visible wrong-password
+  refusal, and a successful session. Other
   scenarios use fixture-only one-tap sign-in through the app's Better Auth cookie path.
 - `crystal-guardian-obelisk.yaml` closes the first-visit board celebration before capturing Leg and
   Expedition Guardians. Its screenshots have judgment authority only.
 
-To requalify the Support class, run the positive flow and an isolated behavior-only negative control
-that must fail at the body/footer assertion. Retain the correlated user-recorded physical pass in
-this README before granting automatic authority. Other visual/smoke results do not inherit it.
+The focused flow waits for the enabled Trail trigger and confirms the drawer is open before
+scrolling. It must reach the third Leg, beyond the initial viewport. Native dismissible overlays
+keep the backdrop beside their content and remove the primitive Content's responder claim;
+making the backdrop a pressable ancestor blocked the Trail's iOS ScrollView. Preserve this
+gesture boundary in [the overlay implementation](../src/ui/overlays.tsx), following React Native's
+[responder negotiation](https://reactnative.dev/docs/gesture-responder-system).
+
+To establish automatic authority for the new Support presentation, first define a behavior-only
+negative control that fails its body/footer oracle and record a correlated user-initiated physical
+pass here. No such authority is claimed by the focused-flow integration smoke.
 
 ## Prerequisites and build
 
-Use JDK 17, the Android SDK, a booted emulator, and Maestro CLI. After app changes, build a fresh APK:
+Use JDK 17, the Android SDK, a connected and unlocked Android device with USB debugging authorized,
+and Maestro CLI. After app changes, build a fresh APK:
 
 ```sh
 scripts/build-learner-android.sh e2e
 ```
 
-The gitignored `apps/learner-app/lrnki-learner-e2e.apk` embeds `http://10.0.2.2:8799` and enables
+The gitignored `apps/learner-app/lrnki-learner-e2e.apk` embeds `http://127.0.0.1:8799` and enables
 cleartext for the fixture. Never upload or distribute it. Rebuild after app changes; an existing APK
 does not establish correspondence to the working tree.
 
@@ -46,29 +55,31 @@ From the repository root:
 caffeinate -dimsu pnpm e2e:native:maestro
 ```
 
-The runner refuses missing tools/APK or ambiguous device selection. It starts the fixture on `:8799`,
-installs the APK, passes fixture identity and production-created challenge ids to Maestro, runs each
-flow separately, then stops the fixture. Use the runner's artifact directory for JUnit and screenshots.
+The runner selects the single ready physical device and pins its serial for both `adb` and Maestro.
+With multiple connected physical devices, select one from `adb devices -l` using
+`pnpm e2e:native:maestro --device <serial>` or `NATIVE_DEVICE`. Offline and unauthorized targets refuse.
+An emulator requires an explicit user/plan selection and `--device`; it is never a silent fallback.
+
+The runner refuses missing tools/APK or ambiguous selection. It starts the fixture on `:8799`, uses
+[ADB reverse](https://reactnative.dev/docs/running-on-device#method-1-using-adb-reverse-recommended)
+to connect the device's loopback API to the local fixture, installs the APK, passes fixture identity
+and production-created challenge ids to Maestro, runs each flow separately, then stops the fixture
+and removes only its own reverse mapping. Existing mappings are preserved or cause a refusal if
+they conflict. `NATIVE_FIXTURE_PORT` can select a different host port; the APK still uses device port 8799.
+Use the runner's artifact directory for JUnit, screenshots, and `device.json`, which records the APK
+hash, pinned model/serial/OS, display settings, and fixture endpoint.
 Set `NATIVE_MAESTRO` or `NATIVE_ADB` to exact compatible binaries when diagnosing tool regressions and
 record the selected binaries.
 
-For the required narrow run, select a 1080 px-wide emulator from `adb devices -l` and set
-`LRNKI_EMULATOR_SERIAL` to its serial. Apply 540 dpi and restore density even after failure:
-
-```sh
-(
-  set -e
-  trap 'adb -s "$LRNKI_EMULATOR_SERIAL" shell wm density reset' EXIT
-  adb -s "$LRNKI_EMULATOR_SERIAL" shell wm density 540
-  pnpm e2e:native:maestro --device "$LRNKI_EMULATOR_SERIAL"
-)
-```
+Preserve the connected device's existing size, density, and font scale. Record them instead of
+resetting them. The intercepted layout suite owns the deterministic 320 by 568 and 200% text checks;
+an explicitly requested narrow native configuration is a separate run with its own evidence.
 
 The runner passes one resolved serial to both Maestro and `adb`. An incompatible-signature install
 removes only the configured app id and retries once, erasing that app's local data.
 
-Keep the host awake and unlocked. System UI/autofill overlays invalidate product claims; stabilize
-the host/AVD before rerunning. Coordinates, sleeps, and repeated taps are not a repair.
+Keep the host and device awake and unlocked. System UI/autofill overlays invalidate product claims;
+stabilize the selected target before rerunning. Coordinates, sleeps, and repeated taps are not a repair.
 
 ## iOS Debug simulator
 
@@ -101,9 +112,9 @@ Preserve these host/tooling corrections:
 - Keychain survives reinstall. `clearKeychain: true` is required for a clean auth refusal/recovery
   path; `clearState` alone is insufficient.
 
-The iOS flow covers keyboard-backed wrong-password recovery, Journal/board celebration, first Lesson
-source disclosure, all Leg titles, Support body/footer, both Guardian scopes, leaderboard, and a
-no-reset process restart. It owns Debug-simulator integration smoke, without automatic visual
+The iOS flow covers keyboard-backed wrong-password recovery, Journal/board celebration, focused
+theory and question feedback, source disclosure, Trail Leg titles, Support body/footer and return,
+both Guardian scopes, leaderboard, and a no-reset process restart. It owns Debug-simulator integration smoke, without automatic visual
 regression authority. Use the runner's artifact directory for JUnit and screenshots.
 
 ## Fixture and selectors

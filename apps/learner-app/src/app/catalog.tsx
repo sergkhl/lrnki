@@ -2,25 +2,20 @@ import { useMemo, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { ArrowLeft, BookOpen } from "lucide-react-native";
+import { ArrowLeft } from "lucide-react-native";
 
-import { SourceCreditList } from "@/components/SourceCredits";
+import { SourceCreditsButton } from "@/components/SourceCredits";
 import { dispatchLearnerCommand } from "@/lib/actions";
+import { commandFeedback, learnerTerm } from "@/learn/vocabulary";
 import { catalogQuery, type CatalogView } from "@/lib/queries";
 import {
-  Badge,
   Button,
   Card,
-  Dialog,
-  DialogBody,
-  DialogFooter,
   Input,
-  OverlayHeader,
   RouteStatus,
   Screen,
   Text,
   buttonIconColor,
-  colors
 } from "@/ui";
 
 export default function CatalogPage() {
@@ -39,12 +34,9 @@ export default function CatalogPage() {
     );
   }, [search, view]);
 
-  const goBack = () => {
-    if (router.canGoBack()) router.back();
-    else router.replace("/");
-  };
+  const goBack = () => router.replace("/");
 
-  if (catalog.isPending) return <RouteStatus tone="loading" title="Opening the authored catalog…" />;
+  if (catalog.isPending) return <RouteStatus tone="loading" title="Opening the catalog…" />;
   if (catalog.isError || !catalog.data) {
     return (
       <RouteStatus
@@ -73,7 +65,7 @@ export default function CatalogPage() {
           command: { kind: "adopt_expedition", expeditionKey: candidate.expeditionKey }
         });
         if (adopted.status !== "applied") {
-          setError(commandMessage(adopted.status));
+          setError(commandFeedback(adopted.status));
           return;
         }
         version = adopted.stateVersion;
@@ -83,7 +75,7 @@ export default function CatalogPage() {
         command: { kind: "activate_expedition", expeditionKey: candidate.expeditionKey }
       });
       if (activated.status === "applied") router.push(`/expedition/${candidate.expeditionKey}`);
-      else setError(commandMessage(activated.status));
+      else setError(commandFeedback(activated.status));
     } catch {
       setError("The expedition could not be opened. Try again.");
     } finally {
@@ -107,9 +99,8 @@ export default function CatalogPage() {
         <View className="flex-row items-start justify-between gap-3">
           <View className="min-w-0 flex-1 gap-1">
             <Text variant="display">Browse expeditions</Text>
-            <Text color="muted">Directly authored trails, qualified together before the server starts.</Text>
+            <Text color="muted">{learnerTerm("catalogDescription")}</Text>
           </View>
-          <SourcesDialog expeditions={catalog.data.view.expeditions} />
         </View>
         <Input
           label="Search expeditions"
@@ -134,12 +125,13 @@ export default function CatalogPage() {
                 <Text variant="heading">{candidate.title}</Text>
                 <Text variant="caption" color="muted">{candidate.declaredDomain}</Text>
               </View>
-              {candidate.active ? <Badge>Active</Badge> : candidate.adopted ? <Badge>In journal</Badge> : null}
+              <SourceCreditsButton sourceCredits={candidate.sourceCredits} sourceCreditKeys={candidate.sourceCredits.map(credit => credit.key)}
+                contextLabel={candidate.title} />
             </View>
             <Text>{candidate.teaser}</Text>
             <Text variant="caption" color="muted">For {candidate.audience}</Text>
             <Button
-              label={candidate.active ? "Resume trail" : candidate.adopted ? "Make active and open" : "Add to journal"}
+              label={candidate.active ? "Resume" : candidate.adopted ? "Open expedition" : "Start expedition"}
               busy={pendingKey === candidate.expeditionKey}
               disabled={pendingKey !== null}
               onPress={() => void open(candidate)}
@@ -149,44 +141,4 @@ export default function CatalogPage() {
       </ScrollView>
     </Screen>
   );
-}
-
-function SourcesDialog({ expeditions }: Readonly<{ expeditions: CatalogView["expeditions"] }>) {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <Button
-        variant="outline"
-        size="compact"
-        label="Sources"
-        icon={<BookOpen size={14} color={buttonIconColor("outline")} />}
-        onPress={() => setOpen(true)}
-      />
-      <Dialog open={open} onOpenChange={setOpen}>
-        <OverlayHeader
-          icon={<BookOpen size={20} color={colors.ink} />}
-          title="Sources and disclosures"
-          description="Authored source credits for this catalog. Open a link to inspect its public source; no independent factual-verification claim is implied."
-          onClose={() => setOpen(false)}
-        />
-        <DialogBody>
-          {expeditions.map((expedition) => (
-            <View key={expedition.expeditionKey} className="gap-2 border-b border-line pb-4 last:border-b-0">
-              <Text variant="title">{expedition.title}</Text>
-              <SourceCreditList sourceCredits={expedition.sourceCredits} />
-            </View>
-          ))}
-        </DialogBody>
-        <DialogFooter>
-          <Button variant="outline" label="Done" onPress={() => setOpen(false)} />
-        </DialogFooter>
-      </Dialog>
-    </>
-  );
-}
-
-function commandMessage(status: string): string {
-  if (status === "stale") return "Your journal changed elsewhere. The catalog is refreshing; try again.";
-  if (status === "content_changed") return "This content revision needs the guarded development reset.";
-  return "The learner runtime refused this catalog action.";
 }

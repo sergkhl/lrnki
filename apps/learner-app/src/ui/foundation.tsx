@@ -4,6 +4,9 @@
 import { useState, type ReactNode } from "react";
 import {
   Text as RNText,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
   TextInput as RNTextInput,
   View,
   type StyleProp,
@@ -99,20 +102,34 @@ export function Screen({
   );
 }
 
+/** Scroll from the top when the form outgrows the viewport or the software keyboard. */
+export function AuthScreen({ children }: Readonly<{ children: ReactNode }>) {
+  return <Screen edges={["top", "bottom"]}>
+    <KeyboardAvoidingView className="min-h-0 flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <ScrollView className="flex-1" contentContainerClassName="grow items-center justify-center p-4"
+        keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" testID="auth-scroll">
+        {children}
+      </ScrollView>
+    </KeyboardAvoidingView>
+  </Screen>;
+}
+
 export function Card({
   children,
   className,
   style,
-  testID
+  testID,
+  padding = "normal"
 }: Readonly<{
   children: ReactNode;
   className?: string;
   style?: StyleProp<ViewStyle>;
   testID?: string;
+  padding?: "normal" | "none";
 }>) {
   return (
     <View
-      className={`rounded-card border border-line bg-card p-4 ${className ?? ""}`}
+      className={`rounded-card border border-line bg-card ${padding === "none" ? "p-0" : "p-4"} ${className ?? ""}`}
       style={style}
       testID={testID}
     >

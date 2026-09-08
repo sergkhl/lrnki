@@ -42,8 +42,14 @@ in the same change.
 - A native scenario gains automatic authority for one regression class only when its owning README
   records an intended behavior-only negative-control failure and a correlated user-recorded physical
   pass. Current Android claims live in the [native rig README](apps/learner-app/e2e-native/README.md).
-- Agents may initiate emulator or simulator runs on a capable host. Physical-device runs remain
-  user-initiated; add a blocker only when an active plan requires one.
+- Use a connected physical Android device for Android E2E tests. Agents may initiate these local
+  fixture-backed runs when Android E2E is in scope. Resolve and pin one ready device serial for both
+  installation and Maestro; if several physical devices are connected, require an explicit target.
+  Do not start or substitute an Android emulator unless the user or active plan explicitly selects
+  one. Preserve the device's existing display settings and follow the [native rig procedure](apps/learner-app/e2e-native/README.md#android-execution).
+- Agents may initiate iOS simulator runs on a capable host. Physical acceptance and other physical
+  device runs remain user-initiated; automated Android E2E does not establish user-recorded physical
+  acceptance. Add a blocker only when an active plan requires one.
 - Before running or qualifying evidence, apply [validate-lrnki](.agents/skills/validate-lrnki/SKILL.md)
   and its smallest relevant environment reference.
 - Enforce the [authored-quality decision](docs/adr/0013-verify-quality-by-real-source-inspection.md)

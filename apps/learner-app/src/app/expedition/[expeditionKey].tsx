@@ -1,424 +1,167 @@
-import { useState } from "react";
-import { ScrollView, View } from "react-native";
+import { useMemo, useState } from "react";
+import { ScrollView, View, useWindowDimensions } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, Shield, Sparkles } from "lucide-react-native";
-
-import { AuthoredActivityCard } from "@/components/AuthoredActivityCard";
-import {
-  AuthoredSupportDialog,
-  type AuthoredSupportPath
-} from "@/components/AuthoredSupportDialog";
-import { CrystalSpecimen } from "@/components/CrystalSpecimen";
-import { ExplorableTheoryText } from "@/components/ExplorableTheoryText";
-import {
-  SourceCreditsExpander,
-  type SourceCredit
-} from "@/components/SourceCredits";
-import { dispatchLearnerCommand, type LearnerCommandDto, type LearnerTransitionDto } from "@/lib/actions";
-import { expeditionQuery, type ExpeditionView } from "@/lib/queries";
-import { crystalForBand } from "@/learn/crystalLibrary";
-import {
-  Badge,
-  Button,
-  Card,
-  Progress,
-  RouteStatus,
-  Screen,
-  Text,
-  buttonIconColor,
-  colors
-} from "@/ui";
+import { ArrowLeft, Map as MapIcon, Shield } from "lucide-react-native";
+import { AuthoredSupportDialog, type AuthoredSupportPath } from "@/components/AuthoredSupportDialog";
+import { FocusedLearningFlow } from "@/components/FocusedLearningFlow";
+import { expeditionQuery, meQuery, LearnerReadError, type ExpeditionView } from "@/lib/queries";
+import { useLearnerCommand } from "@/lib/useLearnerCommand";
+import { useFocusedFlow } from "@/learn/useFocusedFlow";
+import type { LearningStep } from "@/learn/focusedFlow";
+import { learnerTerm, stopStateLabel } from "@/learn/vocabulary";
+import { Badge, Button, Card, Dialog, DialogBody, IconButton, OverlayHeader, RouteStatus, Screen, SideSheet, Text, colors } from "@/ui";
 
 export default function ExpeditionPage() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
   const { expeditionKey } = useLocalSearchParams<{ expeditionKey: string }>();
+  const me = useQuery(meQuery);
   const expedition = useQuery(expeditionQuery(expeditionKey));
-  const [pending, setPending] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [supportKey, setSupportKey] = useState<string | null>(null);
-  const [supportOpen, setSupportOpen] = useState(false);
-
-  // This control promises the Journal, so it must not inherit an arbitrary deep-link stack.
-  // A Guardian can have another Guardian underneath it after native openLink navigation; using
-  // back() here returned the learner to combat instead of home.
+  const view = expedition.data?.view;
+  const action = useLearnerCommand(expedition.data?.stateVersion ?? "0");
+  const [flowBusy, setFlowBusy] = useState(false);
+  const [overviewOpen, setOverviewOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const steps = useMemo<LearningStep[]>(() => view ? view.expedition.legs.flatMap(leg => leg.stops.map(stop => {
+    const progress = view.progress.find(candidate => candidate.stopKey === stop.key);
+    return {
+      key: stop.key, stopKey: stop.key, label: stop.label, lesson: stop.lesson, activities: stop.activities,
+      locked: !progress || progress.state === "locked", settled: progress?.state === "mastered" || progress?.state === "known",
+      lessonRead: progress?.lessonReadAt != null,
+      correctActivityKeys: progress?.latestActivityOutcomes.filter(outcome => outcome.correct).map(outcome => outcome.activityKey) ?? [],
+      source: { kind: "trail" }
+    };
+  })) : [], [view]);
+  const flow = useFocusedFlow(steps, {
+    learnerRef: me.data?.learnerStateRef ?? "", expeditionKey,
+    contentRevision: view?.expedition.contentRevision ?? ""
+  }, view?.supportPaths.filter(path => path.status === "open").map(path => path.supportPathKey));
   const goHome = () => router.replace("/");
+  if (expedition.isPending || me.isPending) return <RouteStatus tone="loading" title="Opening your expedition…" />;
+  if (expedition.isError || !view || !expedition.data || me.isError || !me.data) return <RouteStatus
+    tone="error" title="This expedition is unavailable" message={expedition.error instanceof LearnerReadError && expedition.error.result.status === "content_changed"
+      ? learnerTerm("contentChanged") : "Check your connection or return to your journal."}
+    actions={[{ label: "Try again", onPress: () => { void expedition.refetch(); void me.refetch(); } },
+      { label: "Back to journal", variant: "outline", onPress: goHome }]} />;
 
-  if (expedition.isPending) return <RouteStatus tone="loading" title="Opening the authored trail…" />;
-  if (expedition.isError || !expedition.data) {
-    return (
-      <RouteStatus
-        tone="error"
-        title="This expedition is unavailable"
-        message="It may have changed or may not belong to this journal."
-        actions={[
-          { label: "Try again", onPress: () => void expedition.refetch() },
-          { label: "Back to journal", variant: "outline", onPress: goHome }
-        ]}
-      />
-    );
-  }
-
-  const data = expedition.data;
-  const view = data.view;
-  const refresh = () => expedition.refetch();
-  const run = async (identity: string, command: LearnerCommandDto) => {
-    setPending(identity);
-    setError(null);
-    try {
-      const result = await dispatchLearnerCommand({
-        expectedStateVersion: data.stateVersion,
-        command
-      });
-      if (result.status !== "applied") setError(commandMessage(result.status, result.status === "refused" ? result.reason : null));
-      await refresh();
-      return result;
-    } catch {
-      setError("The learner command could not be recorded. Try again.");
-      return null;
-    } finally {
-      setPending(null);
-    }
-  };
-
-  const openSupport = async (stopKey: string, path: AuthoredSupportPath) => {
-    setSupportKey(path.supportPathKey);
+  const busy = action.busy || flowBusy;
+  const selectedSupport = view.supportPaths.find(path => path.supportPathKey === flow.supportPathKey) ?? null;
+  const supportOpen = selectedSupport !== null;
+  const currentLeg = view.expedition.legs.find(leg => leg.stops.some(stop => stop.key === flow.step?.stopKey));
+  const currentStop = currentLeg?.stops.find(stop => stop.key === flow.step?.stopKey);
+  const currentSection = currentStop?.lesson.sections.find(section => section.key === flow.cursor?.itemKey);
+  const sectionPaths = view.supportPaths.filter(path => currentSection?.explorableTerms.some(term => term.supportPathKey === path.supportPathKey));
+  const stopNames = new Map(steps.map(step => [step.key, step.label]));
+  const settled = view.progress.filter(progress => progress.state === "mastered" || progress.state === "known").length;
+  const openSupport = async (path?: AuthoredSupportPath) => {
+    if (busy) return;
+    if (!path) { setHelpOpen(true); return; }
     if (path.status !== "open") {
-      const result = await run(`support:${path.supportPathKey}`, {
-        kind: "open_support_path",
-        expeditionKey,
-        stopKey,
-        supportPathKey: path.supportPathKey
-      });
-      if (!result || result.status !== "applied") return;
+      const result = await action.run({ kind: "open_support_path", expeditionKey, stopKey: path.parentStopKey, supportPathKey: path.supportPathKey });
+      if (result?.status !== "applied") return;
     }
-    setSupportOpen(true);
+    setHelpOpen(false);
+    flow.setSupportPathKey(path.supportPathKey);
   };
-
   const enterGuardian = async (guardian: ExpeditionView["guardians"][number]) => {
+    if (busy) return;
     if (guardian.activeChallengeId) {
+      setOverviewOpen(false);
       router.push(`/guardian/${expeditionKey}/${guardian.activeChallengeId}`);
       return;
     }
-    const result = await run(`guardian:${scopeKey(guardian.scope)}`, {
-      kind: "create_guardian",
-      expeditionKey,
-      scope: guardian.scope
-    });
+    const result = await action.run({ kind: "create_guardian", expeditionKey, scope: guardian.scope });
     if (result?.status === "applied" && result.effect.challengeId) {
+      setOverviewOpen(false);
       router.push(`/guardian/${expeditionKey}/${result.effect.challengeId}`);
     }
   };
+  const legGuardian = view.guardians.find(guardian => guardian.scope.kind === "leg" && guardian.scope.legKey === currentLeg?.key);
+  const atLegEnd = currentLeg?.stops.at(-1)?.key === flow.step?.stopKey;
 
-  const selectedSupport = view.supportPaths.find((path) => path.supportPathKey === supportKey) ?? null;
-  const settledStops = view.progress.filter((progress) => progress.state === "mastered" || progress.state === "known").length;
-
-  return (
-    <Screen>
-      <View className="border-b border-line bg-card px-4 py-2">
-        <Button
-          variant="outline"
-          size="compact"
-          onPress={goHome}
-          icon={<ArrowLeft size={14} color={buttonIconColor("outline")} />}
-          label="Expedition journal"
-          className="self-start"
-        />
+  return <Screen edges={["top", "bottom"]}>
+    <View className="min-h-0 flex-1" accessibilityElementsHidden={supportOpen} importantForAccessibility={supportOpen ? "no-hide-descendants" : "auto"} aria-hidden={supportOpen}>
+      <View className="flex-row items-center gap-[8px] border-b border-line bg-card px-[12px] py-[8px]">
+        {width < 480 ? <IconButton icon={<ArrowLeft size={18} color={colors.ink} />} accessibilityLabel="Expedition journal" disabled={busy} onPress={goHome} />
+          : <Button variant="outline" size="compact" label="Journal" accessibilityLabel="Expedition journal" disabled={busy}
+            icon={<ArrowLeft size={14} color={colors.ink} />} onPress={goHome} />}
+        <Text variant="label" className="min-w-0 flex-1" numberOfLines={2}>{view.expedition.title}</Text>
+        <Button variant="outline" size="compact" label="Trail" disabled={busy} icon={<MapIcon size={14} color={colors.ink} />}
+          onPress={() => setOverviewOpen(true)} testID="open-trail" />
       </View>
-      <ScrollView contentContainerClassName="mx-auto w-full max-w-3xl gap-5 p-4 pb-16">
-        <View className="gap-2">
-          <View className="flex-row flex-wrap items-center gap-2">
-            <Text variant="display" className="min-w-0 flex-1">{view.expedition.title}</Text>
-            {view.active ? <Badge>Active</Badge> : <Badge>Read only until activated</Badge>}
-          </View>
-          <Text color="muted">{view.expedition.teaser}</Text>
-          <Progress
-            fraction={view.progress.length === 0 ? 0 : settledStops / view.progress.length}
-            accessibilityLabel={`${settledStops} of ${view.progress.length} Stops settled`}
-          />
-          <Text variant="caption" color="muted">{settledStops} of {view.progress.length} Stops settled</Text>
+      <View className="mx-auto min-h-0 w-full max-w-2xl flex-1 gap-[8px] p-[12px]">
+        <View className="flex-row items-center gap-[8px]">
+          <Text variant="caption" color="muted" className="min-w-0 flex-1" numberOfLines={1}>{currentLeg?.title ?? "Your trail"}</Text>
+          <Text variant="caption" color="muted">{settled}/{steps.length} complete</Text>
         </View>
-
-        {error ? (
-          <Card className="border-destructive">
-            <Text color="destructive">{error}</Text>
-          </Card>
-        ) : null}
-
-        {view.expedition.legs.map((leg) => {
-          const guardian = view.guardians.find(
-            (candidate) => candidate.scope.kind === "leg" && candidate.scope.legKey === leg.key
-          );
-          return (
-            <View key={leg.key} className="gap-3">
-              <View className="flex-row items-center gap-2">
-                <Sparkles size={20} color={colors.trail} />
-                <Text variant="heading" className="flex-1">{leg.title}</Text>
-              </View>
-              {leg.stops.map((stop) => {
-                const progress = view.progress.find((candidate) => candidate.stopKey === stop.key);
-                if (!progress) return null;
-                return (
-                  <StopCard
-                    key={stop.key}
-                    expeditionKey={expeditionKey}
-                    stop={stop}
-                    progress={progress}
-                    supportPaths={view.supportPaths.filter((path) => path.parentStopKey === stop.key)}
-                    sourceCredits={view.expedition.sourceCredits}
-                    stateVersion={data.stateVersion}
-                    pending={pending}
-                    onRun={run}
-                    onRefresh={refresh}
-                    onOpenSupport={openSupport}
-                  />
-                );
-              })}
-              {guardian ? (
-                <GuardianGate
-                  testID={`guardian-leg-${leg.key}`}
-                  guardian={guardian}
-                  busy={pending === `guardian:${scopeKey(guardian.scope)}`}
-                  onEnter={() => void enterGuardian(guardian)}
-                />
-              ) : null}
-            </View>
-          );
-        })}
-
-        {view.guardians.find((guardian) => guardian.scope.kind === "expedition") ? (
-          <GuardianGate
-            summit
-            testID="guardian-expedition"
-            guardian={view.guardians.find((guardian) => guardian.scope.kind === "expedition") as ExpeditionView["guardians"][number]}
-            busy={pending === "guardian:expedition"}
-            onEnter={() => {
-              const summit = view.guardians.find((guardian) => guardian.scope.kind === "expedition");
-              if (summit) void enterGuardian(summit);
-            }}
-          />
-        ) : null}
+        {action.error ? <Text color="destructive" accessibilityLiveRegion="polite">{action.error}</Text> : null}
+        <FocusedLearningFlow flow={flow} expeditionKey={expeditionKey} stateVersion={expedition.data.stateVersion}
+          sourceCredits={view.expedition.sourceCredits} disabled={action.busy} onBusyChange={setFlowBusy}
+          onHelp={pathKey => void openSupport(sectionPaths.find(path => path.supportPathKey === pathKey))}
+          onFinished={() => setOverviewOpen(true)} finishedLabel="Open Trail"
+          completionActions={atLegEnd && legGuardian && canEnterGuardian(legGuardian) ?
+            <GuardianGate guardian={legGuardian} busy={busy} onEnter={() => void enterGuardian(legGuardian)} /> : null} />
+      </View>
+    </View>
+    <SideSheet open={overviewOpen} onOpenChange={setOverviewOpen} dismissBlocked={busy}>
+      <OverlayHeader icon={<MapIcon size={20} color={colors.ink} />} title="Trail" description={view.expedition.title}
+        onClose={() => setOverviewOpen(false)} closeDisabled={busy} closeLabel="Close Trail" />
+      <ScrollView className="min-h-0 flex-1" contentContainerClassName="gap-5 p-4" testID="trail-overview">
+        {action.error ? <Text color="destructive" accessibilityLiveRegion="polite">{action.error}</Text> : null}
+        {view.expedition.legs.map(leg => <View key={leg.key} className="gap-3">
+          <Text variant="heading">{leg.title}</Text>
+          {leg.stops.map(stop => {
+            const progress = view.progress.find(candidate => candidate.stopKey === stop.key);
+            if (!progress) return null;
+            return <View key={stop.key} className="gap-2 border-b border-line pb-3" testID={`stop-${stop.key}`}>
+              <Button variant={flow.step?.key === stop.key ? "secondary" : "outline"} label={stop.label}
+                disabled={busy || progress.state === "locked"} onPress={() => { flow.select(stop.key); setOverviewOpen(false); }} />
+              <Badge>{stopStateLabel(progress.state)}</Badge>
+              {progress.state === "locked" ? <Text variant="caption">First complete: {stop.requires.map(key => stopNames.get(key)).join(", ")}</Text> : null}
+              {progress.restorationStopKeys.length > 0 ? <Text variant="caption">Review {progress.restorationStopKeys.map(key => stopNames.get(key)).join(", ")} to continue.</Text> : null}
+              {progress.state !== "locked" && progress.state !== "mastered" ? <Button variant="outline" size="compact"
+                label={progress.state === "known" ? "Clear known" : "I already know this"} disabled={busy}
+                onPress={() => void action.run({ kind: progress.state === "known" ? "clear_calibration_known" : "set_calibration_known", expeditionKey, stopKey: stop.key })} /> : null}
+            </View>;
+          })}
+          {view.guardians.filter(guardian => guardian.scope.kind === "leg" && guardian.scope.legKey === leg.key).map(guardian =>
+            <GuardianGate key={leg.key} testID={`guardian-leg-${leg.key}`} guardian={guardian} busy={busy} onEnter={() => void enterGuardian(guardian)} />)}
+        </View>)}
+        {view.guardians.filter(guardian => guardian.scope.kind === "expedition").map(guardian =>
+          <GuardianGate key="summit" testID="guardian-expedition" guardian={guardian} busy={busy} onEnter={() => void enterGuardian(guardian)} />)}
       </ScrollView>
-
-      <AuthoredSupportDialog
-        open={supportOpen}
-        path={selectedSupport}
-        sourceCredits={view.expedition.sourceCredits}
-        expeditionKey={expeditionKey}
-        expectedStateVersion={data.stateVersion}
-        onOpenChange={setSupportOpen}
-        onSettled={refresh}
-        onRefresh={refresh}
-      />
-    </Screen>
-  );
+    </SideSheet>
+    <Dialog open={helpOpen} onOpenChange={setHelpOpen} dismissBlocked={busy}>
+      <OverlayHeader icon={<MapIcon size={20} color={colors.ink} />} title="Help with this idea" onClose={() => setHelpOpen(false)} closeDisabled={busy} />
+      <DialogBody>
+        {action.error ? <Text color="destructive">{action.error}</Text> : null}
+        {sectionPaths.map(path => <Button key={path.supportPathKey} label={path.term} disabled={busy}
+          onPress={() => void openSupport(path)} />)}
+      </DialogBody>
+    </Dialog>
+    <AuthoredSupportDialog open={supportOpen} onOpenChange={open => { if (!open) flow.setSupportPathKey(null); }} path={selectedSupport}
+      expeditionKey={expeditionKey} expectedStateVersion={expedition.data.stateVersion}
+      sourceCredits={view.expedition.sourceCredits} learnerRef={me.data.learnerStateRef} contentRevision={view.expedition.contentRevision} />
+  </Screen>;
 }
 
-type AuthoredStop = ExpeditionView["expedition"]["legs"][number]["stops"][number];
-type StopProgress = ExpeditionView["progress"][number];
-
-function StopCard({
-  expeditionKey,
-  stop,
-  progress,
-  supportPaths,
-  sourceCredits,
-  stateVersion,
-  pending,
-  onRun,
-  onRefresh,
-  onOpenSupport
-}: Readonly<{
-  expeditionKey: string;
-  stop: AuthoredStop;
-  progress: StopProgress;
-  supportPaths: ExpeditionView["supportPaths"];
-  sourceCredits: readonly SourceCredit[];
-  stateVersion: string;
-  pending: string | null;
-  onRun: (identity: string, command: LearnerCommandDto) => Promise<LearnerTransitionDto | null>;
-  onRefresh: () => Promise<unknown>;
-  onOpenSupport: (stopKey: string, path: AuthoredSupportPath) => Promise<void>;
+function canEnterGuardian(guardian: ExpeditionView["guardians"][number]) {
+  return guardian.activeChallengeId !== null || guardian.state === "available" || guardian.state === "won";
+}
+function GuardianGate({ guardian, busy, onEnter, testID }: Readonly<{
+  guardian: ExpeditionView["guardians"][number]; busy: boolean; onEnter: () => void; testID?: string;
 }>) {
-  const locked = progress.state === "locked";
-  const activitiesReady = progress.lessonReadAt !== null || progress.state === "known" || progress.state === "mastered";
-  const settledCount = stop.activities.filter((activity) =>
-    progress.latestActivityOutcomes.some((outcome) => outcome.activityKey === activity.key && outcome.correct)
-  ).length;
-  const termPaths = new Map(supportPaths.map((path) => [path.term, path] as const));
-
-  return (
-    <Card className={`gap-4 ${locked ? "opacity-60" : ""}`} testID={`stop-${stop.key}`}>
-      <View className="flex-row items-start gap-3">
-        <CrystalSpecimen
-          species={crystalForBand(stop.difficultyBand)}
-          identityKey={stop.key}
-          material={progress.state === "mastered" ? "collected" : locked ? "fogged" : progress.state === "known" ? "open" : "next"}
-          growthFraction={stop.activities.length === 0 ? 0 : settledCount / stop.activities.length}
-          size={52}
-          ariaLabel={`${stop.label}: ${progress.state}`}
-        />
-        <View className="min-w-0 flex-1 gap-1">
-          <View className="flex-row flex-wrap items-center gap-2">
-            <Text variant="heading" className="min-w-0 flex-1">{stop.label}</Text>
-            <Badge>{progress.state}</Badge>
-          </View>
-          <Text variant="caption" color="muted">Difficulty {stop.difficultyBand} · {settledCount}/{stop.activities.length} current activities correct</Text>
-          {progress.restorationStopKeys.length > 0 ? (
-            <Text color="destructive">Restore calibrated prerequisites: {progress.restorationStopKeys.join(", ")}</Text>
-          ) : null}
-        </View>
-      </View>
-
-      {locked ? (
-        <Text color="muted">Requires: {stop.requires.join(", ") || "an earlier Stop"}</Text>
-      ) : (
-        <>
-          <View className="gap-4">
-            {stop.lesson.sections.map((section) => (
-              <View key={section.key} className="gap-1">
-                <Text variant="title">{section.title}</Text>
-                <ExplorableTheoryText
-                  text={section.body}
-                  terms={section.explorableTerms.map((term) => term.term)}
-                  onPressTerm={(term) => {
-                    const path = termPaths.get(term);
-                    if (path) void onOpenSupport(stop.key, path);
-                  }}
-                />
-                <SourceCreditsExpander
-                  sourceCredits={sourceCredits}
-                  sourceCreditKeys={section.sourceCreditKeys}
-                  contextLabel={`the Lesson section “${section.title}”`}
-                  testID={`sources-expander-${stop.key}-${section.key}`}
-                />
-                {section.explorableTerms.map((term) => {
-                  const path = supportPaths.find((candidate) => candidate.supportPathKey === term.supportPathKey);
-                  return path ? (
-                    <Button
-                      key={term.supportPathKey}
-                      testID={`support-path-${term.supportPathKey}`}
-                      variant="outline"
-                      size="compact"
-                      label={`${path.status === "hidden" ? "Restore" : path.status === "open" ? "Open" : "Explore"} “${term.term}” Support Path`}
-                      disabled={pending !== null}
-                      busy={pending === `support:${path.supportPathKey}`}
-                      onPress={() => void onOpenSupport(stop.key, path)}
-                    />
-                  ) : null;
-                })}
-              </View>
-            ))}
-          </View>
-          <View className="flex-row flex-wrap gap-2">
-            {progress.lessonReadAt ? (
-              <Badge>Lesson read</Badge>
-            ) : (
-              <Button
-                label="Mark lesson read"
-                busy={pending === `read:${stop.key}`}
-                disabled={pending !== null}
-                onPress={() => void onRun(`read:${stop.key}`, {
-                  kind: "record_lesson_read",
-                  expeditionKey,
-                  stopKey: stop.key
-                })}
-              />
-            )}
-            {progress.state === "known" ? (
-              <Button
-                variant="outline"
-                label="Clear known"
-                busy={pending === `calibrate:${stop.key}`}
-                disabled={pending !== null}
-                onPress={() => void onRun(`calibrate:${stop.key}`, {
-                  kind: "clear_calibration_known",
-                  expeditionKey,
-                  stopKey: stop.key
-                })}
-              />
-            ) : progress.state !== "mastered" ? (
-              <Button
-                variant="outline"
-                label="I already know this"
-                busy={pending === `calibrate:${stop.key}`}
-                disabled={pending !== null}
-                onPress={() => void onRun(`calibrate:${stop.key}`, {
-                  kind: "set_calibration_known",
-                  expeditionKey,
-                  stopKey: stop.key
-                })}
-              />
-            ) : null}
-          </View>
-          {activitiesReady ? (
-            <View className="gap-3">
-              {stop.activities.map((activity) => (
-                <AuthoredActivityCard
-                  key={activity.key}
-                  expeditionKey={expeditionKey}
-                  stopKey={stop.key}
-                  activity={activity}
-                  sourceCredits={sourceCredits}
-                  source={{ kind: "trail" }}
-                  expectedStateVersion={stateVersion}
-                  disabled={pending !== null}
-                  onSettled={onRefresh}
-                />
-              ))}
-            </View>
-          ) : (
-            <Text variant="caption" color="muted">Mark the lesson read before attempting acquisition activities.</Text>
-          )}
-        </>
-      )}
-    </Card>
-  );
-}
-
-function GuardianGate({
-  guardian,
-  summit = false,
-  testID,
-  busy,
-  onEnter
-}: Readonly<{
-  guardian: ExpeditionView["guardians"][number];
-  summit?: boolean;
-  testID: string;
-  busy: boolean;
-  onEnter: () => void;
-}>) {
-  const label = guardian.state === "active" ? "Resume Guardian"
-    : guardian.state === "won" ? "Rematch Guardian"
-      : guardian.state === "available" ? "Challenge Guardian"
-        : guardian.state === "unavailable" ? "Guardian unavailable"
-          : "Guardian locked";
-  const canEnter = guardian.state === "active" || guardian.state === "won" || guardian.state === "available";
-  return (
-    <Card className={`gap-3 ${summit ? "border-trail bg-gem-soft" : ""}`} testID={testID}>
-      <View className="flex-row items-center gap-3">
-        <Shield size={28} color={colors.trail} />
-        <View className="min-w-0 flex-1 gap-1">
-          <Text variant="heading">{summit ? "Expedition Guardian" : "Leg Guardian"}</Text>
-          <Text variant="caption" color="muted">
-            {guardian.eligibleActivityCount} eligible wards · {guardian.state}
-          </Text>
-        </View>
-      </View>
-      <Button label={label} busy={busy} disabled={!canEnter || busy} onPress={onEnter} />
-    </Card>
-  );
-}
-
-function scopeKey(scope: ExpeditionView["guardians"][number]["scope"]): string {
-  return scope.kind === "leg" ? `leg:${scope.legKey}` : "expedition";
-}
-
-function commandMessage(status: string, reason: string | null): string {
-  if (status === "stale") return "Progress changed elsewhere. The trail has refreshed; try again.";
-  if (status === "content_changed") return "This content revision needs the guarded development reset.";
-  if (reason === "guardian_locked") return "Complete this scope before challenging its Guardian.";
-  if (reason === "guardian_unavailable") return "No eligible acquisition evidence exists for this Guardian yet.";
-  return "The learner runtime refused this command.";
+  const label = guardian.activeChallengeId ? "Resume Guardian" : guardian.state === "won" ? "Rematch Guardian"
+    : guardian.state === "available" ? "Challenge Guardian" : "Guardian locked";
+  return <Card className="gap-2" testID={testID}>
+    <View className="flex-row items-center gap-2">
+      <Shield size={18} color={colors.trail} />
+      <Text variant="title">{guardian.scope.kind === "leg" ? "Leg Guardian" : "Expedition Guardian"}</Text>
+    </View>
+    {!canEnterGuardian(guardian) ? <Text variant="caption">{guardian.state === "unavailable"
+      ? "Practise the questions in this part of the trail to prepare."
+      : guardian.scope.kind === "leg" ? "Complete this Leg to unlock its challenge." : "Complete the trail and win each available Leg Guardian."}</Text> : null}
+    <Button variant="outline" label={label} disabled={busy || !canEnterGuardian(guardian)} onPress={onEnter} />
+  </Card>;
 }

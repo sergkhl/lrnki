@@ -2,7 +2,7 @@
 // primitives ONLY from here; ESLint blocks the raw React Native equivalents outside
 // this module.
 export { Button, IconButton, PressableSurface, buttonIconColor, type ButtonVariant, type PressableSurfaceProps } from "./actions";
-export { AppText as Text, Badge, Card, Input, Progress, Screen, type TextColor, type TextVariant } from "./foundation";
+export { AppText as Text, AuthScreen, Badge, Card, Input, Progress, Screen, type TextColor, type TextVariant } from "./foundation";
 export { Dialog, DialogBody, DialogFooter, FullScreenDialog, OverlayHeader, SideSheet, type OverlayProps } from "./overlays";
 export { RouteStatus, type RouteStatusAction, type RouteStatusTone } from "./routeStatus";
 export { BottomSheet } from "./sheets";

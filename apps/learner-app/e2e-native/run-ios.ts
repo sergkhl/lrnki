@@ -19,7 +19,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const appRoot = resolve(here, "..");
 const repoRoot = resolve(appRoot, "..", "..");
 const FLOW = join(appRoot, ".maestro", "flows-ios", "authored-runtime-smoke.yaml");
-const EVIDENCE = join(repoRoot, "tmp", "2026-08-31-authored-learner-runtime", "native-ios");
+const EVIDENCE = join(repoRoot, "tmp", "native-learner-ios", new Date().toISOString().replaceAll(":", "-"));
 const FIXTURE_PORT = "8799";
 const METRO_ORIGIN = process.env.IOS_METRO_ORIGIN ?? "http://127.0.0.1:8881";
 const DEV_CLIENT_URL = `exp+lrnki://expo-development-client/?url=${encodeURIComponent(METRO_ORIGIN)}`;
@@ -104,6 +104,12 @@ type FixtureMeta = Readonly<{
   firstSectionTitle: string;
   firstSourceTitle: string;
   supportPathKey: string;
+  supportStopLabel: string;
+  supportSectionKey: string;
+  supportSectionIndex: number;
+  firstSectionCount: number;
+  firstActivityKey: string;
+  firstActivityAnswer: string;
   legTitles: readonly [string, string, string];
 }>;
 
@@ -173,6 +179,12 @@ async function main(): Promise<void> {
       "-e", `FIRST_SECTION_TITLE=${fixture.firstSectionTitle}`,
       "-e", `FIRST_SOURCE_TITLE=${fixture.firstSourceTitle}`,
       "-e", `SUPPORT_PATH_KEY=${fixture.supportPathKey}`,
+      "-e", `SUPPORT_STOP_LABEL=${fixture.supportStopLabel}`,
+      "-e", `SUPPORT_SECTION_KEY=${fixture.supportSectionKey}`,
+      "-e", `SUPPORT_SECTION_INDEX=${fixture.supportSectionIndex}`,
+      "-e", `FIRST_SECTION_COUNT=${fixture.firstSectionCount}`,
+      "-e", `FIRST_ACTIVITY_KEY=${fixture.firstActivityKey}`,
+      "-e", `FIRST_ACTIVITY_ANSWER=${fixture.firstActivityAnswer}`,
       "-e", `LEG_ONE_TITLE=${fixture.legTitles[0]}`,
       "-e", `LEG_TWO_TITLE=${fixture.legTitles[1]}`,
       "-e", `LEG_THREE_TITLE=${fixture.legTitles[2]}`,

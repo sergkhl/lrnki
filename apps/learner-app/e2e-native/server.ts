@@ -66,6 +66,12 @@ type Fixture = Readonly<{
   firstSectionTitle: string;
   firstSourceTitle: string;
   supportPathKey: string;
+  supportStopLabel: string;
+  supportSectionKey: string;
+  supportSectionIndex: number;
+  firstSectionCount: number;
+  firstActivityKey: string;
+  firstActivityAnswer: string;
   legTitles: readonly [string, string, string];
 }>;
 
@@ -212,11 +218,19 @@ async function bootstrapFixture(): Promise<Fixture> {
   const firstSource = document.sourceCredits.find((credit) => credit.key === firstCreditKey);
   const firstSupport = document.legs
     .flatMap((leg) => leg.stops)
-    .flatMap((stop) => stop.supportPaths)
+    .flatMap((stop) => stop.supportPaths.map(path => ({ stop, path })))
     .at(0);
   if (!firstStop || !firstSection || !firstSource || !firstSupport) {
     throw new Error("native fixture lacks its representative Stop, source credit, or Support Path");
   }
+  const supportSectionIndex = firstSupport.stop.lesson.sections.findIndex(section =>
+    section.explorableTerms.some(term => term.supportPathKey === firstSupport.path.key));
+  const firstActivity = firstStop.activities[0];
+  if (supportSectionIndex < 0 || firstActivity?.family !== "option_select") {
+    throw new Error("native representative theory or first selection question is unavailable");
+  }
+  const firstAnswer = firstActivity.options.find(option => option.key === firstActivity.answerKey);
+  if (!firstAnswer) throw new Error("native first question has no authored answer");
   return {
     runtime,
     legChallengeId: rematch.effect.challengeId,
@@ -226,7 +240,13 @@ async function bootstrapFixture(): Promise<Fixture> {
     firstSectionKey: firstSection.key,
     firstSectionTitle: firstSection.title,
     firstSourceTitle: firstSource.title,
-    supportPathKey: firstSupport.key,
+    supportPathKey: firstSupport.path.key,
+    supportStopLabel: firstSupport.stop.label,
+    supportSectionKey: firstSupport.stop.lesson.sections[supportSectionIndex]!.key,
+    supportSectionIndex,
+    firstSectionCount: firstStop.lesson.sections.length,
+    firstActivityKey: firstActivity.key,
+    firstActivityAnswer: firstAnswer.text,
     legTitles: [firstLeg.title, secondLeg.title, thirdLeg.title]
   };
 }
@@ -340,6 +360,12 @@ const server = createServer(async (req, res) => {
       firstSectionTitle: fixture.firstSectionTitle,
       firstSourceTitle: fixture.firstSourceTitle,
       supportPathKey: fixture.supportPathKey,
+      supportStopLabel: fixture.supportStopLabel,
+      supportSectionKey: fixture.supportSectionKey,
+      supportSectionIndex: fixture.supportSectionIndex,
+      firstSectionCount: fixture.firstSectionCount,
+      firstActivityKey: fixture.firstActivityKey,
+      firstActivityAnswer: fixture.firstActivityAnswer,
       legTitles: fixture.legTitles
     });
   }
@@ -386,7 +412,7 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(PORT, "127.0.0.1", () => {
-  console.log(`[native-fixture] authored runtime on http://127.0.0.1:${PORT} (emulator http://10.0.2.2:${PORT})`);
+  console.log(`[native-fixture] authored runtime on http://127.0.0.1:${PORT}; Android connects through ADB reverse`);
 });
 
 const shutdown = (): void => {

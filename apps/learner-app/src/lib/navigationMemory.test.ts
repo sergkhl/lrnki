@@ -1,4 +1,4 @@
-import { describe, expect, test } from "@jest/globals";
+import { describe, expect, jest, test } from "@jest/globals";
 
 import { createNavigationMemory, type NavigationMemoryStorage } from "./navigationMemory";
 
@@ -12,6 +12,51 @@ function memoryStorage(): NavigationMemoryStorage & { values: Map<string, string
 }
 
 describe("navigation memory", () => {
+  test("slow storage cannot overwrite a newer learning cursor", async () => {
+    let release!: () => void;
+    const storage = memoryStorage();
+    const delayed = jest.fn(async (key: string, value: string) => {
+      if (delayed.mock.calls.length === 1) await new Promise<void>(resolve => { release = resolve; });
+      await storage.setItem(key, value);
+    });
+    const memory = createNavigationMemory({ getItem: storage.getItem, setItem: delayed });
+    const scope = { learnerRef: "one", expeditionKey: "reasoning", contentRevision: "v1" };
+    const first = memory.writeLearningCursor(scope, { stepKey: "s", kind: "theory", itemKey: "one" });
+    const second = memory.writeLearningCursor(scope, { stepKey: "s", kind: "theory", itemKey: "two" });
+    const reopened = memory.readLearningCursor(scope);
+    await Promise.resolve();
+    expect(delayed).toHaveBeenCalledTimes(1);
+    release();
+    await Promise.all([first, second]);
+    expect(delayed).toHaveBeenCalledTimes(2);
+    await expect(reopened).resolves.toEqual({ stepKey: "s", kind: "theory", itemKey: "two" });
+    await expect(memory.readLearningCursor(scope)).resolves.toEqual({ stepKey: "s", kind: "theory", itemKey: "two" });
+  });
+  test("learning pointers are isolated by learner, expedition, revision and Support path", async () => {
+    const memory = createNavigationMemory(memoryStorage());
+    const scope = { learnerRef: "one", expeditionKey: "reasoning", contentRevision: "v1" };
+    const cursor = { stepKey: "claims", kind: "theory" as const, itemKey: "examples" };
+    await memory.writeLearningCursor(scope, cursor);
+    await expect(memory.readLearningCursor(scope)).resolves.toEqual(cursor);
+    for (const other of [{ learnerRef: "two" }, { expeditionKey: "probability" }, { contentRevision: "v2" }, { supportPathKey: "help" }]) {
+      await expect(memory.readLearningCursor({ ...scope, ...other })).resolves.toBeNull();
+    }
+    await memory.writeLearningCursor({ ...scope, supportPathKey: "help" }, cursor);
+    await expect(memory.readLearningCursor({ ...scope, supportPathKey: "help" })).resolves.toEqual(cursor);
+  });
+
+  test("corrupt and unavailable learning memory falls back without changing progress", async () => {
+    const scope = { learnerRef: "one", expeditionKey: "reasoning", contentRevision: "v1" };
+    const storage = memoryStorage();
+    const memory = createNavigationMemory(storage);
+    await memory.writeLearningCursor(scope, { stepKey: "s", kind: "question", itemKey: "q" });
+    const key = [...storage.values.keys()][0];
+    expect(await memory.readLearningCursor(scope)).not.toBeNull();
+    for (const raw of ["{", "{}", '{"stepKey":"s","kind":"answer","itemKey":"q"}']) {
+      storage.values.set(key, raw);
+      await expect(memory.readLearningCursor(scope)).resolves.toBeNull();
+    }
+  });
   test("isolates learner keys and round-trips one valid board snapshot", async () => {
     const storage = memoryStorage();
     const memory = createNavigationMemory(storage);

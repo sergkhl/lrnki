@@ -53,9 +53,8 @@ export function buildTermRuns(text: string, terms: readonly string[]): TermRun[]
 
 // Theory prose with tappable first-occurrence term highlights (R6). Each term run is a
 // nested Text with button semantics, the exact term in its accessible name, and a dotted
-// underline as the non-color cue; the post-content Support Paths panel remains the
-// large-target equivalent (KTD4). List items and generated Support Step prose do not
-// pass through here (R5).
+// underline as the non-color cue. The focused card's contextual Help control provides
+// the same action with a full touch target.
 export function ExplorableTheoryText({
   text,
   terms,

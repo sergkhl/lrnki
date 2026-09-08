@@ -2,7 +2,8 @@
 
 ## TODO
 
-_None._
+- [Focused learning cards](2026-09-08-focused-learning-cards.md): preserve the completed validation
+  record and retire the implemented plan.
 
 ## COMPLETED
 

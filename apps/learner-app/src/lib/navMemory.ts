@@ -8,3 +8,5 @@ const navigationMemory = createNavigationMemory({
 
 export const readBoardSeen = navigationMemory.readBoardSeen;
 export const writeBoardSeen = navigationMemory.writeBoardSeen;
+export const readLearningCursor = navigationMemory.readLearningCursor;
+export const writeLearningCursor = navigationMemory.writeLearningCursor;

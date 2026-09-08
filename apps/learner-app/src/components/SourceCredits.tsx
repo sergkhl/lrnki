@@ -1,17 +1,21 @@
-import { useMemo, useState } from "react";
-import { Linking, View } from "react-native";
+import { useMemo, useRef, useState } from "react";
+import { AccessibilityInfo, Linking, Platform, View } from "react-native";
 import { BookOpen, ExternalLink } from "lucide-react-native";
 
 import type { CatalogView } from "@/lib/queries";
 import {
   Button,
+  Dialog,
+  DialogBody,
+  OverlayHeader,
+  PressableSurface,
   Text,
   buttonIconColor
 } from "@/ui";
 
 export type SourceCredit = CatalogView["expeditions"][number]["sourceCredits"][number];
 
-export function SourceCreditsExpander({
+export function SourceCreditsButton({
   sourceCredits,
   sourceCreditKeys,
   contextLabel,
@@ -22,10 +26,17 @@ export function SourceCreditsExpander({
   contextLabel: string;
   testID?: string;
 }>) {
-  const [expanded, setExpanded] = useState(false);
+  const [open, setOpen] = useState(false);
+  const trigger = useRef<View>(null);
+  const changeOpen = (next: boolean) => {
+    setOpen(next);
+    if (!next && Platform.OS !== "web") requestAnimationFrame(() => {
+      if (trigger.current) AccessibilityInfo.sendAccessibilityEvent(trigger.current, "focus");
+    });
+  };
   const resolved = useMemo(() => {
     const byKey = new Map(sourceCredits.map((credit) => [credit.key, credit] as const));
-    return sourceCreditKeys.flatMap((key) => {
+    return [...new Set(sourceCreditKeys)].flatMap((key) => {
       const credit = byKey.get(key);
       return credit ? [credit] : [];
     });
@@ -34,27 +45,34 @@ export function SourceCreditsExpander({
   if (resolved.length === 0) return null;
 
   return (
-    <View className="items-start gap-2">
-      <Button
-        variant="outline"
-        size="compact"
-        expanded={expanded}
-        accessibilityLabel={`${expanded ? "Hide" : "Show"} sources for ${contextLabel}`}
-        label={expanded ? "Hide sources" : `Sources (${resolved.length})`}
-        icon={<BookOpen size={14} color={buttonIconColor("outline")} />}
-        onPress={() => setExpanded((current) => !current)}
-        testID={testID ?? "sources-expander"}
-      />
-      {expanded ? (
-        <View
-          accessibilityLiveRegion="polite"
-          className="w-full gap-3 rounded-control border border-line bg-muted-panel p-3"
-          testID="source-credit-list"
-        >
+    <>
+      <PressableSurface
+        ref={trigger}
+        expanded={open}
+        accessibilityLabel={`Show sources for ${contextLabel}`}
+        onPress={() => setOpen(true)}
+        className="min-h-target min-w-target shrink-0 flex-row items-center justify-center gap-1 px-1"
+        testID={testID ?? "sources-button"}
+      >
+        <BookOpen size={14} color={buttonIconColor("outline")} />
+        <Text variant="caption">Sources</Text>
+      </PressableSurface>
+      <Dialog open={open} onOpenChange={changeOpen} onCloseAutoFocus={event => {
+        event.preventDefault();
+        trigger.current?.focus();
+      }}>
+        <OverlayHeader
+          icon={<BookOpen size={20} color={buttonIconColor("outline")} />}
+          title="Sources"
+          description={contextLabel}
+          onClose={() => changeOpen(false)}
+          closeLabel="Close sources"
+        />
+        <DialogBody>
           <SourceCreditList sourceCredits={resolved} />
-        </View>
-      ) : null}
-    </View>
+        </DialogBody>
+      </Dialog>
+    </>
   );
 }
 

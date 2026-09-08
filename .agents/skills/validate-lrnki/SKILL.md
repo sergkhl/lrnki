@@ -1,6 +1,6 @@
 ---
 name: validate-lrnki
-description: Route and qualify lrnki validation across local automated checks, authored-content inspection, intercepted and real-backend web, Android emulators, iOS simulators, deployed systems, and physical devices. Use whenever implementing, reviewing, testing, or reporting an lrnki behavior change, running Playwright, Maestro, database-backed, deployment, or real-use gates, or deciding what an observed result proves.
+description: Route and qualify lrnki validation across local automated checks, authored-content inspection, intercepted and real-backend web, connected Android devices, explicitly selected Android emulators, iOS simulators, deployed systems, and physical acceptance. Use whenever implementing, reviewing, testing, or reporting an lrnki behavior change, running Playwright, Maestro, database-backed, deployment, or real-use gates, or deciding what an observed result proves.
 ---
 
 # Validate lrnki
@@ -23,7 +23,7 @@ Apply the repository's [evidence authority](../../../AGENTS.md#validation-author
 | Teaching and semantic source support | [Authored real-use quality](references/real-use-quality.md) |
 | Expo presentation against owned DTO fixtures | [Intercepted web](references/web-intercepted.md) |
 | Local Better Auth/Hono/Postgres web behavior | [Real-backend web](references/web-real-backend.md) |
-| Android emulator integration | [Android](references/native-android.md) |
+| Connected Android E2E or explicitly selected emulator integration | [Android](references/native-android.md) |
 | iOS Debug simulator integration | [iOS](references/native-ios.md) |
 | Authorized deployed routes | [Deployed](references/deployed.md) |
-| User-initiated physical-device behavior | [Physical device](references/physical-device.md) |
+| User-recorded physical acceptance or other physical-device behavior | [Physical device](references/physical-device.md) |

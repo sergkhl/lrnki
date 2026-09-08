@@ -65,7 +65,7 @@ export function ExplorerNameGate({ suggestedName }: Readonly<{ suggestedName: st
         busy={pending}
         onPress={submit}
         icon={<UserPlus size={16} color={buttonIconColor("primary")} />}
-        label={learnerTerm("createAction")}
+        label={learnerTerm("saveExplorerName")}
       />
     </Card>
   );

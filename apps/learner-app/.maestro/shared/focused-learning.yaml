@@ -1,0 +1,99 @@
+# Shared focused-flow integration smoke. The runtime fixture supplies authored selectors.
+# Screenshots require visual inspection; this replacement does not inherit old dialog authority.
+appId: com.globesoul.lrnki
+---
+- tapOn: "Resume"
+- assertVisible: ${FIRST_STOP_LABEL}
+- assertVisible: ${LEG_ONE_TITLE}
+- tapOn: "Review theory"
+- assertVisible:
+    id: "theory-${FIRST_SECTION_KEY}"
+- assertVisible: "Theory 1 of.*"
+- tapOn:
+    id: "sources-button"
+- assertVisible: ${FIRST_SOURCE_TITLE}
+- takeScreenshot: focused-theory-sources
+- tapOn: "Close sources"
+- assertVisible:
+    id: "theory-${FIRST_SECTION_KEY}"
+
+# Reading advances individually. The already-mastered fixture permits explicit question review.
+- repeat:
+    times: ${FIRST_SECTION_COUNT - 1}
+    commands:
+      - tapOn: "Continue"
+- tapOn: "Start questions"
+- assertVisible:
+    id: "activity-${FIRST_ACTIVITY_KEY}"
+- assertVisible: "Previously answered correctly."
+- tapOn: "Try again"
+- tapOn: ${FIRST_ACTIVITY_ANSWER}
+- assertVisible: "Correct."
+- assertVisible:
+    id: "activity-${FIRST_ACTIVITY_KEY}"
+- takeScreenshot: focused-question-feedback
+
+# Select the authored parent from the drawer, then open contextual Help in its theory.
+- assertVisible:
+    id: "open-trail"
+    enabled: true
+- tapOn:
+    id: "open-trail"
+- assertVisible: "Close Trail"
+- scrollUntilVisible:
+    element:
+      text: ${SUPPORT_STOP_LABEL}
+    direction: DOWN
+    timeout: 30000
+    visibilityPercentage: 100
+- tapOn: ${SUPPORT_STOP_LABEL}
+- tapOn: "Review theory"
+- repeat:
+    times: ${SUPPORT_SECTION_INDEX}
+    commands:
+      - tapOn: "Continue"
+- scrollUntilVisible:
+    element:
+      id: "learning-help"
+    direction: DOWN
+    timeout: 30000
+    visibilityPercentage: 100
+- tapOn:
+    id: "learning-help"
+- assertVisible: "Support Path"
+- assertVisible:
+    id: "learning-body"
+- assertVisible:
+    id: "learning-footer"
+- assertVisible: "Back to lesson"
+- assertVisible: "Hide path"
+- takeScreenshot: focused-support-path
+- tapOn: "Back to lesson"
+- assertVisible:
+    id: "theory-${SUPPORT_SECTION_KEY}"
+- assertNotVisible: "Hide path"
+
+# Leg names remain reachable through the on-demand Trail.
+- assertVisible:
+    id: "open-trail"
+    enabled: true
+- tapOn:
+    id: "open-trail"
+- assertVisible: "Close Trail"
+- assertVisible: ${LEG_ONE_TITLE}
+- scrollUntilVisible:
+    element:
+      text: ${LEG_TWO_TITLE}
+    direction: DOWN
+    timeout: 30000
+    visibilityPercentage: 100
+- assertVisible: ${LEG_TWO_TITLE}
+- scrollUntilVisible:
+    element:
+      text: ${LEG_THREE_TITLE}
+    direction: DOWN
+    timeout: 30000
+    visibilityPercentage: 100
+- assertVisible: ${LEG_THREE_TITLE}
+- takeScreenshot: focused-trail-overview
+- tapOn: "Close Trail"

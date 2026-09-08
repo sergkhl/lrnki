@@ -18,6 +18,6 @@ test("the retained learner vocabulary is complete and nonempty", () => {
 test("an Explorable Term receives an exact accessible Support action", () => {
   assert.equal(
     termSupportActionLabel("support relationship"),
-    "Open the authored Support Path for support relationship"
+    "Get help with support relationship"
   );
 });

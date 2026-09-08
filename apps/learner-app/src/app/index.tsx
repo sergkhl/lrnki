@@ -12,8 +12,10 @@ import { SignInGate } from "@/components/SignInGate";
 import { dispatchLearnerCommand } from "@/lib/actions";
 import { journalQuery, leaderboardQuery, meQuery } from "@/lib/queries";
 import { logout } from "@/lib/session";
+import { commandFeedback, learnerTerm } from "@/learn/vocabulary";
 import {
   Badge,
+  AuthScreen,
   Button,
   Card,
   IconButton,
@@ -49,16 +51,16 @@ export default function JournalPage() {
   }
   if (!learner) {
     return (
-      <Screen className="items-center justify-center p-4">
+      <AuthScreen>
         <SignInGate />
-      </Screen>
+      </AuthScreen>
     );
   }
   if (!learner.profileComplete) {
     return (
-      <Screen className="items-center justify-center p-4">
+      <AuthScreen>
         <ExplorerNameGate suggestedName={learner.displayName} />
-      </Screen>
+      </AuthScreen>
     );
   }
   if (journal.isPending) return <RouteStatus tone="loading" title="Opening your expedition journal…" />;
@@ -67,7 +69,7 @@ export default function JournalPage() {
       <RouteStatus
         tone="error"
         title="Your journal is out of reach"
-        message="You are still signed in. Retry the learner-service read or sign out."
+        message="You are still signed in. Check your connection and try again."
         actions={[
           { label: "Try again", onPress: () => void journal.refetch() },
           { label: "Sign out", variant: "outline", onPress: () => void logout() }
@@ -90,7 +92,7 @@ export default function JournalPage() {
         command: { kind: "activate_expedition", expeditionKey }
       });
       if (result.status === "applied") router.push(`/expedition/${expeditionKey}`);
-      else setActionError(commandMessage(result.status));
+      else setActionError(commandFeedback(result.status));
     } catch {
       setActionError("The expedition could not be activated. Try again.");
     } finally {
@@ -122,9 +124,9 @@ export default function JournalPage() {
         {journalView.expeditions.length === 0 ? (
           <Card className="items-center gap-3 py-8">
             <BookOpen size={28} color={colors.trail} />
-            <Text variant="heading">Begin with an authored expedition</Text>
+            <Text variant="heading">{learnerTerm("beginExpedition")}</Text>
             <Text color="muted" className="text-center">
-              Every authored trail is qualified and immediately ready to enter.
+              {learnerTerm("expeditionReady")}
             </Text>
             <Button label="Browse expeditions" onPress={() => router.push("/catalog")} />
           </Card>
@@ -138,7 +140,7 @@ export default function JournalPage() {
                     <View className="min-w-0 flex-1 gap-1">
                       <Text variant="heading">{expedition.title}</Text>
                       <Text variant="caption" color="muted">
-                        {expedition.masteredStopCount} earned · {expedition.knownStopCount} calibrated · {expedition.totalStopCount} stops
+                        {expedition.masteredStopCount} mastered · {expedition.knownStopCount} marked as known · {expedition.totalStopCount} Stops
                       </Text>
                     </View>
                     {journalView.activeExpeditionKey === expedition.expeditionKey ? <Badge>Active</Badge> : null}
@@ -148,10 +150,10 @@ export default function JournalPage() {
                     accessibilityLabel={`${settled} of ${expedition.totalStopCount} stops settled`}
                   />
                   {expedition.contentChanged ? (
-                    <Text color="destructive">Content changed. Use the guarded development reset before continuing.</Text>
+                    <Text color="destructive">{learnerTerm("contentChanged")}</Text>
                   ) : (
                     <Button
-                      label={journalView.activeExpeditionKey === expedition.expeditionKey ? "Resume trail" : "Make active and open"}
+                      label={journalView.activeExpeditionKey === expedition.expeditionKey ? "Resume" : "Open expedition"}
                       busy={openingKey === expedition.expeditionKey}
                       disabled={openingKey !== null}
                       onPress={() => void openExpedition(expedition.expeditionKey)}
@@ -181,10 +183,4 @@ export default function JournalPage() {
       />
     </Screen>
   );
-}
-
-function commandMessage(status: string): string {
-  if (status === "stale") return "Your journal changed on another screen. It has been refreshed; try again.";
-  if (status === "content_changed") return "This authored expedition changed and needs the guarded development reset.";
-  return "The expedition could not be activated.";
 }

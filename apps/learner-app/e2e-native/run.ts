@@ -1,5 +1,6 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { existsSync, mkdirSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { E2E_FIXTURE_EMAIL, E2E_FIXTURE_PASSWORD } from "../src/lib/e2eFixture";
@@ -10,13 +11,13 @@ import appConfig from "../app.config";
 // shared fixture identity only to the dedicated manual sign-in flow. It fails BEFORE UI execution
 // when any prerequisite is missing, with an exact setup command.
 // The APK and UI are real; only the upstream data service is deterministic (KTD7). Run:
-//   pnpm e2e:native:maestro   (from repo root; requires a booted emulator + installed Maestro)
-//   pnpm e2e:native:maestro --device emulator-5554     (when more than one device is attached)
+//   pnpm e2e:native:maestro   (from repo root; requires a connected Android device + Maestro)
+//   pnpm e2e:native:maestro --device <serial>         (when several physical devices are attached)
 //
 // Device selection is explicit because `adb` and Maestro disagree about ambient configuration: adb
 // honours `ANDROID_SERIAL`, Maestro does not. Rather than let the two tools silently drive different
-// devices, this runner resolves ONE serial and passes it to both, and fails closed when several are
-// attached and none was chosen — a run whose target is ambiguous is evidence about nothing.
+// devices, this runner resolves ONE serial and passes it to both. The connected physical device is
+// the default; an emulator is used only when explicitly selected. Ambiguous physical targets refuse.
 
 const here = dirname(fileURLToPath(import.meta.url));
 const appRoot = resolve(here, "..");
@@ -27,14 +28,14 @@ const APK = process.env.NATIVE_APK ?? join(appRoot, "lrnki-learner-e2e.apk");
 const APP_ID = appConfig.android?.package ?? fail("app.config.ts does not define android.package.");
 // One Maestro PROCESS per flow, not one directory-batch process. A fresh driver session keeps an
 // opaque driver failure in one scenario from poisoning later scenarios and makes the README's
-// evidence boundary mechanically true. Keep the order explicit: auth first, the adopted Support
-// authority second, and judgment-only Guardian screenshots last.
+// evidence boundary mechanically true. Keep the order explicit: auth first, focused-learning
+// integration second, and judgment-only Guardian screenshots last.
 const FLOWS = [
   "signin.yaml",
   "android-runtime-reliability.yaml",
   "crystal-guardian-obelisk.yaml"
 ].map((name) => ({ name: name.replace(/\.yaml$/, ""), path: join(appRoot, ".maestro", "flows", name) }));
-const EVIDENCE = resolve(appRoot, "..", "..", "tmp", "2026-08-31-authored-learner-runtime", "native");
+const EVIDENCE = resolve(appRoot, "..", "..", "tmp", "native-learner", new Date().toISOString().replaceAll(":", "-"));
 
 function fail(message: string): never {
   console.error(`\n[native] ${message}\n`);
@@ -87,16 +88,24 @@ function preflight(): { adb: string; maestro: string; device: string } {
   }
 
   const ready = readyDevices(adb);
-  if (ready.length === 0) fail("no booted Android emulator/device. Start one: $ANDROID_HOME/emulator/emulator -avd <name>");
+  if (ready.length === 0) fail("no ready Android device. Connect and unlock the Android device, enable USB debugging, and authorize this host; inspect adb devices -l.");
 
   const requested = requestedDevice();
   if (requested !== null && !ready.includes(requested)) {
     fail(`requested device ${requested} is not attached and ready. Attached: ${ready.join(", ")}.`);
   }
-  if (requested === null && ready.length > 1) {
-    fail(`${ready.length} devices attached (${ready.join(", ")}). Choose one: pnpm e2e:native:maestro --device ${ready[0]} (or set NATIVE_DEVICE).`);
+  const physical = ready.filter((serial) => {
+    const qemu = tool(adb, ["-s", serial, "shell", "getprop", "ro.kernel.qemu"]);
+    if (!qemu.ok) fail(`could not identify Android target ${serial}: ${qemu.out}`);
+    return qemu.out.trim() !== "1" && !serial.startsWith("emulator-");
+  });
+  if (requested === null && physical.length === 0) {
+    fail("no connected physical Android device is ready. Connect one; an emulator requires an explicit user/plan selection and --device <serial>.");
   }
-  const device = requested ?? ready[0];
+  if (requested === null && physical.length > 1) {
+    fail(`${physical.length} physical Android devices attached (${physical.join(", ")}). Choose one: pnpm e2e:native:maestro --device <serial> (or set NATIVE_DEVICE).`);
+  }
+  const device = requested ?? physical[0];
 
   if (!existsSync(APK)) fail(`e2e APK not found at ${APK}. Build it: scripts/build-learner-android.sh e2e (set NATIVE_APK to override).`);
   return { adb, maestro, device };
@@ -124,6 +133,51 @@ function installApk(adb: string, device: string): { ok: boolean; out: string } {
 }
 
 let server: ChildProcess | null = null;
+let removeOwnedReverse: (() => void) | null = null;
+
+function connectFixture(adb: string, device: string): void {
+  // The APK uses device loopback on physical hardware and explicitly selected emulators alike.
+  // Preserve any pre-existing reverse; never replace another task's port mapping.
+  const local = "tcp:8799";
+  const remote = `tcp:${FIXTURE_PORT}`;
+  const listed = tool(adb, ["-s", device, "reverse", "--list"]);
+  if (!listed.ok) throw new Error(`could not inspect ADB reverse mappings: ${listed.out}`);
+  const existing = listed.out.split("\n").map((line) => line.trim().split(/\s+/)).find((parts) => parts[1] === local);
+  if (existing) {
+    if (existing[2] !== remote) throw new Error(`device ${device} already maps ${local} to ${existing[2]}; refusing to replace it.`);
+    return;
+  }
+  const reversed = tool(adb, ["-s", device, "reverse", "--no-rebind", local, remote]);
+  if (!reversed.ok) throw new Error(`could not connect device loopback to the fixture: ${reversed.out}`);
+  removeOwnedReverse = () => {
+    const removed = tool(adb, ["-s", device, "reverse", "--remove", local]);
+    if (!removed.ok) console.error(`[native] could not remove owned ${local} reverse: ${removed.out}`);
+  };
+}
+
+function recordDevice(adb: string, device: string): void {
+  const read = (...args: string[]) => {
+    const result = tool(adb, ["-s", device, "shell", ...args]);
+    if (!result.ok) throw new Error(`could not read device ${args.join(" ")}: ${result.out}`);
+    return result.out.trim();
+  };
+  const metadata = {
+    serial: device,
+    model: read("getprop", "ro.product.model"),
+    android: read("getprop", "ro.build.version.release"),
+    api: read("getprop", "ro.build.version.sdk"),
+    emulator: read("getprop", "ro.kernel.qemu") === "1",
+    size: read("wm", "size"),
+    density: read("wm", "density"),
+    fontScale: read("settings", "get", "system", "font_scale"),
+    apk: APK,
+    apkSha256: createHash("sha256").update(readFileSync(APK)).digest("hex"),
+    fixture: `http://127.0.0.1:${FIXTURE_PORT}`,
+    deviceApi: "http://127.0.0.1:8799"
+  };
+  writeFileSync(join(EVIDENCE, "device.json"), `${JSON.stringify(metadata, null, 2)}\n`);
+  console.log(`[native] ${metadata.model}, Android ${metadata.android} / API ${metadata.api}; existing display settings preserved`);
+}
 type FixtureMeta = Readonly<{
   expeditionKey: string;
   legChallengeId: string;
@@ -134,10 +188,22 @@ type FixtureMeta = Readonly<{
   firstSectionTitle: string;
   firstSourceTitle: string;
   supportPathKey: string;
+  supportStopLabel: string;
+  supportSectionKey: string;
+  supportSectionIndex: number;
+  firstSectionCount: number;
+  firstActivityKey: string;
+  firstActivityAnswer: string;
   legTitles: readonly [string, string, string];
 }>;
 
-function startFixture(): Promise<FixtureMeta> {
+async function startFixture(): Promise<FixtureMeta> {
+  try {
+    const occupied = await fetch(`http://127.0.0.1:${FIXTURE_PORT}/health`);
+    if (occupied.ok) fail(`fixture port ${FIXTURE_PORT} is already serving. Stop the old native fixture before running this owned gate.`);
+  } catch {
+    // Expected: this runner starts its own fixture below.
+  }
   const tsx = join(appRoot, "..", "..", "node_modules", ".bin", "tsx");
   server = spawn(tsx, [join(here, "server.ts")], {
     stdio: "inherit",
@@ -147,6 +213,7 @@ function startFixture(): Promise<FixtureMeta> {
   return new Promise((resolvePromise, reject) => {
     const deadline = Date.now() + 10_000;
     const poll = async (): Promise<void> => {
+      if (server?.exitCode !== null) return reject(new Error(`fixture server exited with ${server?.exitCode}.`));
       try {
         const res = await fetch(`http://127.0.0.1:${FIXTURE_PORT}/health`);
         if (res.ok) {
@@ -166,6 +233,8 @@ function startFixture(): Promise<FixtureMeta> {
 
 function stopFixture(): void {
   if (server && !server.killed) server.kill("SIGTERM");
+  removeOwnedReverse?.();
+  removeOwnedReverse = null;
 }
 
 async function main(): Promise<void> {
@@ -174,12 +243,13 @@ async function main(): Promise<void> {
   // `takeScreenshot` writes relative to Maestro's working directory, so the flow's Guardian
   // evidence lands beside the JUnit report instead of in the repository.
   mkdirSync(EVIDENCE, { recursive: true });
+  recordDevice(adb, device);
 
   console.log(`[native] fixture login ${E2E_FIXTURE_EMAIL} (fixture-only password withheld)`);
 
   const fixture = await startFixture();
 
-  // Emulator reaches the host fixture via 10.0.2.2; nothing else is needed for host loopback.
+  connectFixture(adb, device);
   console.log(`[native] installing ${APK}`);
   const install = installApk(adb, device);
   if (!install.ok) {
@@ -209,9 +279,18 @@ async function main(): Promise<void> {
         "-e", `FIRST_SECTION_TITLE=${fixture.firstSectionTitle}`,
         "-e", `FIRST_SOURCE_TITLE=${fixture.firstSourceTitle}`,
         "-e", `SUPPORT_PATH_KEY=${fixture.supportPathKey}`,
+        "-e", `SUPPORT_STOP_LABEL=${fixture.supportStopLabel}`,
+        "-e", `SUPPORT_SECTION_KEY=${fixture.supportSectionKey}`,
+        "-e", `SUPPORT_SECTION_INDEX=${fixture.supportSectionIndex}`,
+        "-e", `FIRST_SECTION_COUNT=${fixture.firstSectionCount}`,
+        "-e", `FIRST_ACTIVITY_KEY=${fixture.firstActivityKey}`,
+        "-e", `FIRST_ACTIVITY_ANSWER=${fixture.firstActivityAnswer}`,
         "-e", `LEG_ONE_TITLE=${fixture.legTitles[0]}`,
         "-e", `LEG_TWO_TITLE=${fixture.legTitles[1]}`,
         "-e", `LEG_THREE_TITLE=${fixture.legTitles[2]}`,
+        "--debug-output", join(EVIDENCE, flow.name),
+        "--flatten-debug-output",
+        "--test-output-dir", EVIDENCE,
         "--format", "JUNIT",
         "--output", join(EVIDENCE, `maestro-${flow.name}.xml`)
       ],

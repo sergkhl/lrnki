@@ -1,0 +1,41 @@
+# Inspect signup with the software keyboard open, then scroll to its action and return to sign-in.
+# Dragging uses the form's normal keyboard dismissal behavior.
+appId: com.globesoul.lrnki
+---
+- scrollUntilVisible:
+    element:
+      id: "gate-toggle-intent"
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn:
+    id: "gate-toggle-intent"
+- scrollUntilVisible:
+    element:
+      id: "gate-name"
+    direction: UP
+    visibilityPercentage: 100
+- tapOn:
+    id: "gate-name"
+- inputText: Native layout
+- takeScreenshot: signup-keyboard-input
+- scrollUntilVisible:
+    element:
+      id: "gate-create"
+    direction: DOWN
+    visibilityPercentage: 100
+- assertVisible:
+    id: "gate-create"
+- takeScreenshot: signup-scrolled-action
+- pressKey: ENTER
+- scrollUntilVisible:
+    element:
+      id: "gate-toggle-intent"
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn:
+    id: "gate-toggle-intent"
+- scrollUntilVisible:
+    element:
+      id: "gate-email"
+    direction: UP
+    visibilityPercentage: 100

@@ -1,4 +1,4 @@
-import { test, expect, status } from "./fixtures";
+import { test, expect, status, signedIn } from "./fixtures";
 
 test.afterEach(async ({ pageErrors }) => {
   expect(pageErrors, `unexpected runtime errors:\n${pageErrors.join("\n")}`).toEqual([]);
@@ -6,6 +6,7 @@ test.afterEach(async ({ pageErrors }) => {
 
 test("a hard-loaded authored Expedition key reaches its unavailable surface without hydration errors", async ({ page, mock }) => {
   mock.handlers = {
+    ...signedIn(),
     "GET /expedition/*": () => status(404, {
       status: "not_found",
       stateVersion: "0",

@@ -117,11 +117,11 @@ async function signUp(page: Page, email: string, name: string, staleCookie: bool
     await expect(page.getByText("Choose your explorer")).toBeVisible();
     await page.getByLabel("Email").fill(email);
     await page.getByLabel("Password").fill(PASSWORD);
-    await page.getByRole("button", { name: "Enter" }).click();
+    await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page.locator('[aria-live="polite"]')).toBeVisible();
   }
   await fillSignUp(page, email, name);
-  await page.getByRole("button", { name: "Set out" }).click();
+  await page.getByRole("button", { name: "Create account" }).click();
   await expect(page.getByText("Expedition journal")).toBeVisible();
   await expectNoReadableCredential(page);
 }
@@ -158,18 +158,18 @@ async function adoptThroughCatalog(
   await page.goto("/catalog");
   await page.getByLabel("Search expeditions").fill(expedition.title);
   if (inspectCatalogSources) {
-    await page.getByRole("button", { name: "Sources" }).click();
+    await page.getByRole("button", { name: `Show sources for ${expedition.title}` }).click();
     const credit = expedition.sourceCredits[0];
     assert.ok(credit);
     await expect(page.getByText(credit.title, { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: `Open source: ${credit.title}` })).toBeVisible();
-    await page.getByRole("button", { name: "Done" }).click();
+    await page.getByRole("button", { name: "Close sources" }).click();
   }
 
   const preAnswerResponse = page.waitForResponse((response) =>
     response.request().method() === "GET" && response.url().endsWith(`/expedition/${expedition.key}`)
   );
-  await page.getByRole("button", { name: "Add to journal" }).click();
+  await page.getByRole("button", { name: "Start expedition" }).click();
   await expect(page).toHaveURL(new RegExp(`/expedition/${expedition.key}$`));
   const response = await preAnswerResponse;
   const preAnswerBody = JSON.stringify(await response.json());
@@ -177,9 +177,11 @@ async function adoptThroughCatalog(
     /answerKey|feedbackSourceCreditKeys|sourceAnchor|"kind":"truth"|"kind":"impostor"/
   );
   expect(preAnswerBody).toMatch(/sourceCredits|sourceCreditKeys/);
+  await openTrail(page);
   for (const leg of expedition.legs) {
-    await expect(page.getByText(leg.title, { exact: true })).toBeVisible();
+    await expect(page.getByTestId("trail-overview").getByText(leg.title, { exact: true })).toBeVisible();
   }
+  await page.getByRole("button", { name: "Close Trail" }).click();
 }
 
 function stopCard(page: Page, stopKey: string): Locator {
@@ -190,33 +192,48 @@ function activityCard(page: Page, activityKey: string): Locator {
   return page.getByTestId(`activity-${activityKey}`);
 }
 
+async function openTrail(page: Page): Promise<void> {
+  if (!(await page.getByTestId("trail-overview").isVisible().catch(() => false))) {
+    await page.getByRole("button", { name: "Trail", exact: true }).click();
+  }
+  await expect(page.getByTestId("trail-overview")).toBeVisible();
+}
+
+async function selectStop(page: Page, stop: AuthoredStop, review = false): Promise<void> {
+  await openTrail(page);
+  await stopCard(page, stop.key).getByRole("button", { name: stop.label, exact: true }).click();
+  await expect(page.getByTestId("focused-learning-card").getByText(stop.label, { exact: true })).toBeVisible();
+  if (!review) return;
+  if (await page.getByTestId("learning-completion").isVisible().catch(() => false)) {
+    await page.getByRole("button", { name: "Review theory", exact: true }).click();
+  }
+  for (let turn = 0; turn < stop.lesson.sections.length + stop.activities.length + 2; turn++) {
+    if (await page.getByTestId(`theory-${stop.lesson.sections[0]!.key}`).isVisible().catch(() => false)) return;
+    await page.getByTestId("learning-footer").getByRole("button", { name: "Back", exact: true }).click();
+  }
+  throw new Error(`Cannot review the first theory section of ${stop.key}`);
+}
+
 async function calibrateKnown(page: Page, stop: AuthoredStop): Promise<void> {
+  await openTrail(page);
   const card = stopCard(page, stop.key);
-  await expect(card).toBeVisible();
-  await clickCommand(
-    page,
-    card.getByRole("button", { name: "I already know this" }),
-    new RegExp(`/expedition/[^/]+$`)
-  );
-  await expect(card.getByText("known", { exact: true })).toBeVisible();
+  await clickCommand(page, card.getByRole("button", { name: "I already know this" }), /\/expedition\/[^/]+$/);
+  await expect(card.getByText("Marked as known", { exact: true })).toBeVisible();
 }
 
 async function clearKnown(page: Page, stop: AuthoredStop): Promise<void> {
-  const card = stopCard(page, stop.key);
-  await clickCommand(
-    page,
-    card.getByRole("button", { name: "Clear known" }),
-    new RegExp(`/expedition/[^/]+$`)
-  );
+  await openTrail(page);
+  await clickCommand(page, stopCard(page, stop.key).getByRole("button", { name: "Clear known" }), /\/expedition\/[^/]+$/);
 }
 
 async function markLessonRead(page: Page, stop: AuthoredStop): Promise<void> {
-  const card = stopCard(page, stop.key);
-  const button = card.getByRole("button", { name: "Mark lesson read" });
-  if (await button.isVisible().catch(() => false)) {
-    await clickCommand(page, button, new RegExp(`/expedition/[^/]+$`));
+  await selectStop(page, stop, true);
+  for (let index = 0; index < stop.lesson.sections.length; index++) {
+    await expect(page.getByTestId(`theory-${stop.lesson.sections[index]!.key}`)).toBeVisible();
+    const last = index === stop.lesson.sections.length - 1;
+    await page.getByTestId("learning-footer").getByRole("button", { name: last ? "Start questions" : "Continue", exact: true }).click();
   }
-  await expect(card.getByText("Lesson read", { exact: true })).toBeVisible();
+  await expect(activityCard(page, stop.activities[0]!.key)).toBeVisible();
 }
 
 function creditTitle(expedition: AuthoredExpedition, creditKey: string): string {
@@ -225,21 +242,16 @@ function creditTitle(expedition: AuthoredExpedition, creditKey: string): string 
   return credit.title;
 }
 
-async function expandRepresentativeLessonCredit(
-  page: Page,
-  expedition: AuthoredExpedition,
-  stop: AuthoredStop
-): Promise<void> {
-  const section = stop.lesson.sections[0];
-  const sourceKey = section?.sourceCreditKeys[0];
-  assert.ok(section && sourceKey);
-  const card = stopCard(page, stop.key);
-  const toggle = card.getByLabel(`Show sources for the Lesson section “${section.title}”`);
+async function expandRepresentativeLessonCredit(page: Page, expedition: AuthoredExpedition, stop: AuthoredStop): Promise<void> {
+  await selectStop(page, stop, true);
+  const section = stop.lesson.sections[0]!;
+  const sourceKey = section.sourceCreditKeys[0]!;
+  const toggle = page.getByRole("button", { name: /^Show sources for/ });
   await toggle.click();
-  await expect(card.getByText(creditTitle(expedition, sourceKey), { exact: true })).toBeVisible();
-  await expect(
-    card.getByLabel(`Hide sources for the Lesson section “${section.title}”`)
-  ).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByText(creditTitle(expedition, sourceKey), { exact: true })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Sources", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Close sources" }).click();
+  await expect(toggle).toBeFocused();
 }
 
 function correctSelection(activity: Exclude<AuthoredActivity, { family: "matching" }>): string {
@@ -285,6 +297,8 @@ async function answerActivityOnce(
 ): Promise<void> {
   const card = activityCard(page, activity.key);
   await expect(card).toBeVisible();
+  const repeat = card.getByRole("button", { name: "Try again", exact: true });
+  if (await repeat.isVisible().catch(() => false)) await repeat.click();
   if (activity.family === "matching") {
     await fillMatching(card, activity, correct);
     await clickCommand(
@@ -302,65 +316,57 @@ async function answerActivityOnce(
   await expect(card.getByText(correct ? "Correct." : "Not quite.", { exact: true })).toBeVisible();
 }
 
-async function answerActivityWrongThenCorrect(
-  page: Page,
-  expedition: AuthoredExpedition,
-  activity: AuthoredActivity,
-  inspectExplanationCredit: boolean
-): Promise<void> {
-  const card = activityCard(page, activity.key);
-  await expect(card.getByLabel("Show sources for this graded explanation")).toHaveCount(0);
+async function answerActivityWrongThenCorrect(page: Page, expedition: AuthoredExpedition, activity: AuthoredActivity, inspectExplanationCredit: boolean): Promise<void> {
+  // Calibration/restoration deliberately visited this question earlier. Retained feedback is
+  // already revealed; start a new attempt before asserting pre-answer privacy.
+  if (await page.getByTestId("answer-feedback").isVisible().catch(() => false)) {
+    await expect(page.getByText("Not quite.", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Show sources for/ })).toHaveCount(1);
+    await page.getByTestId("learning-footer").getByRole("button", { name: "Try again", exact: true }).click();
+  }
+  await expect(page.getByRole("button", { name: /^Show sources for/ })).toHaveCount(0);
   await answerActivityOnce(page, activity, false);
-  if (activity.family === "matching") await card.getByRole("button", { name: "Reset" }).click();
+  await page.getByTestId("learning-footer").getByRole("button", { name: "Try again", exact: true }).click();
   await answerActivityOnce(page, activity, true);
   if (inspectExplanationCredit) {
-    const sourceKey = activity.explanation.sourceCreditKeys[0];
-    assert.ok(sourceKey);
-    const toggle = card.getByLabel("Show sources for this graded explanation");
-    await toggle.click();
-    await expect(card.getByText(creditTitle(expedition, sourceKey), { exact: true })).toBeVisible();
+    const sourceKey = activity.explanation.sourceCreditKeys[0]!;
+    await page.getByRole("button", { name: /^Show sources for/ }).click();
+    await expect(page.getByText(creditTitle(expedition, sourceKey), { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Close sources" }).click();
   }
+  await page.getByTestId("learning-footer").getByRole("button", { name: "Continue", exact: true }).click();
 }
 
-async function exerciseSupport(
-  page: Page,
-  expedition: AuthoredExpedition,
-  parent: AuthoredStop,
-  support: AuthoredSupportPath
-): Promise<void> {
-  await clickCommand(
-    page,
-    page.getByTestId(`support-path-${support.key}`),
-    new RegExp(`/expedition/${expedition.key}$`)
-  );
-  await expect(page.getByText("Support Path", { exact: true })).toBeVisible();
-  await expect(page.getByText(/reuses ordinary acquisition evidence/i)).toBeVisible();
-  const sourceToggle = page.getByLabel(/Show sources for the Support Lesson section/).first();
-  await sourceToggle.click();
-  await expect(page.getByTestId("source-credit-list").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "Hide path" })).toBeVisible();
-  await page.getByRole("button", { name: "Keep exploring" }).click();
-  await expect(page.getByText("Support Path", { exact: true })).toHaveCount(0);
-  await expect(stopCard(page, parent.key)).toBeVisible();
+async function exerciseSupport(page: Page, expedition: AuthoredExpedition, parent: AuthoredStop, support: AuthoredSupportPath): Promise<void> {
+  await selectStop(page, parent, true);
+  const sectionIndex = parent.lesson.sections.findIndex(section => section.explorableTerms.some(term => term.supportPathKey === support.key));
+  assert.ok(sectionIndex >= 0);
+  for (let index = 0; index < sectionIndex; index++) {
+    await page.getByTestId("learning-footer").getByRole("button", { name: "Continue", exact: true }).click();
+  }
+  await clickCommand(page, page.getByLabel(`Get help with ${support.term}`, { exact: true }), new RegExp(`/expedition/${expedition.key}$`));
+  const dialog = page.getByTestId("fullscreen-content");
+  await expect(dialog.getByText("Support Path", { exact: true })).toBeVisible();
+  await expect(dialog.getByTestId("learning-body")).toBeVisible();
+  await expect(dialog.getByTestId("learning-footer")).toBeVisible();
+  await dialog.getByTestId("sources-button").click();
+  await expect(page.locator('[data-testid^="source-credit-"]').first()).toBeVisible();
+  await page.getByRole("button", { name: "Close sources" }).click();
+  await dialog.getByRole("button", { name: "Back to lesson", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByTestId(`theory-${parent.lesson.sections[sectionIndex]!.key}`)).toBeVisible();
 }
 
-async function completeStop(
-  page: Page,
-  expedition: AuthoredExpedition,
-  stop: AuthoredStop,
-  inspectCredits: boolean
-): Promise<void> {
+async function completeStop(page: Page, expedition: AuthoredExpedition, stop: AuthoredStop, inspectCredits: boolean): Promise<void> {
   if (inspectCredits) await expandRepresentativeLessonCredit(page, expedition, stop);
   await markLessonRead(page, stop);
-  for (let index = 0; index < stop.activities.length; index += 1) {
-    await answerActivityWrongThenCorrect(
-      page,
-      expedition,
-      stop.activities[index]!,
-      inspectCredits && index === 0
-    );
+  for (let index = 0; index < stop.activities.length; index++) {
+    await answerActivityWrongThenCorrect(page, expedition, stop.activities[index]!, inspectCredits && index === 0);
   }
-  await expect(stopCard(page, stop.key).getByText("mastered", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("learning-completion")).toBeVisible();
+  await openTrail(page);
+  await expect(stopCard(page, stop.key).getByText("Mastered", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Close Trail" }).click();
 }
 
 function transitiveExternalPrerequisites(
@@ -412,12 +418,14 @@ async function answerGuardianWrong(page: Page, expedition: AuthoredExpedition): 
     assert.ok(first && wrong);
     await card.getByLabel(first.left, { exact: true }).click();
     result = await clickCommand(page, card.getByLabel(wrong.right, { exact: true }), /\/guardian\//);
-    await expect(page.getByText("The shield took the hit.", { exact: true })).toBeVisible();
+    await expect(page.getByTestId("guardian-feedback")).toBeVisible();
+    await page.getByRole("button", { name: "Try again", exact: true }).click();
     // A wrong Matching pair taints the round; the combat fold spends shield only after the learner
     // finishes that round. Close every real pair so this helper records one complete miss.
     for (const pair of activity.pairs) {
       await card.getByLabel(pair.left, { exact: true }).click();
       result = await clickCommand(page, card.getByLabel(pair.right, { exact: true }), /\/guardian\//);
+      await page.getByRole("button", { name: "Continue", exact: true }).click();
     }
   } else {
     result = await clickCommand(
@@ -425,7 +433,8 @@ async function answerGuardianWrong(page: Page, expedition: AuthoredExpedition): 
       card.getByLabel(wrongSelection(activity), { exact: true }),
       /\/guardian\//
     );
-    await expect(page.getByText("The shield took the hit.", { exact: true })).toBeVisible();
+    await expect(page.getByTestId("guardian-feedback")).toBeVisible();
+    await page.getByRole("button", { name: "Try again", exact: true }).click();
   }
   if (result.view?.state === "recovery") {
     await expect(page.getByText("Last Stand", { exact: true })).toBeVisible();
@@ -441,6 +450,7 @@ async function answerGuardianCorrect(page: Page, expedition: AuthoredExpedition)
     for (const pair of activity.pairs) {
       await card.getByLabel(pair.left, { exact: true }).click();
       await clickCommand(page, card.getByLabel(pair.right, { exact: true }), /\/guardian\//);
+      if (pair !== activity.pairs.at(-1)) await page.getByRole("button", { name: "Continue", exact: true }).click();
     }
   } else {
     await clickCommand(page, card.getByLabel(correctSelection(activity), { exact: true }), /\/guardian\//);
@@ -471,18 +481,19 @@ async function solveGuardian(
     if (await victory.isVisible().catch(() => false)) return;
     const activity = await answerGuardianCorrect(page, expedition);
     if (!inspected) {
-      const toggle = page.getByLabel("Show sources for this graded Guardian explanation");
+      const toggle = page.getByLabel("Show sources for this Guardian answer’s explanation");
       if (await toggle.isVisible().catch(() => false)) {
         const sourceKey = activity.explanation.sourceCreditKeys[0];
         assert.ok(sourceKey);
         await toggle.click();
         await expect(
-          page.locator('[data-testid^="guardian-activity-"]').first()
-            .getByText(creditTitle(expedition, sourceKey), { exact: true })
+          page.getByText(creditTitle(expedition, sourceKey), { exact: true })
         ).toBeVisible();
+        await page.getByRole("button", { name: "Close sources" }).click();
         inspected = true;
       }
     }
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
   }
   throw new Error(`${expedition.key} Guardian did not finish within 100 UI turns`);
 }
@@ -492,6 +503,7 @@ async function enterGuardian(
   gateTestId: string,
   buttonName: "Challenge Guardian" | "Rematch Guardian"
 ): Promise<void> {
+  await openTrail(page);
   await clickCommand(
     page,
     page.getByTestId(gateTestId).getByRole("button", { name: buttonName }),
@@ -521,11 +533,12 @@ async function exerciseFlagship(page: Page): Promise<AuthoredExpedition> {
   const dependent = requireStop(expedition, "compare-plausible-explanations");
   await markLessonRead(page, dependent);
   await answerActivityOnce(page, requireActivity(expedition, "choose-discriminating-test"), false);
+  await openTrail(page);
   await expect(
-    stopCard(page, dependent.key).getByText(/Restore calibrated prerequisites: distinguish-causal-support/)
+    stopCard(page, dependent.key).getByText(/Review .* to continue/)
   ).toBeVisible();
   await clearKnown(page, requireStop(expedition, "distinguish-causal-support"));
-  await expect(stopCard(page, dependent.key).getByText("locked", { exact: true })).toBeVisible();
+  await expect(stopCard(page, dependent.key).getByText("Locked", { exact: true })).toBeVisible();
 
   const representativeSupport = expedition.legs
     .flatMap((leg) => leg.stops)
@@ -546,6 +559,7 @@ async function exerciseFlagship(page: Page): Promise<AuthoredExpedition> {
   }
   assert.equal(supportExercised, true);
 
+  await openTrail(page);
   await expect(
     page.getByTestId("guardian-expedition").getByRole("button", { name: "Guardian locked" })
   ).toBeDisabled();
@@ -554,7 +568,7 @@ async function exerciseFlagship(page: Page): Promise<AuthoredExpedition> {
   assert.ok(firstLeg);
   await enterGuardian(page, `guardian-leg-${firstLeg.key}`, "Challenge Guardian");
   await solveGuardian(page, expedition, 3, true);
-  await expect(page.getByText(/first-win reward is durable/i)).toBeVisible();
+  await expect(page.getByText(/first victory is saved/i)).toBeVisible();
   await returnToTrail(page);
 
   await enterGuardian(page, `guardian-leg-${firstLeg.key}`, "Rematch Guardian");
@@ -569,7 +583,7 @@ async function exerciseFlagship(page: Page): Promise<AuthoredExpedition> {
   }
   await enterGuardian(page, "guardian-expedition", "Challenge Guardian");
   await solveGuardian(page, expedition, 0, false);
-  await expect(page.getByText(/summit keystone is seated/i)).toBeVisible();
+  await expect(page.getByText(/summit keystone is yours/i)).toBeVisible();
   await returnToTrail(page);
   return expedition;
 }
@@ -609,9 +623,11 @@ async function exerciseSecondaryScopes(page: Page): Promise<AuthoredExpedition[]
 
 async function dismissBoardSplash(page: Page): Promise<void> {
   const splash = page.getByText("You climbed the board!", { exact: true });
-  if (await splash.isVisible().catch(() => false)) {
-    await page.getByRole("button", { name: "Close" }).click();
-  }
+  // This is the learner's first Journal visit after earning points. Wait for the asynchronous
+  // navigation-memory read to reveal the expected celebration before reloading the page.
+  await expect(splash).toBeVisible();
+  await page.getByRole("button", { name: "Close" }).click();
+  await expect(splash).toHaveCount(0);
 }
 
 async function verifyPersistenceAndCompactNavigation(
@@ -644,7 +660,7 @@ async function verifyPersistenceAndCompactNavigation(
   await expect(page.getByText("Choose your explorer")).toBeVisible();
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Enter" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByText("Expedition journal", { exact: true })).toBeVisible();
   for (const expedition of expected) {
     await expect(page.getByText(expedition.title, { exact: true })).toBeVisible();

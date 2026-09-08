@@ -3,7 +3,7 @@
 // OverlayHeader with a circular semantic icon, and one dismissal contract. A pending
 // mutation blocks every dismissal input via `dismissBlocked`.
 import { useEffect, type ComponentType, type ReactNode } from "react";
-import { BackHandler, Platform, ScrollView, useWindowDimensions, View } from "react-native";
+import { BackHandler, Platform, Pressable, ScrollView, useWindowDimensions, View } from "react-native";
 import { FadeInDown, FadeInRight } from "react-native-reanimated";
 import * as DialogPrimitive from "@rn-primitives/dialog";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -45,13 +45,13 @@ export function OverlayHeader({
     <View className="flex-row items-center gap-3 border-b border-line bg-card px-4 py-3">
       <View className={`h-target w-target shrink-0 items-center justify-center rounded-full ${tone}`}>{icon}</View>
       <View className="min-w-0 flex-1">
-        <AppText variant="title" numberOfLines={2}>
-          {title}
-        </AppText>
+        <DialogPrimitive.Title asChild>
+          <AppText variant="title" numberOfLines={2}>{title}</AppText>
+        </DialogPrimitive.Title>
         {description ? (
-          <AppText variant="caption" color="muted" numberOfLines={2}>
-            {description}
-          </AppText>
+          <DialogPrimitive.Description asChild>
+            <AppText variant="caption" color="muted" numberOfLines={2}>{description}</AppText>
+          </DialogPrimitive.Description>
         ) : null}
       </View>
       {onClose ? (
@@ -127,12 +127,13 @@ export type OverlayProps = Readonly<{
   onOpenChange: (open: boolean) => void;
   /** True while a pending mutation must keep the overlay mounted (AE4). */
   dismissBlocked?: boolean;
+  onCloseAutoFocus?: (event: Event) => void;
   children: ReactNode;
 }>;
 
 /** Centered adaptive dialog (Board, celebrations): close control, Escape / system back,
  * and backdrop press all honor `dismissBlocked`. */
-export function Dialog({ open, onOpenChange, dismissBlocked = false, children }: OverlayProps) {
+export function Dialog({ open, onOpenChange, dismissBlocked = false, onCloseAutoFocus, children }: OverlayProps) {
   const { height } = useWindowDimensions();
   const requestClose = (next: boolean) => {
     if (!next && dismissBlocked) return;
@@ -144,9 +145,11 @@ export function Dialog({ open, onOpenChange, dismissBlocked = false, children }:
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay
           closeOnPress={!dismissBlocked}
+          disabled={Platform.OS === "web" ? undefined : true}
           className="absolute inset-0 items-center justify-center bg-scrim p-4"
           style={Platform.OS === "web" ? ({ position: "fixed" } as object) : undefined}
         >
+          <NativeBackdrop blocked={dismissBlocked} onClose={() => requestClose(false)} />
           {/* The bounded dialog column (KTD5/KTD9): Content caps the height with ONE
               window-derived NUMERIC maximum — a percentage cap needs a definite-height
               parent, but on web the primitive inserts an unstyled auto-height focus
@@ -157,6 +160,8 @@ export function Dialog({ open, onOpenChange, dismissBlocked = false, children }:
               height so the BODY scrolls while the header and DialogFooter stay reachable. */}
           <DialogPrimitive.Content
             testID="dialog-content"
+            onCloseAutoFocus={onCloseAutoFocus}
+            onStartShouldSetResponder={undefined}
             className="w-full max-w-md overflow-hidden rounded-overlay border border-line bg-card"
             style={{ maxHeight: Math.round(height * 0.85) }}
           >
@@ -237,15 +242,18 @@ export function SideSheet({ open, onOpenChange, dismissBlocked = false, children
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay
           closeOnPress={!dismissBlocked}
+          disabled={Platform.OS === "web" ? undefined : true}
           className="absolute inset-0 bg-scrim"
           style={Platform.OS === "web" ? ({ position: "fixed" } as object) : undefined}
         >
+          <NativeBackdrop blocked={dismissBlocked} onClose={() => requestClose(false)} />
           {/* The drawer spans the full height, so it owns the device insets exactly as the
               full-screen surface does. Padding on Content (not a wrapper inside it) keeps
               `bg-card` painting behind the transparent status and navigation bars while the
               drawer's chrome starts below them. */}
           <DialogPrimitive.Content
             testID="side-sheet-content"
+            onStartShouldSetResponder={undefined}
             className="absolute bottom-0 right-0 top-0 w-80 max-w-[85%] border-l border-line bg-card"
             style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
           >
@@ -257,6 +265,14 @@ export function SideSheet({ open, onOpenChange, dismissBlocked = false, children
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
   );
+}
+
+// A dismissible native backdrop must be a sibling of the scrolling content. An ancestor Pressable
+// or Content's default responder claim can capture drags before an iOS ScrollView receives them.
+// Web retains the primitive's existing backdrop and focus behavior.
+function NativeBackdrop({ blocked, onClose }: Readonly<{ blocked: boolean; onClose: () => void }>) {
+  return Platform.OS === "web" ? null : <Pressable accessible={false} className="absolute inset-0"
+    disabled={blocked} onPress={onClose} testID="overlay-backdrop" />;
 }
 
 export type { IconComponent };

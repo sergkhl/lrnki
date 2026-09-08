@@ -158,6 +158,7 @@ export function SignInGate() {
       />
       <PressableSurface
         testID="gate-toggle-intent"
+        className="min-h-target justify-center"
         accessibilityRole="button"
         disabled={pending !== null}
         onPress={() => {
